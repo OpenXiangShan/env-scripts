@@ -47,14 +47,18 @@ class VModule(object):
     def get_lines(self):
         return self.lines
 
-    def get_io(self, prefix=""):
-        return list(filter(lambda x: x.startswith(prefix), self.io))
+    def get_io(self, prefix="", match=""):
+        if match:
+            r = re.compile(match)
+            return list(filter(lambda x: r.match(str(x)), self.io))
+        else:
+            return list(filter(lambda x: x.startswith(prefix), self.io))
 
     def get_submodule(self):
         return self.submodule
 
-    def dump_io(self, prefix=""):
-        print("\n".join(map(lambda x: str(x), self.get_io(prefix))))
+    def dump_io(self, prefix="", match=""):
+        print("\n".join(map(lambda x: str(x), self.get_io(prefix, match))))
 
     def __str__(self):
         module_name = "Module {}: \n".format(self.name)
@@ -122,7 +126,7 @@ class VCollection(object):
         if not with_submodule:
             modules = [modules]
         if not os.path.isdir(output_dir):
-            os.mkdir(output_dir)
+            os.makedirs(output_dir, exist_ok=True)
         if split:
             for module in modules:
                 output_file = os.path.join(output_dir, module.get_name() + ".v")
@@ -142,11 +146,24 @@ def main(files):
     modules.sort()
     print(modules)
 
-    roq = collection.get_module("DispatchQueue")
-    roq.dump_io()
-    roq.dump_io("io_commits_")
+    # for m in modules:
+    #     module = collection.get_module(m)
+    #     print("Module:", m)
+    #     module.dump_io(match=".*put.*exception.*")
+    # roq = collection.get_module("DispatchQueue")
+    # print(roq.get_submodule())
+    # roq.dump_io()
+    # roq.dump_io(match=".*io_deq_0_.*")
+    # alu = collection.get_module("ReservationStationData_7")
+    # alu.dump_io(match=".*exception.*")
+    # r = re.compile(".*exception.*")
+    # print("".join(filter(lambda x: r.match(x), alu.get_lines())))
 
-    # collection.dump_to_file("XSSoc", "verilog1")
+    directory = "XSSoc"
+    # out_modules = ["XSSimSoC", "XSSoc", "XSCore", "Frontend", "CtrlBlock", "IntegerBlock", "FloatBlock", "MemBlock", "InclusiveCache", "InclusiveCache_2"]
+    out_modules = ["XSSoc"]
+    for m in out_modules:
+        collection.dump_to_file(m, os.path.join(directory, m))
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description='Verilog helper')
