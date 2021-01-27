@@ -89,6 +89,7 @@ class VCollection(object):
     def load_modules(self, vfile):
         in_module = False
         current_module = None
+        skipped_lines = []
         with open(vfile) as f:
             print("Loading modules from {}...".format(vfile))
             for i, line in enumerate(f):
@@ -99,10 +100,14 @@ class VCollection(object):
                         print("Line {}: does not find endmodule for {}".format(i, current_module))
                         exit()
                     current_module = VModule(module_name)
+                    for line in skipped_lines:
+                        print("[WARNING]{}:{} is added to module {}:\n{}".format(vfile, i, module_name, line), end="")
+                        current_module.add_line(line)
+                    skipped_lines = []
                     in_module = True
                 if not in_module or current_module is None:
                     if line.strip() != "" and not line.strip().startswith("//"):
-                        print("[WARNING]{}:{} is skipped: \n{}".format(vfile, i, line))
+                        skipped_lines.append(line)
                     continue
                 current_module.add_line(line)
                 if line.startswith("endmodule"):
@@ -158,6 +163,7 @@ class VCollection(object):
                     f.writelines(module.get_lines())
 
 def check_data_module_template(collection):
+    error_modules = []
     field_re = re.compile(r'io_(w|r)data_(\d*)(_.*|)')
     modules = collection.get_all_modules(match="(Sync|Async)DataModuleTemplate.*")
     for module in modules:
@@ -173,13 +179,17 @@ def check_data_module_template(collection):
             print("  wdata only:", sorted(wdata_pattern - rdata_pattern, key=lambda x: x.split(" ")[1]))
             print("  rdata only:", sorted(rdata_pattern - wdata_pattern, key=lambda x: x.split(" ")[1]))
             print("In", str(module))
+            error_modules.append(module)
+    return error_modules
 
 def main(files):
     collection = VCollection()
     for f in files:
         collection.load_modules(f)
 
-    check_data_module_template(collection)
+    errors = check_data_module_template(collection)
+    if errors:
+        print("Errors in checking data module template input/output:", errors)
 
     # modules = collection.get_module_names()
     # modules.sort()
