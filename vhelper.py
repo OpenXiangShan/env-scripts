@@ -113,8 +113,12 @@ class VCollection(object):
     def get_module_names(self):
         return list(map(lambda m: m.get_name(), self.modules))
 
-    def get_all_modules(self):
-        return self.modules
+    def get_all_modules(self, match=""):
+        if match:
+            r = re.compile(match)
+            return list(filter(lambda m: r.match(m.get_name()), self.modules))
+        else:
+            return self.modules
 
     def get_module(self, name, with_submodule=False):
         target = None
@@ -155,21 +159,20 @@ class VCollection(object):
 
 def check_data_module_template(collection):
     field_re = re.compile(r'io_(w|r)data_(\d*)(_.*|)')
-    modules = collection.get_all_modules()
+    modules = collection.get_all_modules(match="(Sync|Async)DataModuleTemplate.*")
     for module in modules:
         module_name = module.get_name()
-        if module_name.startswith("SyncDataModuleTemplate") or module_name.startswith("SyncDataModuleTemplate"):
-            print("Checking", module_name, "...")
-            wdata_all = sorted(module.get_io(match="input.*wdata.*"))
-            rdata_all = sorted(module.get_io(match="output.*rdata.*"))
-            # field_re.match("io_wdata_14_inst").group(3)
-            wdata_pattern = set(map(lambda x: " ".join((str(x.get_width()), field_re.match(x.get_name()).group(3))), wdata_all))
-            rdata_pattern = set(map(lambda x: " ".join((str(x.get_width()), field_re.match(x.get_name()).group(3))), rdata_all))
-            if wdata_pattern != rdata_pattern:
-                print("Errors:")
-                print("  wdata only:", sorted(wdata_pattern - rdata_pattern, key=lambda x: x.split(" ")[1]))
-                print("  rdata only:", sorted(rdata_pattern - wdata_pattern, key=lambda x: x.split(" ")[1]))
-                print("In", str(module))
+        print("Checking", module_name, "...")
+        wdata_all = sorted(module.get_io(match="input.*wdata.*"))
+        rdata_all = sorted(module.get_io(match="output.*rdata.*"))
+        field_re.match("io_wdata_14_inst").group(3)
+        wdata_pattern = set(map(lambda x: " ".join((str(x.get_width()), field_re.match(x.get_name()).group(3))), wdata_all))
+        rdata_pattern = set(map(lambda x: " ".join((str(x.get_width()), field_re.match(x.get_name()).group(3))), rdata_all))
+        if wdata_pattern != rdata_pattern:
+            print("Errors:")
+            print("  wdata only:", sorted(wdata_pattern - rdata_pattern, key=lambda x: x.split(" ")[1]))
+            print("  rdata only:", sorted(rdata_pattern - wdata_pattern, key=lambda x: x.split(" ")[1]))
+            print("In", str(module))
 
 def main(files):
     collection = VCollection()
