@@ -7,6 +7,16 @@ import sys
 class VIO(object):
     def __init__(self, info):
         self.info = info
+        assert(self.info[0] in ["input", "output"])
+        self.direction = True if self.info[0] == "input" else False
+        self.width = 0 if self.info[1] == "" else int(self.info[1].split(":")[0].replace("[", ""))
+        self.name = self.info[2]
+
+    def get_width(self):
+        return self.width
+
+    def get_name(self):
+        return self.name
 
     def startswith(self, prefix):
         return self.info[2].startswith(prefix)
@@ -17,6 +27,8 @@ class VIO(object):
     def __repr__(self):
         return self.__str__()
 
+    def __lt__(self, other):
+        return str(self) < str(other)
 
 class VModule(object):
     io_re = re.compile(r'^\s*(input|output)\s*(\[\s*\d+\s*:\s*\d+\s*\]|)\s*(\w+),?\s*$')
@@ -62,7 +74,7 @@ class VModule(object):
 
     def __str__(self):
         module_name = "Module {}: \n".format(self.name)
-        module_io = "\n".join(map(lambda x: "\t" + x, self.io)) + "\n"
+        module_io = "\n".join(map(lambda x: "\t" + str(x), self.io)) + "\n"
         return module_name + module_io
 
     def __repr__(self):
@@ -101,6 +113,9 @@ class VCollection(object):
     def get_module_names(self):
         return list(map(lambda m: m.get_name(), self.modules))
 
+    def get_all_modules(self):
+        return self.modules
+
     def get_module(self, name, with_submodule=False):
         target = None
         for module in self.modules:
@@ -138,13 +153,34 @@ class VCollection(object):
                 for module in modules:
                     f.writelines(module.get_lines())
 
+def check_data_module_template(collection):
+    field_re = re.compile(r'io_(w|r)data_(\d*)(_.*|)')
+    modules = collection.get_all_modules()
+    for module in modules:
+        module_name = module.get_name()
+        if module_name.startswith("SyncDataModuleTemplate") or module_name.startswith("SyncDataModuleTemplate"):
+            print("Checking", module_name, "...")
+            wdata_all = sorted(module.get_io(match="input.*wdata.*"))
+            rdata_all = sorted(module.get_io(match="output.*rdata.*"))
+            # field_re.match("io_wdata_14_inst").group(3)
+            wdata_pattern = set(map(lambda x: " ".join((str(x.get_width()), field_re.match(x.get_name()).group(3))), wdata_all))
+            rdata_pattern = set(map(lambda x: " ".join((str(x.get_width()), field_re.match(x.get_name()).group(3))), rdata_all))
+            if wdata_pattern != rdata_pattern:
+                print("Errors:")
+                print("  wdata only:", sorted(wdata_pattern - rdata_pattern, key=lambda x: x.split(" ")[1]))
+                print("  rdata only:", sorted(rdata_pattern - wdata_pattern, key=lambda x: x.split(" ")[1]))
+                print("In", str(module))
+
 def main(files):
     collection = VCollection()
     for f in files:
         collection.load_modules(f)
-    modules = collection.get_module_names()
-    modules.sort()
-    print(modules)
+
+    check_data_module_template(collection)
+
+    # modules = collection.get_module_names()
+    # modules.sort()
+    # print(modules)
 
     # for m in modules:
     #     module = collection.get_module(m)
@@ -159,11 +195,11 @@ def main(files):
     # r = re.compile(".*exception.*")
     # print("".join(filter(lambda x: r.match(x), alu.get_lines())))
 
-    directory = "XSSoc"
-    # out_modules = ["XSSimSoC", "XSSoc", "XSCore", "Frontend", "CtrlBlock", "IntegerBlock", "FloatBlock", "MemBlock", "InclusiveCache", "InclusiveCache_2"]
-    out_modules = ["XSSoc"]
-    for m in out_modules:
-        collection.dump_to_file(m, os.path.join(directory, m))
+    # directory = "XSSoc-20210127"
+    # # out_modules = ["XSSimSoC", "XSSoc", "XSCore", "Frontend", "CtrlBlock", "IntegerBlock", "FloatBlock", "MemBlock", "InclusiveCache", "InclusiveCache_2"]
+    # out_modules = ["XSSoc"]
+    # for m in out_modules:
+    #     collection.dump_to_file(m, os.path.join(directory, m))
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description='Verilog helper')
