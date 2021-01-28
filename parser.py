@@ -1,3 +1,5 @@
+#! /usr/bin/env python3
+
 import argparse
 import os
 import re
@@ -187,9 +189,9 @@ def main(files):
     for f in files:
         collection.load_modules(f)
 
-    errors = check_data_module_template(collection)
-    if errors:
-        print("Errors in checking data module template input/output:", errors)
+    # errors = check_data_module_template(collection)
+    # if errors:
+    #     print("Errors in checking data module template input/output:", errors)
 
     # modules = collection.get_module_names()
     # modules.sort()
@@ -208,11 +210,11 @@ def main(files):
     # r = re.compile(".*exception.*")
     # print("".join(filter(lambda x: r.match(x), alu.get_lines())))
 
-    # directory = "XSSoc-20210127"
-    # # out_modules = ["XSSimSoC", "XSSoc", "XSCore", "Frontend", "CtrlBlock", "IntegerBlock", "FloatBlock", "MemBlock", "InclusiveCache", "InclusiveCache_2"]
-    # out_modules = ["XSSoc"]
-    # for m in out_modules:
-    #     collection.dump_to_file(m, os.path.join(directory, m))
+    directory = "XSSoc-20210127"
+    # out_modules = ["XSSimSoC", "XSSoc", "XSCore", "Frontend", "CtrlBlock", "IntegerBlock", "FloatBlock", "MemBlock", "InclusiveCache", "InclusiveCache_2"]
+    out_modules = ["XSSoc"]
+    for m in out_modules:
+        collection.dump_to_file(m, os.path.join(directory, m))
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description='Verilog helper')
