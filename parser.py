@@ -12,6 +12,7 @@ class VIO(object):
         assert(self.info[0] in ["input", "output"])
         self.direction = True if self.info[0] == "input" else False
         self.width = 0 if self.info[1] == "" else int(self.info[1].split(":")[0].replace("[", ""))
+        self.width += 1
         self.name = self.info[2]
 
     def get_width(self):
