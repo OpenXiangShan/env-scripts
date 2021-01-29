@@ -10,10 +10,13 @@ class VIO(object):
     def __init__(self, info):
         self.info = info
         assert(self.info[0] in ["input", "output"])
-        self.direction = True if self.info[0] == "input" else False
+        self.direction = self.info[0]
         self.width = 0 if self.info[1] == "" else int(self.info[1].split(":")[0].replace("[", ""))
         self.width += 1
         self.name = self.info[2]
+
+    def get_direction(self):
+        return self.direction
 
     def get_width(self):
         return self.width
@@ -54,7 +57,7 @@ class VModule(object):
             if submodule_match:
                 this_submodule = submodule_match.group(1)
                 if this_submodule != "module":
-                    self.submodule.add(this_submodule)
+                    self.add_submodule(this_submodule)
 
     def get_name(self):
         return self.name
@@ -72,8 +75,19 @@ class VModule(object):
     def get_submodule(self):
         return self.submodule
 
+    def add_submodule(self, name):
+        # print(self.get_name(), "add submodule", name)
+        self.submodule.add(name)
+
+    def add_submodules(self, names):
+        # print(self.get_name(), "add submodules", names)
+        self.submodule.update(names)
+
     def dump_io(self, prefix="", match=""):
         print("\n".join(map(lambda x: str(x), self.get_io(prefix, match))))
+
+    def replace(self, s):
+        self.lines = [s]
 
     def __str__(self):
         module_name = "Module {}: \n".format(self.name)
@@ -149,7 +163,9 @@ class VCollection(object):
         print("Dump module {} to {}...".format(name, output_dir))
         modules = self.get_module(name, with_submodule)
         if modules is None:
+            print("does not find module", name)
             return False
+        print("All modules:", modules)
         if not with_submodule:
             modules = [modules]
         if not os.path.isdir(output_dir):
@@ -157,13 +173,20 @@ class VCollection(object):
         if split:
             for module in modules:
                 output_file = os.path.join(output_dir, module.get_name() + ".v")
-                with open(output_file, "w+") as f:
+                print("write module", module.get_name(), "to", output_file)
+                with open(output_file, "w") as f:
                     f.writelines(module.get_lines())
         else:
             output_file = os.path.join(output_dir, name + ".v")
-            with open(output_file, "w+") as f:
+            with open(output_file, "w") as f:
                 for module in modules:
                     f.writelines(module.get_lines())
+
+    def add_module(self, name, line):
+        module = VModule(name)
+        module.add_line(line)
+        self.modules.append(module)
+        return module
 
 def check_data_module_template(collection):
     error_modules = []
@@ -174,7 +197,6 @@ def check_data_module_template(collection):
         print("Checking", module_name, "...")
         wdata_all = sorted(module.get_io(match="input.*wdata.*"))
         rdata_all = sorted(module.get_io(match="output.*rdata.*"))
-        field_re.match("io_wdata_14_inst").group(3)
         wdata_pattern = set(map(lambda x: " ".join((str(x.get_width()), field_re.match(x.get_name()).group(3))), wdata_all))
         rdata_pattern = set(map(lambda x: " ".join((str(x.get_width()), field_re.match(x.get_name()).group(3))), rdata_all))
         if wdata_pattern != rdata_pattern:

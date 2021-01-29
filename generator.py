@@ -38,6 +38,9 @@ class VerilogModuleGenerator(object):
   def add_decl_line(self, line):
     self.decl.append(line)
 
+  def add_assign(self, signal, value):
+    self.add_combinational(f"assign {signal} = {value};")
+
   def add_sequential(self, line):
     self.sequential.append(line)
 
