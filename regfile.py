@@ -40,7 +40,7 @@ def generate_addr_dec(addr_width):
 def generate_regfile(width, depth, nw, nr):
   addr_width = math.ceil(math.log2(depth))
   full_depth = 2 ** addr_width
-  regfile_name = f"regfile_{depth}x{width}_{nw}w{nr}r"
+  regfile_name = f"sregfile_{depth}x{width}_{nw}w{nr}r"
   addr_dec_name = f"addr_dec_{addr_width}x{full_depth}_with_en"
   addr_cmp_name = f"addr_cmp_{nw}w_{addr_width}b"
 

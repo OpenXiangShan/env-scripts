@@ -69,7 +69,7 @@ def generate_regfile_instance(gen, instance, config, nw, nr, depth, rdata_sets=N
             index += width
         wdata = wdata[:-2] + "}"
         connections.append((f"wdata{wport}", wdata))
-    class_name = f"regfile_{depth}x{data_width}_{nw}w{nr}r"
+    class_name = f"sregfile_{depth}x{data_width}_{nw}w{nr}r"
     gen.add_sequential(f"{class_name} {instance} (")
     gen.add_sequential(", \n    ".join(map(lambda c: f".{c[0]}({c[1]})", connections)))
     gen.add_sequential(f");")
