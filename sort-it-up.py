@@ -1,5 +1,8 @@
 #!/bin/python3
 import os
+import operator
+import csv
+import sys
 def all():
     global time_requirement
     global wrong_time
@@ -8,12 +11,12 @@ def all():
     wrong_time = -92
 all()
 
-for file in os.listdir():
-    if (file[-7:] == '.detail'):
-        filename_1 = file
+
+filename_1 = sys.argv[1]
 filename_2 = 'temp.log'
 filename_3 = 'result.log'
 filename_4 = 'inform.log'
+filename_5 = 'inf.log'
 with open(filename_1, 'r') as source_object:
     source_lines = source_object.readlines()
 
@@ -45,6 +48,8 @@ flag_inform_e = 0
 flag_external = 0
 wrong_lines = 0
 flag_network_delay = 0
+paixu = []
+
 
 with open(filename_3, 'w') as final_object:
     for t_line in temp_lines:       
@@ -98,4 +103,61 @@ with open(filename_3, 'w') as final_object:
         inform_object.write(str(wrong_lines)+'.\n')
 
 os.remove(filename_2)
+
+#write the sorted paixu.csv
+number = 0
+real_time = 0.0
+with open(filename_4, 'r') as inform_object:
+    inform_lines = inform_object.readlines()
+for i_lines in inform_lines:
+    if 'Start' in i_lines:
+        number_end = number
+        number_time = number
+        number_delay_c = number
+        number_delay_e = number
+        while('End' not in inform_lines[number_end]):
+            number_end = number_end + 1 
+        while('time' not in inform_lines[number_time]):
+            number_time = number_time + 1
+        while('clock network delay' not in inform_lines[number_delay_c] ):
+            number_delay_c = number_delay_c + 1
+            if(number_delay_c >= number_time):
+                break
+        while('input external delay' not in inform_lines[number_delay_e] ):
+            number_delay_e = number_delay_e + 1
+            if(number_delay_e >= number_time):
+                break
+
+        if('clock network delay' in inform_lines[number_delay_c]):
+            real_time = float(inform_lines[number_time][-8:-1])-float(inform_lines[number_delay_c][-8:-1])
+            new_paixu = {'Startpoint':'{:>50}'.format(i_lines[:-1]), 'Endpoint':'{:>50}'.format(inform_lines[number_end][:-1]),'Time':'{:->20}'.format('%.5f'%real_time)}
+        elif('input external delay' in inform_lines[number_delay_e]):
+            real_time = float(inform_lines[number_time][-8:-1])-float(inform_lines[number_delay_e][-10:-3])
+            new_paixu = {'Startpoint':'{:>50}'.format(i_lines[:-1]), 'Endpoint':'{:>50}'.format(inform_lines[number_end][:-1]),'Time':'{:->20}'.format('%.5f'%real_time)}
+        else:
+            real_time = float(inform_lines[number_time][-8:-1])
+            new_paixu = {'Startpoint':'{:>50}'.format(i_lines[:-1]), 'Endpoint':'{:>50}'.format(inform_lines[number_end][:-1]),'Time':'{:->20}'.format('%.5f'%real_time)}
+        paixu.append(new_paixu)
+    number = number + 1 
+paixu_temp = sorted(paixu, key=operator.itemgetter('Time'), reverse=True)
+
+
+paixu_final = []
+set_new = set()
+for d in paixu_temp:
+    t = tuple(d.items())
+    if t not in set_new:
+        set_new.add(t)
+        paixu_final.append(d)
+
+output_csv = [['Startpoint', 'Endpoint', 'Time']]
+for record in paixu_final:
+    start_point = record['Startpoint']
+    end_point   = record['Endpoint']
+    time        = record['Time']
+    output_csv.append([start_point, end_point, time])
+
+with open('paixu.csv', 'w', newline='') as csvfile:
+    writer = csv.writer(csvfile, delimiter=',')
+    writer.writerows(output_csv)
 
