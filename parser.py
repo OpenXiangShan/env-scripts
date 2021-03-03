@@ -165,7 +165,7 @@ class VCollection(object):
         if modules is None:
             print("does not find module", name)
             return False
-        print("All modules:", modules)
+        # print("All modules:", modules)
         if not with_submodule:
             modules = [modules]
         if not os.path.isdir(output_dir):
@@ -173,7 +173,7 @@ class VCollection(object):
         if split:
             for module in modules:
                 output_file = os.path.join(output_dir, module.get_name() + ".v")
-                print("write module", module.get_name(), "to", output_file)
+                # print("write module", module.get_name(), "to", output_file)
                 with open(output_file, "w") as f:
                     f.writelines(module.get_lines())
         else:
@@ -233,9 +233,9 @@ def main(files):
     # r = re.compile(".*exception.*")
     # print("".join(filter(lambda x: r.match(x), alu.get_lines())))
 
-    directory = "XSSoc-20210127"
+    directory = "20210223-XSSoc"
     # out_modules = ["XSSimSoC", "XSSoc", "XSCore", "Frontend", "CtrlBlock", "IntegerBlock", "FloatBlock", "MemBlock", "InclusiveCache", "InclusiveCache_2"]
-    out_modules = ["XSSoc"]
+    out_modules = ["XSSoc", "XSCore", "Frontend", "CtrlBlock", "IntegerBlock", "FloatBlock", "MemBlock", "BlockInclusiveCache", "BlockInclusiveCache_1", "L1plusCache"]
     for m in out_modules:
         collection.dump_to_file(m, os.path.join(directory, m))
 
