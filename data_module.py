@@ -33,7 +33,7 @@ def get_packed_array(fields):
         if width + counter > max_limit and counter > 0:
             packed_fields.append((counter, pack))
             counter, pack = 0, []
-        if width >= single_width_limit:
+        if width >= single_width_limit or "psrc" in name:
             packed_fields.append((width, [(width, name)]))
         else:
             counter += width
@@ -75,13 +75,22 @@ def generate_regfile_instance(gen, instance, config, nw, nr, depth, rdata_sets=N
     gen.add_sequential(f");")
     return class_name, (data_width, depth, nw, nr)
 
+def get_rdata_fields(module):
+    max_read_ports = 20
+    all_fields = set()
+    for i in range(max_read_ports):
+        fields = sorted(module.get_io(match="output.*io_rdata_{}(.*)".format(i)), key=lambda x: x.get_width())
+        fields = list(map(lambda f: (f.get_width(), f.get_name().replace("io_rdata_{}".format(i), "")), fields))
+        all_fields.update(fields)
+    # print(all_fields)
+    return all_fields
+
 def replace_data_module(module):
     print("Replace", module.get_name(), "...")
     if not check_field(module):
         exit()
         return "", []
-    fields = sorted(module.get_io(match="output.*io_rdata_0(.*)"), key=lambda x: x.get_width())
-    fields = list(map(lambda f: (f.get_width(), f.get_name().replace("io_rdata_0", "")), fields))
+    fields = get_rdata_fields(module)
     packed_fields = get_packed_array(fields)
     if len(fields) == 1:
         print("no need for packing, skipped")
@@ -144,7 +153,7 @@ def main(files, output_dir):
         collection.add_module(name, line)
 
     # out_modules = ["XSSoc", "XSCore", "Frontend", "CtrlBlock", "IntegerBlock", "FloatBlock", "MemBlock", "InclusiveCache", "InclusiveCache_2"]
-    out_modules = ["CtrlBlock"]
+    out_modules = ["XSSoc", "XSCore", "Frontend", "CtrlBlock", "IntegerBlock", "FloatBlock", "MemBlock", "PTW", "L1plusCache"]
     for m in out_modules:
         collection.dump_to_file(m, os.path.join(output_dir, m))
 
