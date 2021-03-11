@@ -5,14 +5,14 @@ import os
 import re
 
 def load_perf(filename):
-    perf_re = re.compile(r'.*\[PERF \]\[time=\s*\d*\] ((\w*(\.|))*): (\w*)\s*,\s*(\d*)$')
+    perf_re = re.compile(r'.*\[PERF \]\[time=\s*\d*\] ((\w*(\.|))*): (\w*)\s*,\s*(\d*)')
     all_perf_counters = dict()
     with open(filename) as f:
         for line in f:
             perf_match = perf_re.match(line)
             if perf_match:
                 perf_name = ".".join([str(perf_match.group(1)), str(perf_match.group(4))])
-                perf_value = int(str(perf_match.group(5)))
+                perf_value = str(perf_match.group(5))
                 all_perf_counters[perf_name] = perf_value
     return all_perf_counters
 
@@ -24,7 +24,7 @@ def main(pfiles, output_file):
     all_sources = list(map(lambda x: os.path.split(x)[1], pfiles))
     output_lines = [",".join([""] + all_sources) + "\n"]
     for name in all_names:
-        output_lines.append(",".join([name] + list(map(lambda col: str(col[name]) if name in col else "", all_perf))) + "\n")
+        output_lines.append(",".join([name] + list(map(lambda col: col[name] if name in col else "", all_perf))) + "\n")
     with open(output_file, "w") as f:
         f.writelines(output_lines)
 
