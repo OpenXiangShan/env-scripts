@@ -92,9 +92,9 @@ def replace_data_module(module):
         return "", []
     fields = get_rdata_fields(module)
     packed_fields = get_packed_array(fields)
-    if len(fields) == 1:
-        print("no need for packing, skipped")
-        return "", []
+    #if len(fields) == 1:
+    #    print("no need for packing, skipped")
+    #    return "", []
     nr = len(module.get_io(match=".*io_raddr_(.*)"))
     nw = len(module.get_io(match=".*io_waddr_(.*)"))
     depth = -1
@@ -153,7 +153,8 @@ def main(files, output_dir):
         collection.add_module(name, line)
 
     # out_modules = ["XSSoc", "XSCore", "Frontend", "CtrlBlock", "IntegerBlock", "FloatBlock", "MemBlock", "InclusiveCache", "InclusiveCache_2"]
-    out_modules = ["XSSoc", "XSCore", "Frontend", "CtrlBlock", "IntegerBlock", "FloatBlock", "MemBlock", "PTW", "L1plusCache"]
+    # out_modules = ["ReservationStation", "RedirectGenerator", "XSSoc", "XSCore", "Frontend", "CtrlBlock", "IntegerBlock", "FloatBlock", "MemBlock", "PTW", "L1plusCache"]
+    out_modules = ["XSTop", "XSCore", "InclusiveCache", "InclusiveCache_2"]
     for m in out_modules:
         collection.dump_to_file(m, os.path.join(output_dir, m))
 
