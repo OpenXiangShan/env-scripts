@@ -117,9 +117,9 @@ class VCollection(object):
                         print("Line {}: does not find endmodule for {}".format(i, current_module))
                         exit()
                     current_module = VModule(module_name)
-                    for line in skipped_lines:
-                        print("[WARNING]{}:{} is added to module {}:\n{}".format(vfile, i, module_name, line), end="")
-                        current_module.add_line(line)
+                    for skip_line in skipped_lines:
+                        print("[WARNING]{}:{} is added to module {}:\n{}".format(vfile, i, module_name, skip_line), end="")
+                        current_module.add_line(skip_line)
                     skipped_lines = []
                     in_module = True
                 if not in_module or current_module is None:
@@ -233,9 +233,10 @@ def main(files):
     # r = re.compile(".*exception.*")
     # print("".join(filter(lambda x: r.match(x), alu.get_lines())))
 
-    directory = "20210223-XSSoc"
+    directory = "20210320-sim"
     # out_modules = ["XSSimSoC", "XSSoc", "XSCore", "Frontend", "CtrlBlock", "IntegerBlock", "FloatBlock", "MemBlock", "InclusiveCache", "InclusiveCache_2"]
-    out_modules = ["XSSoc", "XSCore", "Frontend", "CtrlBlock", "IntegerBlock", "FloatBlock", "MemBlock", "BlockInclusiveCache", "BlockInclusiveCache_1", "L1plusCache"]
+    out_modules = ["XSTop", "SimMMIO", "AXI4RAM"]
+    # out_modules = ["XSSoc", "XSCore", "Frontend", "CtrlBlock", "IntegerBlock", "FloatBlock", "MemBlock", "BlockInclusiveCache", "BlockInclusiveCache_1", "L1plusCache"]
     for m in out_modules:
         collection.dump_to_file(m, os.path.join(directory, m))
 
