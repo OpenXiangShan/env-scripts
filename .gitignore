@@ -1,2 +1,6 @@
 *.v
+!vcs/testbench/SimMMIO/*.v
+!vcs/testbench/AXI4RAM/*.v
+
 __pycache__
+
