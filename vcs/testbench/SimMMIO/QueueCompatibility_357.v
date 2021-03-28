@@ -1,4 +1,4 @@
-module QueueCompatibility_347(
+module QueueCompatibility_357(
   input        clock,
   input        reset,
   output       io_enq_ready,

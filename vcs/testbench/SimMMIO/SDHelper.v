@@ -1,6 +1,6 @@
 import "DPI-C" function void sd_setaddr(input int addr);
 import "DPI-C" function void sd_read(output int data);
-module SDHelper(
+module SDHelper (
   input clk,
   input setAddr,
   input [31:0] addr,

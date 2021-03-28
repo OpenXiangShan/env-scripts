@@ -3,7 +3,7 @@ module AXI4VGA(
   input         reset,
   output        auto_in_1_aw_ready,
   input         auto_in_1_aw_valid,
-  input         auto_in_1_aw_bits_id,
+  input  [1:0]  auto_in_1_aw_bits_id,
   input  [30:0] auto_in_1_aw_bits_addr,
   input  [7:0]  auto_in_1_aw_bits_len,
   input  [2:0]  auto_in_1_aw_bits_size,
@@ -19,11 +19,11 @@ module AXI4VGA(
   input         auto_in_1_w_bits_last,
   input         auto_in_1_b_ready,
   output        auto_in_1_b_valid,
-  output        auto_in_1_b_bits_id,
+  output [1:0]  auto_in_1_b_bits_id,
   output [1:0]  auto_in_1_b_bits_resp,
   output        auto_in_1_ar_ready,
   input         auto_in_1_ar_valid,
-  input         auto_in_1_ar_bits_id,
+  input  [1:0]  auto_in_1_ar_bits_id,
   input  [30:0] auto_in_1_ar_bits_addr,
   input  [7:0]  auto_in_1_ar_bits_len,
   input  [2:0]  auto_in_1_ar_bits_size,
@@ -34,13 +34,13 @@ module AXI4VGA(
   input  [3:0]  auto_in_1_ar_bits_qos,
   input         auto_in_1_r_ready,
   output        auto_in_1_r_valid,
-  output        auto_in_1_r_bits_id,
+  output [1:0]  auto_in_1_r_bits_id,
   output [63:0] auto_in_1_r_bits_data,
   output [1:0]  auto_in_1_r_bits_resp,
   output        auto_in_1_r_bits_last,
   output        auto_in_0_aw_ready,
   input         auto_in_0_aw_valid,
-  input         auto_in_0_aw_bits_id,
+  input  [1:0]  auto_in_0_aw_bits_id,
   input  [30:0] auto_in_0_aw_bits_addr,
   input  [7:0]  auto_in_0_aw_bits_len,
   input  [2:0]  auto_in_0_aw_bits_size,
@@ -56,10 +56,10 @@ module AXI4VGA(
   input         auto_in_0_w_bits_last,
   input         auto_in_0_b_ready,
   output        auto_in_0_b_valid,
-  output        auto_in_0_b_bits_id,
+  output [1:0]  auto_in_0_b_bits_id,
   output [1:0]  auto_in_0_b_bits_resp,
   input         auto_in_0_ar_valid,
-  input         auto_in_0_ar_bits_id,
+  input  [1:0]  auto_in_0_ar_bits_id,
   input  [7:0]  auto_in_0_ar_bits_len,
   input  [2:0]  auto_in_0_ar_bits_size,
   input  [1:0]  auto_in_0_ar_bits_burst,
@@ -68,7 +68,7 @@ module AXI4VGA(
   input  [3:0]  auto_in_0_ar_bits_qos,
   input         auto_in_0_r_ready,
   output        auto_in_0_r_valid,
-  output        auto_in_0_r_bits_id,
+  output [1:0]  auto_in_0_r_bits_id,
   output        auto_in_0_r_bits_last
 );
 `ifdef RANDOMIZE_REG_INIT
@@ -83,7 +83,7 @@ module AXI4VGA(
   wire  fb_reset; // @[AXI4VGA.scala 115:30]
   wire  fb_auto_in_aw_ready; // @[AXI4VGA.scala 115:30]
   wire  fb_auto_in_aw_valid; // @[AXI4VGA.scala 115:30]
-  wire  fb_auto_in_aw_bits_id; // @[AXI4VGA.scala 115:30]
+  wire [1:0] fb_auto_in_aw_bits_id; // @[AXI4VGA.scala 115:30]
   wire [30:0] fb_auto_in_aw_bits_addr; // @[AXI4VGA.scala 115:30]
   wire [7:0] fb_auto_in_aw_bits_len; // @[AXI4VGA.scala 115:30]
   wire [2:0] fb_auto_in_aw_bits_size; // @[AXI4VGA.scala 115:30]
@@ -99,10 +99,10 @@ module AXI4VGA(
   wire  fb_auto_in_w_bits_last; // @[AXI4VGA.scala 115:30]
   wire  fb_auto_in_b_ready; // @[AXI4VGA.scala 115:30]
   wire  fb_auto_in_b_valid; // @[AXI4VGA.scala 115:30]
-  wire  fb_auto_in_b_bits_id; // @[AXI4VGA.scala 115:30]
+  wire [1:0] fb_auto_in_b_bits_id; // @[AXI4VGA.scala 115:30]
   wire [1:0] fb_auto_in_b_bits_resp; // @[AXI4VGA.scala 115:30]
   wire  fb_auto_in_ar_valid; // @[AXI4VGA.scala 115:30]
-  wire  fb_auto_in_ar_bits_id; // @[AXI4VGA.scala 115:30]
+  wire [1:0] fb_auto_in_ar_bits_id; // @[AXI4VGA.scala 115:30]
   wire [30:0] fb_auto_in_ar_bits_addr; // @[AXI4VGA.scala 115:30]
   wire [7:0] fb_auto_in_ar_bits_len; // @[AXI4VGA.scala 115:30]
   wire [2:0] fb_auto_in_ar_bits_size; // @[AXI4VGA.scala 115:30]
@@ -110,13 +110,13 @@ module AXI4VGA(
   wire  fb_auto_in_ar_bits_lock; // @[AXI4VGA.scala 115:30]
   wire [3:0] fb_auto_in_ar_bits_cache; // @[AXI4VGA.scala 115:30]
   wire [3:0] fb_auto_in_ar_bits_qos; // @[AXI4VGA.scala 115:30]
-  wire  fb_auto_in_r_bits_id; // @[AXI4VGA.scala 115:30]
+  wire [1:0] fb_auto_in_r_bits_id; // @[AXI4VGA.scala 115:30]
   wire  fb_auto_in_r_bits_last; // @[AXI4VGA.scala 115:30]
   wire  ctrl_clock; // @[AXI4VGA.scala 121:32]
   wire  ctrl_reset; // @[AXI4VGA.scala 121:32]
   wire  ctrl_auto_in_aw_ready; // @[AXI4VGA.scala 121:32]
   wire  ctrl_auto_in_aw_valid; // @[AXI4VGA.scala 121:32]
-  wire  ctrl_auto_in_aw_bits_id; // @[AXI4VGA.scala 121:32]
+  wire [1:0] ctrl_auto_in_aw_bits_id; // @[AXI4VGA.scala 121:32]
   wire [30:0] ctrl_auto_in_aw_bits_addr; // @[AXI4VGA.scala 121:32]
   wire [7:0] ctrl_auto_in_aw_bits_len; // @[AXI4VGA.scala 121:32]
   wire [2:0] ctrl_auto_in_aw_bits_size; // @[AXI4VGA.scala 121:32]
@@ -132,11 +132,11 @@ module AXI4VGA(
   wire  ctrl_auto_in_w_bits_last; // @[AXI4VGA.scala 121:32]
   wire  ctrl_auto_in_b_ready; // @[AXI4VGA.scala 121:32]
   wire  ctrl_auto_in_b_valid; // @[AXI4VGA.scala 121:32]
-  wire  ctrl_auto_in_b_bits_id; // @[AXI4VGA.scala 121:32]
+  wire [1:0] ctrl_auto_in_b_bits_id; // @[AXI4VGA.scala 121:32]
   wire [1:0] ctrl_auto_in_b_bits_resp; // @[AXI4VGA.scala 121:32]
   wire  ctrl_auto_in_ar_ready; // @[AXI4VGA.scala 121:32]
   wire  ctrl_auto_in_ar_valid; // @[AXI4VGA.scala 121:32]
-  wire  ctrl_auto_in_ar_bits_id; // @[AXI4VGA.scala 121:32]
+  wire [1:0] ctrl_auto_in_ar_bits_id; // @[AXI4VGA.scala 121:32]
   wire [30:0] ctrl_auto_in_ar_bits_addr; // @[AXI4VGA.scala 121:32]
   wire [7:0] ctrl_auto_in_ar_bits_len; // @[AXI4VGA.scala 121:32]
   wire [2:0] ctrl_auto_in_ar_bits_size; // @[AXI4VGA.scala 121:32]
@@ -147,7 +147,7 @@ module AXI4VGA(
   wire [3:0] ctrl_auto_in_ar_bits_qos; // @[AXI4VGA.scala 121:32]
   wire  ctrl_auto_in_r_ready; // @[AXI4VGA.scala 121:32]
   wire  ctrl_auto_in_r_valid; // @[AXI4VGA.scala 121:32]
-  wire  ctrl_auto_in_r_bits_id; // @[AXI4VGA.scala 121:32]
+  wire [1:0] ctrl_auto_in_r_bits_id; // @[AXI4VGA.scala 121:32]
   wire [63:0] ctrl_auto_in_r_bits_data; // @[AXI4VGA.scala 121:32]
   wire [1:0] ctrl_auto_in_r_bits_resp; // @[AXI4VGA.scala 121:32]
   wire  ctrl_auto_in_r_bits_last; // @[AXI4VGA.scala 121:32]

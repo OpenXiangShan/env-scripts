@@ -31,21 +31,37 @@ always @(posedge clock) begin
   end
 end
 
-reg [31:0] commit_count;
+reg [63:0] stuck_timer;
+reg [63:0] commit_count;
+reg [63:0] cycle_count;
+
 wire has_commit = !sim.CPU.core_with_l2.core.ctrlBlock.roq.io_commits_isWalk && sim.CPU.core_with_l2.core.ctrlBlock.roq.io_commits_valid_0;
 
 always @(posedge clock) begin
   if (reset || has_commit)
-    commit_count <= 0;
+    stuck_timer <= 0;
   else
-    commit_count <= commit_count + 1;
+    stuck_timer <= stuck_timer + 1;
 
-  if (commit_count > 5000) begin
+  if (reset)
+    commit_count <= 0;
+  else if (!sim.CPU.core_with_l2.core.ctrlBlock.roq.io_commits_isWalk)
+    commit_count <= commit_count + sim.CPU.core_with_l2.core.ctrlBlock.roq.io_commits_valid_0 + sim.CPU.core_with_l2.core.ctrlBlock.roq.io_commits_valid_1 + sim.CPU.core_with_l2.core.ctrlBlock.roq.io_commits_valid_2 + sim.CPU.core_with_l2.core.ctrlBlock.roq.io_commits_valid_3 + sim.CPU.core_with_l2.core.ctrlBlock.roq.io_commits_valid_4 + sim.CPU.core_with_l2.core.ctrlBlock.roq.io_commits_valid_5;
+
+  if (reset)
+    cycle_count <= 0;
+  else
+    cycle_count <= cycle_count + 1;
+
+  if (!reset && stuck_timer > 5000) begin
     $display("no instruction commits for 5000 cycles");
     $fatal;
   end
-  if (!sim.CPU.core_with_l2.core.ctrlBlock.roq.io_commits_isWalk && sim.CPU.core_with_l2.core.ctrlBlock.roq.io_commits_valid_0) begin
+  if (!reset && !sim.CPU.core_with_l2.core.ctrlBlock.roq.io_commits_isWalk && sim.CPU.core_with_l2.core.ctrlBlock.roq.io_commits_valid_0) begin
     // $display("instr commit %b", {sim.CPU.core_with_l2.core.ctrlBlock.roq.io_commits_valid_0,sim.CPU.core_with_l2.core.ctrlBlock.roq.io_commits_valid_1,sim.CPU.core_with_l2.core.ctrlBlock.roq.io_commits_valid_2,sim.CPU.core_with_l2.core.ctrlBlock.roq.io_commits_valid_3,sim.CPU.core_with_l2.core.ctrlBlock.roq.io_commits_valid_4,sim.CPU.core_with_l2.core.ctrlBlock.roq.io_commits_valid_5});
+  end
+  if (!reset && cycle_count % 10000 == 0) begin
+    $display("[time=%d] instrCnt = %d", cycle_count, commit_count);
   end
 end
 

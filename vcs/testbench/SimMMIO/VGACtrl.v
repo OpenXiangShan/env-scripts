@@ -3,7 +3,7 @@ module VGACtrl(
   input         reset,
   output        auto_in_aw_ready,
   input         auto_in_aw_valid,
-  input         auto_in_aw_bits_id,
+  input  [1:0]  auto_in_aw_bits_id,
   input  [30:0] auto_in_aw_bits_addr,
   input  [7:0]  auto_in_aw_bits_len,
   input  [2:0]  auto_in_aw_bits_size,
@@ -19,11 +19,11 @@ module VGACtrl(
   input         auto_in_w_bits_last,
   input         auto_in_b_ready,
   output        auto_in_b_valid,
-  output        auto_in_b_bits_id,
+  output [1:0]  auto_in_b_bits_id,
   output [1:0]  auto_in_b_bits_resp,
   output        auto_in_ar_ready,
   input         auto_in_ar_valid,
-  input         auto_in_ar_bits_id,
+  input  [1:0]  auto_in_ar_bits_id,
   input  [30:0] auto_in_ar_bits_addr,
   input  [7:0]  auto_in_ar_bits_len,
   input  [2:0]  auto_in_ar_bits_size,
@@ -34,7 +34,7 @@ module VGACtrl(
   input  [3:0]  auto_in_ar_bits_qos,
   input         auto_in_r_ready,
   output        auto_in_r_valid,
-  output        auto_in_r_bits_id,
+  output [1:0]  auto_in_r_bits_id,
   output [63:0] auto_in_r_bits_data,
   output [1:0]  auto_in_r_bits_resp,
   output        auto_in_r_bits_last
@@ -93,10 +93,10 @@ module VGACtrl(
   wire  _T_56 = in_ar_bits_len == 8'hf; // @[AXI4SlaveModule.scala 132:26]
   wire  _T_57 = _T_55 | _T_56; // @[AXI4SlaveModule.scala 131:34]
   wire [30:0] in_aw_bits_addr = auto_in_aw_bits_addr; // @[Nodes.scala 1210:84 LazyModule.scala 309:16]
-  reg  r_3; // @[Reg.scala 15:16]
-  wire  in_aw_bits_id = auto_in_aw_bits_id; // @[Nodes.scala 1210:84 LazyModule.scala 309:16]
-  reg  r_5; // @[Reg.scala 15:16]
-  wire  in_ar_bits_id = auto_in_ar_bits_id; // @[Nodes.scala 1210:84 LazyModule.scala 309:16]
+  reg [1:0] r_3; // @[Reg.scala 15:16]
+  wire [1:0] in_aw_bits_id = auto_in_aw_bits_id; // @[Nodes.scala 1210:84 LazyModule.scala 309:16]
+  reg [1:0] r_5; // @[Reg.scala 15:16]
+  wire [1:0] in_ar_bits_id = auto_in_ar_bits_id; // @[Nodes.scala 1210:84 LazyModule.scala 309:16]
   wire  _T_95 = 4'h0 == _GEN_10[3:0]; // @[LookupTree.scala 8:34]
   wire  _T_96 = 4'h4 == _GEN_10[3:0]; // @[LookupTree.scala 8:34]
   wire [31:0] _T_97 = _T_95 ? 32'h190012c : 32'h0; // @[Mux.scala 27:72]
@@ -110,14 +110,14 @@ module VGACtrl(
   wire [2:0] in_aw_bits_prot = auto_in_aw_bits_prot; // @[Nodes.scala 1210:84 LazyModule.scala 309:16]
   wire [3:0] in_aw_bits_qos = auto_in_aw_bits_qos; // @[Nodes.scala 1210:84 LazyModule.scala 309:16]
   wire [63:0] in_w_bits_data = auto_in_w_bits_data; // @[Nodes.scala 1210:84 LazyModule.scala 309:16]
-  wire  in_b_bits_id = r_3; // @[Nodes.scala 1210:84 AXI4SlaveModule.scala 162:16]
+  wire [1:0] in_b_bits_id = r_3; // @[Nodes.scala 1210:84 AXI4SlaveModule.scala 162:16]
   wire [1:0] in_b_bits_resp = 2'h0; // @[Nodes.scala 1210:84 AXI4SlaveModule.scala 159:18]
   wire [2:0] in_ar_bits_size = auto_in_ar_bits_size; // @[Nodes.scala 1210:84 LazyModule.scala 309:16]
   wire  in_ar_bits_lock = auto_in_ar_bits_lock; // @[Nodes.scala 1210:84 LazyModule.scala 309:16]
   wire [3:0] in_ar_bits_cache = auto_in_ar_bits_cache; // @[Nodes.scala 1210:84 LazyModule.scala 309:16]
   wire [2:0] in_ar_bits_prot = auto_in_ar_bits_prot; // @[Nodes.scala 1210:84 LazyModule.scala 309:16]
   wire [3:0] in_ar_bits_qos = auto_in_ar_bits_qos; // @[Nodes.scala 1210:84 LazyModule.scala 309:16]
-  wire  in_r_bits_id = r_5; // @[Nodes.scala 1210:84 AXI4SlaveModule.scala 164:16]
+  wire [1:0] in_r_bits_id = r_5; // @[Nodes.scala 1210:84 AXI4SlaveModule.scala 164:16]
   wire [63:0] in_r_bits_data = {{32'd0}, _T_99}; // @[Nodes.scala 1210:84 RegMap.scala 12:11]
   wire [1:0] in_r_bits_resp = 2'h0; // @[Nodes.scala 1210:84 AXI4SlaveModule.scala 139:18]
   assign auto_in_aw_ready = in_aw_ready; // @[LazyModule.scala 309:16]
@@ -290,9 +290,9 @@ initial begin
   _RAND_3 = {1{`RANDOM}};
   r_1 = _RAND_3[30:0];
   _RAND_4 = {1{`RANDOM}};
-  r_3 = _RAND_4[0:0];
+  r_3 = _RAND_4[1:0];
   _RAND_5 = {1{`RANDOM}};
-  r_5 = _RAND_5[0:0];
+  r_5 = _RAND_5[1:0];
 `endif // RANDOMIZE_REG_INIT
   `endif // RANDOMIZE
 end // initial
