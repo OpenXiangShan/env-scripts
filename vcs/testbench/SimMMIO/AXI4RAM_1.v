@@ -3,7 +3,7 @@ module AXI4RAM_1(
   input         reset,
   output        auto_in_aw_ready,
   input         auto_in_aw_valid,
-  input         auto_in_aw_bits_id,
+  input  [1:0]  auto_in_aw_bits_id,
   input  [30:0] auto_in_aw_bits_addr,
   input  [7:0]  auto_in_aw_bits_len,
   input  [2:0]  auto_in_aw_bits_size,
@@ -19,10 +19,10 @@ module AXI4RAM_1(
   input         auto_in_w_bits_last,
   input         auto_in_b_ready,
   output        auto_in_b_valid,
-  output        auto_in_b_bits_id,
+  output [1:0]  auto_in_b_bits_id,
   output [1:0]  auto_in_b_bits_resp,
   input         auto_in_ar_valid,
-  input         auto_in_ar_bits_id,
+  input  [1:0]  auto_in_ar_bits_id,
   input  [30:0] auto_in_ar_bits_addr,
   input  [7:0]  auto_in_ar_bits_len,
   input  [2:0]  auto_in_ar_bits_size,
@@ -30,7 +30,7 @@ module AXI4RAM_1(
   input         auto_in_ar_bits_lock,
   input  [3:0]  auto_in_ar_bits_cache,
   input  [3:0]  auto_in_ar_bits_qos,
-  output        auto_in_r_bits_id,
+  output [1:0]  auto_in_r_bits_id,
   output        auto_in_r_bits_last
 );
 `ifdef RANDOMIZE_GARBAGE_ASSIGN
@@ -169,10 +169,10 @@ module AXI4RAM_1(
   wire [30:0] in_aw_bits_addr = auto_in_aw_bits_addr; // @[Nodes.scala 1210:84 LazyModule.scala 309:16]
   wire [30:0] _GEN_13 = _T_1 ? in_aw_bits_addr : r_2; // @[Reg.scala 28:19 Reg.scala 28:23 Reg.scala 27:20]
   wire [7:0] _value_T_3 = value_1 + 8'h1; // @[Counter.scala 76:24]
-  reg  r_3; // @[Reg.scala 15:16]
-  wire  in_aw_bits_id = auto_in_aw_bits_id; // @[Nodes.scala 1210:84 LazyModule.scala 309:16]
-  reg  r_5; // @[Reg.scala 15:16]
-  wire  in_ar_bits_id = auto_in_ar_bits_id; // @[Nodes.scala 1210:84 LazyModule.scala 309:16]
+  reg [1:0] r_3; // @[Reg.scala 15:16]
+  wire [1:0] in_aw_bits_id = auto_in_aw_bits_id; // @[Nodes.scala 1210:84 LazyModule.scala 309:16]
+  reg [1:0] r_5; // @[Reg.scala 15:16]
+  wire [1:0] in_ar_bits_id = auto_in_ar_bits_id; // @[Nodes.scala 1210:84 LazyModule.scala 309:16]
   wire [30:0] _T_76 = _GEN_13 - 31'h50000000; // @[AXI4RAM.scala 44:36]
   wire [15:0] _GEN_53 = {{8'd0}, value_1}; // @[AXI4RAM.scala 48:29]
   wire [15:0] wIdx = _T_76[18:3] + _GEN_53; // @[AXI4RAM.scala 48:29]
@@ -188,14 +188,14 @@ module AXI4RAM_1(
   wire [3:0] in_aw_bits_cache = auto_in_aw_bits_cache; // @[Nodes.scala 1210:84 LazyModule.scala 309:16]
   wire [2:0] in_aw_bits_prot = auto_in_aw_bits_prot; // @[Nodes.scala 1210:84 LazyModule.scala 309:16]
   wire [3:0] in_aw_bits_qos = auto_in_aw_bits_qos; // @[Nodes.scala 1210:84 LazyModule.scala 309:16]
-  wire  in_b_bits_id = r_3; // @[Nodes.scala 1210:84 AXI4SlaveModule.scala 162:16]
+  wire [1:0] in_b_bits_id = r_3; // @[Nodes.scala 1210:84 AXI4SlaveModule.scala 162:16]
   wire [1:0] in_b_bits_resp = 2'h0; // @[Nodes.scala 1210:84 AXI4SlaveModule.scala 159:18]
   wire [2:0] in_ar_bits_size = auto_in_ar_bits_size; // @[Nodes.scala 1210:84 LazyModule.scala 309:16]
   wire  in_ar_bits_lock = auto_in_ar_bits_lock; // @[Nodes.scala 1210:84 LazyModule.scala 309:16]
   wire [3:0] in_ar_bits_cache = auto_in_ar_bits_cache; // @[Nodes.scala 1210:84 LazyModule.scala 309:16]
   wire [2:0] in_ar_bits_prot = 3'h0; // @[Nodes.scala 1210:84 LazyModule.scala 309:16]
   wire [3:0] in_ar_bits_qos = auto_in_ar_bits_qos; // @[Nodes.scala 1210:84 LazyModule.scala 309:16]
-  wire  in_r_bits_id = r_5; // @[Nodes.scala 1210:84 AXI4SlaveModule.scala 164:16]
+  wire [1:0] in_r_bits_id = r_5; // @[Nodes.scala 1210:84 AXI4SlaveModule.scala 164:16]
   wire [63:0] in_r_bits_data = rdata; // @[Cat.scala 30:58]
   wire [1:0] in_r_bits_resp = 2'h0; // @[Nodes.scala 1210:84 AXI4SlaveModule.scala 139:18]
   assign MEM_0_MPORT_1_addr = _T_81[18:3] + _GEN_54;
@@ -522,9 +522,9 @@ initial begin
   _RAND_21 = {1{`RANDOM}};
   r_2 = _RAND_21[30:0];
   _RAND_22 = {1{`RANDOM}};
-  r_3 = _RAND_22[0:0];
+  r_3 = _RAND_22[1:0];
   _RAND_23 = {1{`RANDOM}};
-  r_5 = _RAND_23[0:0];
+  r_5 = _RAND_23[1:0];
 `endif // RANDOMIZE_REG_INIT
   `endif // RANDOMIZE
 end // initial

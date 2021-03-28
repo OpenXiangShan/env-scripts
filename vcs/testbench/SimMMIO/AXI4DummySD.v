@@ -3,7 +3,7 @@ module AXI4DummySD(
   input         reset,
   output        auto_in_aw_ready,
   input         auto_in_aw_valid,
-  input         auto_in_aw_bits_id,
+  input  [1:0]  auto_in_aw_bits_id,
   input  [30:0] auto_in_aw_bits_addr,
   input  [7:0]  auto_in_aw_bits_len,
   input  [2:0]  auto_in_aw_bits_size,
@@ -19,11 +19,11 @@ module AXI4DummySD(
   input         auto_in_w_bits_last,
   input         auto_in_b_ready,
   output        auto_in_b_valid,
-  output        auto_in_b_bits_id,
+  output [1:0]  auto_in_b_bits_id,
   output [1:0]  auto_in_b_bits_resp,
   output        auto_in_ar_ready,
   input         auto_in_ar_valid,
-  input         auto_in_ar_bits_id,
+  input  [1:0]  auto_in_ar_bits_id,
   input  [30:0] auto_in_ar_bits_addr,
   input  [7:0]  auto_in_ar_bits_len,
   input  [2:0]  auto_in_ar_bits_size,
@@ -34,7 +34,7 @@ module AXI4DummySD(
   input  [3:0]  auto_in_ar_bits_qos,
   input         auto_in_r_ready,
   output        auto_in_r_valid,
-  output        auto_in_r_bits_id,
+  output [1:0]  auto_in_r_bits_id,
   output [63:0] auto_in_r_bits_data,
   output [1:0]  auto_in_r_bits_resp,
   output        auto_in_r_bits_last
@@ -110,10 +110,10 @@ module AXI4DummySD(
   reg [30:0] r_2; // @[Reg.scala 27:20]
   wire [30:0] in_aw_bits_addr = auto_in_aw_bits_addr; // @[Nodes.scala 1210:84 LazyModule.scala 309:16]
   wire [30:0] _GEN_13 = _T_1 ? in_aw_bits_addr : r_2; // @[Reg.scala 28:19 Reg.scala 28:23 Reg.scala 27:20]
-  reg  r_3; // @[Reg.scala 15:16]
-  wire  in_aw_bits_id = auto_in_aw_bits_id; // @[Nodes.scala 1210:84 LazyModule.scala 309:16]
-  reg  r_5; // @[Reg.scala 15:16]
-  wire  in_ar_bits_id = auto_in_ar_bits_id; // @[Nodes.scala 1210:84 LazyModule.scala 309:16]
+  reg [1:0] r_3; // @[Reg.scala 15:16]
+  wire [1:0] in_aw_bits_id = auto_in_aw_bits_id; // @[Nodes.scala 1210:84 LazyModule.scala 309:16]
+  reg [1:0] r_5; // @[Reg.scala 15:16]
+  wire [1:0] in_ar_bits_id = auto_in_ar_bits_id; // @[Nodes.scala 1210:84 LazyModule.scala 309:16]
   reg [31:0] regs_0; // @[AXI4DummySD.scala 66:45]
   reg [31:0] regs_1; // @[AXI4DummySD.scala 66:45]
   reg [31:0] regs_4; // @[AXI4DummySD.scala 66:45]
@@ -211,14 +211,14 @@ module AXI4DummySD(
   wire [3:0] in_aw_bits_cache = auto_in_aw_bits_cache; // @[Nodes.scala 1210:84 LazyModule.scala 309:16]
   wire [2:0] in_aw_bits_prot = auto_in_aw_bits_prot; // @[Nodes.scala 1210:84 LazyModule.scala 309:16]
   wire [3:0] in_aw_bits_qos = auto_in_aw_bits_qos; // @[Nodes.scala 1210:84 LazyModule.scala 309:16]
-  wire  in_b_bits_id = r_3; // @[Nodes.scala 1210:84 AXI4SlaveModule.scala 162:16]
+  wire [1:0] in_b_bits_id = r_3; // @[Nodes.scala 1210:84 AXI4SlaveModule.scala 162:16]
   wire [1:0] in_b_bits_resp = 2'h0; // @[Nodes.scala 1210:84 AXI4SlaveModule.scala 159:18]
   wire [2:0] in_ar_bits_size = auto_in_ar_bits_size; // @[Nodes.scala 1210:84 LazyModule.scala 309:16]
   wire  in_ar_bits_lock = auto_in_ar_bits_lock; // @[Nodes.scala 1210:84 LazyModule.scala 309:16]
   wire [3:0] in_ar_bits_cache = auto_in_ar_bits_cache; // @[Nodes.scala 1210:84 LazyModule.scala 309:16]
   wire [2:0] in_ar_bits_prot = auto_in_ar_bits_prot; // @[Nodes.scala 1210:84 LazyModule.scala 309:16]
   wire [3:0] in_ar_bits_qos = auto_in_ar_bits_qos; // @[Nodes.scala 1210:84 LazyModule.scala 309:16]
-  wire  in_r_bits_id = r_5; // @[Nodes.scala 1210:84 AXI4SlaveModule.scala 164:16]
+  wire [1:0] in_r_bits_id = r_5; // @[Nodes.scala 1210:84 AXI4SlaveModule.scala 164:16]
   wire [63:0] in_r_bits_data = {hi_2,hi_2}; // @[Cat.scala 30:58]
   wire [1:0] in_r_bits_resp = 2'h0; // @[Nodes.scala 1210:84 AXI4SlaveModule.scala 139:18]
   SDHelper sdHelper ( // @[AXI4DummySD.scala 108:26]
@@ -478,9 +478,9 @@ initial begin
   _RAND_4 = {1{`RANDOM}};
   r_2 = _RAND_4[30:0];
   _RAND_5 = {1{`RANDOM}};
-  r_3 = _RAND_5[0:0];
+  r_3 = _RAND_5[1:0];
   _RAND_6 = {1{`RANDOM}};
-  r_5 = _RAND_6[0:0];
+  r_5 = _RAND_6[1:0];
   _RAND_7 = {1{`RANDOM}};
   regs_0 = _RAND_7[31:0];
   _RAND_8 = {1{`RANDOM}};
