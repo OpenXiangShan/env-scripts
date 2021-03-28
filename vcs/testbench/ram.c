@@ -2,6 +2,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <stdint.h>
+#include <assert.h>
 
 #define EMU_RAM_SIZE (256 * 1024 * 1024UL)
 
@@ -11,7 +12,7 @@ static long img_size = 0;
 
 void init_ram() {
   const char *img = "./ram.bin";
-  //assert(img != NULL);
+  assert(img != NULL);
 
   printf("The image is %s\n", img);
 
