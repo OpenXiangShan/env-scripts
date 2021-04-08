@@ -16,7 +16,7 @@ VCS_OPTS := -full64 +v2k -timescale=1ns/1ns \
   +define+RANDOMIZE_GARBAGE_ASSIGN \
   +define+RANDOMIZE_INVALID_ASSIGN \
   +define+RANDOMIZE_MEM_INIT \
-  +define+RANDOMIZE_DELAY=1 \
+  +define+RANDOMIZE_DELAY=0 \
   +define+RANDOMIZE_REG_INIT
  
 $(EMU_VCS): $(VCS_SRC_FILE) $(VCS_TB_FILE)

@@ -321,6 +321,8 @@ assign uart_ch = mmio_io_uart_out_ch;
 XSTop CPU(
   .clock(cpu_clock),
   .reset(cpu_reset),
+  //.io_clock(cpu_clock),
+  //.io_reset(cpu_reset),
   .memory_0_aw_ready(cpu_memory_0_aw_ready),
   .memory_0_aw_valid(cpu_memory_0_aw_valid),
   .memory_0_aw_bits_id(cpu_memory_0_aw_bits_id),
