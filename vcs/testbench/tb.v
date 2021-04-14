@@ -50,7 +50,7 @@ always @(posedge clock) begin
   if (reset)
     commit_count <= 0;
   else if (!sim.CPU.core_with_l2.core.ctrlBlock.roq.io_commits_isWalk)
-    commit_count <= commit_count + sim.CPU.core_with_l2.core.ctrlBlock.roq.io_commits_valid_0 + sim.CPU.core_with_l2.core.ctrlBlock.roq.io_commits_valid_1 + sim.CPU.core_with_l2.core.ctrlBlock.roq.io_commits_valid_2 + sim.CPU.core_with_l2.core.ctrlBlock.roq.io_commits_valid_3 + sim.CPU.core_with_l2.core.ctrlBlock.roq.io_commits_valid_4 + sim.CPU.core_with_l2.core.ctrlBlock.roq.io_commits_valid_5;
+    commit_count <= commit_count + `ROQ.io_commits_valid_0 + `ROQ.io_commits_valid_1 + `ROQ.io_commits_valid_2 + `ROQ.io_commits_valid_3 + `ROQ.io_commits_valid_4 + `ROQ.io_commits_valid_5;
 
   if (reset)
     cycle_count <= 0;
@@ -61,9 +61,9 @@ always @(posedge clock) begin
     $display("no instruction commits for 5000 cycles");
     $fatal;
   end
-  /*if (!reset && !sim.CPU.core_with_l2.core.ctrlBlock.roq.io_commits_isWalk && sim.CPU.core_with_l2.core.ctrlBlock.roq.io_commits_valid_0) begin
-    // $display("instr commit %b", {sim.CPU.core_with_l2.core.ctrlBlock.roq.io_commits_valid_0,sim.CPU.core_with_l2.core.ctrlBlock.roq.io_commits_valid_1,sim.CPU.core_with_l2.core.ctrlBlock.roq.io_commits_valid_2,sim.CPU.core_with_l2.core.ctrlBlock.roq.io_commits_valid_3,sim.CPU.core_with_l2.core.ctrlBlock.roq.io_commits_valid_4,sim.CPU.core_with_l2.core.ctrlBlock.roq.io_commits_valid_5});
-  end*/
+  if (!reset && !`ROQ.io_commits_isWalk && `ROQ.io_commits_valid_0) begin
+    // $display("instr commit %b", {`ROQ.io_commits_valid_0,`ROQ.io_commits_valid_1,`ROQ.io_commits_valid_2,`ROQ.io_commits_valid_3,`ROQ.io_commits_valid_4,`ROQ.io_commits_valid_5});
+  end
   if (!reset && cycle_count % 10000 == 0) begin
     $display("[time=%d] instrCnt = %d", cycle_count, commit_count);
     //$display("[time=%d] mcycle=%d, minstret=%d, bpRight=%d, bpWrong=%d", cycle_count, `CSR.mcycle, `CSR.minstret, `CSR.bpRight, `CSR.bpWrong);
