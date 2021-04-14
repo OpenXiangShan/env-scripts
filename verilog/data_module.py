@@ -27,8 +27,8 @@ def check_field(module):
 def get_packed_array(fields):
     packed_fields = []
     counter, pack = 0, []
-    max_limit, single_width_limit = 64, 32
-    for width, name in fields:
+    max_limit, single_width_limit = 39, 32
+    for width, name in sorted(fields, key=lambda x: x[0]):
         # add to counter
         if width + counter > max_limit and counter > 0:
             packed_fields.append((counter, pack))
@@ -56,7 +56,8 @@ def generate_regfile_instance(gen, instance, config, nw, nr, depth, rdata_sets=N
                 print("Do not find rdata io:", io_rdata)
                 pass
             else:
-                gen.add_assign(io_rdata, f"{rdata}[{index+width-1}:{index}]")
+                bit_slice = f"{index+width-1}:{index}" if width != 1 else f"{index}"
+                gen.add_assign(io_rdata, f"{rdata}[{bit_slice}]")
             index += width
         connections.append((f"raddr{rport}", f"io_raddr_{rport}"))
         connections.append((f"rdata{rport}", rdata))
@@ -64,7 +65,7 @@ def generate_regfile_instance(gen, instance, config, nw, nr, depth, rdata_sets=N
         connections.append((f"wen{wport}", f"io_wen_{wport}"))
         connections.append((f"waddr{wport}", f"io_waddr_{wport}"))
         index, wdata = 0, "{"
-        for width, field in config[1]:
+        for width, field in reversed(config[1]):
             wdata += f"io_wdata_{wport}{field}, "
             index += width
         wdata = wdata[:-2] + "}"
@@ -154,7 +155,8 @@ def main(files, output_dir):
 
     # out_modules = ["XSSoc", "XSCore", "Frontend", "CtrlBlock", "IntegerBlock", "FloatBlock", "MemBlock", "InclusiveCache", "InclusiveCache_2"]
     # out_modules = ["ReservationStation", "RedirectGenerator", "XSSoc", "XSCore", "Frontend", "CtrlBlock", "IntegerBlock", "FloatBlock", "MemBlock", "PTW", "L1plusCache"]
-    out_modules = ["XSTop", "XSCore", "InclusiveCache", "InclusiveCache_2"]
+    # out_modules = ["XSTop", "XSCore", "InclusiveCache", "InclusiveCache_2"]
+    out_modules = ["XSTop"]
     for m in out_modules:
         collection.dump_to_file(m, os.path.join(output_dir, m))
 
