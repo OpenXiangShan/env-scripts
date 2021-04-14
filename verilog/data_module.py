@@ -16,12 +16,23 @@ def check_field(module):
     rdata_all = sorted(module.get_io(match="output.*rdata.*"))
     wdata_pattern = set(map(lambda x: " ".join((str(x.get_width()), field_re.match(x.get_name()).group(3))), wdata_all))
     rdata_pattern = set(map(lambda x: " ".join((str(x.get_width()), field_re.match(x.get_name()).group(3))), rdata_all))
+    wports = list(set(map(lambda x: field_re.match(x.get_name()).group(2), wdata_all)))
+    # check whether every rdata is from wdata
     if wdata_pattern != rdata_pattern:
         print("Errors:")
         print("  wdata only:", sorted(wdata_pattern - rdata_pattern, key=lambda x: x.split(" ")[1]))
         print("  rdata only:", sorted(rdata_pattern - wdata_pattern, key=lambda x: x.split(" ")[1]))
         print("In", str(module))
         ok = False
+    # check whether every port has the same wdata fields
+    for wp in wdata_pattern:
+        wp_count = sum(map(lambda x: x.get_name().endswith(wp.split(" ")[1]), wdata_all))
+        if not (wp_count == len(wports) and len(wports) > 0):
+            print("Warning:")
+            print(f"  wdata (wports = {len(wports)}) is not consistent:")
+            wp_list = filter(lambda x: x.get_name().endswith(wp.split(" ")[1]), wdata_all)
+            print("  " + "\n  ".join(map(lambda x: x.get_name(), wp_list)))
+            # ok = False
     return ok
 
 def get_packed_array(fields):
@@ -157,6 +168,7 @@ def main(files, output_dir):
     # out_modules = ["ReservationStation", "RedirectGenerator", "XSSoc", "XSCore", "Frontend", "CtrlBlock", "IntegerBlock", "FloatBlock", "MemBlock", "PTW", "L1plusCache"]
     # out_modules = ["XSTop", "XSCore", "InclusiveCache", "InclusiveCache_2"]
     out_modules = ["XSTop"]
+    # out_modules = ["XSSimSoC"]
     for m in out_modules:
         collection.dump_to_file(m, os.path.join(output_dir, m))
 
