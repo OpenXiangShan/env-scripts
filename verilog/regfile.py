@@ -101,3 +101,4 @@ if __name__ == "__main__":
   print(generate_cmp(8, 19))
   print(generate_addr_dec(8))
   print(generate_regfile(17, 192, 19, 6))
+

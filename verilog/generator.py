@@ -59,5 +59,5 @@ class VerilogModuleGenerator(object):
 \n\
 %s\
 \n\
-endmodule" % (self.name, ',\n  '.join(self.port_spec), body if not blackbox else blackbox)
+endmodule\n" % (self.name, ',\n  '.join(self.port_spec), body if not blackbox else blackbox)
     return s

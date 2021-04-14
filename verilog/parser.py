@@ -63,7 +63,7 @@ class VModule(object):
         return self.name
 
     def get_lines(self):
-        return self.lines
+        return self.lines + ["\n"]
 
     def get_io(self, prefix="", match=""):
         if match:
