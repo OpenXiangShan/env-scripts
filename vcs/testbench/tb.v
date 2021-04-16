@@ -15,6 +15,8 @@ initial begin
   //$vcdpluson;
   #100 reset = 0;
   // #10000 $finish;
+  //#220000 $vcdplusfile("fix.vpd");
+  // $vcdpluson;
 end
 
 always #1 clock = ~clock;
@@ -36,8 +38,8 @@ reg [63:0] stuck_timer;
 reg [63:0] commit_count;
 reg [63:0] cycle_count;
 
-`define ROQ sim.CPU.core_with_l2.core.ctrlBlock.roq
-`define CSR sim.CPU.core_with_l2.core.integerBlock.jmpExeUnit.csr
+`define ROQ sim.CPU.core.ctrlBlock.roq
+`define CSR sim.CPU.core.integerBlock.jmpExeUnit.csr
 
 wire has_commit = !`ROQ.io_commits_isWalk && `ROQ.io_commits_valid_0;
 
@@ -49,7 +51,7 @@ always @(posedge clock) begin
 
   if (reset)
     commit_count <= 0;
-  else if (!sim.CPU.core_with_l2.core.ctrlBlock.roq.io_commits_isWalk)
+  else if (!`ROQ.io_commits_isWalk)
     commit_count <= commit_count + `ROQ.io_commits_valid_0 + `ROQ.io_commits_valid_1 + `ROQ.io_commits_valid_2 + `ROQ.io_commits_valid_3 + `ROQ.io_commits_valid_4 + `ROQ.io_commits_valid_5;
 
   if (reset)
@@ -59,7 +61,7 @@ always @(posedge clock) begin
 
   if (!reset && stuck_timer > 5000) begin
     $display("no instruction commits for 5000 cycles");
-    $fatal;
+    $finish;
   end
   if (!reset && !`ROQ.io_commits_isWalk && `ROQ.io_commits_valid_0) begin
     // $display("instr commit %b", {`ROQ.io_commits_valid_0,`ROQ.io_commits_valid_1,`ROQ.io_commits_valid_2,`ROQ.io_commits_valid_3,`ROQ.io_commits_valid_4,`ROQ.io_commits_valid_5});
