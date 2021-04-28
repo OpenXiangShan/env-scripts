@@ -4,6 +4,12 @@ import argparse
 import os
 import re
 
+class PerfManip(object):
+    def __init__(self, name, counters, func):
+        self.name = name
+        self.counters = counters
+        self.func = func
+
 def load_perf(filename):
     perf_re = re.compile(r'.*\[PERF \]\[time=\s*\d*\] ((\w*(\.|))*): (\w*)\s*,\s*(\d*)')
     all_perf_counters = dict()
@@ -16,10 +22,36 @@ def load_perf(filename):
                 all_perf_counters[perf_name] = perf_value
     return all_perf_counters
 
+def calc(counters, target, func):
+    numbers = map(lambda name: int(counters[name]), target)
+    return str(func(*numbers))
+
+def get_all_manip():
+    all_manip = []
+    ipc = PerfManip(
+        name = "TOP.XSSimSoC.soc.xs_core.IPC",
+        counters = ["TOP.XSSimSoC.soc.xs_core.ctrlBlock.roq.clock_cycle",
+        "TOP.XSSimSoC.soc.xs_core.ctrlBlock.roq.commitInstr"],
+        func = lambda cycle, instr: instr / cycle
+    )
+    all_manip.append(ipc)
+    block_fraction = PerfManip(
+        name = "TOP.XSSimSoC.soc.xs_core.ctrlBlock.dispatch.intDispatch.blocked_fraction",
+        counters = ["TOP.XSSimSoC.soc.xs_core.ctrlBlock.dispatch.intDispatch.blocked",
+        "TOP.XSSimSoC.soc.xs_core.ctrlBlock.dispatch.intDispatch.in"],
+        func = lambda blocked, dpin: blocked / dpin
+    )
+    all_manip.append(block_fraction)
+    return all_manip
+
 def main(pfiles, output_file):
     all_perf = []
+    all_manip = get_all_manip()
     for filename in pfiles:
-        all_perf.append(load_perf(filename))
+        perf = load_perf(filename)
+        for manip in all_manip:
+            perf[manip.name] = calc(perf, manip.counters, manip.func)
+        all_perf.append(perf)
     all_names = sorted(list(set().union(*list(map(lambda s: s.keys(), all_perf)))))
     all_sources = list(map(lambda x: os.path.split(x)[1], pfiles))
     output_lines = [",".join([""] + all_sources) + "\n"]
