@@ -53,7 +53,8 @@ def main(pfiles, output_file):
             perf[manip.name] = calc(perf, manip.counters, manip.func)
         all_perf.append(perf)
     all_names = sorted(list(set().union(*list(map(lambda s: s.keys(), all_perf)))))
-    all_sources = list(map(lambda x: os.path.split(x)[1], pfiles))
+    # all_sources = list(map(lambda x: os.path.split(x)[1], pfiles))
+    all_sources = pfiles
     output_lines = [",".join([""] + all_sources) + "\n"]
     for name in all_names:
         output_lines.append(",".join([name] + list(map(lambda col: col[name] if name in col else "", all_perf))) + "\n")
