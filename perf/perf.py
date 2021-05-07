@@ -29,17 +29,17 @@ def calc(counters, target, func):
 def get_all_manip():
     all_manip = []
     ipc = PerfManip(
-        name = "TOP.XSSimSoC.soc.xs_core.IPC",
-        counters = ["TOP.XSSimSoC.soc.xs_core.ctrlBlock.roq.clock_cycle",
-        "TOP.XSSimSoC.soc.xs_core.ctrlBlock.roq.commitInstr"],
-        func = lambda cycle, instr: instr / cycle
+        name = "global.IPC",
+        counters = ["TOP.SimTop.l_soc.core_with_l2.core.ctrlBlock.roq.clock_cycle",
+        "TOP.SimTop.l_soc.core_with_l2.core.ctrlBlock.roq.commitInstr"],
+        func = lambda cycle, instr: instr * 1.0 / cycle
     )
     all_manip.append(ipc)
     block_fraction = PerfManip(
-        name = "TOP.XSSimSoC.soc.xs_core.ctrlBlock.dispatch.intDispatch.blocked_fraction",
-        counters = ["TOP.XSSimSoC.soc.xs_core.ctrlBlock.dispatch.intDispatch.blocked",
-        "TOP.XSSimSoC.soc.xs_core.ctrlBlock.dispatch.intDispatch.in"],
-        func = lambda blocked, dpin: blocked / dpin
+        name = "global.intDispatch.blocked_fraction",
+        counters = ["TOP.SimTop.l_soc.core_with_l2.core.ctrlBlock.dispatch.intDispatch.blocked",
+        "TOP.SimTop.l_soc.core_with_l2.core.ctrlBlock.dispatch.intDispatch.in"],
+        func = lambda blocked, dpin: blocked * 1.0 / dpin
     )
     all_manip.append(block_fraction)
     return all_manip
