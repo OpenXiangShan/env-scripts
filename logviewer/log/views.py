@@ -4,7 +4,7 @@ from django.http import HttpResponse
 from django.template import loader
 from django.views.decorators.csrf import csrf_exempt
 
-from . import XSLogParser
+from . import parser
 
 filename = ""
 
@@ -66,7 +66,7 @@ logparser = -1
 
 def loadLogFile(filename):
     global logparser
-    logparser = XSLogParser.XSLogParser(filename)
+    logparser = parser.XSLogParser(filename)
     if not logparser.is_good():
         return [], 0, 0
     print(logparser.modules, logparser.cycles)
