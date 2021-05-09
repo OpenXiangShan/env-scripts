@@ -38,6 +38,17 @@ class FileLoader(object):
     def step_back(self, steps=-2):
         self.current -= steps
 
+def get_common_prefix_length(s):
+    min_len = min(map(lambda x: len(x), s))
+    common_length = 0
+    for i in range(1, min_len):
+        num_prefix = set(map(lambda x: x[:i], s))
+        if len(num_prefix) == 1:
+            common_length += 1
+        else:
+            break
+    return common_length
+
 
 class XSLogParser(object):
     log_re = re.compile(r'^\[(\w*)\s*\]\[time=\s*(\d*)\] ((\w*(\.|))*): (.*)')
@@ -70,6 +81,15 @@ class XSLogParser(object):
         self.loglevels = sorted(list(self.loglevels))
         self.cycles = sorted(list(self.cycles))
         self.modules = sorted(list(self.modules))
+        # remove common prefix of module names, assume
+        common_prefix_length = get_common_prefix_length(self.modules)
+        print("remove common prefix of", common_prefix_length, "characters")
+        self.modules = sorted(list(map(lambda x: x[common_prefix_length:], self.modules)))
+        for level in self.loglevels:
+            for cycle in self.logs[level]:
+                for (module, _) in list(self.logs[level][cycle].items()):
+                    new_module = module[common_prefix_length:]
+                    self.logs[level][cycle][new_module] = self.logs[level][cycle].pop(module)
 
     def get_logs(self, begin, end, module, loglevel):
         loglevel = loglevel + ["PERF"]
@@ -79,7 +99,7 @@ class XSLogParser(object):
             for m in module:
                 for l in loglevel:
                     if l in self.logs and c in self.logs[l] and m in self.logs[l][c]:
-                        target += list(map(lambda x: "[{}][{}][{}]{}".format(l, c, m, x), self.logs[l][c][m]))
+                        target += list(map(lambda x: "[{}][{}][{}] {}".format(l, c, m, x), self.logs[l][c][m]))
         return target
 
     def do_parse(self, line):
@@ -103,5 +123,5 @@ if __name__ == "__main__":
     print(logparser.cycles)
     print(logparser.loglevels)
     print(logparser.modules)
-    print(logparser.get_logs(2000, 2010, ["tb_top.sim.l_soc.core_with_l2.l2prefetcher.BestOffsetPrefetch"], ["DEBUG", "INFO"]))
+    print(logparser.get_logs(0, 2000, ["ctrlBlock.dispatch.dispatch1"], ["DEBUG", "INFO"]))
 
