@@ -1,5 +1,9 @@
+#! /usr/bin/env python3
+
 import os
 import os.path
+import re
+
 
 class FileLoader(object):
     def __init__(self, filename):
@@ -36,8 +40,7 @@ class FileLoader(object):
 
 
 class XSLogParser(object):
-    LOGLEVEL_LENGTH = 5
-    CYCLE_START, CYCLE_END = 13, 33
+    log_re = re.compile(r'^\[(\w*)\s*\]\[time=\s*(\d*)\] ((\w*(\.|))*): (.*)')
 
     def __init__(self, filename):
         self.file = FileLoader(filename)
@@ -47,26 +50,22 @@ class XSLogParser(object):
     def parse(self):
         self.loglevels, self.cycles, self.modules = set(), set(), set()
         self.logs = dict()
-        lines = list(filter(self.__is_log_line, self.file.get_lines()))
-        for line in lines:
-            try:
-                loglevel = self.__get_log_level(line)
-                if loglevel not in self.loglevels:
-                    self.loglevels.add(loglevel)
-                    self.logs[loglevel] = dict()
-                cycle = self.__get_cycle(line)
-                if cycle not in self.cycles:
-                    self.cycles.add(cycle)
-                if cycle not in self.logs[loglevel]:
-                    self.logs[loglevel][cycle] = dict()
-                module = self.__get_module(line)
-                if module not in self.modules:
-                    self.modules.add(module)
-                if module not in self.logs[loglevel][cycle]:
-                    self.logs[loglevel][cycle][module] = []
-            except:
+        for line in self.file.get_lines():
+            is_log, content = self.do_parse(line)
+            if not is_log:
                 continue
-            loginfo = ":".join(line.split(":")[1:])
+            loglevel, cycle, module, loginfo = content
+            if loglevel not in self.loglevels:
+                self.loglevels.add(loglevel)
+                self.logs[loglevel] = dict()
+            if cycle not in self.cycles:
+                self.cycles.add(cycle)
+            if cycle not in self.logs[loglevel]:
+                self.logs[loglevel][cycle] = dict()
+            if module not in self.modules:
+                self.modules.add(module)
+            if module not in self.logs[loglevel][cycle]:
+                self.logs[loglevel][cycle][module] = []
             self.logs[loglevel][cycle][module].append(loginfo)
         self.loglevels = sorted(list(self.loglevels))
         self.cycles = sorted(list(self.cycles))
@@ -83,20 +82,15 @@ class XSLogParser(object):
                         target += list(map(lambda x: "[{}][{}][{}]{}".format(l, c, m, x), self.logs[l][c][m]))
         return target
 
-    # def __get_log(self, line):
-    #     return ":".join(line.split(":")[1:])
-
-    def __is_log_line(self, line):
-        return len(line) > self.LOGLEVEL_LENGTH + 2 and line[0] == "[" and line[1 + self.LOGLEVEL_LENGTH] == ']'
-
-    def __get_log_level(self, line):
-        return line[1 : 1+self.LOGLEVEL_LENGTH].strip()
-
-    def __get_module(self, line):
-        return line.split(":")[0].split(" ")[-1].split(".")[-1]
-
-    def __get_cycle(self, line):
-        return int(line[self.CYCLE_START : self.CYCLE_END])
+    def do_parse(self, line):
+        log_match = self.log_re.match(line)
+        if log_match is None:
+            return False,()
+        level = str(log_match.group(1))
+        cycle = int(log_match.group(2))
+        module = str(log_match.group(3))
+        info = str(log_match.group(6))
+        return True, (level, cycle, module, info)
 
     def is_good(self):
         return self.file.is_good() and len(self.cycles) > 0
@@ -104,10 +98,10 @@ class XSLogParser(object):
 logparser = -1
 
 if __name__ == "__main__":
-    logparser = XSLogParser("/home/xyn/XiangShan/simv.log")
+    logparser = XSLogParser("/home52/xyn/xs/XiangShan/coremark.txt")
     assert(logparser.is_good())
     print(logparser.cycles)
     print(logparser.loglevels)
     print(logparser.modules)
-    print(logparser.get_logs(0, 20, ["Dispatch1"], ["DEBUG", "INFO"]))
+    print(logparser.get_logs(2000, 2010, ["tb_top.sim.l_soc.core_with_l2.l2prefetcher.BestOffsetPrefetch"], ["DEBUG", "INFO"]))
 
