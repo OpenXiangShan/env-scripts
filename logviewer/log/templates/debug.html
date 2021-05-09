@@ -1,0 +1,166 @@
+{% extends 'base.html' %}
+
+{% block title %}
+    <title>Debug</title>
+{% endblock %}
+
+{% block content %}
+
+
+    <br/><br/><br/><br/>
+
+    <div class="container">
+
+        <form class="form-inline" role="form" id="fileForm">
+            <input type="text" class="form-control" id="filename" value="{{ filename }}">
+            <button id="confirmLogFile" type="button" class="btn btn-primary">确认</button>
+        </form>
+
+    </div>
+
+    <br/>
+
+    <div class="container">
+        <form role="form" id="llForm">
+            <div class="form-group">
+                {% for l in ll %}
+                    <label class="checkbox-inline">
+                        <input type="checkbox" id="{{ l }}" name="checkBoxLogLevel" checked="checked"
+                               value="{{ l }}"> {{ l }}
+                    </label>
+                {% endfor %}
+            </div>
+        </form>
+    </div>
+
+    <div class="container" id="rtlModules">
+    </div>
+
+    <br/>
+
+    <div id="logs" style="white-space:pre">
+    </div>
+
+    <br/>
+
+    <div id="dg" style="z-index: 9999; position: fixed ! important; right: 5%; top: 10%">
+        <a href="#"><button id="goTop" type="submit" class="btn btn-primary">返回顶部(g)</button></a>
+        <a href="#footer"><button id="goBottom" type="submit" class="btn btn-primary">前往底部(G)</button></a>
+    </div>
+
+
+{% endblock %}
+
+{% block scripts %}
+
+    <script type="text/javascript">
+        $("#ALL").click(function () {
+            if ($("#ALL").prop("checked") === true) {
+                $("input[name=checkBoxLogLevel]").prop("checked", true);
+            } else {
+                $("input[name=checkBoxLogLevel]").prop("checked", false)
+            }
+        })
+    </script>
+
+    <script type="text/javascript">
+        $(document).ready(function () {
+            $(document).keypress(function (e) {
+                if(e.key === 'g'){
+                    $('#goTop').trigger("click")
+                } else if(e.key === 'G'){
+                    $('#goBottom').trigger("click")
+                }
+            })
+        })
+    </script>
+
+
+
+    <script type="text/javascript">
+        $('#confirmLogFile').click(function () {
+            $.ajax('readfile', {
+                type: 'get',
+                data: {
+                    'filename': $('#filename').val()
+                },
+                success: function (data) {
+                    $('#rtlModules').html(data);
+                    $(function () {
+                        $("#selAll").click(function () {
+                            if ($("#selAll").prop("checked") === true) {
+                                $("input[name=checkBoxModule]").prop("checked", true);
+                            } else {
+                                $("input[name=checkBoxModule]").prop("checked", false)
+                            }
+                        });
+                    })
+                }
+            })
+        })
+    </script>
+
+    <script type="text/javascript">
+        var flag = false;
+
+        function getLogTime(num) {
+            var $start = $("#startTime");
+            var startTime = parseInt($start.val());
+            var $end = $("#endTime");
+            var endTime = parseInt($end.val());
+
+
+            if (num === 1 && !flag) {
+                $(document).keypress(function (e) {
+                    if (e.key === 'n') {
+                        getLogTime(2);
+                    } else if (e.key === 'N') {
+                        getLogTime(3);
+                    }
+                });
+                flag = true;
+            }
+
+            if (num === 2) {
+                startTime += 1;
+                endTime += 1;
+            }
+            if (num === 3) {
+                startTime -= 1;
+                endTime -= 1;
+            }
+
+            if (num === 2 || num === 3) {
+                $start.val(startTime);
+                $end.val(endTime);
+            }
+
+            var modules = [];
+            var lls = [];
+
+            $("input[name=checkBoxModule]:checked").each(function () {
+                modules.push($(this).val())
+            });
+
+            $("input[name=checkBoxLogLevel]:checked").each(function () {
+                lls.push($(this).val())
+            });
+
+            $.ajax("viewLog", {
+                type: 'POST',
+                data: {
+                    'startTime': startTime,
+                    'endTime': endTime,
+                    'lls': lls,
+                    'modules': modules
+                },
+                traditional: true,
+                success: function (data) {
+                    const code = $("#logs");
+                    code.html(data);
+                }
+            });
+        }
+    </script>
+
+{% endblock %}
