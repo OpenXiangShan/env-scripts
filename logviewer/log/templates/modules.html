@@ -1,0 +1,23 @@
+<form role="form" id="moduleForm">
+    <div class="form-group">
+	<label class="checkbox-row">
+	    <input type="checkbox" id="selAll">全选
+	</label></br>
+        {% for m in  modules %}
+            <label class="checkbox-inline">
+                <input type="checkbox" name="checkBoxModule" value="{{ m }}"> {{ m }}
+            </label>
+        {% endfor %}
+    </div>
+</form>
+
+<br>
+
+<form role="form" class="form-inline" id="timeForm">
+    <input type="number" class="form-control" id="startTime" name="startTime" placeholder="开始时间"
+           value={{ startTime }}>&nbsp;&nbsp;
+    <input type="number" class="form-control" id="endTime" name="endTime" placeholder="结束时间" value={{ endTime }}>&nbsp;&nbsp;
+    <button type="button" class="btn btn-primary" onclick="getLogTime(1)">确认</button>&nbsp;&nbsp;
+    <button type="button" class="btn btn-primary" onclick="getLogTime(2)">前进一步(n)</button>&nbsp;&nbsp;
+    <button type="button" class="btn btn-primary" onclick="getLogTime(3)">倒退一步(N)</button>
+</form>
