@@ -1,8 +1,8 @@
 EMU_VCS := simv
 
 RTL_DIR = $(abspath ./rtl)
+LIB_DIR = $(abspath ./nanshan_sram_317)
 VCS_SRC_FILE = $(shell find $(RTL_DIR) -name "*.v")
-
 
 VCS_TB_DIR = $(abspath ./testbench)
 VCS_TB_FILE = $(shell find $(VCS_TB_DIR) -name "*.c") \
@@ -17,10 +17,14 @@ VCS_OPTS := -full64 +v2k -timescale=1ns/1ns \
   +define+RANDOMIZE_INVALID_ASSIGN \
   +define+RANDOMIZE_MEM_INIT \
   +define+RANDOMIZE_DELAY=0 \
-  +define+RANDOMIZE_REG_INIT
- 
+  +define+RANDOMIZE_REG_INIT \
+  +define+UNIT_DELAY \
+  +define+no_warning \
+  -f nanshan.f \
+  -f sram.f
+
 $(EMU_VCS): $(VCS_SRC_FILE) $(VCS_TB_FILE)
-	vcs $(VCS_OPTS) $(VCS_SRC_FILE) $(VCS_TB_FILE)
+	export RTL_PATH=$(RTL_DIR) && export LIB_PATH=$(LIB_DIR) && export LIB_PREFIX="tt0p9v85c.v" && vcs $(VCS_OPTS) $(VCS_TB_FILE)
 
 clean:
 	rm -rf simv csrc DVEfiles simv.daidir stack.info.* ucli.key

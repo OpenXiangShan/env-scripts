@@ -21,7 +21,7 @@ uint32_t sd_read(int ren) {
 }
 
 void init_sd(void) {
-  fp = fopen("/home/xyn/debian/debian.img", "r");
+  fp = fopen("/bigdata/xs-workloads/debians/riscv-debian-mini.img", "r");
   if(!fp) {
     printf("[warning] sdcard img not found\n");
   }
