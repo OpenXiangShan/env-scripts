@@ -1,0 +1,124 @@
+{% extends 'base.html' %}
+
+{% block title %}
+    <title> Home </title>
+{% endblock %}
+
+{% block content %}
+<!--- <section class="hero bg-overlay" id="hero" data-bg={% static "img/hero.jpeg" %}> -->
+    <section class="hero bg-overlay" id="hero" data-bg="bg-dark">
+        <div class="text">
+            <p class="lead">XS Core Log Viewer</p>
+            <h1>香山处理器Log查看器</h1>
+            <div class="cta">
+                <a href="debug" class="btn btn-primary smooth-link">开始Debug</a>
+                <div class="link">
+                    <a href="#">Help</a>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <section class="padding" id="features">
+        <div class="container">
+            <div class="row">
+                <div class="col-12 col-md-4 col-sm-12">
+                    <div class="list-item">
+                        <div class="icon">
+                            <i class="ion-code"></i>
+                        </div>
+                        <div class="desc">
+                            <h2>Based on Bootstrap 4</h2>
+                            <p>
+                                Lorem ipsum dolor sit amet, consectetur adipisicing elit, sed do eiusmod
+                                tempor incididunt ut labore.
+                            </p>
+                            <a href="#" class="more">Learn More</a>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-12 col-md-4 col-sm-12">
+                    <div class="list-item">
+                        <div class="icon">
+                            <i class="ion-social-github"></i>
+                        </div>
+                        <div class="desc">
+                            <h2>Open Source</h2>
+                            <p>
+                                Lorem ipsum dolor sit amet, consectetur adipisicing elit, sed do eiusmod
+                                tempor incididunt ut labore.
+                            </p>
+                            <a href="#" class="more">Learn More</a>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-12 col-md-4 col-sm-12">
+                    <div class="list-item no-spacing">
+                        <div class="icon">
+                            <i class="ion-paintbrush"></i>
+                        </div>
+                        <div class="desc">
+                            <h2>Customizable</h2>
+                            <p>
+                                Lorem ipsum dolor sit amet, consectetur adipisicing elit, sed do eiusmod
+                                tempor incididunt ut labore.
+                            </p>
+                            <a href="#" class="more">Learn More</a>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <section class="bg-overlay padding" id="project" data-bg={% static "img/projects.jpeg" %}>
+        <div class="container">
+            <div class="row align-items-center">
+                <div class="col-12 col-md-6">
+                    <figure class="projects-picture">
+                        <img src={% static "img/youzhang.png" %} alt="Youzhang">
+                    </figure>
+                </div>
+                <div class="col-12 col-md-6">
+                    <div class="projects-details">
+                        <div class="projects-badge">
+                            Featured
+                        </div>
+                        <h2 class="projects-title">Youzhang - Ionic 3 Catalogue Template</h2>
+                        <p class="projects-description">
+                            Youzhang is an iconic template catalog 3. This ionic template uses version 3 and uses the
+                            latest feature of ionic v3 that is Lazy Loading. With Ionic version 3 and Lazy Loading you
+                            don’t have to define all the components in the app.module.ts file and your hybrid app will
+                            get more native and it will make the app performance better.
+                        </p>
+                        <div class="projects-cta">
+                            <a href="#" class="btn btn-primary" target="_blank">
+                                Buy Now
+                            </a>
+                            <a href="#" class="btn btn-link" target="_blank">
+                                More Products
+                            </a>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <section class="callout">
+        <div class="container">
+            <div class="row align-items-center">
+                <div class="col-12 col-md-8 text">
+                    <h3>Start your project with this awesome template</h3>
+                </div>
+                <div class="col-12 col-md-4 cta">
+                    <a href="#" class="btn btn-outline-primary">
+                        Download Now
+                    </a>
+                </div>
+            </div>
+        </div>
+    </section>
+
+
+{% endblock %}

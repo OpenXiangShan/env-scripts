@@ -1,0 +1,115 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width,initial-scale=1">
+    <meta name="author" content="">
+    <meta name="keyword" content=" template, html5, css3, bootstrap4">
+    <meta name="description" content="HTML5 and CSS3 Template Based on Bootstrap 4">
+    {% block title %}
+    {% endblock %}
+    <link rel="stylesheet" href={% static "ionicons/css/ionicons.css" %}>
+    <link rel="stylesheet" href={% static "bootstrap/css/bootstrap.min.css" %}>
+    <link rel="stylesheet" href={% static "sweetalert/dist/sweetalert.css" %}>
+    <link rel="stylesheet" href={% static "css/stisla.css" %}>
+</head>
+
+
+<body>
+
+<nav class="navbar navbar-expand-lg main-navbar bg-dark">
+    <div class="container-fluid">
+        <a class="navbar-brand" href="#">
+            <img src={% static "img/logo-light.png" %} alt="Logo">
+        </a>
+        <button class="navbar-toggler" type="button" data-toggle="collapse" data-target="#navbarNav"
+                aria-controls="navbarNav" aria-expanded="false" aria-label="Toggle navigation">
+		<span class="navbar-toggler-icon">
+			<i class="ion-navicon"></i>
+		</span>
+        </button>
+        <div class="collapse navbar-collapse" id="navbarNav">
+            <div class="mr-auto"></div>
+            <ul class="navbar-nav">
+                <li class="nav-item active">
+                    <a class="nav-link smooth-link" href="/log">Home</a>
+                </li>
+                <li class="nav-item">
+                    <a class="nav-link smooth-link" href="#features">Features</a>
+                </li>
+                <li class="nav-item">
+                    <a class="nav-link smooth-link" href="#blog">Blog</a>
+                </li>
+                <li class="nav-item">
+                    <a class="nav-link smooth-link" href="#project">Project</a>
+                </li>
+            </ul>
+            <form class="form-inline">
+                <a href="#" data-toggle="modal" data-target="#helpModal" class="btn smooth-link align-middle btn-primary">Need Help?</a>
+            </form>
+        </div>
+    </div>
+</nav>
+
+{% block content %}
+{% endblock %}
+
+
+<div class="modal fade" id="helpModal" aria-hidden="true" role="dialog" >
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <button type="button" class="close" data-dismiss="modal" aria-hidden="true">&times;</button>
+                <h4 class="modal-title" >帮助</h4>
+            </div>
+            <div class="modal-body">
+                <table class="table table-striped">
+                    <tr>
+                        <td>前进1周期</td>
+                        <td><kbd>n</kbd></td>
+                    </tr>
+                    <tr>
+                        <td>后退1周期</td>
+                        <td><kbd>N</kbd></td>
+                    </tr>
+                    <tr>
+                        <td>返回页面顶部</td>
+                        <td><kbd>g</kbd></td>
+                    </tr>
+                    <tr>
+                        <td>前往页面底部</td>
+                        <td><kbd>G</kbd></td>
+                    </tr>
+                </table>
+            </div>
+            <div class="modal-footer">
+                <a href="/log/debug"><button type="button" class="btn btn-primary">开始DEBUG</button></a>
+                <button type="button" class="btn btn-default" data-dismiss="modal">关闭</button>
+            </div>
+        </div><!-- /.modal-content -->
+    </div><!-- /.modal -->
+</div>
+
+<footer id="footer">
+    <div class="container">
+        <figure>
+            <img src={% static "img/logo-light.png" %} alt="Logo">
+        </figure>
+        <p>Copyright &copy; 2019.Company name All rights reserved.<a target="_blank" href="http://sc.chinaz.com/moban/">&#x7F51;&#x9875;&#x6A21;&#x677F;</a>
+        </p>
+    </div>
+</footer>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/popper.js/1.12.6/umd/popper.js"></script>
+<script src={% static "js/jquery.min.js" %}></script>
+<script src={% static "bootstrap/js/bootstrap.min.js" %}></script>
+<script src={% static "js/jquery.easeScroll.js" %}></script>
+<script src={% static "sweetalert/dist/sweetalert.min.js" %}></script>
+<script src={% static "js/stisla.js" %}></script>
+
+{% block scripts %}
+{% endblock %}
+
+</body>
+</html>
