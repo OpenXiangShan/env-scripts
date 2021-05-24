@@ -284,7 +284,7 @@ assign mmio_auto_axi4xbar_in_ar_bits_cache = cpu_peripheral_0_ar_bits_cache;
 assign mmio_auto_axi4xbar_in_ar_bits_prot = cpu_peripheral_0_ar_bits_prot;
 assign mmio_auto_axi4xbar_in_ar_bits_qos = cpu_peripheral_0_ar_bits_qos;
 assign mmio_auto_axi4xbar_in_r_ready = cpu_peripheral_0_r_ready;
-assign mmio_io_uart_in_ch = 0;
+assign mmio_io_uart_in_ch = 8'hff;
 
 assign ram_clock = clock;
 assign ram_reset = reset;

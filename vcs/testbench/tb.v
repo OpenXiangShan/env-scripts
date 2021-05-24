@@ -1,4 +1,5 @@
 import "DPI-C" function void init_ram();
+import "DPI-C" function void init_sd();
 
 module tb_top();
 
@@ -9,6 +10,7 @@ wire [7:0] uart_ch;
 
 initial begin
   init_ram();
+  init_sd();
   clock = 0;
   reset = 1;
   //$vcdplusfile("fix.vpd");
@@ -29,7 +31,7 @@ sim_top sim (
 );
 
 always @(posedge clock) begin
-  if (uart_valid) begin
+  if (uart_valid && uart_ch) begin
     $write("%c", uart_ch);
   end
 end
@@ -69,6 +71,10 @@ always @(posedge clock) begin
   if (!reset && cycle_count % 10000 == 0) begin
     $display("[time=%d] instrCnt = %d", cycle_count, commit_count);
     //$display("[time=%d] mcycle=%d, minstret=%d, bpRight=%d, bpWrong=%d", cycle_count, `CSR.mcycle, `CSR.minstret, `CSR.bpRight, `CSR.bpWrong);
+  end
+
+  if (!reset && sim.mmio.io_uart_in_valid) begin
+    $display("[time=%d] uart query, instrCnt = %d", cycle_count, commit_count);
   end
 end
 
