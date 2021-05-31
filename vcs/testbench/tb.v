@@ -18,9 +18,6 @@ initial begin
     $vcdpluson;
   end
   #100 reset = 0;
-  // #10000 $finish;
-  //#220000 $vcdplusfile("fix.vpd");
-  // $vcdpluson;
 end
 
 always #1 clock = ~clock;

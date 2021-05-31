@@ -1,3 +1,5 @@
+import sys
+
 need_initial = [
   # not initialized registers (from rocket-chip and chisel lib)
   # (1) RRArbiter.lastGrant; (2) PLRU replacement init state
@@ -25,14 +27,6 @@ need_force = [
   ("`CORE.frontend.instrUncache.entries_0.io_resp_bits_data", 256),
   ("`CORE.frontend.ifu.io_redirect_bits_cfiUpdate_pc", 39),#X cause LOOP to be X
   ("`CORE.frontend.ifu.io_redirect_bits_cfiUpdate_target", 39),#X cause LOOP to be X
-  #("`CORE.frontend.ifu.icache.pds_0.io_in_data", 256),
-  #("`CORE.frontend.ifu.icache.pds_1.io_in_data", 256),
-  #("`CORE.frontend.ifu.icache.pds_2.io_in_data", 256),
-  #("`CORE.frontend.ifu.icache.pds_3.io_in_data", 256),
-  #("`CORE.frontend.ifu.icache.pds_0.io_in_mask", 16),
-  #("`CORE.frontend.ifu.icache.pds_1.io_in_mask", 16),
-  #("`CORE.frontend.ifu.icache.pds_2.io_in_mask", 16),
-  #("`CORE.frontend.ifu.icache.pds_3.io_in_mask", 16),
   # dual-port SRAMs read and write the same index at the same clock cycle
   ("`CORE.frontend.ifu.bpu.bim.bim.array.array_2_ext.R0_data", 32),
   ("`CORE.frontend.ifu.bpu.preds_3.tables_5.lo_us.array.array_3_ext.R0_data", 16),
@@ -103,22 +97,29 @@ def find_qn(level, filename, prefix):
         last_line = line
   return all_qn
 
-need_qn = []
-for level, module, prefix in all_modules:
-    need_qn += find_qn(level, module, prefix)
+def rtl_generate():
+  for source, width in need_initial:
+    assert(width < 64)
+    source_name = f"{source}"
+    print("initial begin")
+    print(f"  force {source_name} = $random();")
+    print(f"  #10 release {source_name};")
+    print("end")
 
-def generate():
-  '''for source, width in need_initial:
-    # print("initial begin")
+  print("always @(clock) begin")
+  for source, width in need_force + need_force_1:
     for i in range(width):
-      source_name = f"{source}_reg_{i}_.Q"
-      print("initial begin")
+      source_name = f"{source}"
+      if width > 1:
+        source_name += f"[{i}]"
+      print(f"if ({source_name} === 1'bx) begin")
       print(f"  force {source_name} = $random();")
-      print(f"  force {source_name}N = $random();")
-      print(f"  #10 release {source_name};")
-      print("end")
-'''
+      print(f"end")
+      print(f"else begin release {source_name}; end")
+  print("end")
 
+
+def netlist_generate():
   print("always @(clock) begin")
   for source, width in need_force_1:
     for i in range(width):
@@ -137,6 +138,10 @@ def generate():
       print(f"  force {source_name} = $random();")
       print(f"end")
       print(f"else begin release {source_name}; end")
+
+  need_qn = []
+  for level, module, prefix in all_modules:
+    need_qn += find_qn(level, module, prefix)
 
   for source in need_qn:
       source_name = f"{source}.QN"
@@ -157,5 +162,9 @@ def generate():
   print("end")
 
 if __name__ == "__main__":
-  generate()
+  func_map = {
+    "rtl": rtl_generate,
+    "netlist": netlist_generate
+  }
+  func_map[sys.argv[1]]()
 

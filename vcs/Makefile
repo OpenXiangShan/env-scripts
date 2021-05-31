@@ -11,7 +11,7 @@ VCS_OTHER_FILE = $(shell find $(VCS_TB_DIR) -name "*.h")
 
 VCS_OPTS := -full64 +v2k -timescale=1ns/1ns \
   -LDFLAGS -Wl,--no-as-needed \
-  -j200 -sverilog \
+  -j200 -sverilog +error+1 \
   -debug_access+all \
   +lint=TFIPC-L \
   +define+UNIT_DELAY \
