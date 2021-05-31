@@ -1,8 +1,11 @@
+import "DPI-C" function void uart_putc(
+  input byte c
+);
+import "DPI-C" function byte uart_getc();
+
 module sim_top(
   input clock,
-  input reset,
-  output uart_valid,
-  output [7:0] uart_ch
+  input reset
 );
 
 wire         cpu_clock;
@@ -257,6 +260,66 @@ assign cpu_dma_0_ar_bits_qos = 0;
 assign cpu_dma_0_r_ready = 0;
 assign cpu_io_extIntrs = mmio_io_interrupt_intrVec;
 
+`ifdef NETLIST
+assign mmio_clock = clock;
+assign mmio_reset = reset;
+assign mmio_auto_axi4xbar_in_aw_valid = cpu_peripheral_0_aw_valid;
+assign mmio_auto_axi4xbar_in_aw_bits_id = cpu_peripheral_0_aw_bits_id;
+assign mmio_auto_axi4xbar_in_aw_bits_addr = cpu_peripheral_0_aw_bits_addr;
+assign mmio_auto_axi4xbar_in_aw_bits_len = 8'b0;
+assign mmio_auto_axi4xbar_in_aw_bits_size = {1'b0,cpu_peripheral_0_aw_bits_size[1:0]};
+assign mmio_auto_axi4xbar_in_aw_bits_burst = 2'b1;
+assign mmio_auto_axi4xbar_in_aw_bits_lock = 1'b0;
+assign mmio_auto_axi4xbar_in_aw_bits_cache = 4'b0;
+assign mmio_auto_axi4xbar_in_aw_bits_prot = 3'b1;
+assign mmio_auto_axi4xbar_in_aw_bits_qos = 4'b0;
+assign mmio_auto_axi4xbar_in_w_valid = cpu_peripheral_0_w_valid;
+assign mmio_auto_axi4xbar_in_w_bits_data = cpu_peripheral_0_w_bits_data;
+assign mmio_auto_axi4xbar_in_w_bits_strb = cpu_peripheral_0_w_bits_strb;
+assign mmio_auto_axi4xbar_in_w_bits_last = 1'b1;
+assign mmio_auto_axi4xbar_in_b_ready = cpu_peripheral_0_b_ready;
+assign mmio_auto_axi4xbar_in_ar_valid = cpu_peripheral_0_ar_valid;
+assign mmio_auto_axi4xbar_in_ar_bits_id = cpu_peripheral_0_ar_bits_id;
+assign mmio_auto_axi4xbar_in_ar_bits_addr = cpu_peripheral_0_ar_bits_addr;
+assign mmio_auto_axi4xbar_in_ar_bits_len = 8'b0;
+assign mmio_auto_axi4xbar_in_ar_bits_size = {1'b0,cpu_peripheral_0_ar_bits_size[1:0]};
+assign mmio_auto_axi4xbar_in_ar_bits_burst = 2'b1;
+assign mmio_auto_axi4xbar_in_ar_bits_lock = 1'b0;
+assign mmio_auto_axi4xbar_in_ar_bits_cache = 4'b0;
+assign mmio_auto_axi4xbar_in_ar_bits_prot = 3'b1;
+assign mmio_auto_axi4xbar_in_ar_bits_qos = 4'b0;
+assign mmio_auto_axi4xbar_in_r_ready = cpu_peripheral_0_r_ready;
+assign mmio_io_uart_in_ch = 8'hff;
+
+assign ram_clock = clock;
+assign ram_reset = reset;
+assign ram_auto_in_aw_valid = cpu_memory_0_aw_valid;
+assign ram_auto_in_aw_bits_id = cpu_memory_0_aw_bits_id;
+assign ram_auto_in_aw_bits_addr = {cpu_memory_0_aw_bits_addr[39:6],6'b0};
+assign ram_auto_in_aw_bits_len = {7'b0,cpu_memory_0_aw_bits_len[0]};
+assign ram_auto_in_aw_bits_size = cpu_memory_0_aw_bits_size;
+assign ram_auto_in_aw_bits_burst = 2'b1;
+assign ram_auto_in_aw_bits_lock = 1'b0;
+assign ram_auto_in_aw_bits_cache = 4'b0;
+assign ram_auto_in_aw_bits_prot = 3'b1;
+assign ram_auto_in_aw_bits_qos = 4'b0;
+assign ram_auto_in_w_valid = cpu_memory_0_w_valid;
+assign ram_auto_in_w_bits_data = cpu_memory_0_w_bits_data;
+assign ram_auto_in_w_bits_strb = cpu_memory_0_w_bits_strb;
+assign ram_auto_in_w_bits_last = cpu_memory_0_w_bits_last;
+assign ram_auto_in_b_ready = cpu_memory_0_b_ready;
+assign ram_auto_in_ar_valid = cpu_memory_0_ar_valid;
+assign ram_auto_in_ar_bits_id = cpu_memory_0_ar_bits_id;
+assign ram_auto_in_ar_bits_addr = {cpu_memory_0_ar_bits_addr[39:6],6'b0};
+assign ram_auto_in_ar_bits_len = {7'b0,cpu_memory_0_ar_bits_len[0]};
+assign ram_auto_in_ar_bits_size = cpu_memory_0_ar_bits_size;
+assign ram_auto_in_ar_bits_burst = 2'b1;
+assign ram_auto_in_ar_bits_lock = 1'b0;
+assign ram_auto_in_ar_bits_cache = 4'b0;
+assign ram_auto_in_ar_bits_prot = 3'b1;
+assign ram_auto_in_ar_bits_qos = 4'b0;
+assign ram_auto_in_r_ready = cpu_memory_0_r_ready;
+`else
 assign mmio_clock = clock;
 assign mmio_reset = reset;
 assign mmio_io_axi4_0_aw_valid = cpu_peripheral_0_aw_valid;
@@ -315,15 +378,26 @@ assign ram_auto_in_ar_bits_cache = cpu_memory_0_ar_bits_cache;
 assign ram_auto_in_ar_bits_prot = cpu_memory_0_ar_bits_prot;
 assign ram_auto_in_ar_bits_qos = cpu_memory_0_ar_bits_qos;
 assign ram_auto_in_r_ready = cpu_memory_0_r_ready;
+`endif
 
-assign uart_valid = mmio_io_uart_out_valid;
-assign uart_ch = mmio_io_uart_out_ch;
+always @(posedge clock) begin
+  if (mmio_io_uart_out_valid) begin
+    uart_putc(mmio_io_uart_out_ch);
+  end
+end
 
+
+`ifdef NETLIST
+nanshan_soc_core_XSTop_0 CPU(
+`else
 XSTop CPU(
-  // .clock(cpu_clock),
-  // .reset(cpu_reset),
+`endif
   .io_clock(cpu_clock),
+`ifdef NETLIST
+  .io_reset_BAR(~cpu_reset),
+`else
   .io_reset(cpu_reset),
+`endif
   .memory_0_aw_ready(cpu_memory_0_aw_ready),
   .memory_0_aw_valid(cpu_memory_0_aw_valid),
   .memory_0_aw_bits_id(cpu_memory_0_aw_bits_id),
@@ -436,6 +510,19 @@ XSTop CPU(
   .dma_0_r_bits_resp(cpu_dma_0_r_bits_resp),
   .dma_0_r_bits_last(cpu_dma_0_r_bits_last),
   .io_extIntrs(cpu_io_extIntrs)
+`ifdef NETLIST
+  ,
+  .IN22(1'b0),
+  .IN23(1'b0),
+  .IN24(1'b0),
+  .IN25(1'b0),
+  .IN26(1'b0),
+  .IN28(1'b0),
+  .IN29(1'b0),
+  .IN0(cpu_clock),
+  .IN31(1'b0),
+  .IN27(1'b0)
+`endif
 );
 
 
