@@ -1,5 +1,6 @@
 import "DPI-C" function void init_ram();
 import "DPI-C" function void init_sd();
+import "DPI-C" function void init_uart();
 
 module tb_top();
 
@@ -24,16 +25,8 @@ always #1 clock = ~clock;
 
 sim_top sim (
   .clock(clock),
-  .reset(reset),
-  .uart_valid(uart_valid),
-  .uart_ch(uart_ch)
+  .reset(reset)
 );
-
-always @(posedge clock) begin
-  if (uart_valid && uart_ch) begin
-    $write("%c", uart_ch);
-  end
-end
 
 reg [63:0] stuck_timer;
 reg [63:0] commit_count;

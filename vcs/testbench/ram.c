@@ -1,8 +1,5 @@
+#include "common.h"
 #include <sys/mman.h>
-#include <stdio.h>
-#include <stdlib.h>
-#include <stdint.h>
-#include <assert.h>
 
 #define EMU_RAM_SIZE (256 * 1024 * 1024UL)
 
@@ -72,3 +69,4 @@ void ram_write_helper(uint64_t wIdx, uint64_t wdata, uint64_t wmask, uint8_t wen
     ram[wIdx] = (ram[wIdx] & ~wmask) | (wdata & wmask);
   }
 }
+
