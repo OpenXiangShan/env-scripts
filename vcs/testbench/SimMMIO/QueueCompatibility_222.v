@@ -1,12 +1,12 @@
-module QueueCompatibility_357(
+module QueueCompatibility_222(
   input        clock,
   input        reset,
   output       io_enq_ready,
   input        io_enq_valid,
-  input  [4:0] io_enq_bits,
+  input  [5:0] io_enq_bits,
   input        io_deq_ready,
   output       io_deq_valid,
-  output [4:0] io_deq_bits
+  output [5:0] io_deq_bits
 );
 `ifdef RANDOMIZE_MEM_INIT
   reg [31:0] _RAND_0;
@@ -16,10 +16,10 @@ module QueueCompatibility_357(
   reg [31:0] _RAND_2;
   reg [31:0] _RAND_3;
 `endif // RANDOMIZE_REG_INIT
-  reg [4:0] ram [0:1]; // @[Decoupled.scala 218:16]
-  wire [4:0] ram_io_deq_bits_MPORT_data; // @[Decoupled.scala 218:16]
+  reg [5:0] ram [0:1]; // @[Decoupled.scala 218:16]
+  wire [5:0] ram_io_deq_bits_MPORT_data; // @[Decoupled.scala 218:16]
   wire  ram_io_deq_bits_MPORT_addr; // @[Decoupled.scala 218:16]
-  wire [4:0] ram_MPORT_data; // @[Decoupled.scala 218:16]
+  wire [5:0] ram_MPORT_data; // @[Decoupled.scala 218:16]
   wire  ram_MPORT_addr; // @[Decoupled.scala 218:16]
   wire  ram_MPORT_mask; // @[Decoupled.scala 218:16]
   wire  ram_MPORT_en; // @[Decoupled.scala 218:16]
@@ -109,7 +109,7 @@ initial begin
 `ifdef RANDOMIZE_MEM_INIT
   _RAND_0 = {1{`RANDOM}};
   for (initvar = 0; initvar < 2; initvar = initvar+1)
-    ram[initvar] = _RAND_0[4:0];
+    ram[initvar] = _RAND_0[5:0];
 `endif // RANDOMIZE_MEM_INIT
 `ifdef RANDOMIZE_REG_INIT
   _RAND_1 = {1{`RANDOM}};
@@ -126,3 +126,4 @@ end // initial
 `endif
 `endif // SYNTHESIS
 endmodule
+

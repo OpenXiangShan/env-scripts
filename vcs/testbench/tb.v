@@ -1,5 +1,6 @@
 import "DPI-C" function void init_ram();
 import "DPI-C" function void init_sd();
+import "DPI-C" function void init_uart();
 
 module tb_top();
 
@@ -13,35 +14,27 @@ initial begin
   init_sd();
   clock = 0;
   reset = 1;
-  //$vcdplusfile("fix.vpd");
-  //$vcdpluson;
+  if ($test$plusargs("dump-wave")) begin
+    $vcdplusfile("fix.vpd");
+    $vcdpluson;
+  end
   #100 reset = 0;
-  // #10000 $finish;
-  //#220000 $vcdplusfile("fix.vpd");
-  // $vcdpluson;
 end
 
 always #1 clock = ~clock;
 
 sim_top sim (
   .clock(clock),
-  .reset(reset),
-  .uart_valid(uart_valid),
-  .uart_ch(uart_ch)
+  .reset(reset)
 );
-
-always @(posedge clock) begin
-  if (uart_valid && uart_ch) begin
-    $write("%c", uart_ch);
-  end
-end
 
 reg [63:0] stuck_timer;
 reg [63:0] commit_count;
 reg [63:0] cycle_count;
 
-`define ROQ sim.CPU.core.ctrlBlock.roq
-`define CSR sim.CPU.core.integerBlock.jmpExeUnit.csr
+`define CORE sim.CPU.core
+`define ROQ  `CORE.ctrlBlock.roq
+`define CSR  `CORE.integerBlock.jmpExeUnit.csr
 
 wire has_commit = !`ROQ.io_commits_isWalk && `ROQ.io_commits_valid_0;
 
@@ -61,8 +54,8 @@ always @(posedge clock) begin
   else
     cycle_count <= cycle_count + 1;
 
-  if (!reset && stuck_timer > 5000) begin
-    $display("no instruction commits for 5000 cycles");
+  if (!reset && stuck_timer > 2000) begin
+    $display("no instruction commits for 2000 cycles");
     $finish;
   end
   if (!reset && !`ROQ.io_commits_isWalk && `ROQ.io_commits_valid_0) begin
@@ -77,6 +70,8 @@ always @(posedge clock) begin
     $display("[time=%d] uart query, instrCnt = %d", cycle_count, commit_count);
   end
 end
+
+`include "testbench/force.h"
 
 endmodule
 
