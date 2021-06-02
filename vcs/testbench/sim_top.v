@@ -1,15 +1,18 @@
+import "DPI-C" function void uart_putc(
+  input byte c
+);
+import "DPI-C" function byte uart_getc();
+
 module sim_top(
   input clock,
-  input reset,
-  output uart_valid,
-  output [7:0] uart_ch
+  input reset
 );
 
 wire         cpu_clock;
 wire         cpu_reset;
 wire         cpu_memory_0_aw_ready;
 wire         cpu_memory_0_aw_valid;
-wire [7:0]   cpu_memory_0_aw_bits_id;
+wire [6:0]   cpu_memory_0_aw_bits_id;
 wire [39:0]  cpu_memory_0_aw_bits_addr;
 wire [7:0]   cpu_memory_0_aw_bits_len;
 wire [2:0]   cpu_memory_0_aw_bits_size;
@@ -25,11 +28,11 @@ wire [31:0]  cpu_memory_0_w_bits_strb;
 wire         cpu_memory_0_w_bits_last;
 wire         cpu_memory_0_b_ready;
 wire         cpu_memory_0_b_valid;
-wire [7:0]   cpu_memory_0_b_bits_id;
+wire [6:0]   cpu_memory_0_b_bits_id;
 wire [1:0]   cpu_memory_0_b_bits_resp;
 wire         cpu_memory_0_ar_ready;
 wire         cpu_memory_0_ar_valid;
-wire [7:0]   cpu_memory_0_ar_bits_id;
+wire [6:0]   cpu_memory_0_ar_bits_id;
 wire [39:0]  cpu_memory_0_ar_bits_addr;
 wire [7:0]   cpu_memory_0_ar_bits_len;
 wire [2:0]   cpu_memory_0_ar_bits_size;
@@ -40,7 +43,7 @@ wire [2:0]   cpu_memory_0_ar_bits_prot;
 wire [3:0]   cpu_memory_0_ar_bits_qos;
 wire         cpu_memory_0_r_ready;
 wire         cpu_memory_0_r_valid;
-wire [7:0]   cpu_memory_0_r_bits_id;
+wire [6:0]   cpu_memory_0_r_bits_id;
 wire [255:0] cpu_memory_0_r_bits_data;
 wire [1:0]   cpu_memory_0_r_bits_resp;
 wire         cpu_memory_0_r_bits_last;
@@ -120,55 +123,56 @@ wire [1:0]   cpu_dma_0_r_bits_resp;
 wire         cpu_dma_0_r_bits_last;
 wire [149:0] cpu_io_extIntrs;
 
-wire        mmio_clock;
-wire        mmio_reset;
-wire        mmio_auto_axi4xbar_in_aw_ready;
-wire        mmio_auto_axi4xbar_in_aw_valid;
-wire [1:0]  mmio_auto_axi4xbar_in_aw_bits_id;
-wire [30:0] mmio_auto_axi4xbar_in_aw_bits_addr;
-wire [7:0]  mmio_auto_axi4xbar_in_aw_bits_len;
-wire [2:0]  mmio_auto_axi4xbar_in_aw_bits_size;
-wire [1:0]  mmio_auto_axi4xbar_in_aw_bits_burst;
-wire        mmio_auto_axi4xbar_in_aw_bits_lock;
-wire [3:0]  mmio_auto_axi4xbar_in_aw_bits_cache;
-wire [2:0]  mmio_auto_axi4xbar_in_aw_bits_prot;
-wire [3:0]  mmio_auto_axi4xbar_in_aw_bits_qos;
-wire        mmio_auto_axi4xbar_in_w_ready;
-wire        mmio_auto_axi4xbar_in_w_valid;
-wire [63:0] mmio_auto_axi4xbar_in_w_bits_data;
-wire [7:0]  mmio_auto_axi4xbar_in_w_bits_strb;
-wire        mmio_auto_axi4xbar_in_w_bits_last;
-wire        mmio_auto_axi4xbar_in_b_ready;
-wire        mmio_auto_axi4xbar_in_b_valid;
-wire [1:0]  mmio_auto_axi4xbar_in_b_bits_id;
-wire [1:0]  mmio_auto_axi4xbar_in_b_bits_resp;
-wire        mmio_auto_axi4xbar_in_ar_ready;
-wire        mmio_auto_axi4xbar_in_ar_valid;
-wire [1:0]  mmio_auto_axi4xbar_in_ar_bits_id;
-wire [30:0] mmio_auto_axi4xbar_in_ar_bits_addr;
-wire [7:0]  mmio_auto_axi4xbar_in_ar_bits_len;
-wire [2:0]  mmio_auto_axi4xbar_in_ar_bits_size;
-wire [1:0]  mmio_auto_axi4xbar_in_ar_bits_burst;
-wire        mmio_auto_axi4xbar_in_ar_bits_lock;
-wire [3:0]  mmio_auto_axi4xbar_in_ar_bits_cache;
-wire [2:0]  mmio_auto_axi4xbar_in_ar_bits_prot;
-wire [3:0]  mmio_auto_axi4xbar_in_ar_bits_qos;
-wire        mmio_auto_axi4xbar_in_r_ready;
-wire        mmio_auto_axi4xbar_in_r_valid;
-wire [1:0]  mmio_auto_axi4xbar_in_r_bits_id;
-wire [63:0] mmio_auto_axi4xbar_in_r_bits_data;
-wire [1:0]  mmio_auto_axi4xbar_in_r_bits_resp;
-wire        mmio_auto_axi4xbar_in_r_bits_last;
-wire        mmio_io_uart_out_valid;
-wire [7:0]  mmio_io_uart_out_ch;
-wire        mmio_io_uart_in_valid;
-wire [7:0]  mmio_io_uart_in_ch;
+wire         mmio_clock;
+wire         mmio_reset;
+wire         mmio_io_axi4_0_aw_ready;
+wire         mmio_io_axi4_0_aw_valid;
+wire [1:0]   mmio_io_axi4_0_aw_bits_id;
+wire [30:0]  mmio_io_axi4_0_aw_bits_addr;
+wire [7:0]   mmio_io_axi4_0_aw_bits_len;
+wire [2:0]   mmio_io_axi4_0_aw_bits_size;
+wire [1:0]   mmio_io_axi4_0_aw_bits_burst;
+wire         mmio_io_axi4_0_aw_bits_lock;
+wire [3:0]   mmio_io_axi4_0_aw_bits_cache;
+wire [2:0]   mmio_io_axi4_0_aw_bits_prot;
+wire [3:0]   mmio_io_axi4_0_aw_bits_qos;
+wire         mmio_io_axi4_0_w_ready;
+wire         mmio_io_axi4_0_w_valid;
+wire [63:0]  mmio_io_axi4_0_w_bits_data;
+wire [7:0]   mmio_io_axi4_0_w_bits_strb;
+wire         mmio_io_axi4_0_w_bits_last;
+wire         mmio_io_axi4_0_b_ready;
+wire         mmio_io_axi4_0_b_valid;
+wire [1:0]   mmio_io_axi4_0_b_bits_id;
+wire [1:0]   mmio_io_axi4_0_b_bits_resp;
+wire         mmio_io_axi4_0_ar_ready;
+wire         mmio_io_axi4_0_ar_valid;
+wire [1:0]   mmio_io_axi4_0_ar_bits_id;
+wire [30:0]  mmio_io_axi4_0_ar_bits_addr;
+wire [7:0]   mmio_io_axi4_0_ar_bits_len;
+wire [2:0]   mmio_io_axi4_0_ar_bits_size;
+wire [1:0]   mmio_io_axi4_0_ar_bits_burst;
+wire         mmio_io_axi4_0_ar_bits_lock;
+wire [3:0]   mmio_io_axi4_0_ar_bits_cache;
+wire [2:0]   mmio_io_axi4_0_ar_bits_prot;
+wire [3:0]   mmio_io_axi4_0_ar_bits_qos;
+wire         mmio_io_axi4_0_r_ready;
+wire         mmio_io_axi4_0_r_valid;
+wire [1:0]   mmio_io_axi4_0_r_bits_id;
+wire [63:0]  mmio_io_axi4_0_r_bits_data;
+wire [1:0]   mmio_io_axi4_0_r_bits_resp;
+wire         mmio_io_axi4_0_r_bits_last;
+wire         mmio_io_uart_out_valid;
+wire [7:0]   mmio_io_uart_out_ch;
+wire         mmio_io_uart_in_valid;
+wire [7:0]   mmio_io_uart_in_ch;
+wire [255:0] mmio_io_interrupt_intrVec;
 
 wire         ram_clock;
 wire         ram_reset;
 wire         ram_auto_in_aw_ready;
 wire         ram_auto_in_aw_valid;
-wire [7:0]   ram_auto_in_aw_bits_id;
+wire [6:0]   ram_auto_in_aw_bits_id;
 wire [39:0]  ram_auto_in_aw_bits_addr;
 wire [7:0]   ram_auto_in_aw_bits_len;
 wire [2:0]   ram_auto_in_aw_bits_size;
@@ -184,11 +188,11 @@ wire [31:0]  ram_auto_in_w_bits_strb;
 wire         ram_auto_in_w_bits_last;
 wire         ram_auto_in_b_ready;
 wire         ram_auto_in_b_valid;
-wire [7:0]   ram_auto_in_b_bits_id;
+wire [6:0]   ram_auto_in_b_bits_id;
 wire [1:0]   ram_auto_in_b_bits_resp;
 wire         ram_auto_in_ar_ready;
 wire         ram_auto_in_ar_valid;
-wire [7:0]   ram_auto_in_ar_bits_id;
+wire [6:0]   ram_auto_in_ar_bits_id;
 wire [39:0]  ram_auto_in_ar_bits_addr;
 wire [7:0]   ram_auto_in_ar_bits_len;
 wire [2:0]   ram_auto_in_ar_bits_size;
@@ -199,7 +203,7 @@ wire [2:0]   ram_auto_in_ar_bits_prot;
 wire [3:0]   ram_auto_in_ar_bits_qos;
 wire         ram_auto_in_r_ready;
 wire         ram_auto_in_r_valid;
-wire [7:0]   ram_auto_in_r_bits_id;
+wire [6:0]   ram_auto_in_r_bits_id;
 wire [255:0] ram_auto_in_r_bits_data;
 wire [1:0]   ram_auto_in_r_bits_resp;
 wire         ram_auto_in_r_bits_last;
@@ -217,17 +221,17 @@ assign cpu_memory_0_r_bits_id = ram_auto_in_r_bits_id;
 assign cpu_memory_0_r_bits_data = ram_auto_in_r_bits_data;
 assign cpu_memory_0_r_bits_resp = ram_auto_in_r_bits_resp;
 assign cpu_memory_0_r_bits_last = ram_auto_in_r_bits_last;
-assign cpu_peripheral_0_aw_ready = mmio_auto_axi4xbar_in_aw_ready;
-assign cpu_peripheral_0_w_ready = mmio_auto_axi4xbar_in_w_ready;
-assign cpu_peripheral_0_b_valid = mmio_auto_axi4xbar_in_b_valid;
-assign cpu_peripheral_0_b_bits_id = mmio_auto_axi4xbar_in_b_bits_id;
-assign cpu_peripheral_0_b_bits_resp = mmio_auto_axi4xbar_in_b_bits_resp;
-assign cpu_peripheral_0_ar_ready = mmio_auto_axi4xbar_in_ar_ready;
-assign cpu_peripheral_0_r_valid = mmio_auto_axi4xbar_in_r_valid;
-assign cpu_peripheral_0_r_bits_id = mmio_auto_axi4xbar_in_r_bits_id;
-assign cpu_peripheral_0_r_bits_data = mmio_auto_axi4xbar_in_r_bits_data;
-assign cpu_peripheral_0_r_bits_resp = mmio_auto_axi4xbar_in_r_bits_resp;
-assign cpu_peripheral_0_r_bits_last = mmio_auto_axi4xbar_in_r_bits_last;
+assign cpu_peripheral_0_aw_ready = mmio_io_axi4_0_aw_ready;
+assign cpu_peripheral_0_w_ready = mmio_io_axi4_0_w_ready;
+assign cpu_peripheral_0_b_valid = mmio_io_axi4_0_b_valid;
+assign cpu_peripheral_0_b_bits_id = mmio_io_axi4_0_b_bits_id;
+assign cpu_peripheral_0_b_bits_resp = mmio_io_axi4_0_b_bits_resp;
+assign cpu_peripheral_0_ar_ready = mmio_io_axi4_0_ar_ready;
+assign cpu_peripheral_0_r_valid = mmio_io_axi4_0_r_valid;
+assign cpu_peripheral_0_r_bits_id = mmio_io_axi4_0_r_bits_id;
+assign cpu_peripheral_0_r_bits_data = mmio_io_axi4_0_r_bits_data;
+assign cpu_peripheral_0_r_bits_resp = mmio_io_axi4_0_r_bits_resp;
+assign cpu_peripheral_0_r_bits_last = mmio_io_axi4_0_r_bits_last;
 assign cpu_dma_0_aw_valid = 0;
 assign cpu_dma_0_aw_bits_id = 0;
 assign cpu_dma_0_aw_bits_addr = 0;
@@ -254,36 +258,96 @@ assign cpu_dma_0_ar_bits_cache = 0;
 assign cpu_dma_0_ar_bits_prot = 0;
 assign cpu_dma_0_ar_bits_qos = 0;
 assign cpu_dma_0_r_ready = 0;
-assign cpu_io_extIntrs = 0;
+assign cpu_io_extIntrs = mmio_io_interrupt_intrVec;
 
+`ifdef NETLIST
 assign mmio_clock = clock;
 assign mmio_reset = reset;
 assign mmio_auto_axi4xbar_in_aw_valid = cpu_peripheral_0_aw_valid;
 assign mmio_auto_axi4xbar_in_aw_bits_id = cpu_peripheral_0_aw_bits_id;
 assign mmio_auto_axi4xbar_in_aw_bits_addr = cpu_peripheral_0_aw_bits_addr;
-assign mmio_auto_axi4xbar_in_aw_bits_len = cpu_peripheral_0_aw_bits_len;
-assign mmio_auto_axi4xbar_in_aw_bits_size = cpu_peripheral_0_aw_bits_size;
-assign mmio_auto_axi4xbar_in_aw_bits_burst = cpu_peripheral_0_aw_bits_burst;
-assign mmio_auto_axi4xbar_in_aw_bits_lock = cpu_peripheral_0_aw_bits_lock;
-assign mmio_auto_axi4xbar_in_aw_bits_cache = cpu_peripheral_0_aw_bits_cache;
-assign mmio_auto_axi4xbar_in_aw_bits_prot = cpu_peripheral_0_aw_bits_prot;
-assign mmio_auto_axi4xbar_in_aw_bits_qos = cpu_peripheral_0_aw_bits_qos;
+assign mmio_auto_axi4xbar_in_aw_bits_len = 8'b0;
+assign mmio_auto_axi4xbar_in_aw_bits_size = {1'b0,cpu_peripheral_0_aw_bits_size[1:0]};
+assign mmio_auto_axi4xbar_in_aw_bits_burst = 2'b1;
+assign mmio_auto_axi4xbar_in_aw_bits_lock = 1'b0;
+assign mmio_auto_axi4xbar_in_aw_bits_cache = 4'b0;
+assign mmio_auto_axi4xbar_in_aw_bits_prot = 3'b1;
+assign mmio_auto_axi4xbar_in_aw_bits_qos = 4'b0;
 assign mmio_auto_axi4xbar_in_w_valid = cpu_peripheral_0_w_valid;
 assign mmio_auto_axi4xbar_in_w_bits_data = cpu_peripheral_0_w_bits_data;
 assign mmio_auto_axi4xbar_in_w_bits_strb = cpu_peripheral_0_w_bits_strb;
-assign mmio_auto_axi4xbar_in_w_bits_last = cpu_peripheral_0_w_bits_last;
+assign mmio_auto_axi4xbar_in_w_bits_last = 1'b1;
 assign mmio_auto_axi4xbar_in_b_ready = cpu_peripheral_0_b_ready;
 assign mmio_auto_axi4xbar_in_ar_valid = cpu_peripheral_0_ar_valid;
 assign mmio_auto_axi4xbar_in_ar_bits_id = cpu_peripheral_0_ar_bits_id;
 assign mmio_auto_axi4xbar_in_ar_bits_addr = cpu_peripheral_0_ar_bits_addr;
-assign mmio_auto_axi4xbar_in_ar_bits_len = cpu_peripheral_0_ar_bits_len;
-assign mmio_auto_axi4xbar_in_ar_bits_size = cpu_peripheral_0_ar_bits_size;
-assign mmio_auto_axi4xbar_in_ar_bits_burst = cpu_peripheral_0_ar_bits_burst;
-assign mmio_auto_axi4xbar_in_ar_bits_lock = cpu_peripheral_0_ar_bits_lock;
-assign mmio_auto_axi4xbar_in_ar_bits_cache = cpu_peripheral_0_ar_bits_cache;
-assign mmio_auto_axi4xbar_in_ar_bits_prot = cpu_peripheral_0_ar_bits_prot;
-assign mmio_auto_axi4xbar_in_ar_bits_qos = cpu_peripheral_0_ar_bits_qos;
+assign mmio_auto_axi4xbar_in_ar_bits_len = 8'b0;
+assign mmio_auto_axi4xbar_in_ar_bits_size = {1'b0,cpu_peripheral_0_ar_bits_size[1:0]};
+assign mmio_auto_axi4xbar_in_ar_bits_burst = 2'b1;
+assign mmio_auto_axi4xbar_in_ar_bits_lock = 1'b0;
+assign mmio_auto_axi4xbar_in_ar_bits_cache = 4'b0;
+assign mmio_auto_axi4xbar_in_ar_bits_prot = 3'b1;
+assign mmio_auto_axi4xbar_in_ar_bits_qos = 4'b0;
 assign mmio_auto_axi4xbar_in_r_ready = cpu_peripheral_0_r_ready;
+assign mmio_io_uart_in_ch = 8'hff;
+
+assign ram_clock = clock;
+assign ram_reset = reset;
+assign ram_auto_in_aw_valid = cpu_memory_0_aw_valid;
+assign ram_auto_in_aw_bits_id = cpu_memory_0_aw_bits_id;
+assign ram_auto_in_aw_bits_addr = {cpu_memory_0_aw_bits_addr[39:6],6'b0};
+assign ram_auto_in_aw_bits_len = {7'b0,cpu_memory_0_aw_bits_len[0]};
+assign ram_auto_in_aw_bits_size = cpu_memory_0_aw_bits_size;
+assign ram_auto_in_aw_bits_burst = 2'b1;
+assign ram_auto_in_aw_bits_lock = 1'b0;
+assign ram_auto_in_aw_bits_cache = 4'b0;
+assign ram_auto_in_aw_bits_prot = 3'b1;
+assign ram_auto_in_aw_bits_qos = 4'b0;
+assign ram_auto_in_w_valid = cpu_memory_0_w_valid;
+assign ram_auto_in_w_bits_data = cpu_memory_0_w_bits_data;
+assign ram_auto_in_w_bits_strb = cpu_memory_0_w_bits_strb;
+assign ram_auto_in_w_bits_last = cpu_memory_0_w_bits_last;
+assign ram_auto_in_b_ready = cpu_memory_0_b_ready;
+assign ram_auto_in_ar_valid = cpu_memory_0_ar_valid;
+assign ram_auto_in_ar_bits_id = cpu_memory_0_ar_bits_id;
+assign ram_auto_in_ar_bits_addr = {cpu_memory_0_ar_bits_addr[39:6],6'b0};
+assign ram_auto_in_ar_bits_len = {7'b0,cpu_memory_0_ar_bits_len[0]};
+assign ram_auto_in_ar_bits_size = cpu_memory_0_ar_bits_size;
+assign ram_auto_in_ar_bits_burst = 2'b1;
+assign ram_auto_in_ar_bits_lock = 1'b0;
+assign ram_auto_in_ar_bits_cache = 4'b0;
+assign ram_auto_in_ar_bits_prot = 3'b1;
+assign ram_auto_in_ar_bits_qos = 4'b0;
+assign ram_auto_in_r_ready = cpu_memory_0_r_ready;
+`else
+assign mmio_clock = clock;
+assign mmio_reset = reset;
+assign mmio_io_axi4_0_aw_valid = cpu_peripheral_0_aw_valid;
+assign mmio_io_axi4_0_aw_bits_id = cpu_peripheral_0_aw_bits_id;
+assign mmio_io_axi4_0_aw_bits_addr = cpu_peripheral_0_aw_bits_addr;
+assign mmio_io_axi4_0_aw_bits_len = cpu_peripheral_0_aw_bits_len;
+assign mmio_io_axi4_0_aw_bits_size = cpu_peripheral_0_aw_bits_size;
+assign mmio_io_axi4_0_aw_bits_burst = cpu_peripheral_0_aw_bits_burst;
+assign mmio_io_axi4_0_aw_bits_lock = cpu_peripheral_0_aw_bits_lock;
+assign mmio_io_axi4_0_aw_bits_cache = cpu_peripheral_0_aw_bits_cache;
+assign mmio_io_axi4_0_aw_bits_prot = cpu_peripheral_0_aw_bits_prot;
+assign mmio_io_axi4_0_aw_bits_qos = cpu_peripheral_0_aw_bits_qos;
+assign mmio_io_axi4_0_w_valid = cpu_peripheral_0_w_valid;
+assign mmio_io_axi4_0_w_bits_data = cpu_peripheral_0_w_bits_data;
+assign mmio_io_axi4_0_w_bits_strb = cpu_peripheral_0_w_bits_strb;
+assign mmio_io_axi4_0_w_bits_last = cpu_peripheral_0_w_bits_last;
+assign mmio_io_axi4_0_b_ready = cpu_peripheral_0_b_ready;
+assign mmio_io_axi4_0_ar_valid = cpu_peripheral_0_ar_valid;
+assign mmio_io_axi4_0_ar_bits_id = cpu_peripheral_0_ar_bits_id;
+assign mmio_io_axi4_0_ar_bits_addr = cpu_peripheral_0_ar_bits_addr;
+assign mmio_io_axi4_0_ar_bits_len = cpu_peripheral_0_ar_bits_len;
+assign mmio_io_axi4_0_ar_bits_size = cpu_peripheral_0_ar_bits_size;
+assign mmio_io_axi4_0_ar_bits_burst = cpu_peripheral_0_ar_bits_burst;
+assign mmio_io_axi4_0_ar_bits_lock = cpu_peripheral_0_ar_bits_lock;
+assign mmio_io_axi4_0_ar_bits_cache = cpu_peripheral_0_ar_bits_cache;
+assign mmio_io_axi4_0_ar_bits_prot = cpu_peripheral_0_ar_bits_prot;
+assign mmio_io_axi4_0_ar_bits_qos = cpu_peripheral_0_ar_bits_qos;
+assign mmio_io_axi4_0_r_ready = cpu_peripheral_0_r_ready;
 assign mmio_io_uart_in_ch = 8'hff;
 
 assign ram_clock = clock;
@@ -314,15 +378,26 @@ assign ram_auto_in_ar_bits_cache = cpu_memory_0_ar_bits_cache;
 assign ram_auto_in_ar_bits_prot = cpu_memory_0_ar_bits_prot;
 assign ram_auto_in_ar_bits_qos = cpu_memory_0_ar_bits_qos;
 assign ram_auto_in_r_ready = cpu_memory_0_r_ready;
+`endif
 
-assign uart_valid = mmio_io_uart_out_valid;
-assign uart_ch = mmio_io_uart_out_ch;
+always @(posedge clock) begin
+  if (mmio_io_uart_out_valid) begin
+    uart_putc(mmio_io_uart_out_ch);
+  end
+end
 
+
+`ifdef NETLIST
+nanshan_soc_core_XSTop_0 CPU(
+`else
 XSTop CPU(
-  // .clock(cpu_clock),
-  // .reset(cpu_reset),
+`endif
   .io_clock(cpu_clock),
+`ifdef NETLIST
+  .io_reset_BAR(~cpu_reset),
+`else
   .io_reset(cpu_reset),
+`endif
   .memory_0_aw_ready(cpu_memory_0_aw_ready),
   .memory_0_aw_valid(cpu_memory_0_aw_valid),
   .memory_0_aw_bits_id(cpu_memory_0_aw_bits_id),
@@ -435,22 +510,35 @@ XSTop CPU(
   .dma_0_r_bits_resp(cpu_dma_0_r_bits_resp),
   .dma_0_r_bits_last(cpu_dma_0_r_bits_last),
   .io_extIntrs(cpu_io_extIntrs)
+`ifdef NETLIST
+  ,
+  .IN22(1'b0),
+  .IN23(1'b0),
+  .IN24(1'b0),
+  .IN25(1'b0),
+  .IN26(1'b0),
+  .IN28(1'b0),
+  .IN29(1'b0),
+  .IN0(cpu_clock),
+  .IN31(1'b0),
+  .IN27(1'b0)
+`endif
 );
 
 
 always @(posedge clock) begin
-   if (mmio_auto_axi4xbar_in_aw_valid) begin
-    //$display("MMIO: waddr valid %x", mmio_auto_axi4xbar_in_aw_bits_addr);
+   if (mmio_io_axi4_0_aw_valid) begin
+    //$display("MMIO: waddr valid %x", mmio_io_axi4_0_aw_bits_addr);
   end
-  if (mmio_auto_axi4xbar_in_w_valid) begin
-    //$display("MMIO: wdata %x", mmio_auto_axi4xbar_in_w_bits_data);
+  if (mmio_io_axi4_0_w_valid) begin
+    //$display("MMIO: wdata %x", mmio_io_axi4_0_w_bits_data);
   end
 
- if (mmio_auto_axi4xbar_in_aw_ready && mmio_auto_axi4xbar_in_aw_valid) begin
-    //$display("MMIO: waddr %x", mmio_auto_axi4xbar_in_aw_bits_addr);
+ if (mmio_io_axi4_0_aw_ready && mmio_io_axi4_0_aw_valid) begin
+    //$display("MMIO: waddr %x", mmio_io_axi4_0_aw_bits_addr);
   end
-  if (mmio_auto_axi4xbar_in_w_ready && mmio_auto_axi4xbar_in_w_valid) begin
-    //$display("MMIO: wdata %x", mmio_auto_axi4xbar_in_w_bits_data);
+  if (mmio_io_axi4_0_w_ready && mmio_io_axi4_0_w_valid) begin
+    //$display("MMIO: wdata %x", mmio_io_axi4_0_w_bits_data);
   end
 
 end
@@ -459,48 +547,50 @@ end
 SimMMIO mmio(
   .clock(mmio_clock),
   .reset(mmio_reset),
-  .auto_axi4xbar_in_aw_ready(mmio_auto_axi4xbar_in_aw_ready),
-  .auto_axi4xbar_in_aw_valid(mmio_auto_axi4xbar_in_aw_valid),
-  .auto_axi4xbar_in_aw_bits_id(mmio_auto_axi4xbar_in_aw_bits_id),
-  .auto_axi4xbar_in_aw_bits_addr(mmio_auto_axi4xbar_in_aw_bits_addr),
-  .auto_axi4xbar_in_aw_bits_len(mmio_auto_axi4xbar_in_aw_bits_len),
-  .auto_axi4xbar_in_aw_bits_size(mmio_auto_axi4xbar_in_aw_bits_size),
-  .auto_axi4xbar_in_aw_bits_burst(mmio_auto_axi4xbar_in_aw_bits_burst),
-  .auto_axi4xbar_in_aw_bits_lock(mmio_auto_axi4xbar_in_aw_bits_lock),
-  .auto_axi4xbar_in_aw_bits_cache(mmio_auto_axi4xbar_in_aw_bits_cache),
-  .auto_axi4xbar_in_aw_bits_prot(mmio_auto_axi4xbar_in_aw_bits_prot),
-  .auto_axi4xbar_in_aw_bits_qos(mmio_auto_axi4xbar_in_aw_bits_qos),
-  .auto_axi4xbar_in_w_ready(mmio_auto_axi4xbar_in_w_ready),
-  .auto_axi4xbar_in_w_valid(mmio_auto_axi4xbar_in_w_valid),
-  .auto_axi4xbar_in_w_bits_data(mmio_auto_axi4xbar_in_w_bits_data),
-  .auto_axi4xbar_in_w_bits_strb(mmio_auto_axi4xbar_in_w_bits_strb),
-  .auto_axi4xbar_in_w_bits_last(mmio_auto_axi4xbar_in_w_bits_last),
-  .auto_axi4xbar_in_b_ready(mmio_auto_axi4xbar_in_b_ready),
-  .auto_axi4xbar_in_b_valid(mmio_auto_axi4xbar_in_b_valid),
-  .auto_axi4xbar_in_b_bits_id(mmio_auto_axi4xbar_in_b_bits_id),
-  .auto_axi4xbar_in_b_bits_resp(mmio_auto_axi4xbar_in_b_bits_resp),
-  .auto_axi4xbar_in_ar_ready(mmio_auto_axi4xbar_in_ar_ready),
-  .auto_axi4xbar_in_ar_valid(mmio_auto_axi4xbar_in_ar_valid),
-  .auto_axi4xbar_in_ar_bits_id(mmio_auto_axi4xbar_in_ar_bits_id),
-  .auto_axi4xbar_in_ar_bits_addr(mmio_auto_axi4xbar_in_ar_bits_addr),
-  .auto_axi4xbar_in_ar_bits_len(mmio_auto_axi4xbar_in_ar_bits_len),
-  .auto_axi4xbar_in_ar_bits_size(mmio_auto_axi4xbar_in_ar_bits_size),
-  .auto_axi4xbar_in_ar_bits_burst(mmio_auto_axi4xbar_in_ar_bits_burst),
-  .auto_axi4xbar_in_ar_bits_lock(mmio_auto_axi4xbar_in_ar_bits_lock),
-  .auto_axi4xbar_in_ar_bits_cache(mmio_auto_axi4xbar_in_ar_bits_cache),
-  .auto_axi4xbar_in_ar_bits_prot(mmio_auto_axi4xbar_in_ar_bits_prot),
-  .auto_axi4xbar_in_ar_bits_qos(mmio_auto_axi4xbar_in_ar_bits_qos),
-  .auto_axi4xbar_in_r_ready(mmio_auto_axi4xbar_in_r_ready),
-  .auto_axi4xbar_in_r_valid(mmio_auto_axi4xbar_in_r_valid),
-  .auto_axi4xbar_in_r_bits_id(mmio_auto_axi4xbar_in_r_bits_id),
-  .auto_axi4xbar_in_r_bits_data(mmio_auto_axi4xbar_in_r_bits_data),
-  .auto_axi4xbar_in_r_bits_resp(mmio_auto_axi4xbar_in_r_bits_resp),
-  .auto_axi4xbar_in_r_bits_last(mmio_auto_axi4xbar_in_r_bits_last),
+  .io_axi4_0_aw_ready(mmio_io_axi4_0_aw_ready),
+  .io_axi4_0_aw_valid(mmio_io_axi4_0_aw_valid),
+  .io_axi4_0_aw_bits_id(mmio_io_axi4_0_aw_bits_id),
+  .io_axi4_0_aw_bits_addr(mmio_io_axi4_0_aw_bits_addr),
+  .io_axi4_0_aw_bits_len(mmio_io_axi4_0_aw_bits_len),
+  .io_axi4_0_aw_bits_size(mmio_io_axi4_0_aw_bits_size),
+  .io_axi4_0_aw_bits_burst(mmio_io_axi4_0_aw_bits_burst),
+  .io_axi4_0_aw_bits_lock(mmio_io_axi4_0_aw_bits_lock),
+  .io_axi4_0_aw_bits_cache(mmio_io_axi4_0_aw_bits_cache),
+  .io_axi4_0_aw_bits_prot(mmio_io_axi4_0_aw_bits_prot),
+  .io_axi4_0_aw_bits_qos(mmio_io_axi4_0_aw_bits_qos),
+  .io_axi4_0_w_ready(mmio_io_axi4_0_w_ready),
+  .io_axi4_0_w_valid(mmio_io_axi4_0_w_valid),
+  .io_axi4_0_w_bits_data(mmio_io_axi4_0_w_bits_data),
+  .io_axi4_0_w_bits_strb(mmio_io_axi4_0_w_bits_strb),
+  .io_axi4_0_w_bits_last(mmio_io_axi4_0_w_bits_last),
+  .io_axi4_0_b_ready(mmio_io_axi4_0_b_ready),
+  .io_axi4_0_b_valid(mmio_io_axi4_0_b_valid),
+  .io_axi4_0_b_bits_id(mmio_io_axi4_0_b_bits_id),
+  .io_axi4_0_b_bits_resp(mmio_io_axi4_0_b_bits_resp),
+  .io_axi4_0_ar_ready(mmio_io_axi4_0_ar_ready),
+  .io_axi4_0_ar_valid(mmio_io_axi4_0_ar_valid),
+  .io_axi4_0_ar_bits_id(mmio_io_axi4_0_ar_bits_id),
+  .io_axi4_0_ar_bits_addr(mmio_io_axi4_0_ar_bits_addr),
+  .io_axi4_0_ar_bits_len(mmio_io_axi4_0_ar_bits_len),
+  .io_axi4_0_ar_bits_size(mmio_io_axi4_0_ar_bits_size),
+  .io_axi4_0_ar_bits_burst(mmio_io_axi4_0_ar_bits_burst),
+  .io_axi4_0_ar_bits_lock(mmio_io_axi4_0_ar_bits_lock),
+  .io_axi4_0_ar_bits_cache(mmio_io_axi4_0_ar_bits_cache),
+  .io_axi4_0_ar_bits_prot(mmio_io_axi4_0_ar_bits_prot),
+  .io_axi4_0_ar_bits_qos(mmio_io_axi4_0_ar_bits_qos),
+  .io_axi4_0_r_ready(mmio_io_axi4_0_r_ready),
+  .io_axi4_0_r_valid(mmio_io_axi4_0_r_valid),
+  .io_axi4_0_r_bits_id(mmio_io_axi4_0_r_bits_id),
+  .io_axi4_0_r_bits_data(mmio_io_axi4_0_r_bits_data),
+  .io_axi4_0_r_bits_resp(mmio_io_axi4_0_r_bits_resp),
+  .io_axi4_0_r_bits_last(mmio_io_axi4_0_r_bits_last),
   .io_uart_out_valid(mmio_io_uart_out_valid),
   .io_uart_out_ch(mmio_io_uart_out_ch),
   .io_uart_in_valid(mmio_io_uart_in_valid),
-  .io_uart_in_ch(mmio_io_uart_in_ch)
+  .io_uart_in_ch(mmio_io_uart_in_ch),
+  .io_interrupt_intrVec(mmio_io_interrupt_intrVec)
 );
+
 always @(posedge clock) begin
     if (ram_auto_in_aw_valid) begin
     //$display("waddr valid = %x", ram_auto_in_aw_bits_addr);
@@ -520,7 +610,7 @@ if (ram_auto_in_ar_valid && ram_auto_in_ar_ready) begin
 
 end
 
-AXI4RAM ram(
+AXI4RAM_1 ram(
   .clock(ram_clock),
   .reset(ram_reset),
   .auto_in_aw_ready(ram_auto_in_aw_ready),

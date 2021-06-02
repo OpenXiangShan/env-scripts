@@ -178,7 +178,7 @@ module AXI4VGA(
   wire [16:0] hi = vCounterIsOdd ? fbPixelAddrV1 : fbPixelAddrV0; // @[AXI4VGA.scala 166:35]
   wire [18:0] _T_17 = {hi,2'h0}; // @[Cat.scala 30:58]
   reg  REG_1; // @[AXI4VGA.scala 167:31]
-  AXI4RAM_1 fb ( // @[AXI4VGA.scala 115:30]
+  AXI4RAM fb ( // @[AXI4VGA.scala 115:30]
     .clock(fb_clock),
     .reset(fb_reset),
     .auto_in_aw_ready(fb_auto_in_aw_ready),
@@ -425,3 +425,4 @@ end // initial
 `endif
 `endif // SYNTHESIS
 endmodule
+
