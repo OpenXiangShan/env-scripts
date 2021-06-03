@@ -14,6 +14,13 @@ ignore_list_depth = {
   "api-config-chipsalliance": 0,
   "berkeley-hardfloat": 0,
   "block-inclusivecache-sifive": 0,
+  ".git": 0,
+  "ready-to-run": 0,
+  "chiseltest": 0,
+  ".github": 0,
+  "debug": 0,
+  "timingScripts": 0,
+  "tools": 0,
 }
 
 ignore_list_abs = set(
@@ -38,18 +45,63 @@ def ignore(path, depth):
 
 def wanna(file, depth):
   # only use for file now
-  if file in wanna_list:
-    return True
+  # if file in wanna_list:
+  #   return True
 
-  if ".scala" in file:
-    return True
+  # if ".scala" in file:
+  #   return True
 
-  return False
+  # return False
+  return True
 
 def abs(path):
   return os.path.abspath(path)
 
+header = open("/home/zzf/env-scripts/license/mulan-psl2-header-clike.txt", mode='r')
+header_content_c = header.readlines()
+header.close()
+header = open("/home/zzf/env-scripts/license/mulan-psl2-header-shlike.txt", mode='r')
+header_content_sh = header.readlines()
+header.close()
+
+do_write = True
+
+def get_header(path):
+  c_set = (".scala", ".h", ".c", ".cc", ".cpp", ".v", ".sv")
+  sh_set = (".py", ".mk", "Makefile")
+  for t in c_set:
+    if t in path:
+      print(" c-type ", end="")
+      return header_content_c
+  for t in sh_set:
+    if t in path:
+      print(" sh-type ", end="")
+      return header_content_sh
+  print("header: unknow type", end="")
+  return header_content_c
+
 def add_license(path):
+  header_content = get_header(path)
+
+  if do_write:
+    print("add license...")
+    dest = open(abs(path), "r+")
+    dest_content = dest.readlines()
+    dest.close()
+    os.remove(path)
+    dest = open(abs(path), "w")
+    dest_content.insert(0, header_content)
+    # print(dest_content)
+    for c in dest_content:
+      dest.writelines(c)
+    # dest.writelines(dest_content)
+    dest.flush()
+    dest.close()
+    # print("-------------------------")
+    # dest = open(abs(path), "r").readlines()
+    # print(dest)
+  else:
+    print("will add license...")
   return
 
 def print_dot(num):
@@ -68,11 +120,11 @@ def dir_walker(path, depth):
       print_dot(depth)
       print("file: " + sub, end="")
       if wanna(sub, depth) & ~ignore(sub, depth):
-        print("  add license...")
+        add_license(sub)
       else:
         print("  ignore it...")
-      add_license(sub)
-    elif os.path.isdir(sub) & ~ignore(sub, depth):
+
+    elif os.path.isdir(sub):
       print_dot(depth)
       print("dir : " + sub, end="")
       if ignore(sub, depth):
@@ -86,4 +138,6 @@ def dir_walker(path, depth):
       assert(0, "find unkown files")
     os.chdir(path) # return to current path
 
-dir_walker(abs("/home/zzf/RISCVERS/XiangShan"), depth = 0)
+dir_walker(abs("/home/zzf/RISCVERS/XiangShan/src"), depth = 0)
+# add_license(abs("result.scala"))
+# TODO: re-add is not checked
