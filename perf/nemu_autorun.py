@@ -53,7 +53,9 @@ def nemu_run(workloads, nemu_path, output_file, max_instr):
   counters, values = ["workload"], []
   nemu_path = os.path.join(nemu_path, "build/riscv64-nemu-interpreter")
   base_arguments = [nemu_path, '-b', '-I', str(max_instr)]
-  max_pending_proc = 128
+  proc_count = 0
+  finish_count = 0
+  max_pending_proc = 200
   pending_proc = []
   error_proc = []
   try:
@@ -70,11 +72,12 @@ def nemu_run(workloads, nemu_path, output_file, max_instr):
               continue
             outs, _ = proc.communicate()
             c, v = parse_stdout(outs)
-            print(workload, c, v)
+            print(finish_count, workload, c, v)
             if len(counters) == 1:
               counters += c
             assert(c == counters[1:])
             values.append([workload] + v)
+            finish_count += 1
           if len(finished_proc) == 0:
             time.sleep(1)
       can_launch = max_pending_proc - len(pending_proc)
@@ -82,9 +85,10 @@ def nemu_run(workloads, nemu_path, output_file, max_instr):
         if len(pending_proc) < max_pending_proc:
           workload_path = workload.get_path()
           cmd = " ".join(base_arguments + [workload_path])
-          print(f"cmd: {cmd}")
+          print(f"cmd {proc_count}: {cmd}")
           proc = subprocess.Popen(base_arguments + [workload_path], stdout=subprocess.PIPE)
           pending_proc.append((workload, proc))
+          proc_count += 1
       workloads = workloads[can_launch:]
   except KeyboardInterrupt:
     print("Interrupted. Exiting all programs ...")
