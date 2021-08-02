@@ -128,7 +128,7 @@ trait TDPArgParser {
 
     val usage = """
         timingDetailProcessor
-        Usage: mill timing.runMain vme.TDPTest [OPTION...]
+        Usage: mill timing.runMain timing.TDPTest [OPTION...]
             -s, --source   the timing detail you would like to extract
                            default: none
                            MUST BE SPECIFIED
