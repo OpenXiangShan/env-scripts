@@ -57,7 +57,7 @@ trait TAPArgParser {
 
     val usage = """
         timingAnalysisProcessor
-        Usage: mill timing.runMain vme.TAPTest [OPTION...]
+        Usage: mill timing.runMain timing.TAPTest [OPTION...]
             -s, --source   the timing analysis you would like to extract
                            default: none
             -o, --output   the place you want to store your extracted verilog
