@@ -33,9 +33,19 @@ class PerfCounters(object):
 
     def add_manip(self, all_manip):
         for manip in all_manip:
-            numbers = map(lambda name: int(self.counters[name]), manip.counters)
+            numbers = map(lambda name: int(self[name]), manip.counters)
             self.counters[manip.name] = str(manip.func(*numbers))
 
+    def get_counter(self, name):
+        if name in self.keys():
+            return self.counters[name]
+        matched_keys = list(filter(lambda k: k.endswith(name), self.keys()))
+        if len(matched_keys) == 0:
+            matched_keys = [name]
+        if len(matched_keys) > 1:
+            print(f"more than one found for {name}!!")
+        return self.counters[matched_keys[0]]
+        
     def get_counters(self):
         return self.counters
 
@@ -43,27 +53,22 @@ class PerfCounters(object):
         return self.counters.keys()
 
     def __getitem__(self, index):
-        return self.counters[index]
+        return self.get_counter(index)
 
     def __iter__(self):
         return self.counters.__iter__()
 
 def get_all_manip():
     all_manip = []
-    old_data = False
-    if old_data:
-        soc = "TOP.XSSimSoC.soc"
-        core = ".".join([soc, "xs_core"])
-    else:
-        soc = "TOP.SimTop.l_soc"
-        core = ".".join([soc, "core_with_l2.core"])
+    soc = ""
+    core = ""
     ipc = PerfManip(
         name = "global.IPC",
         counters = [f"{core}.ctrlBlock.roq.clock_cycle",
         f"{core}.ctrlBlock.roq.commitInstr"],
         func = lambda cycle, instr: instr * 1.0 / cycle
     )
-    # all_manip.append(ipc)
+    all_manip.append(ipc)
     block_fraction = PerfManip(
         name = "global.intDispatch.blocked_fraction",
         counters = [f"{core}.ctrlBlock.dispatch.intDispatch.blocked",
