@@ -112,6 +112,7 @@ location_cn = [
     "National Taiwan University",
     "w3ctech",
     "National Chung Cheng University",
+    "wubigo.com",
     # match all characters when all letters are upper cases
     "CN",
     "CAS",
@@ -155,6 +156,28 @@ email_cn = [
     "tetras.ai"
 ]
 
+email_unknown = [
+    "gmail.com",
+    "outlook.com",
+    "icloud.com",
+    "hotmail.com",
+    "foxmail.com",
+    "msn.com"
+]
+
+location_unknown = [
+    "Somewhere on this planet",
+    "UFO",
+    "Earth",
+    "nowhere",
+    "no",
+    "our tiny round earth",
+    "Mars",
+    "somwhere, over the rainbow",
+    "127.0.0.1",
+    "0xfff"
+]
+
 # returns: (is_cn, is_others)
 def is_cn(email, location, institute):
     for loc in location_cn:
@@ -175,6 +198,15 @@ def is_cn(email, location, institute):
     for em in email_cn:
         if email.endswith(em):
             return True
+    return False
+
+def is_unknown(email, location, institute):
+    if not location or location in location_unknown:
+        if not institute or institute in location_unknown:
+            if not email:
+                return True
+            else:
+                return True in list(map(lambda s: email.endswith(s), email_unknown))
     return False
 
 def load_from_github(token, output):
@@ -230,19 +262,20 @@ def main(token, input_csv, output_csv):
     else:
         stargazers = load_from_csv(input_csv)
     cn_list, others_list, unknown_list = [], [], []
+    all_stars = len(stargazers)
     for star in stargazers:
-        if not star[2] and not star[3] and not star[4]:
-            unknown_list.append(star)
-        elif is_cn(star[2], star[3], star[4]):
+        if is_cn(star[2], star[3], star[4]):
             cn_list.append(star)
+        elif is_unknown(star[2], star[3], star[4]):
+            unknown_list.append(star)
         else:
             others_list.append(star)
-    print(f"cn:     {len(cn_list)}")
-    print(f"others: {len(others_list)}")
-    print(f"unkown: {len(unknown_list)}")
+    print(f"cn:      {len(cn_list)} {len(cn_list) / all_stars}")
+    print(f"others:  {len(others_list)} {len(others_list) / all_stars}")
+    print(f"unknown: {len(unknown_list)} {len(unknown_list) / all_stars}")
     write_to_csv(cn_list, "cn.csv")
     write_to_csv(others_list, "others.csv")
-    write_to_csv(unknown_list, "unkown.csv")
+    write_to_csv(unknown_list, "unknown.csv")
 
 
 if __name__ == "__main__":
