@@ -29,7 +29,7 @@ class PerfCounters(object):
         prefix_length = len(os.path.commonprefix(list(all_perf_counters.keys())))
         updated_perf = dict()
         for key in all_perf_counters:
-            updated_perf[key[prefix_length:].replace("xs_", "")] = all_perf_counters[key]
+            updated_perf[key[prefix_length:]] = all_perf_counters[key]
         self.counters = updated_perf
 
     def add_manip(self, all_manip):
@@ -39,9 +39,10 @@ class PerfCounters(object):
             numbers = map(lambda name: int(self[name]), manip.counters)
             self.counters[manip.name] = str(manip.func(*numbers))
 
-    def get_counter(self, name):
-        if name in self.keys():
-            return self.counters[name]
+    def get_counter(self, name, strict=False):
+        key = self.counters.get(name, "")
+        if strict or key != "":
+            return key
         matched_keys = list(filter(lambda k: k.endswith(name), self.keys()))
         if len(matched_keys) == 0:
             return None
@@ -116,7 +117,7 @@ def merge_perf_counters(filenames, all_perf):
     for i, name in enumerate(all_names):
         percentage = (i + 1) / len(all_names)
         print(f"Processing ({i + 1}/{len(all_names)})({percentage:.2%}) {name} ...")
-        yield [name] + list(map(lambda col: col[name] if name in col else "", all_perf))
+        yield [name] + list(map(lambda perf: perf.get_counter(name, strict=True), all_perf))
     # return output_rows
 
 
