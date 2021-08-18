@@ -110,13 +110,14 @@ def get_all_manip():
 
 def merge_perf_counters(filenames, all_perf):
     all_names = sorted(list(set().union(*list(map(lambda s: s.keys(), all_perf)))))
-    all_sources = filenames
-    output_rows = [[""] + all_sources]
+    prefix_length = len(os.path.commonprefix(filenames)) if len(filenames) > 1 else 0
+    all_sources = list(map(lambda name: name[prefix_length:], filenames))
+    yield [""] + all_sources
     for i, name in enumerate(all_names):
         percentage = (i + 1) / len(all_names)
         print(f"Processing ({i + 1}/{len(all_names)})({percentage:.2%}) {name} ...")
-        output_rows.append([name] + list(map(lambda col: col[name] if name in col else "", all_perf)))
-    return output_rows
+        yield [name] + list(map(lambda col: col[name] if name in col else "", all_perf))
+    # return output_rows
 
 
 def main(pfiles, output_file):
@@ -124,15 +125,15 @@ def main(pfiles, output_file):
     all_manip = get_all_manip()
     files_count = len(pfiles)
     for i, filename in enumerate(pfiles):
-        percentage = (i + 1) % files_count
+        percentage = (i + 1) / files_count
         print(f"Processing ({i + 1}/{files_count})({percentage:.2%}) {filename} ...")
         perf = PerfCounters(filename)
         perf.add_manip(all_manip)
         all_perf.append(perf)
-    output_rows = merge_perf_counters(pfiles, all_perf)
     with open(output_file, 'w') as csvfile:
         csvwriter = csv.writer(csvfile)
-        csvwriter.writerows(output_rows)
+        for output_row in merge_perf_counters(pfiles, all_perf):
+            csvwriter.writerow(output_row)
 
 
 def find_simulator_err(pfiles):
