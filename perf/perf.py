@@ -111,7 +111,13 @@ def get_prefix_length(names):
     return len(os.path.commonprefix(names))
 
 def merge_perf_counters(filenames, all_perf, verbose=False):
-    all_names = sorted(list(set().union(*list(map(lambda s: s.keys(), all_perf)))))
+    def extract_numbers(s):
+        re_digits = re.compile(r"(\d+)")
+        pieces = re_digits.split(s)
+        # convert int strings to int
+        pieces = list(map(lambda x: int(x) if x.isdecimal() else x, pieces))
+        return pieces
+    all_names = sorted(list(set().union(*list(map(lambda s: s.keys(), all_perf)))), key=extract_numbers)
     # remove common prefix
     prefix_length = get_prefix_length(filenames) if len(filenames) > 1 else 0
     if prefix_length > 0:
