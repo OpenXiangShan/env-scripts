@@ -118,6 +118,7 @@ def main(pfiles, output_file):
     all_perf = []
     all_manip = get_all_manip()
     for filename in pfiles:
+        print(f"Processing {filename} ...")
         perf = PerfCounters(filename)
         perf.add_manip(all_manip)
         all_perf.append(perf)
@@ -126,18 +127,43 @@ def main(pfiles, output_file):
         csvwriter = csv.writer(csvfile)
         csvwriter.writerows(output_rows)
 
+def find_simulator_err(pfiles):
+    if len(pfiles) > 1:
+        return sum(map(lambda filename: find_simulator_err([filename])), [])
+    # recursively find simulator_err.txt
+    base_path = pfiles[0]
+    all_files = []
+    for sub_dir in os.listdir(base_path):
+        sub_path = os.path.join(base_path, sub_dir)
+        if os.path.isfile(sub_path) and sub_dir == "simulator_err.txt":
+            all_files.append(sub_path)
+        elif os.path.isdir(sub_path):
+            all_files += find_simulator_err([sub_path])
+    return all_files
+
+
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description='performance counter log parser')
     parser.add_argument('pfiles', metavar='filename', type=str, nargs='*', default=None,
                         help='performance counter log')
     parser.add_argument('--output', '-o', default="stats.csv", help='output file')
     parser.add_argument('--filelist', '-f', default=None, help="filelist")
+    parser.add_argument('--recursive', '-r', action='store_true', default=False,
+        help="recursively find simulator_err.txt")
 
     args = parser.parse_args()
 
     if args.filelist is not None:
         with open(args.filelist) as f:
             args.pfiles = list(map(lambda x: x.strip(), f.readlines()))
+
+    if args.recursive:
+        args.pfiles = find_simulator_err(args.pfiles)
+
+    for filename in args.pfiles:
+        if not os.path.isfile(filename):
+            print(f"{filename} is not a file. Probably you need --recursive?")
+            exit()
 
     main(args.pfiles, args.output)
 
