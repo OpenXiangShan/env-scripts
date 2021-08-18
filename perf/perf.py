@@ -64,76 +64,75 @@ class PerfCounters(object):
 
 def get_all_manip():
     all_manip = []
-    soc = ""
-    core = ""
     ipc = PerfManip(
         name = "global.IPC",
-        counters = [f"{core}.ctrlBlock.roq.clock_cycle",
-        f"{core}.ctrlBlock.roq.commitInstr"],
+        counters = [f"ctrlBlock.roq.clock_cycle",
+        f"ctrlBlock.roq.commitInstr"],
         func = lambda cycle, instr: instr * 1.0 / cycle
     )
     all_manip.append(ipc)
     block_fraction = PerfManip(
         name = "global.intDispatch.blocked_fraction",
-        counters = [f"{core}.ctrlBlock.dispatch.intDispatch.blocked",
-        f"{core}.ctrlBlock.dispatch.intDispatch.in"],
+        counters = [f"ctrlBlock.dispatch.intDispatch.blocked",
+        f"ctrlBlock.dispatch.intDispatch.in"],
         func = lambda blocked, dpin: blocked * 1.0 / dpin
     )
     # all_manip.append(block_fraction)
     icache_miss_rate = PerfManip(
         name = "global.icache_miss_rate",
-        counters = [f"{core}.frontend.ifu.icache.req", f"{core}.frontend.ifu.icache.miss"],
+        counters = [f"frontend.ifu.icache.req", f"frontend.ifu.icache.miss"],
         func = lambda req, miss: miss / req
     )
     # all_manip.append(icache_miss_rate)
     dtlb_miss_rate = PerfManip(
         name = "global.dtlb_miss_rate",
-        counters = [f"{core}.memBlock.LoadUnit_0.load_s1.in", f"{core}.memBlock.LoadUnit_0.load_s1.tlb_miss",
-            f"{core}.memBlock.LoadUnit_1.load_s1.in", f"{core}.memBlock.LoadUnit_1.load_s1.tlb_miss"],
+        counters = [f"memBlock.LoadUnit_0.load_s1.in", f"memBlock.LoadUnit_0.load_s1.tlb_miss",
+            f"memBlock.LoadUnit_1.load_s1.in", f"memBlock.LoadUnit_1.load_s1.tlb_miss"],
         func = lambda req1, miss1, req2, miss2: (miss1 + miss2) / (req1 + req2)
     )
     # all_manip.append(dtlb_miss_rate)
     dcache_load_miss_rate = PerfManip(
         name = "global.dcache_load_miss_rate",
-        counters = [f"{core}.memBlock.LoadUnit_0.load_s2.in", f"{core}.memBlock.LoadUnit_0.load_s2.dcache_miss",
-            f"{core}.memBlock.LoadUnit_1.load_s2.in", f"{core}.memBlock.LoadUnit_1.load_s2.dcache_miss"],
+        counters = [f"memBlock.LoadUnit_0.load_s2.in", f"memBlock.LoadUnit_0.load_s2.dcache_miss",
+            f"memBlock.LoadUnit_1.load_s2.in", f"memBlock.LoadUnit_1.load_s2.dcache_miss"],
         func = lambda req1, miss1, req2, miss2: (miss1 + miss2) / (req1 + req2)
     )
     # all_manip.append(dcache_load_miss_rate)
     branch_mispred = PerfManip(
         name = "global.branch_mispred",
-        counters = [f"{core}.ctrlBlock.ftq.BpRight", f"{core}.ctrlBlock.ftq.BpWrong"],
+        counters = [f"ctrlBlock.ftq.BpRight", f"ctrlBlock.ftq.BpWrong"],
         func = lambda right, wrong: wrong / (right + wrong)
     )
     # all_manip.append(branch_mispred)
     return all_manip
 
 
-def merge_perf_counters(filenames, all_perf):
+def merge_perf_counters(filenames, all_perf, verbose=False):
     all_names = sorted(list(set().union(*list(map(lambda s: s.keys(), all_perf)))))
     prefix_length = len(os.path.commonprefix(filenames)) if len(filenames) > 1 else 0
     all_sources = list(map(lambda name: name[prefix_length:], filenames))
     yield [""] + all_sources
     for i, name in enumerate(all_names):
-        percentage = (i + 1) / len(all_names)
-        print(f"Processing ({i + 1}/{len(all_names)})({percentage:.2%}) {name} ...")
+        if verbose:
+            percentage = (i + 1) / len(all_names)
+            print(f"Processing ({i + 1}/{len(all_names)})({percentage:.2%}) {name} ...")
         yield [name] + list(map(lambda perf: perf.get_counter(name, strict=True), all_perf))
-    # return output_rows
 
 
-def main(pfiles, output_file):
+def main(pfiles, output_file, verbose=False):
     all_perf = []
     all_manip = get_all_manip()
     files_count = len(pfiles)
     for i, filename in enumerate(pfiles):
-        percentage = (i + 1) / files_count
-        print(f"Processing ({i + 1}/{files_count})({percentage:.2%}) {filename} ...")
+        if verbose:
+            percentage = (i + 1) / files_count
+            print(f"Processing ({i + 1}/{files_count})({percentage:.2%}) {filename} ...")
         perf = PerfCounters(filename)
         perf.add_manip(all_manip)
         all_perf.append(perf)
     with open(output_file, 'w') as csvfile:
         csvwriter = csv.writer(csvfile)
-        for output_row in merge_perf_counters(pfiles, all_perf):
+        for output_row in merge_perf_counters(pfiles, all_perf, verbose):
             csvwriter.writerow(output_row)
 
 
@@ -160,6 +159,8 @@ if __name__ == "__main__":
     parser.add_argument('--filelist', '-f', default=None, help="filelist")
     parser.add_argument('--recursive', '-r', action='store_true', default=False,
         help="recursively find simulator_err.txt")
+    parser.add_argument('--verbose', '-v', action='store_true', default=False,
+        help="show processing logs")
 
     args = parser.parse_args()
 
@@ -175,5 +176,5 @@ if __name__ == "__main__":
             print(f"{filename} is not a file. Probably you need --recursive?")
             exit()
 
-    main(args.pfiles, args.output)
+    main(args.pfiles, args.output, args.verbose)
 
