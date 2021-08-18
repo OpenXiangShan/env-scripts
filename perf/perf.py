@@ -107,10 +107,21 @@ def get_all_manip():
     return all_manip
 
 
+def get_prefix_length(names):
+    return len(os.path.commonprefix(names))
+
 def merge_perf_counters(filenames, all_perf, verbose=False):
     all_names = sorted(list(set().union(*list(map(lambda s: s.keys(), all_perf)))))
-    prefix_length = len(os.path.commonprefix(filenames)) if len(filenames) > 1 else 0
-    all_sources = list(map(lambda name: name[prefix_length:], filenames))
+    # remove common prefix
+    prefix_length = get_prefix_length(filenames) if len(filenames) > 1 else 0
+    if prefix_length > 0:
+        filenames = list(map(lambda name: name[prefix_length:], filenames))
+    # remove common suffix
+    reversed_names = list(map(lambda x: x[::-1], filenames))
+    suffix_length = get_prefix_length(reversed_names) if len(filenames) > 1 else 0
+    if suffix_length > 0:
+        filenames = list(map(lambda name: name[:-suffix_length], filenames))
+    all_sources = filenames
     yield [""] + all_sources
     for i, name in enumerate(all_names):
         if verbose:
