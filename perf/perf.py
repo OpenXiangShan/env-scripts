@@ -112,7 +112,9 @@ def merge_perf_counters(filenames, all_perf):
     all_names = sorted(list(set().union(*list(map(lambda s: s.keys(), all_perf)))))
     all_sources = filenames
     output_rows = [[""] + all_sources]
-    for name in all_names:
+    for i, name in enumerate(all_names):
+        percentage = (i + 1) / len(all_names)
+        print(f"Processing ({i + 1}/{len(all_names)})({percentage:.2%}) {name} ...")
         output_rows.append([name] + list(map(lambda col: col[name] if name in col else "", all_perf)))
     return output_rows
 
@@ -122,7 +124,8 @@ def main(pfiles, output_file):
     all_manip = get_all_manip()
     files_count = len(pfiles)
     for i, filename in enumerate(pfiles):
-        print(f"Processing ({i}/{files_count}) {filename} ...")
+        percentage = (i + 1) % files_count
+        print(f"Processing ({i + 1}/{files_count})({percentage:.2%}) {filename} ...")
         perf = PerfCounters(filename)
         perf.add_manip(all_manip)
         all_perf.append(perf)
