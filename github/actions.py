@@ -25,7 +25,6 @@ def write_to_csv(rows, filename):
 
 def get_all_manip():
     all_manip = []
-    old_data = False
     ipc = perf.PerfManip(
         name = "global.IPC",
         counters = [f"ctrlBlock.roq.clock_cycle",
@@ -41,8 +40,11 @@ def main(token, output_csv):
     results = {}
     benchmarks = []
     for commit in commits:
-        results[commit] = {}
         perf_path = os.path.join(base_dir, commit)
+        if not os.path.isdir(perf_path):
+            print(f"{commit} perf data not found. Skip.")
+            continue
+        results[commit] = {}
         for filename in os.listdir(perf_path):
             if filename.endswith(".log"):
                 benchmark = filename[:-4]
@@ -50,9 +52,9 @@ def main(token, output_csv):
                 counters.add_manip(get_all_manip())
                 benchmarks.append(benchmark)
                 results[commit][benchmark] = counters["global.IPC"]
-    benchmarks = list(set(benchmarks))
+    benchmarks = sorted(list(set(benchmarks)))
     all_rows = [["commit"] + benchmarks]
-    for commit in commits:
+    for commit in results:
         all_rows.append([commit] + [results[commit][bench] for bench in benchmarks])
     write_to_csv(all_rows, output_csv)
 
