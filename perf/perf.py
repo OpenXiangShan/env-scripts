@@ -34,6 +34,8 @@ class PerfCounters(object):
 
     def add_manip(self, all_manip):
         for manip in all_manip:
+            if None in map(lambda name: self[name], manip.counters):
+                continue
             numbers = map(lambda name: int(self[name]), manip.counters)
             self.counters[manip.name] = str(manip.func(*numbers))
 
@@ -42,11 +44,11 @@ class PerfCounters(object):
             return self.counters[name]
         matched_keys = list(filter(lambda k: k.endswith(name), self.keys()))
         if len(matched_keys) == 0:
-            matched_keys = [name]
+            return None
         if len(matched_keys) > 1:
-            print(f"more than one found for {name}!!")
+            print(f"more than one found for {name}!! Use the first one.")
         return self.counters[matched_keys[0]]
-        
+
     def get_counters(self):
         return self.counters
 
@@ -118,8 +120,9 @@ def merge_perf_counters(filenames, all_perf):
 def main(pfiles, output_file):
     all_perf = []
     all_manip = get_all_manip()
-    for filename in pfiles:
-        print(f"Processing {filename} ...")
+    files_count = len(pfiles)
+    for i, filename in enumerate(pfiles):
+        print(f"Processing ({i}/{files_count}) {filename} ...")
         perf = PerfCounters(filename)
         perf.add_manip(all_manip)
         all_perf.append(perf)
@@ -127,6 +130,7 @@ def main(pfiles, output_file):
     with open(output_file, 'w') as csvfile:
         csvwriter = csv.writer(csvfile)
         csvwriter.writerows(output_rows)
+
 
 def find_simulator_err(pfiles):
     if len(pfiles) > 1:
