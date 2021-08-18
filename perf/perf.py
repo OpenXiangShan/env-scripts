@@ -14,7 +14,7 @@ class PerfManip(object):
 
 
 class PerfCounters(object):
-    perf_re = re.compile(r'.*\[PERF \]\[time=\s*\d*\] ((\w*(\.|))*): (\w*)\s*,\s*(\d*)')
+    perf_re = re.compile(r'.*\[PERF \]\[time=\s*\d*\] ((\w*(\.|))*): (.*)\s*,\s*(\d*)')
 
     def __init__(self, filename):
         all_perf_counters = dict()
@@ -24,6 +24,7 @@ class PerfCounters(object):
                 if perf_match:
                     perf_name = ".".join([str(perf_match.group(1)), str(perf_match.group(4))])
                     perf_value = str(perf_match.group(5))
+                    perf_name = perf_name.replace(" ", "_").replace("'", "")
                     all_perf_counters[perf_name] = perf_value
         prefix_length = len(os.path.commonprefix(list(all_perf_counters.keys())))
         updated_perf = dict()
