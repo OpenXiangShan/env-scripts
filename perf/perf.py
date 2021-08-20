@@ -229,7 +229,6 @@ def merge_perf_counters(filenames, all_perf, verbose=False):
             pbar.update(1)
         yield [name] + list(map(lambda perf: perf.get_counter(name, strict=True), all_perf))
 
-
 def main(pfiles, output_file, verbose=False):
     all_files, all_perf = [], []
     all_manip = get_all_manip()
@@ -245,12 +244,12 @@ def main(pfiles, output_file, verbose=False):
             all_files.append(filename)
             all_perf.append(perf)
         else:
-            print(f"{filename} skipped because it is empty.")
+            pbar.write(f"{filename} skipped because it is empty.")
     with open(output_file, 'w') as csvfile:
         csvwriter = csv.writer(csvfile)
         for output_row in merge_perf_counters(all_files, all_perf, verbose):
             csvwriter.writerow(output_row)
-    print(f"Finished processing {len(all_files)} non-empty files.")
+    pbar.write(f"Finished processing {len(all_files)} non-empty files.")
 
 def find_simulator_err(pfiles):
     if len(pfiles) > 1:
