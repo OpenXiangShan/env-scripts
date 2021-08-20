@@ -33,8 +33,11 @@ class PerfCounters(object):
         self.counters = updated_perf
 
     def add_manip(self, all_manip):
+        if len(self.counters) == 0:
+            return
         for manip in all_manip:
             if None in map(lambda name: self[name], manip.counters):
+                print(f"Some counters for {manip.name} is not found. Please check it.")
                 continue
             numbers = map(lambda name: int(self[name]), manip.counters)
             self.counters[manip.name] = str(manip.func(*numbers))
@@ -62,6 +65,80 @@ class PerfCounters(object):
     def __iter__(self):
         return self.counters.__iter__()
 
+def get_rs_manip():
+    all_manip = []
+    alu_bypass_from_mdu = PerfManip(
+        name = "global.alu_bypass_from_mdu",
+        counters = [
+            "exuBlocks.scheduler.issue_fire",
+            "exuBlocks.scheduler.rs.source_bypass_6_0",
+            "exuBlocks.scheduler.rs.source_bypass_6_1",
+            "exuBlocks.scheduler.rs.source_bypass_6_2",
+            "exuBlocks.scheduler.rs.source_bypass_6_3",
+            "exuBlocks.scheduler.rs.source_bypass_7_0",
+            "exuBlocks.scheduler.rs.source_bypass_7_1",
+            "exuBlocks.scheduler.rs.source_bypass_7_2",
+            "exuBlocks.scheduler.rs.source_bypass_7_3"
+        ],
+        func = lambda fire, b60, b61, b62, b63, b70, b71, b72, b3: (b60 + b61 + b62 + b63 + b70 + b71 + b72 + b3) / fire
+    )
+    all_manip.append(alu_bypass_from_mdu)
+    mdu_bypass_from_mdu = PerfManip(
+        name = "global.mdu_bypass_from_mdu",
+        counters = [
+            "exuBlocks_1.scheduler.rs.deq_fire_0",
+            "exuBlocks_1.scheduler.rs.deq_fire_1",
+            "exuBlocks_1.scheduler.rs.source_bypass_4_0",
+            "exuBlocks_1.scheduler.rs.source_bypass_4_1",
+            "exuBlocks_1.scheduler.rs.source_bypass_5_0",
+            "exuBlocks_1.scheduler.rs.source_bypass_5_1"
+        ],
+        func = lambda fire0, fire1, b40, b41, b50, b51: (b40 + b41 + b50 + b51) / (fire0 + fire1) if (fire0 + fire1) > 0 else 0
+    )
+    all_manip.append(mdu_bypass_from_mdu)
+    load_bypass_from_mdu = PerfManip(
+        name = "global.load_bypass_from_mdu",
+        counters = [
+            "memScheduler.rs.deq_fire_0",
+            "memScheduler.rs.deq_fire_1",
+            "memScheduler.rs.source_bypass_6_0",
+            "memScheduler.rs.source_bypass_6_1",
+            "memScheduler.rs.source_bypass_7_0",
+            "memScheduler.rs.source_bypass_7_1"
+        ],
+        func = lambda fire0, fire1, b60, b61, b70, b71: (b60 + b61 + b70 + b71) / (fire0 + fire1) if (fire0 + fire1) > 0 else 0
+    )
+    all_manip.append(load_bypass_from_mdu)
+    alu_issue_exceed_limit = PerfManip(
+        name = "global.alu_issue_exceed_limit",
+        counters = [
+            "exuBlocks.scheduler.rs.statusArray.not_selected_entries",
+            "ctrlBlock.roq.clock_cycle"
+        ],
+        func = lambda ex, cycle : ex / cycle
+    )
+    all_manip.append(alu_issue_exceed_limit)
+    alu_issue_exceed_limit_instr = PerfManip(
+        name = "global.alu_issue_exceed_limit_instr",
+        counters = [
+            "exuBlocks.scheduler.rs.statusArray.not_selected_entries",
+            "exuBlocks.scheduler.issue_fire"
+        ],
+        func = lambda ex, cycle : ex / cycle
+    )
+    all_manip.append(alu_issue_exceed_limit_instr)
+    sta_wait_for_std = PerfManip(
+        name = "global.sta_wait_for_std",
+        counters = [
+            "memScheduler.rs_1.statusArray.wait_for_src_0",
+            "memScheduler.rs_1.statusArray.wait_for_src_1"
+        ],
+        func = lambda sta, std : std / (sta + std)
+    )
+    all_manip.append(sta_wait_for_std)
+    return all_manip
+
+
 def get_all_manip():
     all_manip = []
     ipc = PerfManip(
@@ -71,39 +148,54 @@ def get_all_manip():
         func = lambda cycle, instr: instr * 1.0 / cycle
     )
     all_manip.append(ipc)
-    block_fraction = PerfManip(
-        name = "global.intDispatch.blocked_fraction",
-        counters = [f"ctrlBlock.dispatch.intDispatch.blocked",
-        f"ctrlBlock.dispatch.intDispatch.in"],
-        func = lambda blocked, dpin: blocked * 1.0 / dpin
-    )
-    # all_manip.append(block_fraction)
     icache_miss_rate = PerfManip(
         name = "global.icache_miss_rate",
         counters = [f"frontend.ifu.icache.req", f"frontend.ifu.icache.miss"],
         func = lambda req, miss: miss / req
     )
-    # all_manip.append(icache_miss_rate)
+    all_manip.append(icache_miss_rate)
     dtlb_miss_rate = PerfManip(
         name = "global.dtlb_miss_rate",
         counters = [f"memBlock.LoadUnit_0.load_s1.in", f"memBlock.LoadUnit_0.load_s1.tlb_miss",
             f"memBlock.LoadUnit_1.load_s1.in", f"memBlock.LoadUnit_1.load_s1.tlb_miss"],
         func = lambda req1, miss1, req2, miss2: (miss1 + miss2) / (req1 + req2)
     )
-    # all_manip.append(dtlb_miss_rate)
+    all_manip.append(dtlb_miss_rate)
     dcache_load_miss_rate = PerfManip(
         name = "global.dcache_load_miss_rate",
         counters = [f"memBlock.LoadUnit_0.load_s2.in", f"memBlock.LoadUnit_0.load_s2.dcache_miss",
             f"memBlock.LoadUnit_1.load_s2.in", f"memBlock.LoadUnit_1.load_s2.dcache_miss"],
         func = lambda req1, miss1, req2, miss2: (miss1 + miss2) / (req1 + req2)
     )
-    # all_manip.append(dcache_load_miss_rate)
+    all_manip.append(dcache_load_miss_rate)
     branch_mispred = PerfManip(
         name = "global.branch_mispred",
         counters = [f"ctrlBlock.ftq.BpRight", f"ctrlBlock.ftq.BpWrong"],
         func = lambda right, wrong: wrong / (right + wrong)
     )
-    # all_manip.append(branch_mispred)
+    all_manip.append(branch_mispred)
+    l1plus_miss_rate = PerfManip(
+        name = "global.l1plus_miss_rate",
+        counters = [f"l1plusCache.pipe.miss", f"l1plusCache.pipe.req"],
+        func = lambda wrong, req: wrong / req if req > 0 else 0
+    )
+    all_manip.append(l1plus_miss_rate)
+    load_replay_rate = PerfManip(
+        name = "global.load_replay_rate",
+        counters = [f"ftq.replayRedirect", f"roq.commitInstrLoad"],
+        func = lambda redirect, load: redirect / load
+    )
+    all_manip.append(load_replay_rate)
+    ptw_mem_latency = PerfManip(
+        name = "global.ptw_mem_latency",
+        counters = [
+            "core.ptw.ptw.fsm.mem_count",
+            "core.ptw.ptw.fsm.mem_cycle"
+        ],
+        func = lambda count, cycle : cycle / count if count > 0 else 0
+    )
+    all_manip.append(ptw_mem_latency)
+    all_manip += get_rs_manip()
     return all_manip
 
 
@@ -137,7 +229,7 @@ def merge_perf_counters(filenames, all_perf, verbose=False):
 
 
 def main(pfiles, output_file, verbose=False):
-    all_perf = []
+    all_files, all_perf = [], []
     all_manip = get_all_manip()
     files_count = len(pfiles)
     for i, filename in enumerate(pfiles):
@@ -146,12 +238,16 @@ def main(pfiles, output_file, verbose=False):
             print(f"Processing ({i + 1}/{files_count})({percentage:.2%}) {filename} ...")
         perf = PerfCounters(filename)
         perf.add_manip(all_manip)
-        all_perf.append(perf)
+        if perf.counters:
+            all_files.append(filename)
+            all_perf.append(perf)
+        else:
+            print(f"{filename} skipped because it is empty.")
     with open(output_file, 'w') as csvfile:
         csvwriter = csv.writer(csvfile)
-        for output_row in merge_perf_counters(pfiles, all_perf, verbose):
+        for output_row in merge_perf_counters(all_files, all_perf, verbose):
             csvwriter.writerow(output_row)
-
+    print(f"Finished processing {len(all_files)} non-empty files.")
 
 def find_simulator_err(pfiles):
     if len(pfiles) > 1:
