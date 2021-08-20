@@ -5,6 +5,7 @@ import subprocess
 import signal
 import sys
 import time
+from numa import info
 from pathlib import Path
 from multiprocessing import Process, Queue
 from tqdm import tqdm
@@ -33,6 +34,33 @@ config = {
 ################################################################################
 # do not modify the following code
 ################################################################################
+
+def get_numa_node(startId, endId):
+  nodes = info.numa_hardware_info()['node_cpu_info']
+  ret = -1
+  cpu_set = set([x for x in range(startId, endId)])
+  for (nodeId, cpus) in nodes.items():
+    if cpu_set.issubset(set(cpus)):
+      ret = nodeId
+      break
+  return ret
+
+def check_numa():
+  assert(info.numa_available())
+  numa_nodes = info.numa_hardware_info()['node_cpu_info']
+  start_cpu_id = config['start_cpu_id']
+  num_workers = config['workers']
+  emu_threads = config['emu_threads']
+  for i in range(0, num_workers):
+    start = start_cpu_id + i * emu_threads
+    end = start + emu_threads
+    node = get_numa_node(start, end)
+    assert node > -1, (f"cpus [{start}-{end}] can't be allocated in one numa node!")
+
+def check_configuration():
+  assert(config['output_dir'][-1] == '/')
+  assert(config['checkpoint_base_dir'][-1] == '/')
+  check_numa()
 
 class Checkpoint:
   def __init__(self, cpt_dir, basename, instrnum, weight, gzname = ""):
@@ -73,8 +101,10 @@ class Worker(Process):
       Path(task_output_dir).mkdir(parents = True, exist_ok = False)
       out = open(task_output_dir + "/simulator_out.txt", "w+")
       err = open(task_output_dir + "/simulator_err.txt", "w+")
-      arglist = "numactl -m 0 -C {0}-{1} {2} -i {3}".format(
-        self.start_cpu_id, self.end_cpu_id, self.emu, task.get_path()
+      # 'end + 1' because [start, end)
+      numa_node = get_numa_node(self.start_cpu_id, self.end_cpu_id + 1)
+      arglist = "numactl -m {0} -C {1}-{2} {3} -i {4}".format(
+        numa_node, self.start_cpu_id, self.end_cpu_id, self.emu, task.get_path()
       ).split(" ")
       arglist += self.emu_args
       subprocess.run(["echo"] + arglist, stdout = out)
@@ -149,4 +179,5 @@ def run():
     worker.join()
 
 if __name__ == '__main__':
+  check_configuration()
   run()
