@@ -1,22 +1,31 @@
 import sys
 import glob
 
-def get_ipc(filename, instrCnt = 100000000):
+def get_ipc(filename, instrCnt = 50000000):
+    clock_cycle = -2
+    icount = -2
     ipc = -1
     with open(filename, "r") as f:
         for line in f.readlines():
-            if "IPC" in line:
-                words = line.split(" ")
-                icount = int(words[2].replace(",", ""))
-                if abs(icount - instrCnt) > (0.05 * instrCnt):
-                    print(f"{filename} instrCnt mismatch: [{icount}<->{instrCnt}]")
-                    break
-                ipc = float(words[-1])
-                break
+            if "ctrlBlock.roq: clock_cycle" in line:
+                if clock_cycle == -2:
+                    clock_cycle = -1
+                else:
+                    clock_cycle = int(line.split(' ')[-1])
+            if "ctrlBlock.roq: commitInstr," in line:
+                if icount == -2:
+                    icount = -1
+                else:
+                    icount = int(line.split(' ')[-1])
+                    if abs(icount - instrCnt) > (instrCnt * 0.01):
+                        print(f"{filename}: instrCnt mismatch [{icount} <-> {instrCnt}]")
+                        icount = -2
+    if icount > 0 and clock_cycle > 0:
+        ipc = icount * 1.0 / clock_cycle
     return ipc
 
 def get_ipc_map(base_dir):
-    files = [f for f in glob.glob(base_dir + "/**/simulator_out.txt", recursive=True)]
+    files = [f for f in glob.glob(base_dir + "/**/simulator_err.txt", recursive=True)]
     imap = {}
     for f in files:
         path_split = f.split("/")
