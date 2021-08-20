@@ -4,6 +4,7 @@ import argparse
 import csv
 import os
 import re
+from tqdm import tqdm
 
 
 class PerfManip(object):
@@ -221,10 +222,11 @@ def merge_perf_counters(filenames, all_perf, verbose=False):
         filenames = list(map(lambda name: name[:-suffix_length], filenames))
     all_sources = filenames
     yield [""] + all_sources
-    for i, name in enumerate(all_names):
+    pbar = tqdm(total = len(all_names), disable = not verbose, position = 3)
+    for name in all_names:
         if verbose:
-            percentage = (i + 1) / len(all_names)
-            print(f"Processing ({i + 1}/{len(all_names)})({percentage:.2%}) {name} ...")
+            pbar.display(f"Merging perf counter: {name}", 2)
+            pbar.update(1)
         yield [name] + list(map(lambda perf: perf.get_counter(name, strict=True), all_perf))
 
 
@@ -232,10 +234,11 @@ def main(pfiles, output_file, verbose=False):
     all_files, all_perf = [], []
     all_manip = get_all_manip()
     files_count = len(pfiles)
-    for i, filename in enumerate(pfiles):
+    pbar = tqdm(total = files_count, disable = not verbose, position = 1)
+    for filename in pfiles:
         if verbose:
-            percentage = (i + 1) / files_count
-            print(f"Processing ({i + 1}/{files_count})({percentage:.2%}) {filename} ...")
+            pbar.display("Processing " + filename, 0)
+            pbar.update(1)
         perf = PerfCounters(filename)
         perf.add_manip(all_manip)
         if perf.counters:
