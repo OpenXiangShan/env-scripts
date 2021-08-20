@@ -55,7 +55,7 @@ def main(token, output_csv):
     benchmarks = sorted(list(set(benchmarks)))
     all_rows = [["commit"] + benchmarks]
     for commit in results:
-        all_rows.append([commit] + [results[commit][bench] for bench in benchmarks])
+        all_rows.append([commit] + [results.get(commit, dict()).get(bench,"") for bench in benchmarks])
     write_to_csv(all_rows, output_csv)
 
 
