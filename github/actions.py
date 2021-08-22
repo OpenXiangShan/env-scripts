@@ -15,8 +15,8 @@ def get_recent_commits(token):
     xs = g.get_repo("OpenXiangShan/XiangShan")
     actions = xs.get_workflow_runs(branch="master")
     recent_commits = list(map(lambda a: a.head_sha, actions[:10]))
-    print(recent_commits)
-    return recent_commits
+    commit_messages = list(map(lambda s: xs.get_commit(s).commit.message.splitlines()[0], recent_commits))
+    return recent_commits, commit_messages
 
 def write_to_csv(rows, filename):
     with open(filename, 'w') as csvfile:
@@ -35,7 +35,7 @@ def get_all_manip():
     return all_manip
 
 def main(token, output_csv):
-    commits = get_recent_commits(token)
+    commits, messages = get_recent_commits(token)
     base_dir = "/bigdata/xs-perf"
     results = {}
     benchmarks = []
@@ -53,9 +53,9 @@ def main(token, output_csv):
                 benchmarks.append(benchmark)
                 results[commit][benchmark] = counters["global.IPC"]
     benchmarks = sorted(list(set(benchmarks)))
-    all_rows = [["commit"] + benchmarks]
-    for commit in results:
-        all_rows.append([commit] + [results.get(commit, dict()).get(bench,"") for bench in benchmarks])
+    all_rows = [["commit", "message"] + benchmarks]
+    for commit, message in zip(results, messages):
+        all_rows.append([commit, message] + [results.get(commit, dict()).get(bench,"") for bench in benchmarks])
     write_to_csv(all_rows, output_csv)
 
 
