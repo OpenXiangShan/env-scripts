@@ -229,8 +229,15 @@ def merge_perf_counters(filenames, all_perf, verbose=False):
             pbar.update(1)
         yield [name] + list(map(lambda perf: perf.get_counter(name, strict=True), all_perf))
 
+def pick(include_names, name):
+    if len(include_names) == 0:
+        return True
+    for r in include_names:
+        if r.search(name) != None:
+            return True
+    return False
 
-def main(pfiles, output_file, verbose=False):
+def main(pfiles, output_file, include_names, verbose=False):
     all_files, all_perf = [], []
     all_manip = get_all_manip()
     files_count = len(pfiles)
@@ -245,12 +252,13 @@ def main(pfiles, output_file, verbose=False):
             all_files.append(filename)
             all_perf.append(perf)
         else:
-            print(f"{filename} skipped because it is empty.")
+            pbar.write(f"{filename} skipped because it is empty.")
     with open(output_file, 'w') as csvfile:
         csvwriter = csv.writer(csvfile)
         for output_row in merge_perf_counters(all_files, all_perf, verbose):
-            csvwriter.writerow(output_row)
-    print(f"Finished processing {len(all_files)} non-empty files.")
+            if pick(include_names, output_row[0]):
+                csvwriter.writerow(output_row)
+    pbar.write(f"Finished processing {len(all_files)} non-empty files.")
 
 def find_simulator_err(pfiles):
     if len(pfiles) > 1:
@@ -277,6 +285,7 @@ if __name__ == "__main__":
         help="recursively find simulator_err.txt")
     parser.add_argument('--verbose', '-v', action='store_true', default=False,
         help="show processing logs")
+    parser.add_argument('--include', '-I', action='extend', nargs='+', type=str, help="select given counters (using re)")
 
     args = parser.parse_args()
 
@@ -287,10 +296,15 @@ if __name__ == "__main__":
     if args.recursive:
         args.pfiles = find_simulator_err(args.pfiles)
 
+    if args.include is not None:
+        args.include = list(map(lambda x: re.compile(x), args.include))
+    else:
+        args.include = list()
+
     for filename in args.pfiles:
         if not os.path.isfile(filename):
             print(f"{filename} is not a file. Probably you need --recursive?")
             exit()
 
-    main(args.pfiles, args.output, args.verbose)
+    main(args.pfiles, args.output, args.include, args.verbose)
 
