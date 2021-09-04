@@ -158,12 +158,15 @@ def xs_report(all_gcpt, xs_path):
     # when the spec has not finished, IPC may be None
     if counters["IPC"] is not None:
       gcpt_ipc[gcpt.benchspec].append([float(gcpt.weight), float(counters["IPC"])])
+    else:
+      print("IPC not found in", gcpt.benchspec, gcpt.point, gcpt.weight)
   spec_time = {}
   for benchspec in gcpt_ipc:
     total_weight = sum(map(lambda info: info[0], gcpt_ipc[benchspec]))
     total_cpi = sum(map(lambda info: info[0] / info[1], gcpt_ipc[benchspec])) / total_weight
     num_instr = get_total_inst(benchspec)
     num_seconds = total_cpi * num_instr / frequency
+    print(benchspec, "coverage", total_weight)
     spec_name = benchspec.split("_")[0]
     spec_time[spec_name] = spec_time.get(spec_name, 0) + num_seconds
   for spec_name in spec_time:
@@ -173,7 +176,7 @@ def xs_report(all_gcpt, xs_path):
 
 
 if __name__ == "__main__":
-  parser = argparse.ArgumentParser(description="autorun script for nemu")
+  parser = argparse.ArgumentParser(description="autorun script for xs")
   parser.add_argument('gcpt_path', metavar='gcpt_path', type=str,
                       help='path to gcpt checkpoints')
   parser.add_argument('json_path', metavar='json_path', type=str,
