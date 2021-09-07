@@ -4,6 +4,7 @@ import argparse
 import csv
 import os
 import re
+from multiprocessing import Process, Queue
 from tqdm import tqdm
 
 
@@ -32,6 +33,7 @@ class PerfCounters(object):
         for key in all_perf_counters:
             updated_perf[key[prefix_length:]] = all_perf_counters[key]
         self.counters = updated_perf
+        self.filename = filename
 
     def add_manip(self, all_manip):
         if len(self.counters) == 0:
@@ -318,22 +320,41 @@ def pick(include_names, name):
             return True
     return False
 
-def main(pfiles, output_file, include_names, verbose=False):
+def perf_work(manip, work_queue, perf_queue):
+  while not work_queue.empty():
+    filename = work_queue.get()
+    perf = PerfCounters(filename)
+    perf.add_manip(manip)
+    perf_queue.put(perf)
+
+def main(pfiles, output_file, include_names, verbose=False, jobs = 1):
     all_files, all_perf = [], []
     all_manip = get_all_manip()
     files_count = len(pfiles)
     pbar = tqdm(total = files_count, disable = not verbose, position = 1)
+    work_queue = Queue()
+    perf_queue = Queue()
     for filename in pfiles:
-        if verbose:
-            pbar.display("Processing " + filename, 0)
-            pbar.update(1)
-        perf = PerfCounters(filename)
-        perf.add_manip(all_manip)
-        if perf.counters:
-            all_files.append(filename)
-            all_perf.append(perf)
-        else:
-            pbar.write(f"{filename} skipped because it is empty.")
+      work_queue.put(filename)
+    process_lst = []
+    for i in range(0, jobs):
+      p = Process(target = perf_work, args=(all_manip, work_queue, perf_queue))
+      process_lst.append(p)
+      p.start()
+    perf_lst = []
+    while len(perf_lst) != len(pfiles):
+      pbar.display(f"Processing files with {jobs} threads ...", 0)
+      perf = perf_queue.get()
+      perf_lst.append(perf)
+      if perf.counters:
+        all_files.append(perf.filename)
+        all_perf.append(perf)
+      else:
+        pbar.write(f"{perf.filename} skipped because it is empty.")
+      pbar.update(1)
+    for p in process_lst:
+      p.join()
+
     with open(output_file, 'w') as csvfile:
         csvwriter = csv.writer(csvfile)
         for output_row in merge_perf_counters(all_files, all_perf, verbose):
@@ -367,6 +388,7 @@ if __name__ == "__main__":
     parser.add_argument('--verbose', '-v', action='store_true', default=False,
         help="show processing logs")
     parser.add_argument('--include', '-I', action='extend', nargs='+', type=str, help="select given counters (using re)")
+    parser.add_argument('--jobs', '-j', default=1, type=int, help="processing files in 'j' threads")
 
     args = parser.parse_args()
 
@@ -387,5 +409,5 @@ if __name__ == "__main__":
             print(f"{filename} is not a file. Probably you need --recursive?")
             exit()
 
-    main(args.pfiles, args.output, args.include, args.verbose)
+    main(args.pfiles, args.output, args.include, args.verbose, args.jobs)
 
