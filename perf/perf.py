@@ -343,7 +343,8 @@ def main(pfiles, output_file, include_names, verbose=False, jobs = 1):
       p.start()
     perf_lst = []
     while len(perf_lst) != len(pfiles):
-      pbar.display(f"Processing files with {jobs} threads ...", 0)
+      if verbose:
+        pbar.display(f"Processing files with {jobs} threads ...", 0)
       perf = perf_queue.get()
       perf_lst.append(perf)
       if perf.counters:
