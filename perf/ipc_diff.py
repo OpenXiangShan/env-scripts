@@ -1,7 +1,7 @@
 import sys
 import glob
 
-def get_ipc(filename, instrCnt = 50000000):
+def get_ipc(filename, instrCnt = 20000000):
     clock_cycle = -2
     icount = -2
     ipc = -1
@@ -25,7 +25,7 @@ def get_ipc(filename, instrCnt = 50000000):
     return ipc
 
 def get_ipc_map(base_dir):
-    files = [f for f in glob.glob(base_dir + "/**/simulator_err.txt", recursive=True)]
+    files = [f for f in glob.glob(base_dir + "/**/simulator_err.txt", recursive=True)] + [f for f in glob.glob(base_dir + "/**/main_err.txt", recursive=True)]
     imap = {}
     for f in files:
         path_split = f.split("/")
@@ -39,14 +39,15 @@ def diff(new_base_dir, ref_base_dir):
     new_map = get_ipc_map(new_base_dir)
     ref_map = get_ipc_map(ref_base_dir)
     inc_lst = []
+    print(f"{'worloads':<32}: {'diff_ipc':>8} {'ref_ipc':>8} {'inc_rate':>9}")
     for (k, v) in new_map.items():
         if k in ref_map:
             ref_v = ref_map[k]
             inc = ((v - ref_v) / ref_v) * 100
             inc_lst.append(inc)
-            print(f"{k}: {v} {ref_map[k]} {inc}%")
+            print(f"{k:<32}: {v:>8.4f} {ref_map[k]:>8.4f} {inc:>8.4f}%")
     avg_inc = sum(inc_lst) / len(inc_lst)
-    print(f"avg_inc: {avg_inc}%")
+    print(f"{len(inc_lst)} points in total, avg_inc: {avg_inc}%")
 
 if __name__ == "__main__":
     if len(sys.argv) < 3:
