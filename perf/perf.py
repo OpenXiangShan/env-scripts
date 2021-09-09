@@ -15,7 +15,7 @@ class PerfManip(object):
 
 
 class PerfCounters(object):
-    perf_re = re.compile(r'.*\[PERF \]\[time=\s*\d*\] ((\w*(\.|))*): (.*)\s*,\s*(\d*)')
+    perf_re = re.compile(r'^\[PERF \]\[time=\s+\d+\] (([a-zA-Z0-9_]+\.)+[a-zA-Z0-9_]+): ((\w| |\')+),\s+(\d+)$')
 
     def __init__(self, filename):
         all_perf_counters = dict()
@@ -23,7 +23,7 @@ class PerfCounters(object):
             for line in f:
                 perf_match = self.perf_re.match(line)
                 if perf_match:
-                    perf_name = ".".join([str(perf_match.group(1)), str(perf_match.group(4))])
+                    perf_name = ".".join([str(perf_match.group(1)), str(perf_match.group(3))])
                     perf_value = str(perf_match.group(5))
                     perf_name = perf_name.replace(" ", "_").replace("'", "")
                     all_perf_counters[perf_name] = perf_value
@@ -38,6 +38,7 @@ class PerfCounters(object):
             return
         for manip in all_manip:
             if None in map(lambda name: self[name], manip.counters):
+                print(list(map(lambda name: self[name], manip.counters)))
                 print(f"Some counters for {manip.name} is not found. Please check it.")
                 continue
             numbers = map(lambda name: int(self[name]), manip.counters)
@@ -157,11 +158,28 @@ def get_all_manip():
     all_manip.append(icache_miss_rate)
     dtlb_miss_rate = PerfManip(
         name = "global.dtlb_miss_rate",
-        counters = [f"memBlock.LoadUnit_0.load_s1.in", f"memBlock.LoadUnit_0.load_s1.tlb_miss",
-            f"memBlock.LoadUnit_1.load_s1.in", f"memBlock.LoadUnit_1.load_s1.tlb_miss"],
-        func = lambda req1, miss1, req2, miss2: (miss1 + miss2) / (req1 + req2)
+        counters = [f"memBlock.TLB.first_access0", f"memBlock.TLB.first_miss0",
+            f"memBlock.TLB_1.first_access0", f"memBlock.TLB_1.first_miss0",
+            f"memBlock.TLB_2.first_access0", f"memBlock.TLB_2.first_miss0", 
+            f"memBlock.TLB_3.first_access0", f"memBlock.TLB_3.first_miss0"],
+        func = lambda req1, miss1, req2, miss2, req3, miss3, req4, miss4: (miss1 + miss2 + miss3 + miss4) / (req1 + req2 + req3 + req4) if ((req1 + req2 + req3 + req4) > 0) else 0
     )
     all_manip.append(dtlb_miss_rate)
+    dtlb_sa_percent = PerfManip(
+        name = "global.dtlb_sa_hit_percent",
+        counters = [f"memBlock.TLB.tlb_normal_sa.hit", f"memBlock.TLB.tlb_super_fa.hit",
+                   f"memBlock.TLB_1.tlb_normal_sa.hit", f"memBlock.TLB_1.tlb_super_fa.hit",
+                   f"memBlock.TLB_2.tlb_normal_sa.hit", f"memBlock.TLB_2.tlb_super_fa.hit",
+                   f"memBlock.TLB_3.tlb_normal_sa.hit", f"memBlock.TLB_3.tlb_super_fa.hit"],
+        func = lambda sa0, fa0, sa1, fa1, sa2, fa2, sa3, fa3: (sa0 + sa1 + sa2 + sa3) / (sa0 + sa1 + sa2 + sa3 + fa0 + fa1 + fa2 + fa3) if ((sa0 + sa1 + sa2 + sa3 + fa0 + fa1 + fa2 + fa3) > 0) else 0
+    )
+    all_manip.append(dtlb_sa_percent)
+    ptw_access_latency = PerfManip(
+        name = "global.ptw_access_latency",
+        counters = [f"dtlbRepeater.inflight_cycle", f"dtlbRepeater.ptw_req_count"],
+        func = lambda cycle, count: cycle / count
+    )
+    all_manip.append(ptw_access_latency)
     dcache_load_miss_rate = PerfManip(
         name = "global.dcache_load_miss_rate",
         counters = [f"memBlock.LoadUnit_0.load_s2.in", f"memBlock.LoadUnit_0.load_s2.dcache_miss",
@@ -190,8 +208,8 @@ def get_all_manip():
     ptw_mem_latency = PerfManip(
         name = "global.ptw_mem_latency",
         counters = [
-            "core.ptw.ptw.fsm.mem_count",
-            "core.ptw.ptw.fsm.mem_cycle"
+            "core.ptw.ptw.mem_count",
+            "core.ptw.ptw.mem_cycle"
         ],
         func = lambda count, cycle : cycle / count if count > 0 else 0
     )
@@ -274,6 +292,16 @@ def find_simulator_err(pfiles):
             all_files += find_simulator_err([sub_path])
     return all_files
 
+def find_all_in_dir(dir_path):
+    base_path = dir_path
+    all_files = []
+    for sub_dir in os.listdir(base_path):
+        sub_path = os.path.join(base_path, sub_dir)
+        if os.path.isfile(sub_path):
+            all_files.append(sub_path)
+        else:
+            print("find non-file" + sub_path)
+    return all_files
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description='performance counter log parser')
@@ -283,6 +311,7 @@ if __name__ == "__main__":
     parser.add_argument('--filelist', '-f', default=None, help="filelist")
     parser.add_argument('--recursive', '-r', action='store_true', default=False,
         help="recursively find simulator_err.txt")
+    parser.add_argument('--dir', '-d', default = None, help="directory")
     parser.add_argument('--verbose', '-v', action='store_true', default=False,
         help="show processing logs")
     parser.add_argument('--include', '-I', action='extend', nargs='+', type=str, help="select given counters (using re)")
@@ -296,12 +325,16 @@ if __name__ == "__main__":
     if args.recursive:
         args.pfiles = find_simulator_err(args.pfiles)
 
+    if args.dir is not None:
+        args.pfiles += find_all_in_dir(args.dir)
+
     if args.include is not None:
         args.include = list(map(lambda x: re.compile(x), args.include))
     else:
         args.include = list()
 
     for filename in args.pfiles:
+        print(filename)
         if not os.path.isfile(filename):
             print(f"{filename} is not a file. Probably you need --recursive?")
             exit()
