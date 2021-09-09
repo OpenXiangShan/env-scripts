@@ -295,7 +295,26 @@ def get_all_manip():
         ],
         func = lambda count, cycle : cycle / count if count > 0 else 0
     )
-    # all_manip.append(ptw_mem_latency)
+    all_manip.append(ptw_mem_latency)
+    l2tlb_cache_l2 = PerfManip(
+        name = "global.ptw.l2hit_rate",
+        counters = [
+            "core.ptw.ptw.cache.l2_hit",
+            'core.ptw.ptw.cache.access',
+        ],
+        func = lambda hit, access : hit / access if access > 0 else 0
+    )
+    all_manip.append(l2tlb_cache_l2)
+    l2tlb_cache_pte = PerfManip(
+        name = "global.ptw.pte_hit_rate",
+        counters = [
+            "core.ptw.ptw.cache.pte_hit",
+            'core.ptw.ptw.cache.access',
+        ],
+        func = lambda hit, access : hit / access if access > 0 else 0
+    )
+    all_manip.append(l2tlb_cache_pte)
+
     # all_manip += get_rs_manip()
     # all_manip += get_fu_manip()
     return all_manip
