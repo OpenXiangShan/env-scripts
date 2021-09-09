@@ -4,6 +4,7 @@ import argparse
 import csv
 import os
 import re
+from multiprocessing import Process, Queue
 from tqdm import tqdm
 
 
@@ -15,7 +16,7 @@ class PerfManip(object):
 
 
 class PerfCounters(object):
-    perf_re = re.compile(r'^\[PERF \]\[time=\s+\d+\] (([a-zA-Z0-9_]+\.)+[a-zA-Z0-9_]+): ((\w| |\')+),\s+(\d+)$')
+    perf_re = re.compile(r'.*\[PERF \]\[time=\s+\d+\] (([a-zA-Z0-9_]+\.)+[a-zA-Z0-9_]+): ((\w| |\')+),\s+(\d+)$')
 
     def __init__(self, filename):
         all_perf_counters = dict()
@@ -32,6 +33,7 @@ class PerfCounters(object):
         for key in all_perf_counters:
             updated_perf[key[prefix_length:]] = all_perf_counters[key]
         self.counters = updated_perf
+        self.filename = filename
 
     def add_manip(self, all_manip):
         if len(self.counters) == 0:
@@ -70,7 +72,7 @@ class PerfCounters(object):
 def get_rs_manip():
     all_manip = []
     alu_bypass_from_mdu = PerfManip(
-        name = "global.alu_bypass_from_mdu",
+        name = "global.rs.alu_bypass_from_mdu",
         counters = [
             "exuBlocks.scheduler.issue_fire",
             "exuBlocks.scheduler.rs.source_bypass_6_0",
@@ -82,11 +84,11 @@ def get_rs_manip():
             "exuBlocks.scheduler.rs.source_bypass_7_2",
             "exuBlocks.scheduler.rs.source_bypass_7_3"
         ],
-        func = lambda fire, b60, b61, b62, b63, b70, b71, b72, b3: (b60 + b61 + b62 + b63 + b70 + b71 + b72 + b3) / fire
+        func = lambda fire, b60, b61, b62, b63, b70, b71, b72, b3: (b60 + b61 + b62 + b63 + b70 + b71 + b72 + b3)# / fire
     )
-    all_manip.append(alu_bypass_from_mdu)
+    # all_manip.append(alu_bypass_from_mdu)
     mdu_bypass_from_mdu = PerfManip(
-        name = "global.mdu_bypass_from_mdu",
+        name = "global.rs.mdu_bypass_from_mdu",
         counters = [
             "exuBlocks_1.scheduler.rs.deq_fire_0",
             "exuBlocks_1.scheduler.rs.deq_fire_1",
@@ -95,11 +97,11 @@ def get_rs_manip():
             "exuBlocks_1.scheduler.rs.source_bypass_5_0",
             "exuBlocks_1.scheduler.rs.source_bypass_5_1"
         ],
-        func = lambda fire0, fire1, b40, b41, b50, b51: (b40 + b41 + b50 + b51) / (fire0 + fire1) if (fire0 + fire1) > 0 else 0
+        func = lambda fire0, fire1, b40, b41, b50, b51: (b40 + b41 + b50 + b51)# / (fire0 + fire1)# if (fire0 + fire1) > 0 else 0
     )
-    all_manip.append(mdu_bypass_from_mdu)
+    # all_manip.append(mdu_bypass_from_mdu)
     load_bypass_from_mdu = PerfManip(
-        name = "global.load_bypass_from_mdu",
+        name = "global.rs.load_bypass_from_mdu",
         counters = [
             "memScheduler.rs.deq_fire_0",
             "memScheduler.rs.deq_fire_1",
@@ -108,38 +110,124 @@ def get_rs_manip():
             "memScheduler.rs.source_bypass_7_0",
             "memScheduler.rs.source_bypass_7_1"
         ],
-        func = lambda fire0, fire1, b60, b61, b70, b71: (b60 + b61 + b70 + b71) / (fire0 + fire1) if (fire0 + fire1) > 0 else 0
+        func = lambda fire0, fire1, b60, b61, b70, b71: (b60 + b61 + b70 + b71)# / (fire0 + fire1)# if (fire0 + fire1) > 0 else 0
     )
-    all_manip.append(load_bypass_from_mdu)
+    # all_manip.append(load_bypass_from_mdu)
     alu_issue_exceed_limit = PerfManip(
-        name = "global.alu_issue_exceed_limit",
+        name = "global.rs.alu_issue_exceed_limit",
         counters = [
-            "exuBlocks.scheduler.rs.statusArray.not_selected_entries",
+            "exuBlocks.scheduler.rs.rs_0.statusArray.not_selected_entries",
+            "exuBlocks.scheduler.rs.rs_1.statusArray.not_selected_entries",
             "ctrlBlock.roq.clock_cycle"
         ],
-        func = lambda ex, cycle : ex / cycle
+        func = lambda ex0, ex1, cycle : (ex0 + ex1) / cycle
     )
-    all_manip.append(alu_issue_exceed_limit)
+    # all_manip.append(alu_issue_exceed_limit)
     alu_issue_exceed_limit_instr = PerfManip(
-        name = "global.alu_issue_exceed_limit_instr",
+        name = "global.rs.alu_issue_exceed_limit_instr",
         counters = [
-            "exuBlocks.scheduler.rs.statusArray.not_selected_entries",
+            "exuBlocks.scheduler.rs.rs_0.statusArray.not_selected_entries",
+            "exuBlocks.scheduler.rs.rs_1.statusArray.not_selected_entries",
             "exuBlocks.scheduler.issue_fire"
         ],
-        func = lambda ex, cycle : ex / cycle
+        func = lambda ex0, ex1, cycle : (ex0 + ex1) / cycle
     )
-    all_manip.append(alu_issue_exceed_limit_instr)
-    sta_wait_for_std = PerfManip(
-        name = "global.sta_wait_for_std",
-        counters = [
-            "memScheduler.rs_1.statusArray.wait_for_src_0",
-            "memScheduler.rs_1.statusArray.wait_for_src_1"
-        ],
-        func = lambda sta, std : std / (sta + std)
-    )
-    all_manip.append(sta_wait_for_std)
+    # all_manip.append(alu_issue_exceed_limit_instr)
     return all_manip
 
+def get_fu_manip():
+    all_manip = []
+    div_0_in_blocked = PerfManip(
+        name = "global.fu.div_0_in_blocked",
+        counters = ["exeUnits_0.div.in_fire", "exeUnits_0.div.in_valid"],
+        func = lambda f, v: (v - f) / v if v != 0 else 0
+    )
+    all_manip.append(div_0_in_blocked)
+    div_1_in_blocked = PerfManip(
+        name = "global.fu.div_1_in_blocked",
+        counters = ["exeUnits_1.div.in_fire", "exeUnits_1.div.in_valid"],
+        func = lambda f, v: (v - f) / v if v != 0 else 0
+    )
+    all_manip.append(div_1_in_blocked)
+    mul_0_in_blocked = PerfManip(
+        name = "global.fu.mul_0_in_blocked",
+        counters = ["exeUnits_0.mul.in_fire", "exeUnits_0.mul.in_valid"],
+        func = lambda f, v: (v - f) / v if v != 0 else 0
+    )
+    all_manip.append(mul_0_in_blocked)
+    mul_1_in_blocked = PerfManip(
+        name = "global.fu.mul_1_in_blocked",
+        counters = ["exeUnits_1.mul.in_fire", "exeUnits_1.mul.in_valid"],
+        func = lambda f, v: (v - f) / v if v != 0 else 0
+    )
+    all_manip.append(mul_1_in_blocked)
+    i2f_in_blocked = PerfManip(
+        name = "global.fu.i2f_in_blocked",
+        counters = ["exeUnits_2.i2f.in_fire", "exeUnits_2.i2f.in_valid"],
+        func = lambda f, v: (v - f) / v if v != 0 else 0
+    )
+    all_manip.append(i2f_in_blocked)
+    f2i_0_in_blocked = PerfManip(
+        name = "global.fu.f2i_0_in_blocked",
+        counters = ["exeUnits_4.f2i.in_fire", "exeUnits_4.f2i.in_fire"],
+        func = lambda f, v: (v - f) / v if v != 0 else 0
+    )
+    all_manip.append(f2i_0_in_blocked)
+    f2i_1_in_blocked = PerfManip(
+        name = "global.fu.f2i_1_in_blocked",
+        counters = ["exeUnits_5.f2i.in_fire", "exeUnits_5.f2i.in_valid"],
+        func = lambda f, v: (v - f) / v if v != 0 else 0
+    )
+    all_manip.append(f2i_1_in_blocked)
+    f2f_0_in_blocked = PerfManip(
+        name = "global.fu.f2f_0_in_blocked",
+        counters = ["exeUnits_4.f2f.in_fire", "exeUnits_4.f2f.in_fire"],
+        func = lambda f, v: (v - f) / v if v != 0 else 0
+    )
+    all_manip.append(f2f_0_in_blocked)
+    f2f_1_in_blocked = PerfManip(
+        name = "global.fu.f2f_1_in_blocked",
+        counters = ["exeUnits_5.f2f.in_fire", "exeUnits_5.f2f.in_valid"],
+        func = lambda f, v: (v - f) / v if v != 0 else 0
+    )
+    all_manip.append(f2f_1_in_blocked)
+    fdiv_sqrt_0_in_blocked = PerfManip(
+        name = "global.fu.fdiv_sqrt_0_in_blocked",
+        counters = ["exeUnits_4.fdivSqrt.in_fire", "exeUnits_4.fdivSqrt.in_valid"],
+        func = lambda f, v: (v - f) / v if v != 0 else 0
+    )
+    all_manip.append(fdiv_sqrt_0_in_blocked)
+    fdiv_sqrt_1_in_blocked = PerfManip(
+        name = "global.fu.fdiv_sqrt_1_in_blocked",
+        counters = ["exeUnits_5.fdivSqrt.in_fire", "exeUnits_5.fdivSqrt.in_valid"],
+        func = lambda f, v: (v - f) / v if v != 0 else 0
+    )
+    all_manip.append(fdiv_sqrt_1_in_blocked)
+    load_0_in_blocked = PerfManip(
+        name = "global.fu.load_0_in_blocked",
+        counters = ["memScheduler.rs.deq_fire_0", "memScheduler.rs.deq_valid_0"],
+        func = lambda f, v: (v - f) / v if v != 0 else 0
+    )
+    # all_manip.append(load_0_in_blocked)
+    load_1_in_blocked = PerfManip(
+        name = "global.fu.load_1_in_blocked",
+        counters = ["memScheduler.rs.deq_fire_1", "memScheduler.rs.deq_valid_1"],
+        func = lambda f, v: (v - f) / v if v != 0 else 0
+    )
+    # all_manip.append(load_1_in_blocked)
+    load_replay_frac = PerfManip(
+        name = "global.fu.load_replay_frac",
+        counters = ["memScheduler.rs.deq_fire_0", "memScheduler.rs.deq_fire_1", "memScheduler.rs.deq_not_first_issue_0", "memScheduler.rs.deq_not_first_issue_1"],
+        func = lambda f0, f1, r0, r1: (r0 + r1) / (f0 + f1) if (f0 + f1) != 0 else 0
+    )
+    # all_manip.append(load_replay_frac)
+    store_replay_frac = PerfManip(
+        name = "global.fu.store_replay_frac",
+        counters = ["memScheduler.rs_1.deq_fire_0", "memScheduler.rs_1.deq_fire_1", "memScheduler.rs_1.deq_not_first_issue_0", "memScheduler.rs_1.deq_not_first_issue_1"],
+        func = lambda f0, f1, r0, r1: (r0 + r1) / (f0 + f1) if (f0 + f1) != 0 else 0
+    )
+    # all_manip.append(store_replay_frac)
+    return all_manip
 
 def get_all_manip():
     all_manip = []
@@ -155,7 +243,7 @@ def get_all_manip():
         counters = [f"frontend.ifu.icache.req", f"frontend.ifu.icache.miss"],
         func = lambda req, miss: miss / req
     )
-    all_manip.append(icache_miss_rate)
+    # all_manip.append(icache_miss_rate)
     dtlb_miss_rate = PerfManip(
         name = "global.dtlb_miss_rate",
         counters = [f"memBlock.TLB.first_access0", f"memBlock.TLB.first_miss0",
@@ -177,7 +265,7 @@ def get_all_manip():
     ptw_access_latency = PerfManip(
         name = "global.ptw_access_latency",
         counters = [f"dtlbRepeater.inflight_cycle", f"dtlbRepeater.ptw_req_count"],
-        func = lambda cycle, count: cycle / count
+        func = lambda cycle, count: cycle / count if (count > 0) else 0
     )
     all_manip.append(ptw_access_latency)
     dcache_load_miss_rate = PerfManip(
@@ -186,25 +274,19 @@ def get_all_manip():
             f"memBlock.LoadUnit_1.load_s2.in", f"memBlock.LoadUnit_1.load_s2.dcache_miss"],
         func = lambda req1, miss1, req2, miss2: (miss1 + miss2) / (req1 + req2)
     )
-    all_manip.append(dcache_load_miss_rate)
+    # all_manip.append(dcache_load_miss_rate)
     branch_mispred = PerfManip(
         name = "global.branch_mispred",
-        counters = [f"ctrlBlock.ftq.BpRight", f"ctrlBlock.ftq.BpWrong"],
+        counters = [f"ftq.BpRight", f"ftq.BpWrong"],
         func = lambda right, wrong: wrong / (right + wrong)
     )
-    all_manip.append(branch_mispred)
-    l1plus_miss_rate = PerfManip(
-        name = "global.l1plus_miss_rate",
-        counters = [f"l1plusCache.pipe.miss", f"l1plusCache.pipe.req"],
-        func = lambda wrong, req: wrong / req if req > 0 else 0
-    )
-    all_manip.append(l1plus_miss_rate)
+    # all_manip.append(branch_mispred)
     load_replay_rate = PerfManip(
         name = "global.load_replay_rate",
         counters = [f"ftq.replayRedirect", f"roq.commitInstrLoad"],
         func = lambda redirect, load: redirect / load
     )
-    all_manip.append(load_replay_rate)
+    # all_manip.append(load_replay_rate)
     ptw_mem_latency = PerfManip(
         name = "global.ptw_mem_latency",
         counters = [
@@ -213,8 +295,9 @@ def get_all_manip():
         ],
         func = lambda count, cycle : cycle / count if count > 0 else 0
     )
-    all_manip.append(ptw_mem_latency)
-    all_manip += get_rs_manip()
+    # all_manip.append(ptw_mem_latency)
+    # all_manip += get_rs_manip()
+    # all_manip += get_fu_manip()
     return all_manip
 
 
@@ -255,22 +338,42 @@ def pick(include_names, name):
             return True
     return False
 
-def main(pfiles, output_file, include_names, verbose=False):
+def perf_work(manip, work_queue, perf_queue):
+  while not work_queue.empty():
+    filename = work_queue.get()
+    perf = PerfCounters(filename)
+    perf.add_manip(manip)
+    perf_queue.put(perf)
+
+def main(pfiles, output_file, include_names, verbose=False, jobs = 1):
     all_files, all_perf = [], []
     all_manip = get_all_manip()
     files_count = len(pfiles)
     pbar = tqdm(total = files_count, disable = not verbose, position = 1)
+    work_queue = Queue()
+    perf_queue = Queue()
     for filename in pfiles:
-        if verbose:
-            pbar.display("Processing " + filename, 0)
-            pbar.update(1)
-        perf = PerfCounters(filename)
-        perf.add_manip(all_manip)
-        if perf.counters:
-            all_files.append(filename)
-            all_perf.append(perf)
-        else:
-            pbar.write(f"{filename} skipped because it is empty.")
+      work_queue.put(filename)
+    process_lst = []
+    for i in range(0, jobs):
+      p = Process(target = perf_work, args=(all_manip, work_queue, perf_queue))
+      process_lst.append(p)
+      p.start()
+    perf_lst = []
+    while len(perf_lst) != len(pfiles):
+      if verbose:
+        pbar.display(f"Processing files with {jobs} threads ...", 0)
+      perf = perf_queue.get()
+      perf_lst.append(perf)
+      if perf.counters:
+        all_files.append(perf.filename)
+        all_perf.append(perf)
+      else:
+        pbar.write(f"{perf.filename} skipped because it is empty.")
+      pbar.update(1)
+    for p in process_lst:
+      p.join()
+
     with open(output_file, 'w') as csvfile:
         csvwriter = csv.writer(csvfile)
         for output_row in merge_perf_counters(all_files, all_perf, verbose):
@@ -315,6 +418,7 @@ if __name__ == "__main__":
     parser.add_argument('--verbose', '-v', action='store_true', default=False,
         help="show processing logs")
     parser.add_argument('--include', '-I', action='extend', nargs='+', type=str, help="select given counters (using re)")
+    parser.add_argument('--jobs', '-j', default=1, type=int, help="processing files in 'j' threads")
 
     args = parser.parse_args()
 
@@ -333,11 +437,14 @@ if __name__ == "__main__":
     else:
         args.include = list()
 
+    print("input files:")
     for filename in args.pfiles:
         print(filename)
         if not os.path.isfile(filename):
             print(f"{filename} is not a file. Probably you need --recursive?")
             exit()
+    
+    print(f"output file: {args.output}")
 
-    main(args.pfiles, args.output, args.include, args.verbose)
+    main(args.pfiles, args.output, args.include, args.verbose, args.jobs)
 
