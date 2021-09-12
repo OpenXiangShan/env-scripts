@@ -108,7 +108,7 @@ def get_pull_requests(token):
     g = Github(token)
     xs = g.get_repo("OpenXiangShan/XiangShan")
     actions = xs.get_workflow_runs(event="pull_request", status="success")
-    for action in actions[:20]:
+    for action in actions[:15]:
         if not action.pull_requests:
             continue
         pull_request = action.pull_requests[0]
@@ -126,16 +126,21 @@ def get_pull_requests(token):
             print(f"{pull_request.html_url} {action.head_sha} has been commented")
 
 def main(token, output_csv, number, always_on):
+    error_count = 0
     while always_on:
-        get_pull_requests(token)
-        # check PRs every 5 minutes
-        time.sleep(300)
+        try:
+            get_pull_requests(token)
+        except KeyboardInterrupt:
+            sys.exit()
+        except:
+            error_count += 1
+            print(f"ERROR count {error_count}!!!!")
+        else:
+            # check PRs every 5 minutes
+            time.sleep(300)
     run_numbers, commits, messages = get_recent_commits(token, number)
     all_rows = get_actions_data(run_numbers, commits, messages)
     write_to_csv(all_rows, output_csv)
-
-
-
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description='stargazers analysis')
