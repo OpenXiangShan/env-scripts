@@ -3,17 +3,27 @@
 import argparse
 import json
 import os
+import random
 import subprocess
 import time
 
 import perf
 
+
 class GCPT(object):
+  STATE_NONE     = 0
+  STATE_RUNNING  = 1
+  STATE_FINISHED = 2
+  STATE_ABORTED  = 3
+
   def __init__(self, base_path, benchspec, point, weight):
     self.base_path = base_path
     self.benchspec = benchspec
     self.point = point
     self.weight = weight
+    self.state = self.STATE_NONE
+    self.num_cycles = -1
+    self.num_instrs = -1
 
   def get_path(self):
     dir_name = self.__str__()
@@ -27,28 +37,66 @@ class GCPT(object):
   def __str__(self):
       return "_".join([self.benchspec, self.point, str(self.weight)])
 
+  def result_path(self, base_path):
+    return  os.path.join(base_path, self.__str__())
+
   def err_path(self, base_path):
-    return os.path.join(base_path, self.__str__(), "simulator_err.txt")
+    return os.path.join(self.result_path(base_path), "simulator_err.txt")
 
   def out_path(self, base_path):
-    return os.path.join(base_path, self.__str__(), "simulator_out.txt")
+    return os.path.join(self.result_path(base_path), "simulator_out.txt")
+
+  def get_state(self, base_path):
+    self.state = self.STATE_NONE
+    if os.path.exists(self.out_path(base_path)):
+      self.state = self.STATE_RUNNING
+      with open(self.out_path(base_path)) as f:
+        for line in f:
+          if "ABORT at pc" in line:
+            self.state = self.STATE_ABORTED
+          elif "EXCEEDING CYCLE/INSTR LIMIT" in line:
+            self.state = self.STATE_FINISHED
+          else:
+            if "cycleCnt = " in line:
+              cycle_cnt_str = line.split("cycleCnt =")[1].split(", ")[0]
+              self.num_cycles = int(cycle_cnt_str.replace(",", "").strip())
+            if "instrCnt = " in line:
+              instr_cnt_str = line.split("instrCnt =")[1].split(", ")[0]
+              self.num_instrs = int(instr_cnt_str.replace(",", "").strip())
+    return self.state
+
+  def state_str(self):
+    state_strs = ["S_NONE", "S_RUNNING", "S_FINISHED", "S_ABORTED"]
+    return state_strs[self.state]
+
+  def show(self):
+    instr_str = f"instrCnt = {self.num_instrs}"
+    cycle_str = f"cycleCnt = {self.num_cycles}"
+    print(f"GCPT {str(self)}: {self.state_str()}, {instr_str}, {cycle_str}")
 
 
-def load_all_gcpt(gcpt_path, json_path):
+def load_all_gcpt(gcpt_path, json_path, state_filter=None, xs_path=None, sorted_by=None):
   all_gcpt = []
   with open(json_path) as f:
     data = json.load(f)
   for benchspec in data:
-    if "gamess" in benchspec or "wrf" in benchspec:
-      for point in data[benchspec]:
-        weight = data[benchspec][point]
-        gcpt = GCPT(gcpt_path, benchspec, point, weight)
+    for point in data[benchspec]:
+      weight = data[benchspec][point]
+      gcpt = GCPT(gcpt_path, benchspec, point, weight)
+      if state_filter is None:
         all_gcpt.append(gcpt)
-  return all_gcpt
+      else:
+        perf_base_path = get_perf_base_path(xs_path)
+        if gcpt.get_state(perf_base_path) in state_filter:
+          all_gcpt.append(gcpt)
+  if sorted_by is None:
+    return all_gcpt
+  else:
+    return sorted(all_gcpt, key=sorted_by)
 
 
 def get_perf_base_path(xs_path):
-  return os.path.join(xs_path, "gcpt_results")
+  return os.path.join(xs_path, "SPEC06_EmuTasks_10_03_2021")
 
 
 def xs_run(workloads, xs_path, warmup, max_instr):
@@ -56,7 +104,7 @@ def xs_run(workloads, xs_path, warmup, max_instr):
   base_arguments = [emu_path, '-W', str(warmup), '-I', str(max_instr), '-i']
   proc_count = 0
   finish_count = 0
-  max_pending_proc = 80
+  max_pending_proc = 128
   pending_proc = []
   error_proc = []
   try:
@@ -80,15 +128,17 @@ def xs_run(workloads, xs_path, warmup, max_instr):
         print(workload)
         if len(pending_proc) < max_pending_proc:
           workload_path = workload.get_path()
-          cmd = " ".join(base_arguments + [workload_path])
-          print(f"cmd {proc_count}: {cmd}")
-          result_path = os.path.join(get_perf_base_path(xs_path), workload)
+          perf_base_path = get_perf_base_path(xs_path)
+          result_path = workload.result_path(perf_base_path)
           if not os.path.exists(result_path):
-            os.mkdir(result_path)
-          stdout_file = os.path.join(result_path, f"simulator_out.txt")
-          stderr_file = os.path.join(result_path, f"simulator_err.txt")
+            os.makedirs(result_path, exist_ok=True)
+          stdout_file = workload.out_path(perf_base_path)
+          stderr_file = workload.err_path(perf_base_path)
           with open(stdout_file, "w") as stdout, open(stderr_file, "w") as stderr:
-            proc = subprocess.Popen(base_arguments + [workload_path], stdout=stdout, stderr=stderr)
+            random_seed = random.randint(0, 9999)
+            run_cmd = base_arguments + [workload_path] + ["-s", f"{random_seed}"]
+            print(f"cmd {proc_count}: {run_cmd}")
+            proc = subprocess.Popen(run_cmd, stdout=stdout, stderr=stderr)
           pending_proc.append((workload, proc))
           proc_count += 1
       workloads = workloads[can_launch:]
@@ -174,6 +224,9 @@ def xs_report(all_gcpt, xs_path):
     score = reftime / spec_time[spec_name]
     print(spec_name, score, score / 1.5)
 
+def xs_show(all_gcpt):
+  for gcpt in all_gcpt:
+    gcpt.show()
 
 if __name__ == "__main__":
   parser = argparse.ArgumentParser(description="autorun script for xs")
@@ -185,12 +238,17 @@ if __name__ == "__main__":
   parser.add_argument('--warmup', '-W', default=20000000, help="warmup instr count")
   parser.add_argument('--max-instr', '-I', default=40000000, help="max instr count")
   parser.add_argument('--report', '-R', action='store_true', default=False, help='report only')
+  parser.add_argument('--show', '-S', action='store_true', default=False, help='show list of gcpt only')
 
   args = parser.parse_args()
 
   gcpt = load_all_gcpt(args.gcpt_path, args.json_path)
+  # gcpt = load_all_gcpt(args.gcpt_path, args.json_path,
+  #   state_filter=[GCPT.STATE_ABORTED], xs_path=args.xs, sorted_by=lambda x: x.num_cycles)
 
-  if args.report:
+  if args.show:
+    xs_show(gcpt)
+  elif args.report:
     xs_report(gcpt, args.xs)
   else:
     xs_run(gcpt, args.xs, args.warmup, args.max_instr)
