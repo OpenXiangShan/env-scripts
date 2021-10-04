@@ -111,27 +111,26 @@ def load_all_gcpt(gcpt_path, json_path, state_filter=None, xs_path=None, sorted_
 
 
 def get_perf_base_path(xs_path):
-  return os.path.join(xs_path, "SPEC06_EmuTasks_10_03_2021")
+  return os.path.join(xs_path, "SPEC06_EmuTasks_10_04_2021")
 
-
-def xs_run(workloads, xs_path, warmup, max_instr):
+def xs_run(workloads, xs_path, warmup, max_instr, threads):
   emu_path = os.path.join(xs_path, "build/emu")
   base_arguments = [emu_path, '--enable-fork', '-W', str(warmup), '-I', str(max_instr), '-i']
-  proc_count = 0
-  finish_count = 0
-  max_pending_proc = 128
-  pending_proc = []
-  error_proc = []
+  proc_count, finish_count = 0, 0
+  max_pending_proc = 128 // threads
+  pending_proc, error_proc = [], []
+  free_cores = list(range(max_pending_proc))
   try:
     while len(workloads) > 0 or len(pending_proc) > 0:
       has_pending_workload = len(workloads) > 0 and len(pending_proc) >= max_pending_proc
       has_pending_proc = len(pending_proc) > 0
       if has_pending_workload or has_pending_proc:
           finished_proc = list(filter(lambda p: p[1].poll() is not None, pending_proc))
-          for workload, proc in finished_proc:
+          for workload, proc, core in finished_proc:
             print(f"{workload} has finished")
-            pending_proc.remove((workload, proc))
-            if proc.returncode < 0:
+            pending_proc.remove((workload, proc, core))
+            free_cores.append(core)
+            if proc.returncode != 0:
               print(f"[ERROR] {workload} exits with code {proc.returncode}")
               error_proc.append(workload)
               continue
@@ -140,8 +139,14 @@ def xs_run(workloads, xs_path, warmup, max_instr):
             time.sleep(1)
       can_launch = max_pending_proc - len(pending_proc)
       for workload in workloads[:can_launch]:
-        print(workload)
         if len(pending_proc) < max_pending_proc:
+          allocate_core = free_cores[0]
+          numa_cmd = []
+          if threads > 1:
+            start_core = threads * allocate_core
+            end_core = threads * allocate_core + threads - 1
+            numa_node = 1 if start_core >= 64 else 0
+            numa_cmd = ["numactl", "-m", str(numa_node), "-C", f"{start_core}-{end_core}"]
           workload_path = workload.get_path()
           perf_base_path = get_perf_base_path(xs_path)
           result_path = workload.result_path(perf_base_path)
@@ -151,16 +156,17 @@ def xs_run(workloads, xs_path, warmup, max_instr):
           stderr_file = workload.err_path(perf_base_path)
           with open(stdout_file, "w") as stdout, open(stderr_file, "w") as stderr:
             random_seed = random.randint(0, 9999)
-            run_cmd = base_arguments + [workload_path] + ["-s", f"{random_seed}"]
+            run_cmd = numa_cmd + base_arguments + [workload_path] + ["-s", f"{random_seed}"]
             print(f"cmd {proc_count}: {run_cmd}")
             proc = subprocess.Popen(run_cmd, stdout=stdout, stderr=stderr)
-          pending_proc.append((workload, proc))
+          pending_proc.append((workload, proc, allocate_core))
+          free_cores = free_cores[1:]
           proc_count += 1
       workloads = workloads[can_launch:]
   except KeyboardInterrupt:
     print("Interrupted. Exiting all programs ...")
     print("Not finished:")
-    for i, (workload, proc) in enumerate(pending_proc):
+    for i, (workload, proc, _) in enumerate(pending_proc):
       proc.terminate()
       print(f"  ({i + 1}) {workload}")
     print("Not started:")
@@ -256,15 +262,16 @@ if __name__ == "__main__":
   parser.add_argument('json_path', metavar='json_path', type=str,
                       help='path to gcpt json')
   parser.add_argument('--xs', help='path to xs')
-  parser.add_argument('--warmup', '-W', default=20000000, help="warmup instr count")
-  parser.add_argument('--max-instr', '-I', default=40000000, help="max instr count")
+  parser.add_argument('--warmup', '-W', default=20000000, type=int, help="warmup instr count")
+  parser.add_argument('--max-instr', '-I', default=40000000, type=int, help="max instr count")
+  parser.add_argument('--threads', '-T', default=1, type=int, help="number of emu threads")
   parser.add_argument('--report', '-R', action='store_true', default=False, help='report only')
   parser.add_argument('--show', '-S', action='store_true', default=False, help='show list of gcpt only')
   parser.add_argument('--debug', '-D', action='store_true', default=False, help='debug options')
 
   args = parser.parse_args()
 
-  gcpt = load_all_gcpt(args.gcpt_path, args.json_path)
+  gcpt = load_all_gcpt(args.gcpt_path, args.json_path)[:250]
   # gcpt = load_all_gcpt(args.gcpt_path, args.json_path,
   #   state_filter=[GCPT.STATE_ABORTED], xs_path=args.xs, sorted_by=lambda x: x.num_cycles)
 
@@ -275,5 +282,5 @@ if __name__ == "__main__":
   elif args.report:
     xs_report(gcpt, args.xs)
   else:
-    xs_run(gcpt, args.xs, args.warmup, args.max_instr)
+    xs_run(gcpt, args.xs, args.warmup, args.max_instr, args.threads)
 
