@@ -52,7 +52,7 @@ class GCPT(object):
       self.state = self.STATE_RUNNING
       with open(self.out_path(base_path)) as f:
         for line in f:
-          if "ABORT at pc" in line:
+          if "ABORT at pc" in line or "FATAL:" in line:
             self.state = self.STATE_ABORTED
           elif "EXCEEDING CYCLE/INSTR LIMIT" in line:
             self.state = self.STATE_FINISHED
@@ -69,7 +69,8 @@ class GCPT(object):
     state_strs = ["S_NONE", "S_RUNNING", "S_FINISHED", "S_ABORTED"]
     return state_strs[self.state]
 
-  def show(self):
+  def show(self, base_path):
+    self.get_state(base_path)
     instr_str = f"instrCnt = {self.num_instrs}"
     cycle_str = f"cycleCnt = {self.num_cycles}"
     print(f"GCPT {str(self)}: {self.state_str()}, {instr_str}, {cycle_str}")
@@ -101,7 +102,7 @@ def get_perf_base_path(xs_path):
 
 def xs_run(workloads, xs_path, warmup, max_instr):
   emu_path = os.path.join(xs_path, "build/emu")
-  base_arguments = [emu_path, '-W', str(warmup), '-I', str(max_instr), '-i']
+  base_arguments = [emu_path, '--enable-fork', '-W', str(warmup), '-I', str(max_instr), '-i']
   proc_count = 0
   finish_count = 0
   max_pending_proc = 128
@@ -224,9 +225,10 @@ def xs_report(all_gcpt, xs_path):
     score = reftime / spec_time[spec_name]
     print(spec_name, score, score / 1.5)
 
-def xs_show(all_gcpt):
+def xs_show(all_gcpt, xs_path):
   for gcpt in all_gcpt:
-    gcpt.show()
+    perf_base_path = get_perf_base_path(xs_path)
+    gcpt.show(perf_base_path)
 
 if __name__ == "__main__":
   parser = argparse.ArgumentParser(description="autorun script for xs")
@@ -247,7 +249,7 @@ if __name__ == "__main__":
   #   state_filter=[GCPT.STATE_ABORTED], xs_path=args.xs, sorted_by=lambda x: x.num_cycles)
 
   if args.show:
-    xs_show(gcpt)
+    xs_show(gcpt, args.xs)
   elif args.report:
     xs_report(gcpt, args.xs)
   else:
