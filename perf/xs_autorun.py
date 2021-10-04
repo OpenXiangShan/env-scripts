@@ -4,6 +4,7 @@ import argparse
 import json
 import os
 import random
+import shutil
 import subprocess
 import time
 
@@ -24,6 +25,7 @@ class GCPT(object):
     self.state = self.STATE_NONE
     self.num_cycles = -1
     self.num_instrs = -1
+    self.waveform = []
 
   def get_path(self):
     dir_name = self.__str__()
@@ -38,7 +40,7 @@ class GCPT(object):
       return "_".join([self.benchspec, self.point, str(self.weight)])
 
   def result_path(self, base_path):
-    return  os.path.join(base_path, self.__str__())
+    return os.path.join(base_path, self.__str__())
 
   def err_path(self, base_path):
     return os.path.join(self.result_path(base_path), "simulator_err.txt")
@@ -68,6 +70,18 @@ class GCPT(object):
   def state_str(self):
     state_strs = ["S_NONE", "S_RUNNING", "S_FINISHED", "S_ABORTED"]
     return state_strs[self.state]
+
+  def debug(self, base_path):
+    if os.path.exists(self.out_path(base_path)):
+      with open(self.out_path(base_path)) as f:
+        for line in f:
+          if "dump wave to" in line:
+            wave_path = line.replace("...", "").replace("dump wave to", "").strip()
+            if not os.path.exists(wave_path):
+              print(f"{wave_path} does not exist!!!")
+            else:
+              print(f"cp {wave_path} {self.result_path(base_path)}")
+              shutil.copy(wave_path, self.result_path(base_path))
 
   def show(self, base_path):
     self.get_state(base_path)
@@ -230,6 +244,11 @@ def xs_show(all_gcpt, xs_path):
     perf_base_path = get_perf_base_path(xs_path)
     gcpt.show(perf_base_path)
 
+def xs_debug(all_gcpt, xs_path):
+  for gcpt in all_gcpt:
+    perf_base_path = get_perf_base_path(xs_path)
+    gcpt.debug(perf_base_path)
+
 if __name__ == "__main__":
   parser = argparse.ArgumentParser(description="autorun script for xs")
   parser.add_argument('gcpt_path', metavar='gcpt_path', type=str,
@@ -241,6 +260,7 @@ if __name__ == "__main__":
   parser.add_argument('--max-instr', '-I', default=40000000, help="max instr count")
   parser.add_argument('--report', '-R', action='store_true', default=False, help='report only')
   parser.add_argument('--show', '-S', action='store_true', default=False, help='show list of gcpt only')
+  parser.add_argument('--debug', '-D', action='store_true', default=False, help='debug options')
 
   args = parser.parse_args()
 
@@ -250,6 +270,8 @@ if __name__ == "__main__":
 
   if args.show:
     xs_show(gcpt, args.xs)
+  elif args.debug:
+    xs_debug(gcpt, args.xs)
   elif args.report:
     xs_report(gcpt, args.xs)
   else:
