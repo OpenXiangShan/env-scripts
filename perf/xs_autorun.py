@@ -25,6 +25,7 @@ class GCPT(object):
     self.state = self.STATE_NONE
     self.num_cycles = -1
     self.num_instrs = -1
+    self.num_seconds = -1
     self.waveform = []
 
   def get_path(self):
@@ -65,7 +66,13 @@ class GCPT(object):
             if "instrCnt = " in line:
               instr_cnt_str = line.split("instrCnt =")[1].split(", ")[0]
               self.num_instrs = int(instr_cnt_str.replace(",", "").strip())
+            if "Host time spent" in line:
+              second_cnt_str = line.split("Host time spent:")[1].replace("ms", "")
+              self.num_seconds = int(second_cnt_str.replace(",", "").strip()) / 1000
     return self.state
+
+  def get_simulation_cps(self):
+    return int(round(self.num_cycles / self.num_seconds))
 
   def state_str(self):
     state_strs = ["S_NONE", "S_RUNNING", "S_FINISHED", "S_ABORTED"]
@@ -85,9 +92,13 @@ class GCPT(object):
 
   def show(self, base_path):
     self.get_state(base_path)
-    instr_str = f"instrCnt = {self.num_instrs}"
-    cycle_str = f"cycleCnt = {self.num_cycles}"
-    print(f"GCPT {str(self)}: {self.state_str()}, {instr_str}, {cycle_str}")
+    attributes = {
+      "instrCnt": self.num_instrs,
+      "cycleCnt": self.num_cycles,
+      "simSpeed": self.get_simulation_cps()
+    }
+    attributes_str = ", ".join(map(lambda k: f"{k} = {str(attributes[k])}", attributes))
+    print(f"GCPT {str(self)}: {self.state_str()}, {attributes_str}")
 
 
 def load_all_gcpt(gcpt_path, json_path, state_filter=None, xs_path=None, sorted_by=None):
@@ -111,7 +122,7 @@ def load_all_gcpt(gcpt_path, json_path, state_filter=None, xs_path=None, sorted_
 
 
 def get_perf_base_path(xs_path):
-  return os.path.join(xs_path, "SPEC06_EmuTasks_10_04_2021")
+  return os.path.join(xs_path, "SPEC06_EmuTasks_10_03_2021")
 
 def xs_run(workloads, xs_path, warmup, max_instr, threads):
   emu_path = os.path.join(xs_path, "build/emu")
@@ -271,7 +282,9 @@ if __name__ == "__main__":
 
   args = parser.parse_args()
 
-  gcpt = load_all_gcpt(args.gcpt_path, args.json_path)[:250]
+  gcpt = load_all_gcpt(args.gcpt_path, args.json_path)
+  # gcpt = load_all_gcpt(args.gcpt_path, args.json_path,
+  #     state_filter=[GCPT.STATE_FINISHED], xs_path=args.xs, sorted_by=lambda x: x.get_simulation_cps())
   # gcpt = load_all_gcpt(args.gcpt_path, args.json_path,
   #   state_filter=[GCPT.STATE_ABORTED], xs_path=args.xs, sorted_by=lambda x: x.num_cycles)
 
