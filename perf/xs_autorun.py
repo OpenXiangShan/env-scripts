@@ -25,6 +25,7 @@ class GCPT(object):
     self.state = self.STATE_NONE
     self.num_cycles = -1
     self.num_instrs = -1
+    self.ipc = -1
     self.num_seconds = -1
     self.waveform = []
 
@@ -74,6 +75,9 @@ class GCPT(object):
   def get_simulation_cps(self):
     return int(round(self.num_cycles / self.num_seconds))
 
+  def get_ipc(self):
+    return round(self.num_instrs / self.num_cycles, 3)
+
   def state_str(self):
     state_strs = ["S_NONE", "S_RUNNING", "S_FINISHED", "S_ABORTED"]
     return state_strs[self.state]
@@ -95,10 +99,11 @@ class GCPT(object):
     attributes = {
       "instrCnt": self.num_instrs,
       "cycleCnt": self.num_cycles,
+      "totalIPC": f"{self.get_ipc():.3f}",
       "simSpeed": self.get_simulation_cps()
     }
-    attributes_str = ", ".join(map(lambda k: f"{k} = {str(attributes[k])}", attributes))
-    print(f"GCPT {str(self)}: {self.state_str()}, {attributes_str}")
+    attributes_str = ", ".join(map(lambda k: f"{k:>8} = {str(attributes[k]):>9}", attributes))
+    print(f"GCPT {str(self):>50}: {self.state_str():>10}, {attributes_str}")
 
 
 def load_all_gcpt(gcpt_path, json_path, state_filter=None, xs_path=None, sorted_by=None):
@@ -122,7 +127,7 @@ def load_all_gcpt(gcpt_path, json_path, state_filter=None, xs_path=None, sorted_
 
 
 def get_perf_base_path(xs_path):
-  return os.path.join(xs_path, "SPEC06_EmuTasks_10_03_2021")
+  return os.path.join(xs_path, "SPEC06_EmuTasks_10_07_2021")
 
 def xs_run(workloads, xs_path, warmup, max_instr, threads):
   emu_path = os.path.join(xs_path, "build/emu")
