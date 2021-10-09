@@ -198,21 +198,29 @@ def get_all_manip():
     all_manip = []
     ipc = perf.PerfManip(
         name = "IPC",
-        counters = [f"roq.clock_cycle", f"roq.commitInstr"],
+        counters = [f"rob.clock_cycle", f"rob.commitInstr"],
         func = lambda cycle, instr: instr * 1.0 / cycle
     )
     all_manip.append(ipc)
     return all_manip
 
 def get_total_inst(benchspec):
-  if True:
-    base_path = "/bigdata/zzf/spec_cpt/logs/profiling/"
-    filename = benchspec + ".log"
-    bench_path = os.path.join(base_path, filename)
-  else:
+  isa = "rv64gcb"
+  if False:
     base_path = "/bigdata/zyy/checkpoints_profiles/betapoint_profile_06_fix_mem_addr"
     filename = "nemu_out.txt"
     bench_path = os.path.join(base_path, benchspec, filename)
+  elif isa == "rv64gc":
+    base_path = "/bigdata/zzf/spec_cpt/logs/profiling/"
+    filename = benchspec + ".log"
+    bench_path = os.path.join(base_path, filename)
+  elif isa == "rv64gcb":
+    base_path = "/bigdata/zfw/spec_cpt/logs/profiling/"
+    filename = benchspec + ".log"
+    bench_path = os.path.join(base_path, filename)
+  else:
+    print("Unknown ISA\n")
+    return None
   f = open(bench_path)
   for line in f:
     if "total guest instructions" in line:
@@ -232,7 +240,8 @@ def get_spec_reftime(benchspec):
   return None
 
 def xs_report(all_gcpt, xs_path):
-  frequency = 1.5 * (10 ** 9)
+  # frequency/GHz
+  frequency = 2
   gcpt_ipc = dict()
   keys = list(map(lambda gcpt: gcpt.benchspec, all_gcpt))
   for k in keys:
@@ -247,19 +256,28 @@ def xs_report(all_gcpt, xs_path):
       gcpt_ipc[gcpt.benchspec].append([float(gcpt.weight), float(counters["IPC"])])
     else:
       print("IPC not found in", gcpt.benchspec, gcpt.point, gcpt.weight)
+  print("=================== Coverage ==================")
   spec_time = {}
   for benchspec in gcpt_ipc:
     total_weight = sum(map(lambda info: info[0], gcpt_ipc[benchspec]))
     total_cpi = sum(map(lambda info: info[0] / info[1], gcpt_ipc[benchspec])) / total_weight
     num_instr = get_total_inst(benchspec)
-    num_seconds = total_cpi * num_instr / frequency
-    print(benchspec, "coverage", total_weight)
+    num_seconds = total_cpi * num_instr / (frequency * (10 ** 9))
+    print(f"{benchspec:>25} coverage: {total_weight:.2f}")
     spec_name = benchspec.split("_")[0]
     spec_time[spec_name] = spec_time.get(spec_name, 0) + num_seconds
+  print("==================== Score ===================")
+  total_count = 0
+  total_score = 1
   for spec_name in spec_time:
     reftime = get_spec_reftime(spec_name)
     score = reftime / spec_time[spec_name]
-    print(spec_name, score, score / 1.5)
+    total_count += 1
+    total_score *= score
+    print(f"{spec_name:>15}, {score:6.2f}, {score / frequency:6.2f}")
+  geomean_score = total_score ** (1 / total_count)
+  print(f"SPEC06@{frequency}GHz: {geomean_score:6.2f}")
+  print(f"SPEC06@1GHz: {geomean_score / frequency:6.2f}")
 
 def xs_show(all_gcpt, xs_path):
   for gcpt in all_gcpt:
