@@ -296,6 +296,7 @@ if __name__ == "__main__":
   parser.add_argument('json_path', metavar='json_path', type=str,
                       help='path to gcpt json')
   parser.add_argument('--xs', help='path to xs')
+  parser.add_argument('--ref', default=None, type=str, help='path to ref')
   parser.add_argument('--warmup', '-W', default=20000000, type=int, help="warmup instr count")
   parser.add_argument('--max-instr', '-I', default=40000000, type=int, help="max instr count")
   parser.add_argument('--threads', '-T', default=1, type=int, help="number of emu threads")
@@ -305,18 +306,23 @@ if __name__ == "__main__":
 
   args = parser.parse_args()
 
+  if args.ref is None:
+    args.ref = args.xs
+
   gcpt = load_all_gcpt(args.gcpt_path, args.json_path)
   # gcpt = load_all_gcpt(args.gcpt_path, args.json_path,
-  #     state_filter=[GCPT.STATE_FINISHED], xs_path=args.xs, sorted_by=lambda x: x.get_simulation_cps())
+  #     state_filter=[GCPT.STATE_FINISHED], xs_path=args.ref, sorted_by=lambda x: x.get_simulation_cps())
   # gcpt = load_all_gcpt(args.gcpt_path, args.json_path,
-  #   state_filter=[GCPT.STATE_ABORTED], xs_path=args.xs, sorted_by=lambda x: x.num_cycles)
+  #    state_filter=[GCPT.STATE_FINISHED], xs_path=args.ref, sorted_by=lambda x: x.benchspec.lower())
+  # gcpt = load_all_gcpt(args.gcpt_path, args.json_path,
+  #   state_filter=[GCPT.STATE_ABORTED], xs_path=args.ref, sorted_by=lambda x: x.num_cycles)
 
   if args.show:
-    xs_show(gcpt, args.xs)
+    xs_show(gcpt, args.ref)
   elif args.debug:
-    xs_debug(gcpt, args.xs)
+    xs_debug(gcpt, args.ref)
   elif args.report:
-    xs_report(gcpt, args.xs)
+    xs_report(gcpt, args.ref)
   else:
     xs_run(gcpt, args.xs, args.warmup, args.max_instr, args.threads)
 
