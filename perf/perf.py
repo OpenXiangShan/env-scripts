@@ -262,6 +262,34 @@ def get_all_manip():
         func = lambda sa0, fa0, sa1, fa1, sa2, fa2, sa3, fa3: (sa0 + sa1 + sa2 + sa3) / (sa0 + sa1 + sa2 + sa3 + fa0 + fa1 + fa2 + fa3) if ((sa0 + sa1 + sa2 + sa3 + fa0 + fa1 + fa2 + fa3) > 0) else 0
     )
     all_manip.append(dtlb_sa_percent)
+    ldtlb_miss_rate = PerfManip(
+        name = "global.ldtlb_miss_rate",
+        counters = [f"memBlock.TLB.first_access0", f"memBlock.TLB.first_miss0",
+            f"memBlock.TLB_1.first_access0", f"memBlock.TLB_1.first_miss0"],
+        func = lambda req1, miss1, req2, miss2: (miss1 + miss2) / (req1 + req2) if ((req1 + req2) > 0) else 0
+    )
+    all_manip.append(ldtlb_miss_rate)
+    ldtlb_sa_percent = PerfManip(
+        name = "global.ldtlb_sa_hit_percent",
+        counters = [f"memBlock.TLB.tlb_normal_sa.hit", f"memBlock.TLB.tlb_super_fa.hit",
+                   f"memBlock.TLB_1.tlb_normal_sa.hit", f"memBlock.TLB_1.tlb_super_fa.hit"],
+        func = lambda sa0, fa0, sa1, fa1: (sa0 + sa1) / (sa0 + sa1 + fa0 + fa1) if ((sa0 + sa1 + fa0 + fa1) > 0) else 0
+    )
+    all_manip.append(ldtlb_sa_percent)
+    sttlb_miss_rate = PerfManip(
+        name = "global.sttlb_miss_rate",
+        counters = [f"memBlock.TLB_2.first_access0", f"memBlock.TLB_2.first_miss0",
+            f"memBlock.TLB_2.first_access0", f"memBlock.TLB_2.first_miss0"],
+        func = lambda req1, miss1, req2, miss2: (miss1 + miss2) / (req1 + req2) if ((req1 + req2) > 0) else 0
+    )
+    all_manip.append(sttlb_miss_rate)
+    sttlb_sa_percent = PerfManip(
+        name = "global.sttlb_sa_hit_percent",
+        counters = [f"memBlock.TLB_2.tlb_normal_sa.hit", f"memBlock.TLB_2.tlb_super_fa.hit",
+                   f"memBlock.TLB_3.tlb_normal_sa.hit", f"memBlock.TLB_3.tlb_super_fa.hit"],
+        func = lambda sa0, fa0, sa1, fa1: (sa0 + sa1) / (sa0 + sa1 + fa0 + fa1) if ((sa0 + sa1 + fa0 + fa1) > 0) else 0
+    )
+    all_manip.append(sttlb_sa_percent)
     ptw_access_latency = PerfManip(
         name = "global.ptw_access_latency",
         counters = [f"dtlbRepeater.inflight_cycle", f"dtlbRepeater.ptw_req_count"],
