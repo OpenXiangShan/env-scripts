@@ -3,17 +3,31 @@
 import argparse
 import json
 import os
+import random
+import shutil
 import subprocess
 import time
 
 import perf
 
+
 class GCPT(object):
+  STATE_NONE     = 0
+  STATE_RUNNING  = 1
+  STATE_FINISHED = 2
+  STATE_ABORTED  = 3
+
   def __init__(self, base_path, benchspec, point, weight):
     self.base_path = base_path
     self.benchspec = benchspec
     self.point = point
     self.weight = weight
+    self.state = self.STATE_NONE
+    self.num_cycles = -1
+    self.num_instrs = -1
+    self.ipc = -1
+    self.num_seconds = -1
+    self.waveform = []
 
   def get_path(self):
     dir_name = self.__str__()
@@ -27,48 +41,112 @@ class GCPT(object):
   def __str__(self):
       return "_".join([self.benchspec, self.point, str(self.weight)])
 
+  def result_path(self, base_path):
+    return os.path.join(base_path, self.__str__())
+
   def err_path(self, base_path):
-    return os.path.join(base_path, self.__str__(), "simulator_err.txt")
+    return os.path.join(self.result_path(base_path), "simulator_err.txt")
 
   def out_path(self, base_path):
-    return os.path.join(base_path, self.__str__(), "simulator_out.txt")
+    return os.path.join(self.result_path(base_path), "simulator_out.txt")
+
+  def get_state(self, base_path):
+    self.state = self.STATE_NONE
+    if os.path.exists(self.out_path(base_path)):
+      self.state = self.STATE_RUNNING
+      with open(self.out_path(base_path)) as f:
+        for line in f:
+          if "ABORT at pc" in line or "FATAL:" in line:
+            self.state = self.STATE_ABORTED
+          elif "EXCEEDING CYCLE/INSTR LIMIT" in line:
+            self.state = self.STATE_FINISHED
+          else:
+            if "cycleCnt = " in line:
+              cycle_cnt_str = line.split("cycleCnt =")[1].split(", ")[0]
+              self.num_cycles = int(cycle_cnt_str.replace(",", "").strip())
+            if "instrCnt = " in line:
+              instr_cnt_str = line.split("instrCnt =")[1].split(", ")[0]
+              self.num_instrs = int(instr_cnt_str.replace(",", "").strip())
+            if "Host time spent" in line:
+              second_cnt_str = line.split("Host time spent:")[1].replace("ms", "")
+              self.num_seconds = int(second_cnt_str.replace(",", "").strip()) / 1000
+    return self.state
+
+  def get_simulation_cps(self):
+    return int(round(self.num_cycles / self.num_seconds))
+
+  def get_ipc(self):
+    return round(self.num_instrs / self.num_cycles, 3)
+
+  def state_str(self):
+    state_strs = ["S_NONE", "S_RUNNING", "S_FINISHED", "S_ABORTED"]
+    return state_strs[self.state]
+
+  def debug(self, base_path):
+    if os.path.exists(self.out_path(base_path)):
+      with open(self.out_path(base_path)) as f:
+        for line in f:
+          if "dump wave to" in line:
+            wave_path = line.replace("...", "").replace("dump wave to", "").strip()
+            if not os.path.exists(wave_path):
+              print(f"{wave_path} does not exist!!!")
+            else:
+              print(f"cp {wave_path} {self.result_path(base_path)}")
+              shutil.copy(wave_path, self.result_path(base_path))
+
+  def show(self, base_path):
+    self.get_state(base_path)
+    attributes = {
+      "instrCnt": self.num_instrs,
+      "cycleCnt": self.num_cycles,
+      "totalIPC": f"{self.get_ipc():.3f}",
+      "simSpeed": self.get_simulation_cps()
+    }
+    attributes_str = ", ".join(map(lambda k: f"{k:>8} = {str(attributes[k]):>9}", attributes))
+    print(f"GCPT {str(self):>50}: {self.state_str():>10}, {attributes_str}")
 
 
-def load_all_gcpt(gcpt_path, json_path):
+def load_all_gcpt(gcpt_path, json_path, state_filter=None, xs_path=None, sorted_by=None):
   all_gcpt = []
   with open(json_path) as f:
     data = json.load(f)
   for benchspec in data:
-    if "gamess" in benchspec or "wrf" in benchspec:
-      for point in data[benchspec]:
-        weight = data[benchspec][point]
-        gcpt = GCPT(gcpt_path, benchspec, point, weight)
+    for point in data[benchspec]:
+      weight = data[benchspec][point]
+      gcpt = GCPT(gcpt_path, benchspec, point, weight)
+      if state_filter is None:
         all_gcpt.append(gcpt)
-  return all_gcpt
+      else:
+        perf_base_path = get_perf_base_path(xs_path)
+        if gcpt.get_state(perf_base_path) in state_filter:
+          all_gcpt.append(gcpt)
+  if sorted_by is None:
+    return all_gcpt
+  else:
+    return sorted(all_gcpt, key=sorted_by)
 
 
 def get_perf_base_path(xs_path):
-  return os.path.join(xs_path, "gcpt_results")
+  return os.path.join(xs_path, "SPEC06_EmuTasks_10_07_2021")
 
-
-def xs_run(workloads, xs_path, warmup, max_instr):
+def xs_run(workloads, xs_path, warmup, max_instr, threads):
   emu_path = os.path.join(xs_path, "build/emu")
-  base_arguments = [emu_path, '-W', str(warmup), '-I', str(max_instr), '-i']
-  proc_count = 0
-  finish_count = 0
-  max_pending_proc = 80
-  pending_proc = []
-  error_proc = []
+  base_arguments = [emu_path, '--enable-fork', '-W', str(warmup), '-I', str(max_instr), '-i']
+  proc_count, finish_count = 0, 0
+  max_pending_proc = 128 // threads
+  pending_proc, error_proc = [], []
+  free_cores = list(range(max_pending_proc))
   try:
     while len(workloads) > 0 or len(pending_proc) > 0:
       has_pending_workload = len(workloads) > 0 and len(pending_proc) >= max_pending_proc
       has_pending_proc = len(pending_proc) > 0
       if has_pending_workload or has_pending_proc:
           finished_proc = list(filter(lambda p: p[1].poll() is not None, pending_proc))
-          for workload, proc in finished_proc:
+          for workload, proc, core in finished_proc:
             print(f"{workload} has finished")
-            pending_proc.remove((workload, proc))
-            if proc.returncode < 0:
+            pending_proc.remove((workload, proc, core))
+            free_cores.append(core)
+            if proc.returncode != 0:
               print(f"[ERROR] {workload} exits with code {proc.returncode}")
               error_proc.append(workload)
               continue
@@ -77,25 +155,34 @@ def xs_run(workloads, xs_path, warmup, max_instr):
             time.sleep(1)
       can_launch = max_pending_proc - len(pending_proc)
       for workload in workloads[:can_launch]:
-        print(workload)
         if len(pending_proc) < max_pending_proc:
+          allocate_core = free_cores[0]
+          numa_cmd = []
+          if threads > 1:
+            start_core = threads * allocate_core
+            end_core = threads * allocate_core + threads - 1
+            numa_node = 1 if start_core >= 64 else 0
+            numa_cmd = ["numactl", "-m", str(numa_node), "-C", f"{start_core}-{end_core}"]
           workload_path = workload.get_path()
-          cmd = " ".join(base_arguments + [workload_path])
-          print(f"cmd {proc_count}: {cmd}")
-          result_path = os.path.join(get_perf_base_path(xs_path), workload)
+          perf_base_path = get_perf_base_path(xs_path)
+          result_path = workload.result_path(perf_base_path)
           if not os.path.exists(result_path):
-            os.mkdir(result_path)
-          stdout_file = os.path.join(result_path, f"simulator_out.txt")
-          stderr_file = os.path.join(result_path, f"simulator_err.txt")
+            os.makedirs(result_path, exist_ok=True)
+          stdout_file = workload.out_path(perf_base_path)
+          stderr_file = workload.err_path(perf_base_path)
           with open(stdout_file, "w") as stdout, open(stderr_file, "w") as stderr:
-            proc = subprocess.Popen(base_arguments + [workload_path], stdout=stdout, stderr=stderr)
-          pending_proc.append((workload, proc))
+            random_seed = random.randint(0, 9999)
+            run_cmd = numa_cmd + base_arguments + [workload_path] + ["-s", f"{random_seed}"]
+            print(f"cmd {proc_count}: {run_cmd}")
+            proc = subprocess.Popen(run_cmd, stdout=stdout, stderr=stderr)
+          pending_proc.append((workload, proc, allocate_core))
+          free_cores = free_cores[1:]
           proc_count += 1
       workloads = workloads[can_launch:]
   except KeyboardInterrupt:
     print("Interrupted. Exiting all programs ...")
     print("Not finished:")
-    for i, (workload, proc) in enumerate(pending_proc):
+    for i, (workload, proc, _) in enumerate(pending_proc):
       proc.terminate()
       print(f"  ({i + 1}) {workload}")
     print("Not started:")
@@ -111,21 +198,29 @@ def get_all_manip():
     all_manip = []
     ipc = perf.PerfManip(
         name = "IPC",
-        counters = [f"roq.clock_cycle", f"roq.commitInstr"],
+        counters = [f"rob.clock_cycle", f"rob.commitInstr"],
         func = lambda cycle, instr: instr * 1.0 / cycle
     )
     all_manip.append(ipc)
     return all_manip
 
 def get_total_inst(benchspec):
-  if True:
-    base_path = "/bigdata/zzf/spec_cpt/logs/profiling/"
-    filename = benchspec + ".log"
-    bench_path = os.path.join(base_path, filename)
-  else:
+  isa = "rv64gcb"
+  if False:
     base_path = "/bigdata/zyy/checkpoints_profiles/betapoint_profile_06_fix_mem_addr"
     filename = "nemu_out.txt"
     bench_path = os.path.join(base_path, benchspec, filename)
+  elif isa == "rv64gc":
+    base_path = "/bigdata/zzf/spec_cpt/logs/profiling/"
+    filename = benchspec + ".log"
+    bench_path = os.path.join(base_path, filename)
+  elif isa == "rv64gcb":
+    base_path = "/bigdata/zfw/spec_cpt/logs/profiling/"
+    filename = benchspec + ".log"
+    bench_path = os.path.join(base_path, filename)
+  else:
+    print("Unknown ISA\n")
+    return None
   f = open(bench_path)
   for line in f:
     if "total guest instructions" in line:
@@ -145,7 +240,8 @@ def get_spec_reftime(benchspec):
   return None
 
 def xs_report(all_gcpt, xs_path):
-  frequency = 1.5 * (10 ** 9)
+  # frequency/GHz
+  frequency = 2
   gcpt_ipc = dict()
   keys = list(map(lambda gcpt: gcpt.benchspec, all_gcpt))
   for k in keys:
@@ -160,20 +256,38 @@ def xs_report(all_gcpt, xs_path):
       gcpt_ipc[gcpt.benchspec].append([float(gcpt.weight), float(counters["IPC"])])
     else:
       print("IPC not found in", gcpt.benchspec, gcpt.point, gcpt.weight)
+  print("=================== Coverage ==================")
   spec_time = {}
   for benchspec in gcpt_ipc:
     total_weight = sum(map(lambda info: info[0], gcpt_ipc[benchspec]))
     total_cpi = sum(map(lambda info: info[0] / info[1], gcpt_ipc[benchspec])) / total_weight
     num_instr = get_total_inst(benchspec)
-    num_seconds = total_cpi * num_instr / frequency
-    print(benchspec, "coverage", total_weight)
+    num_seconds = total_cpi * num_instr / (frequency * (10 ** 9))
+    print(f"{benchspec:>25} coverage: {total_weight:.2f}")
     spec_name = benchspec.split("_")[0]
     spec_time[spec_name] = spec_time.get(spec_name, 0) + num_seconds
+  print("==================== Score ===================")
+  total_count = 0
+  total_score = 1
   for spec_name in spec_time:
     reftime = get_spec_reftime(spec_name)
     score = reftime / spec_time[spec_name]
-    print(spec_name, score, score / 1.5)
+    total_count += 1
+    total_score *= score
+    print(f"{spec_name:>15}, {score:6.2f}, {score / frequency:6.2f}")
+  geomean_score = total_score ** (1 / total_count)
+  print(f"SPEC06@{frequency}GHz: {geomean_score:6.2f}")
+  print(f"SPEC06@1GHz: {geomean_score / frequency:6.2f}")
 
+def xs_show(all_gcpt, xs_path):
+  for gcpt in all_gcpt:
+    perf_base_path = get_perf_base_path(xs_path)
+    gcpt.show(perf_base_path)
+
+def xs_debug(all_gcpt, xs_path):
+  for gcpt in all_gcpt:
+    perf_base_path = get_perf_base_path(xs_path)
+    gcpt.debug(perf_base_path)
 
 if __name__ == "__main__":
   parser = argparse.ArgumentParser(description="autorun script for xs")
@@ -182,16 +296,33 @@ if __name__ == "__main__":
   parser.add_argument('json_path', metavar='json_path', type=str,
                       help='path to gcpt json')
   parser.add_argument('--xs', help='path to xs')
-  parser.add_argument('--warmup', '-W', default=20000000, help="warmup instr count")
-  parser.add_argument('--max-instr', '-I', default=40000000, help="max instr count")
+  parser.add_argument('--ref', default=None, type=str, help='path to ref')
+  parser.add_argument('--warmup', '-W', default=20000000, type=int, help="warmup instr count")
+  parser.add_argument('--max-instr', '-I', default=40000000, type=int, help="max instr count")
+  parser.add_argument('--threads', '-T', default=1, type=int, help="number of emu threads")
   parser.add_argument('--report', '-R', action='store_true', default=False, help='report only')
+  parser.add_argument('--show', '-S', action='store_true', default=False, help='show list of gcpt only')
+  parser.add_argument('--debug', '-D', action='store_true', default=False, help='debug options')
 
   args = parser.parse_args()
 
-  gcpt = load_all_gcpt(args.gcpt_path, args.json_path)
+  if args.ref is None:
+    args.ref = args.xs
 
-  if args.report:
-    xs_report(gcpt, args.xs)
+  gcpt = load_all_gcpt(args.gcpt_path, args.json_path)
+  # gcpt = load_all_gcpt(args.gcpt_path, args.json_path,
+  #     state_filter=[GCPT.STATE_FINISHED], xs_path=args.ref, sorted_by=lambda x: x.get_simulation_cps())
+  # gcpt = load_all_gcpt(args.gcpt_path, args.json_path,
+  #    state_filter=[GCPT.STATE_FINISHED], xs_path=args.ref, sorted_by=lambda x: x.benchspec.lower())
+  # gcpt = load_all_gcpt(args.gcpt_path, args.json_path,
+  #   state_filter=[GCPT.STATE_ABORTED], xs_path=args.ref, sorted_by=lambda x: x.num_cycles)
+
+  if args.show:
+    xs_show(gcpt, args.ref)
+  elif args.debug:
+    xs_debug(gcpt, args.ref)
+  elif args.report:
+    xs_report(gcpt, args.ref)
   else:
-    xs_run(gcpt, args.xs, args.warmup, args.max_instr)
+    xs_run(gcpt, args.xs, args.warmup, args.max_instr, args.threads)
 
