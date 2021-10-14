@@ -118,7 +118,7 @@ def get_rs_manip():
         counters = [
             "exuBlocks.scheduler.rs.rs_0.statusArray.not_selected_entries",
             "exuBlocks.scheduler.rs.rs_1.statusArray.not_selected_entries",
-            "ctrlBlock.roq.clock_cycle"
+            "ctrlBlock.rob.clock_cycle"
         ],
         func = lambda ex0, ex1, cycle : (ex0 + ex1) / cycle
     )
@@ -233,8 +233,8 @@ def get_all_manip():
     all_manip = []
     ipc = PerfManip(
         name = "global.IPC",
-        counters = [f"ctrlBlock.roq.clock_cycle",
-        f"ctrlBlock.roq.commitInstr"],
+        counters = [f"ctrlBlock.rob.clock_cycle",
+        f"ctrlBlock.rob.commitInstr"],
         func = lambda cycle, instr: instr * 1.0 / cycle
     )
     all_manip.append(ipc)
@@ -248,7 +248,7 @@ def get_all_manip():
         name = "global.dtlb_miss_rate",
         counters = [f"memBlock.TLB.first_access0", f"memBlock.TLB.first_miss0",
             f"memBlock.TLB_1.first_access0", f"memBlock.TLB_1.first_miss0",
-            f"memBlock.TLB_2.first_access0", f"memBlock.TLB_2.first_miss0", 
+            f"memBlock.TLB_2.first_access0", f"memBlock.TLB_2.first_miss0",
             f"memBlock.TLB_3.first_access0", f"memBlock.TLB_3.first_miss0"],
         func = lambda req1, miss1, req2, miss2, req3, miss3, req4, miss4: (miss1 + miss2 + miss3 + miss4) / (req1 + req2 + req3 + req4) if ((req1 + req2 + req3 + req4) > 0) else 0
     )
@@ -311,7 +311,7 @@ def get_all_manip():
     # all_manip.append(branch_mispred)
     load_replay_rate = PerfManip(
         name = "global.load_replay_rate",
-        counters = [f"ftq.replayRedirect", f"roq.commitInstrLoad"],
+        counters = [f"ftq.replayRedirect", f"rob.commitInstrLoad"],
         func = lambda redirect, load: redirect / load
     )
     # all_manip.append(load_replay_rate)
@@ -327,8 +327,8 @@ def get_all_manip():
     l2tlb_cache_l2 = PerfManip(
         name = "global.ptw.l2hit_rate",
         counters = [
-            "core.ptw.ptw.cache.l2_hit",
-            'core.ptw.ptw.cache.access',
+            "core.ptw.ptw.cache.l2_hit_first",
+            'core.ptw.ptw.cache.access_first',
         ],
         func = lambda hit, access : hit / access if access > 0 else 0
     )
@@ -336,13 +336,30 @@ def get_all_manip():
     l2tlb_cache_pte = PerfManip(
         name = "global.ptw.pte_hit_rate",
         counters = [
-            "core.ptw.ptw.cache.pte_hit",
-            'core.ptw.ptw.cache.access',
+            "core.ptw.ptw.cache.pte_hit_first",
+            'core.ptw.ptw.cache.access_first',
         ],
         func = lambda hit, access : hit / access if access > 0 else 0
     )
     all_manip.append(l2tlb_cache_pte)
-
+    l2tlb_cache_pte_pre = PerfManip(
+        name = "global.ptw.pte_hit_pre_rate",
+        counters = [
+            "core.ptw.ptw.cache.pte_hit_pre_first",
+            'core.ptw.ptw.cache.pte_hit_first',
+        ],
+        func = lambda pre, hit : pre / hit if hit > 0 else 0
+    )
+    all_manip.append(l2tlb_cache_pte_pre)
+    l2tlb_cache_pre_hit = PerfManip(
+        name = "global.ptw.pre_pte_hit_rate",
+        counters = [
+            "core.ptw.ptw.cache.pre_pte_hit_first",
+            'core.ptw.ptw.cache.pre_access_first',
+        ],
+        func = lambda hit, access : hit / access if access > 0 else 0
+    )
+    all_manip.append(l2tlb_cache_pre_hit)
     # all_manip += get_rs_manip()
     # all_manip += get_fu_manip()
     return all_manip
@@ -490,7 +507,7 @@ if __name__ == "__main__":
         if not os.path.isfile(filename):
             print(f"{filename} is not a file. Probably you need --recursive?")
             exit()
-    
+
     print(f"output file: {args.output}")
 
     main(args.pfiles, args.output, args.include, args.verbose, args.jobs)
