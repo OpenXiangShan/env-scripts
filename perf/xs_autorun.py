@@ -137,7 +137,7 @@ def xs_run(workloads, xs_path, warmup, max_instr, threads):
   pending_proc, error_proc = [], []
   free_cores = list(range(max_pending_proc))
   # skip CI cores
-  ci_cores = list(map(lambda x: x // threads, range(0, 96)))
+  ci_cores = list(map(lambda x: x // threads, range(64, 80)))
   for core in ci_cores:
     if core in free_cores:
       free_cores.remove(core)
