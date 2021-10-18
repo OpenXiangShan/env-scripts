@@ -40,8 +40,8 @@ class PerfCounters(object):
             return
         for manip in all_manip:
             if None in map(lambda name: self[name], manip.counters):
-                print(list(map(lambda name: self[name], manip.counters)))
-                print(f"Some counters for {manip.name} is not found. Please check it.")
+                # print(list(map(lambda name: self[name], manip.counters)))
+                # print(f"Some counters for {manip.name} is not found. Please check it.")
                 continue
             numbers = map(lambda name: int(self[name]), manip.counters)
             self.counters[manip.name] = str(manip.func(*numbers))
