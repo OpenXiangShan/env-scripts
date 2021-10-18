@@ -33,8 +33,8 @@ def get_all_manip():
     all_manip = []
     ipc = perf.PerfManip(
         name = "global.IPC",
-        counters = [f"ctrlBlock.roq.clock_cycle",
-        f"ctrlBlock.roq.commitInstr"],
+        counters = [f"clock_cycle",
+        f"commitInstr"],
         func = lambda cycle, instr: instr * 1.0 / cycle
     )
     all_manip.append(ipc)

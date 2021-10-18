@@ -155,7 +155,7 @@ class VCollection(object):
             result = self.get_module(submodule, with_submodule=True)
             if result is None:
                 print("Error: cannot find submodules of {} or the module itself".format(submodule))
-                return None
+                continue#return None
             submodules.update(result)
         return submodules
 
@@ -233,9 +233,13 @@ def main(files):
     # r = re.compile(".*exception.*")
     # print("".join(filter(lambda x: r.match(x), alu.get_lines())))
 
-    directory = "20210320-sim"
+    directory = "20211016-XSTop"
+    out_modules = ["XSTop", "CtrlBlock", "ExuBlock", "ExuBlock_1", "MemBlock"]
+    # out_modules = ["ExuBlock", "ExuBlock_1", "XSCore", "ExuBlock_2", "AluExeUnit"]
+    # out_modules = ["XSTop", "XSCore", "ExuBlock", "ExuBlock_1", "MemBlock", "Frontend", "HuanCun", "HuanCun_1"]
     # out_modules = ["XSSimSoC", "XSSoc", "XSCore", "Frontend", "CtrlBlock", "IntegerBlock", "FloatBlock", "MemBlock", "InclusiveCache", "InclusiveCache_2"]
-    out_modules = ["XSTop", "SimMMIO", "AXI4RAM"]
+    # out_modules = ["IntegerBlock"]
+    # out_modules = ["XSTop", "SimMMIO", "AXI4RAM"]
     # out_modules = ["XSSoc", "XSCore", "Frontend", "CtrlBlock", "IntegerBlock", "FloatBlock", "MemBlock", "BlockInclusiveCache", "BlockInclusiveCache_1", "L1plusCache"]
     for m in out_modules:
         collection.dump_to_file(m, os.path.join(directory, m))
