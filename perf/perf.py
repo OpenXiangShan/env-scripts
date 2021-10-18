@@ -233,11 +233,23 @@ def get_all_manip():
     all_manip = []
     ipc = PerfManip(
         name = "global.IPC",
-        counters = [f"ctrlBlock.rob.clock_cycle",
-        f"ctrlBlock.rob.commitInstr"],
+        counters = [f"clock_cycle",
+        f"commitInstr"],
         func = lambda cycle, instr: instr * 1.0 / cycle
     )
     all_manip.append(ipc)
+    load_latency = PerfManip(
+        name = "global.load_instr_latency",
+        counters = ["roq.load_latency_execute", "roq.load_instr_cnt"],
+        func = lambda latency, count: latency / count
+    )
+    all_manip.append(load_latency)
+    fma_latency = PerfManip(
+        name = "global.fma_instr_latency",
+        counters = ["roq.fmac_latency_execute_fma", "roq.fmac_instr_cnt_fma"],
+        func = lambda latency, count: latency / count if count != 0 else 0
+    )
+    all_manip.append(fma_latency)
     icache_miss_rate = PerfManip(
         name = "global.icache_miss_rate",
         counters = [f"frontend.ifu.icache.req", f"frontend.ifu.icache.miss"],

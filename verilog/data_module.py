@@ -167,8 +167,8 @@ def main(files, output_dir):
     # out_modules = ["XSSoc", "XSCore", "Frontend", "CtrlBlock", "IntegerBlock", "FloatBlock", "MemBlock", "InclusiveCache", "InclusiveCache_2"]
     # out_modules = ["ReservationStation", "RedirectGenerator", "XSSoc", "XSCore", "Frontend", "CtrlBlock", "IntegerBlock", "FloatBlock", "MemBlock", "PTW", "L1plusCache"]
     # out_modules = ["XSTop", "XSCore", "InclusiveCache", "InclusiveCache_2"]
+    # out_modules = ["XSTop", "XSCore", "ExuBlock", "ExuBlock_1", "ExuBlock_2"]
     out_modules = ["XSTop"]
-    # out_modules = ["XSSimSoC"]
     for m in out_modules:
         collection.dump_to_file(m, os.path.join(output_dir, m))
 
