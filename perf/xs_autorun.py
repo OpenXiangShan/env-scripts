@@ -127,15 +127,22 @@ def load_all_gcpt(gcpt_path, json_path, state_filter=None, xs_path=None, sorted_
 
 
 def get_perf_base_path(xs_path):
-  return os.path.join(xs_path, "SPEC06_EmuTasks_10_07_2021")
+  return os.path.join(xs_path, "SPEC06_EmuTasks_10_18_2021")
 
 def xs_run(workloads, xs_path, warmup, max_instr, threads):
   emu_path = os.path.join(xs_path, "build/emu")
-  base_arguments = [emu_path, '--enable-fork', '-W', str(warmup), '-I', str(max_instr), '-i']
+  base_arguments = [emu_path, '--dump-tl', '--enable-fork', '-W', str(warmup), '-I', str(max_instr), '-i']
   proc_count, finish_count = 0, 0
   max_pending_proc = 128 // threads
   pending_proc, error_proc = [], []
   free_cores = list(range(max_pending_proc))
+  # skip CI cores
+  ci_cores = list(map(lambda x: x // threads, range(0, 96)))
+  for core in ci_cores:
+    if core in free_cores:
+      free_cores.remove(core)
+      max_pending_proc -= 1
+  print("Free cores:", free_cores)
   try:
     while len(workloads) > 0 or len(pending_proc) > 0:
       has_pending_workload = len(workloads) > 0 and len(pending_proc) >= max_pending_proc
@@ -198,7 +205,7 @@ def get_all_manip():
     all_manip = []
     ipc = perf.PerfManip(
         name = "IPC",
-        counters = [f"rob.clock_cycle", f"rob.commitInstr"],
+        counters = [f"clock_cycle", f"commitInstr"],
         func = lambda cycle, instr: instr * 1.0 / cycle
     )
     all_manip.append(ipc)
