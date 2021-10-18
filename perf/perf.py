@@ -240,13 +240,13 @@ def get_all_manip():
     all_manip.append(ipc)
     load_latency = PerfManip(
         name = "global.load_instr_latency",
-        counters = ["roq.load_latency_execute", "roq.load_instr_cnt"],
+        counters = ["rob.load_latency_execute", "rob.load_instr_cnt"],
         func = lambda latency, count: latency / count
     )
     all_manip.append(load_latency)
     fma_latency = PerfManip(
         name = "global.fma_instr_latency",
-        counters = ["roq.fmac_latency_execute_fma", "roq.fmac_instr_cnt_fma"],
+        counters = ["rob.fmac_latency_execute_fma", "rob.fmac_instr_cnt_fma"],
         func = lambda latency, count: latency / count if count != 0 else 0
     )
     all_manip.append(fma_latency)
