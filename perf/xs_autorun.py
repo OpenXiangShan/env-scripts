@@ -382,7 +382,7 @@ def xs_report(all_gcpt, xs_path, spec_version, isa):
     spec_score[spec_name] = score
   geomean_score = total_score ** (1 / total_count)
   print(f"SPEC{spec_version}@{frequency}GHz: {geomean_score:6.2f}")
-  print(f"SPEC{spec_version}/GHz: {geomean_score / frequency:6.2f}")
+  print(f"SPEC{spec_version}/GHz:  {geomean_score / frequency:6.2f}")
   print()
   print(f"********* SPECINT {spec_version} *********")
   specint_list = get_spec_int(spec_version)
@@ -399,7 +399,7 @@ def xs_report(all_gcpt, xs_path, spec_version, isa):
       print(f"{benchspec:>15}: N/A")
   geomean_specint_score = specint_score ** (1 / len(specint_list))
   print(f"SPECint{spec_version}@{frequency}GHz: {geomean_specint_score:6.2f}")
-  print(f"SPECint{spec_version}/GHz: {geomean_specint_score / frequency:6.2f}")
+  print(f"SPECint{spec_version}/GHz:  {geomean_specint_score / frequency:6.2f}")
   print()
   print(f"********* SPECFP  {spec_version} *********")
   specfp_list = get_spec_fp(spec_version)
