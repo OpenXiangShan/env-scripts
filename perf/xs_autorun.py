@@ -125,9 +125,10 @@ def load_all_gcpt(gcpt_path, json_path, state_filter=None, xs_path=None, sorted_
   else:
     return sorted(all_gcpt, key=sorted_by)
 
+tasks_dir = "SPEC06_EmuTasks_10_22_2021"
 
 def get_perf_base_path(xs_path):
-  return os.path.join(xs_path, "SPEC06_EmuTasks_10_18_2021")
+  return os.path.join(xs_path, tasks_dir)
 
 def xs_run(workloads, xs_path, warmup, max_instr, threads):
   emu_path = os.path.join(xs_path, "build/emu")
@@ -211,22 +212,33 @@ def get_all_manip():
     all_manip.append(ipc)
     return all_manip
 
-def get_total_inst(benchspec):
-  isa = "rv64gcb"
-  if False:
-    base_path = "/bigdata/zyy/checkpoints_profiles/betapoint_profile_06_fix_mem_addr"
-    filename = "nemu_out.txt"
-    bench_path = os.path.join(base_path, benchspec, filename)
-  elif isa == "rv64gc":
-    base_path = "/bigdata/zzf/spec_cpt/logs/profiling/"
-    filename = benchspec + ".log"
-    bench_path = os.path.join(base_path, filename)
-  elif isa == "rv64gcb":
-    base_path = "/bigdata/zfw/spec_cpt/logs/profiling/"
-    filename = benchspec + ".log"
-    bench_path = os.path.join(base_path, filename)
+def get_total_inst(benchspec, spec_version, isa):
+  if spec_version == 2006:
+    if isa == "rv64gc_old":
+      base_path = "/bigdata/zyy/checkpoints_profiles/betapoint_profile_06_fix_mem_addr"
+      filename = "nemu_out.txt"
+      bench_path = os.path.join(base_path, benchspec, filename)
+    elif isa == "rv64gc":
+      base_path = "/bigdata/zzf/spec_cpt/logs/profiling/"
+      filename = benchspec + ".log"
+      bench_path = os.path.join(base_path, filename)
+    elif isa == "rv64gcb":
+      base_path = "/bigdata/zfw/spec_cpt/logs/profiling/"
+      filename = benchspec + ".log"
+      bench_path = os.path.join(base_path, filename)
+    else:
+      print("Unknown ISA\n")
+      return None
+  elif spec_version == 2017:
+    if isa == "rv64gc_old":
+      base_path = "/bigdata/zyy/checkpoints_profiles/betapoint_profile_17_fix_mem_addr"
+      filename = "nemu_out.txt"
+      bench_path = os.path.join(base_path, benchspec, filename)
+    else:
+      print("Unknown ISA\n")
+      return None
   else:
-    print("Unknown ISA\n")
+    print("Unknown SPEC version\n")
     return None
   f = open(bench_path)
   for line in f:
@@ -235,18 +247,100 @@ def get_total_inst(benchspec):
       return int(line.split("instructions = ")[1].replace("\x1b[0m", ""))
   return None
 
-def get_spec_reftime(benchspec):
-  base_path = "/bigdata/cpu2006v99/benchspec/CPU2006"
-  for dirname in os.listdir(base_path):
-    if benchspec in dirname:
-      reftime_path = os.path.join(base_path, dirname, "data/ref/reftime")
-      f = open(reftime_path)
-      reftime = int(f.readlines()[-1])
-      f.close()
-      return reftime
+def get_spec_reftime(benchspec, spec_version):
+  if spec_version == 2006:
+    base_path = "/bigdata/cpu2006v99/benchspec/CPU2006"
+    for dirname in os.listdir(base_path):
+      if benchspec in dirname:
+        reftime_path = os.path.join(base_path, dirname, "data/ref/reftime")
+        f = open(reftime_path)
+        reftime = int(f.readlines()[-1])
+        f.close()
+        return reftime
+  elif spec_version == 2017:
+    base_path = "/bigdata/zfw/17spec/spec2017_slim/benchspec/CPU"
+    for dirname in os.listdir(base_path):
+      if benchspec in dirname and dirname.endswith("_r"):
+        reftime_path = os.path.join(base_path, dirname, "data/refrate/reftime")
+        f = open(reftime_path)
+        reftime = int(f.readlines()[0].split()[-1])
+        f.close()
+        return reftime
   return None
 
-def xs_report(all_gcpt, xs_path):
+def get_spec_int(spec_version):
+  if spec_version == 2006:
+    return [
+      "400.perlbench",
+      "401.bzip2",
+      "403.gcc",
+      "429.mcf",
+      "445.gobmk",
+      "456.hmmer",
+      "458.sjeng",
+      "462.libquantum",
+      "464.h264ref",
+      "471.omnetpp",
+      "473.astar",
+      "483.xalancbmk"
+    ]
+  elif spec_version == 2017:
+    return [
+      "500.perlben_r",
+      "502.gcc_r",
+      "505.mcf_r",
+      "520.omnetpp_r",
+      "523.xalancbmk_r",
+      "525.x264_r",
+      "531.deepsjeng_r",
+      "541.leela_r",
+      "548.exchange2_r",
+      "557.xz_r"
+    ]
+  return None
+
+
+def get_spec_fp(spec_version):
+  if spec_version == 2006:
+    return [
+      "410.bwaves",
+      "416.gamess",
+      "433.milc",
+      "434.zeusmp",
+      "435.gromacs",
+      "436.cactusADM",
+      "437.leslie3d",
+      "444.namd",
+      "447.dealII",
+      "450.soplex",
+      "453.povray",
+      "454.Calculix",
+      "459.GemsFDTD",
+      "465.tonto",
+      "470.lbm",
+      "481.wrf",
+      "482.sphinx3",
+    ]
+  elif spec_version == 2017:
+    return [
+      "503.bwaves_r",
+      "507.cactuBSSN_r",
+      "508.namd_r",
+      "510.parest_r",
+      "511.povray_r",
+      "519.lbm_r",
+      "521.wrf_r",
+      "526.blender_r",
+      "527.cam4_r",
+      "538.imagick_r",
+      "544.nab_r",
+      "549.fotonik3d_r",
+      "554.roms_r"
+    ]
+  return None
+
+
+def xs_report(all_gcpt, xs_path, spec_version, isa):
   # frequency/GHz
   frequency = 2
   gcpt_ipc = dict()
@@ -263,28 +357,67 @@ def xs_report(all_gcpt, xs_path):
       gcpt_ipc[gcpt.benchspec].append([float(gcpt.weight), float(counters["IPC"])])
     else:
       print("IPC not found in", gcpt.benchspec, gcpt.point, gcpt.weight)
+  print()
   print("=================== Coverage ==================")
   spec_time = {}
   for benchspec in gcpt_ipc:
     total_weight = sum(map(lambda info: info[0], gcpt_ipc[benchspec]))
     total_cpi = sum(map(lambda info: info[0] / info[1], gcpt_ipc[benchspec])) / total_weight
-    num_instr = get_total_inst(benchspec)
+    num_instr = get_total_inst(benchspec, spec_version, isa)
     num_seconds = total_cpi * num_instr / (frequency * (10 ** 9))
     print(f"{benchspec:>25} coverage: {total_weight:.2f}")
     spec_name = benchspec.split("_")[0]
     spec_time[spec_name] = spec_time.get(spec_name, 0) + num_seconds
+  print()
   print("==================== Score ===================")
   total_count = 0
   total_score = 1
+  spec_score = dict()
   for spec_name in spec_time:
-    reftime = get_spec_reftime(spec_name)
+    reftime = get_spec_reftime(spec_name, spec_version)
     score = reftime / spec_time[spec_name]
     total_count += 1
     total_score *= score
-    print(f"{spec_name:>15}, {score:6.2f}, {score / frequency:6.2f}")
+    print(f"{spec_name:>15}: {score:6.2f}, {score / frequency:6.2f}")
+    spec_score[spec_name] = score
   geomean_score = total_score ** (1 / total_count)
-  print(f"SPEC06@{frequency}GHz: {geomean_score:6.2f}")
-  print(f"SPEC06@1GHz: {geomean_score / frequency:6.2f}")
+  print(f"SPEC{spec_version}@{frequency}GHz: {geomean_score:6.2f}")
+  print(f"SPEC{spec_version}/GHz: {geomean_score / frequency:6.2f}")
+  print()
+  print(f"********* SPECINT {spec_version} *********")
+  specint_list = get_spec_int(spec_version)
+  specint_score = 1
+  for benchspec in specint_list:
+    found = False
+    for name in spec_score:
+      if name.lower() in benchspec.lower():
+        found = True
+        score = spec_score[name]
+        specint_score *= score
+        print(f"{benchspec:>15}: {score:6.2f}, {score / frequency:6.2f}")
+    if not found:
+      print(f"{benchspec:>15}: N/A")
+  geomean_specint_score = specint_score ** (1 / len(specint_list))
+  print(f"SPECint{spec_version}@{frequency}GHz: {geomean_specint_score:6.2f}")
+  print(f"SPECint{spec_version}/GHz: {geomean_specint_score / frequency:6.2f}")
+  print()
+  print(f"********* SPECFP  {spec_version} *********")
+  specfp_list = get_spec_fp(spec_version)
+  specfp_score = 1
+  for benchspec in specfp_list:
+    found = False
+    for name in spec_score:
+      if name.lower() in benchspec.lower():
+        found = True
+        score = spec_score[name]
+        specfp_score *= score
+        print(f"{benchspec:>15}: {score:6.2f}, {score / frequency:6.2f}")
+    if not found:
+      print(f"{benchspec:>15}: N/A")
+  geomean_specfp_score = specfp_score ** (1 / len(specfp_list))
+  print(f"SPECfp{spec_version}@{frequency}GHz: {geomean_specfp_score:6.2f}")
+  print(f"SPECfp{spec_version}/GHz: {geomean_specfp_score / frequency:6.2f}")
+
 
 def xs_show(all_gcpt, xs_path):
   for gcpt in all_gcpt:
@@ -310,26 +443,32 @@ if __name__ == "__main__":
   parser.add_argument('--report', '-R', action='store_true', default=False, help='report only')
   parser.add_argument('--show', '-S', action='store_true', default=False, help='show list of gcpt only')
   parser.add_argument('--debug', '-D', action='store_true', default=False, help='debug options')
+  parser.add_argument('--version', default=2006, type=int, help='SPEC version')
+  parser.add_argument('--isa', default="rv64gcb", type=str, help='ISA version')
+  parser.add_argument('--dir', default=None, type=str, help='SPECTasks dir')
 
   args = parser.parse_args()
+
+  if args.dir is not None:
+    tasks_dir = args.dir
 
   if args.ref is None:
     args.ref = args.xs
 
-  gcpt = load_all_gcpt(args.gcpt_path, args.json_path)
-  # gcpt = load_all_gcpt(args.gcpt_path, args.json_path,
-  #     state_filter=[GCPT.STATE_FINISHED], xs_path=args.ref, sorted_by=lambda x: x.get_simulation_cps())
-  # gcpt = load_all_gcpt(args.gcpt_path, args.json_path,
-  #    state_filter=[GCPT.STATE_FINISHED], xs_path=args.ref, sorted_by=lambda x: x.benchspec.lower())
-  # gcpt = load_all_gcpt(args.gcpt_path, args.json_path,
-  #   state_filter=[GCPT.STATE_ABORTED], xs_path=args.ref, sorted_by=lambda x: x.num_cycles)
-
   if args.show:
+    gcpt = load_all_gcpt(args.gcpt_path, args.json_path)
+    # gcpt = load_all_gcpt(args.gcpt_path, args.json_path,
+    #   state_filter=[GCPT.STATE_FINISHED], xs_path=args.ref, sorted_by=lambda x: x.get_simulation_cps())
     xs_show(gcpt, args.ref)
   elif args.debug:
+    gcpt = load_all_gcpt(args.gcpt_path, args.json_path,
+      state_filter=[GCPT.STATE_ABORTED], xs_path=args.ref, sorted_by=lambda x: -x.num_cycles)
     xs_debug(gcpt, args.ref)
   elif args.report:
-    xs_report(gcpt, args.ref)
+    gcpt = load_all_gcpt(args.gcpt_path, args.json_path,
+      state_filter=[GCPT.STATE_FINISHED], xs_path=args.ref, sorted_by=lambda x: x.benchspec.lower())
+    xs_report(gcpt, args.ref, args.version, args.isa)
   else:
+    gcpt = load_all_gcpt(args.gcpt_path, args.json_path)
     xs_run(gcpt, args.xs, args.warmup, args.max_instr, args.threads)
 
