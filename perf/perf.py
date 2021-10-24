@@ -238,6 +238,13 @@ def get_all_manip():
         func = lambda cycle, instr: instr * 1.0 / cycle
     )
     all_manip.append(ipc)
+    branch_mpki = PerfManip(
+        name = "global.branch_prediction_mpki",
+        counters = [f"ftq.BpWrong",
+        f"commitInstr"],
+        func = lambda wrong, instr: 1000 * wrong / instr
+    )
+    all_manip.append(branch_mpki)
     load_latency = PerfManip(
         name = "global.load_instr_latency",
         counters = ["rob.load_latency_execute", "rob.load_instr_cnt"],
@@ -309,18 +316,18 @@ def get_all_manip():
     )
     all_manip.append(ptw_access_latency)
     dcache_load_miss_rate = PerfManip(
-        name = "global.dcache_load_miss_rate",
-        counters = [f"memBlock.LoadUnit_0.load_s2.in", f"memBlock.LoadUnit_0.load_s2.dcache_miss",
-            f"memBlock.LoadUnit_1.load_s2.in", f"memBlock.LoadUnit_1.load_s2.dcache_miss"],
+        name = "global.dcache_load_miss_rate_first_issue",
+        counters = [f"LoadUnit_0.load_s2.in_fire_first_issue", f"LoadUnit_0.load_s2.dcache_miss_first_issue",
+            f"LoadUnit_1.load_s2.in_fire_first_issue", f"LoadUnit_1.load_s2.dcache_miss_first_issue"],
         func = lambda req1, miss1, req2, miss2: (miss1 + miss2) / (req1 + req2)
     )
-    # all_manip.append(dcache_load_miss_rate)
+    all_manip.append(dcache_load_miss_rate)
     branch_mispred = PerfManip(
         name = "global.branch_mispred",
         counters = [f"ftq.BpRight", f"ftq.BpWrong"],
         func = lambda right, wrong: wrong / (right + wrong)
     )
-    # all_manip.append(branch_mispred)
+    all_manip.append(branch_mispred)
     load_replay_rate = PerfManip(
         name = "global.load_replay_rate",
         counters = [f"ftq.replayRedirect", f"rob.commitInstrLoad"],
@@ -372,6 +379,19 @@ def get_all_manip():
         func = lambda hit, access : hit / access if access > 0 else 0
     )
     all_manip.append(l2tlb_cache_pre_hit)
+    l3cache_mpki_load = PerfManip(
+        name = "global.l3cache_mpki_load",
+        counters = [
+            "L3_bank_0_A_channel_AcquireBlock_fire", "L3_bank_0_A_channel_Get_fire",
+            "L3_bank_1_A_channel_AcquireBlock_fire", "L3_bank_1_A_channel_Get_fire",
+            "L3_bank_2_A_channel_AcquireBlock_fire", "L3_bank_2_A_channel_Get_fire",
+            "L3_bank_3_A_channel_AcquireBlock_fire", "L3_bank_3_A_channel_Get_fire",
+            "commitInstr"
+        ],
+        func = lambda fire1, fire2, fire3, fire4, fire5, fire6, fire7, fire8, instr :
+            1000 * (fire1 + fire2 + fire3 + fire4 + fire5 + fire6 + fire7 + fire8) / instr
+    )
+    all_manip.append(l3cache_mpki_load)
     # all_manip += get_rs_manip()
     # all_manip += get_fu_manip()
     return all_manip
