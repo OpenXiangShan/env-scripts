@@ -107,19 +107,47 @@ class GCPT(object):
 
 
 def load_all_gcpt(gcpt_path, json_path, state_filter=None, xs_path=None, sorted_by=None):
+  perf_filter = [
+    ("l3cache_mpki_load",      lambda x: float(x) > 5),
+    ("branch_prediction_mpki", lambda x: float(x) > 5),
+  ]
+  perf_filter = None
   all_gcpt = []
   with open(json_path) as f:
     data = json.load(f)
   for benchspec in data:
+    #if "gcc" in benchspec or "hmmer" in benchspec:
+    #  continue
     for point in data[benchspec]:
       weight = data[benchspec][point]
       gcpt = GCPT(gcpt_path, benchspec, point, weight)
-      if state_filter is None:
+      if state_filter is None and perf_filter is None:
         all_gcpt.append(gcpt)
-      else:
+        continue
+      perf_match, state_match = True, True
+      if state_filter is not None:
+        state_match = False
         perf_base_path = get_perf_base_path(xs_path)
         if gcpt.get_state(perf_base_path) in state_filter:
-          all_gcpt.append(gcpt)
+          state_match = True
+      if state_match and perf_filter is not None:
+        perf_path = gcpt.err_path(get_perf_base_path(xs_path))
+        counters = perf.PerfCounters(perf_path)
+        counters.add_manip(get_all_manip())
+        for fit in perf_filter:
+          if not fit[1](counters[fit[0]]):
+            perf_match = False
+      if perf_match and state_match:
+        all_gcpt.append(gcpt)
+  dump_json = False
+  if dump_json:
+    json_dict = dict()
+    for gcpt in all_gcpt:
+      bench_dict = json_dict.get(gcpt.benchspec, dict())
+      bench_dict[gcpt.point] = gcpt.weight
+      json_dict[gcpt.benchspec] = bench_dict
+    with open("gcpt.json", "w") as f:
+      json.dump(json_dict, f)
   if sorted_by is None:
     return all_gcpt
   else:
@@ -138,8 +166,8 @@ def xs_run(workloads, xs_path, warmup, max_instr, threads):
   pending_proc, error_proc = [], []
   free_cores = list(range(max_pending_proc))
   # skip CI cores
-  ci_cores = list(map(lambda x: x // threads, range(64, 80)))
-  for core in ci_cores:
+  ci_cores = list(range(64, 80))# + list(range(96, 96+8))# + list(range(96, 96+16))
+  for core in list(map(lambda x: x // threads, ci_cores)):
     if core in free_cores:
       free_cores.remove(core)
       max_pending_proc -= 1
@@ -210,6 +238,25 @@ def get_all_manip():
         func = lambda cycle, instr: instr * 1.0 / cycle
     )
     all_manip.append(ipc)
+    l3cache_mpki_load = perf.PerfManip(
+      name = "global.l3cache_mpki_load",
+      counters = [
+          "L3_bank_0_A_channel_AcquireBlock_fire", "L3_bank_0_A_channel_Get_fire",
+          "L3_bank_1_A_channel_AcquireBlock_fire", "L3_bank_1_A_channel_Get_fire",
+          "L3_bank_2_A_channel_AcquireBlock_fire", "L3_bank_2_A_channel_Get_fire",
+          "L3_bank_3_A_channel_AcquireBlock_fire", "L3_bank_3_A_channel_Get_fire",
+          "commitInstr"
+      ],
+      func = lambda fire1, fire2, fire3, fire4, fire5, fire6, fire7, fire8, instr :
+          1000 * (fire1 + fire2 + fire3 + fire4 + fire5 + fire6 + fire7 + fire8) / instr
+    )
+    all_manip.append(l3cache_mpki_load)
+    branch_mpki = perf.PerfManip(
+      name = "global.branch_prediction_mpki",
+      counters = ["ftq.BpWrong", "commitInstr"],
+      func = lambda wrong, instr: 1000 * wrong / instr
+    )
+    all_manip.append(branch_mpki)
     return all_manip
 
 def get_total_inst(benchspec, spec_version, isa):
@@ -286,7 +333,7 @@ def get_spec_int(spec_version):
     ]
   elif spec_version == 2017:
     return [
-      "500.perlben_r",
+      "500.perlbench_r",
       "502.gcc_r",
       "505.mcf_r",
       "520.omnetpp_r",
@@ -455,10 +502,13 @@ if __name__ == "__main__":
   if args.ref is None:
     args.ref = args.xs
 
+  # gcpt = load_all_gcpt(args.gcpt_path, args.json_path,
+  #   state_filter=[GCPT.STATE_RUNNING, GCPT.STATE_NONE, GCPT.STATE_ABORTED], xs_path=args.ref)[130:]
+
   if args.show:
-    gcpt = load_all_gcpt(args.gcpt_path, args.json_path)
-    # gcpt = load_all_gcpt(args.gcpt_path, args.json_path,
-    #   state_filter=[GCPT.STATE_FINISHED], xs_path=args.ref, sorted_by=lambda x: x.get_simulation_cps())
+    # gcpt = load_all_gcpt(args.gcpt_path, args.json_path)
+    gcpt = load_all_gcpt(args.gcpt_path, args.json_path,
+      state_filter=[GCPT.STATE_FINISHED], xs_path=args.ref, sorted_by=lambda x: x.get_simulation_cps())
     xs_show(gcpt, args.ref)
   elif args.debug:
     gcpt = load_all_gcpt(args.gcpt_path, args.json_path,
@@ -470,5 +520,7 @@ if __name__ == "__main__":
     xs_report(gcpt, args.ref, args.version, args.isa)
   else:
     gcpt = load_all_gcpt(args.gcpt_path, args.json_path)
+    # gcpt = load_all_gcpt(args.gcpt_path, args.json_path,
+      # state_filter=[GCPT.STATE_ABORTED], xs_path=args.ref, sorted_by=lambda x: -x.num_cycles)
     xs_run(gcpt, args.xs, args.warmup, args.max_instr, args.threads)
 
