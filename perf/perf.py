@@ -479,7 +479,7 @@ def main(pfiles, output_file, include_names, verbose=False, jobs = 1):
 
 def find_simulator_err(pfiles):
     if len(pfiles) > 1:
-        return sum(map(lambda filename: find_simulator_err([filename])), [])
+        return sum(map(lambda filename: find_simulator_err([filename]), pfiles), [])
     # recursively find simulator_err.txt
     base_path = pfiles[0]
     all_files = []
