@@ -146,7 +146,7 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(description='stargazers analysis')
     parser.add_argument('--token', '-t', default=None, help='github token')
     parser.add_argument('--output', '-o', default="actions.csv", help='output csv file')
-    parser.add_argument('--number', '-n', default=20, help='output csv file')
+    parser.add_argument('--number', '-n', default=20, type=int, help='number of commits')
     parser.add_argument('--always-on', '-a', default=False, action="store_true", help='always check PRs')
 
     args = parser.parse_args()
