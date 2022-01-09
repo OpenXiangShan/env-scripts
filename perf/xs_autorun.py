@@ -56,9 +56,9 @@ class GCPT(object):
       self.state = self.STATE_RUNNING
       with open(self.out_path(base_path)) as f:
         for line in f:
-          if "ABORT at pc" in line or "FATAL:" in line:
+          if "ABORT at pc" in line or "FATAL:" in line or "Error:" in line:
             self.state = self.STATE_ABORTED
-          elif "EXCEEDING CYCLE/INSTR LIMIT" in line:
+          elif "EXCEEDING CYCLE/INSTR LIMIT" in line or "GOOD TRAP" in line:
             self.state = self.STATE_FINISHED
           else:
             if "cycleCnt = " in line:
@@ -108,7 +108,7 @@ class GCPT(object):
 
 def load_all_gcpt(gcpt_path, json_path, state_filter=None, xs_path=None, sorted_by=None):
   perf_filter = [
-    ("l3cache_mpki_load",      lambda x: float(x) > 5),
+    ("l3cache_mpki_load",      lambda x: float(x) < 3),
     ("branch_prediction_mpki", lambda x: float(x) > 5),
   ]
   perf_filter = None
@@ -139,6 +139,7 @@ def load_all_gcpt(gcpt_path, json_path, state_filter=None, xs_path=None, sorted_
             perf_match = False
       if perf_match and state_match:
         all_gcpt.append(gcpt)
+  dump_json = True
   dump_json = False
   if dump_json:
     json_dict = dict()
@@ -160,13 +161,15 @@ def get_perf_base_path(xs_path):
 
 def xs_run(workloads, xs_path, warmup, max_instr, threads):
   emu_path = os.path.join(xs_path, "build/emu")
-  base_arguments = [emu_path, '--dump-tl', '--enable-fork', '-W', str(warmup), '-I', str(max_instr), '-i']
+  nemu_so_path = os.path.join(xs_path, "ready-to-run/riscv64-nemu-interpreter-so")
+  base_arguments = [emu_path, '--diff', nemu_so_path, '--dump-tl', '--enable-fork', '-W', str(warmup), '-I', str(max_instr), '-i']
+  # base_arguments = [emu_path, '-W', str(warmup), '-I', str(max_instr), '-i']
   proc_count, finish_count = 0, 0
   max_pending_proc = 128 // threads
   pending_proc, error_proc = [], []
   free_cores = list(range(max_pending_proc))
   # skip CI cores
-  ci_cores = list(range(64, 80))# + list(range(96, 96+8))# + list(range(96, 96+16))
+  ci_cores = []#list(range(0, 32))# + list(range(32, 48)) + list(range(56, 64)) + list(range(72, 80))# + list(range(112, 120))
   for core in list(map(lambda x: x // threads, ci_cores)):
     if core in free_cores:
       free_cores.remove(core)
@@ -198,7 +201,7 @@ def xs_run(workloads, xs_path, warmup, max_instr, threads):
             start_core = threads * allocate_core
             end_core = threads * allocate_core + threads - 1
             numa_node = 1 if start_core >= 64 else 0
-            numa_cmd = ["numactl", "-m", str(numa_node), "-C", f"{start_core}-{end_core}"]
+            numa_cmd = ["numactl", "-m", str(numa_node), "-C", f"{start_core+128}-{end_core+128}"]
           workload_path = workload.get_path()
           perf_base_path = get_perf_base_path(xs_path)
           result_path = workload.result_path(perf_base_path)
@@ -502,13 +505,19 @@ if __name__ == "__main__":
   if args.ref is None:
     args.ref = args.xs
 
-  # gcpt = load_all_gcpt(args.gcpt_path, args.json_path,
-  #   state_filter=[GCPT.STATE_RUNNING, GCPT.STATE_NONE, GCPT.STATE_ABORTED], xs_path=args.ref)[130:]
+  gcpt = load_all_gcpt(args.gcpt_path, args.json_path)
+  gcpt = gcpt#[:170]
+     #state_filter=[GCPT.STATE_RUNNING, GCPT.STATE_NONE, GCPT.STATE_ABORTED], xs_path=args.ref)
 
   if args.show:
     # gcpt = load_all_gcpt(args.gcpt_path, args.json_path)
-    gcpt = load_all_gcpt(args.gcpt_path, args.json_path,
-      state_filter=[GCPT.STATE_FINISHED], xs_path=args.ref, sorted_by=lambda x: x.get_simulation_cps())
+    #gcpt = load_all_gcpt(args.gcpt_path, args.json_path,
+      #state_filter=[GCPT.STATE_FINISHED], xs_path=args.ref, sorted_by=lambda x: x.get_simulation_cps())
+      #state_filter=[GCPT.STATE_ABORTED], xs_path=args.ref, sorted_by=lambda x: x.get_ipc())
+      #state_filter=[GCPT.STATE_ABORTED], xs_path=args.ref, sorted_by=lambda x: x.benchspec.lower())
+      #state_filter=[GCPT.STATE_RUNNING], xs_path=args.ref, sorted_by=lambda x: x.benchspec.lower())
+      #state_filter=[GCPT.STATE_FINISHED], xs_path=args.ref, sorted_by=lambda x: -x.num_cycles)
+      #state_filter=[GCPT.STATE_ABORTED], xs_path=args.ref, sorted_by=lambda x: -x.num_cycles)
     xs_show(gcpt, args.ref)
   elif args.debug:
     gcpt = load_all_gcpt(args.gcpt_path, args.json_path,
@@ -519,8 +528,12 @@ if __name__ == "__main__":
       state_filter=[GCPT.STATE_FINISHED], xs_path=args.ref, sorted_by=lambda x: x.benchspec.lower())
     xs_report(gcpt, args.ref, args.version, args.isa)
   else:
-    gcpt = load_all_gcpt(args.gcpt_path, args.json_path)
-    # gcpt = load_all_gcpt(args.gcpt_path, args.json_path,
-      # state_filter=[GCPT.STATE_ABORTED], xs_path=args.ref, sorted_by=lambda x: -x.num_cycles)
+    #gcpt = load_all_gcpt(args.gcpt_path, args.json_path)
+    #gcpt = load_all_gcpt(args.gcpt_path, args.json_path,
+      #state_filter=[GCPT.STATE_ABORTED], xs_path=args.ref, sorted_by=lambda x: -x.num_cycles)
+      #state_filter=[GCPT.STATE_FINISHED], xs_path=args.ref, sorted_by=lambda x: -x.num_cycles)
+      #state_filter=[GCPT.STATE_ABORTED], xs_path=args.ref, sorted_by=lambda x: x.benchspec.lower())
+      #state_filter=[GCPT.STATE_ABORTED], xs_path=args.ref, sorted_by=lambda x: x.get_ipc())
+      #state_filter=[GCPT.STATE_RUNNING], xs_path=args.ref, sorted_by=lambda x: x.benchspec.lower())
     xs_run(gcpt, args.xs, args.warmup, args.max_instr, args.threads)
 
