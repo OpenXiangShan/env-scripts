@@ -123,7 +123,7 @@ class VCollection(object):
                     skipped_lines = []
                     in_module = True
                 if not in_module or current_module is None:
-                    if line.strip() != "" and not line.strip().startswith("//"):
+                    if line.strip() != "":# and not line.strip().startswith("//"):
                         skipped_lines.append(line)
                     continue
                 current_module.add_line(line)
