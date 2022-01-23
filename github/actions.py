@@ -43,7 +43,7 @@ def get_all_manip():
 def get_actions_data(run_numbers, commits, messages):
     assert(len(run_numbers) == len(commits))
     with_message = messages is not None
-    base_dir = "/bigdata/xs-perf"
+    base_dir = "/nfs/home/ci-runner/xs-perf"
     results = {}
     benchmarks = []
     for i, (run_number, commit) in enumerate(zip(run_numbers, commits)):
