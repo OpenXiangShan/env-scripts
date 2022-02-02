@@ -116,7 +116,7 @@ def load_all_gcpt(gcpt_path, json_path, state_filter=None, xs_path=None, sorted_
   with open(json_path) as f:
     data = json.load(f)
   for benchspec in data:
-    #if "gcc" in benchspec or "hmmer" in benchspec:
+    #if "gcc" not in benchspec:# or "hmmer" in benchspec:
     #  continue
     for point in data[benchspec]:
       weight = data[benchspec][point]
@@ -169,7 +169,7 @@ def xs_run(workloads, xs_path, warmup, max_instr, threads):
   pending_proc, error_proc = [], []
   free_cores = list(range(max_pending_proc))
   # skip CI cores
-  ci_cores = []#list(range(0, 32))# + list(range(32, 48)) + list(range(56, 64)) + list(range(72, 80))# + list(range(112, 120))
+  ci_cores = []#list(range(0, 64))# + list(range(32, 48)) + list(range(56, 64)) + list(range(72, 80))# + list(range(112, 120))
   for core in list(map(lambda x: x // threads, ci_cores)):
     if core in free_cores:
       free_cores.remove(core)
@@ -202,6 +202,7 @@ def xs_run(workloads, xs_path, warmup, max_instr, threads):
             end_core = threads * allocate_core + threads - 1
             numa_node = 1 if start_core >= 64 else 0
             numa_cmd = ["numactl", "-m", str(numa_node), "-C", f"{start_core+128}-{end_core+128}"]
+            numa_cmd = ["numactl", "-m", str(numa_node), "-C", f"{start_core}-{end_core}"]
           workload_path = workload.get_path()
           perf_base_path = get_perf_base_path(xs_path)
           result_path = workload.result_path(perf_base_path)
@@ -212,7 +213,8 @@ def xs_run(workloads, xs_path, warmup, max_instr, threads):
           with open(stdout_file, "w") as stdout, open(stderr_file, "w") as stderr:
             random_seed = random.randint(0, 9999)
             run_cmd = numa_cmd + base_arguments + [workload_path] + ["-s", f"{random_seed}"]
-            print(f"cmd {proc_count}: {run_cmd}")
+            cmd_str = " ".join(run_cmd)
+            print(f"cmd {proc_count}: {cmd_str}")
             proc = subprocess.Popen(run_cmd, stdout=stdout, stderr=stderr)
           pending_proc.append((workload, proc, allocate_core))
           free_cores = free_cores[1:]
@@ -263,17 +265,18 @@ def get_all_manip():
     return all_manip
 
 def get_total_inst(benchspec, spec_version, isa):
+  base_dir = "/nfs/home/share/checkpoints_profiles"
   if spec_version == 2006:
     if isa == "rv64gc_old":
-      base_path = "/bigdata/zyy/checkpoints_profiles/betapoint_profile_06_fix_mem_addr"
+      base_path = os.path.join(base_dir, "spec06_rv64gc_o2_50m/profiling")
       filename = "nemu_out.txt"
       bench_path = os.path.join(base_path, benchspec, filename)
     elif isa == "rv64gc":
-      base_path = "/bigdata/zzf/spec_cpt/logs/profiling/"
+      base_path = os.path.join(base_dir, "spec06_rv64gc_o2_20m/logs/profiling/")
       filename = benchspec + ".log"
       bench_path = os.path.join(base_path, filename)
     elif isa == "rv64gcb":
-      base_path = "/bigdata/zfw/spec_cpt/logs/profiling/"
+      base_path = os.path.join(base_dir, "spec06_rv64gcb_o2_20m/logs/profiling/")
       filename = benchspec + ".log"
       bench_path = os.path.join(base_path, filename)
     else:
@@ -281,7 +284,7 @@ def get_total_inst(benchspec, spec_version, isa):
       return None
   elif spec_version == 2017:
     if isa == "rv64gc_old":
-      base_path = "/bigdata/zyy/checkpoints_profiles/betapoint_profile_17_fix_mem_addr"
+      base_path = os.path.join(base_dir, "spec17_rv64gc_o2_50m/profiling")
       filename = "nemu_out.txt"
       bench_path = os.path.join(base_path, benchspec, filename)
     else:
@@ -299,7 +302,7 @@ def get_total_inst(benchspec, spec_version, isa):
 
 def get_spec_reftime(benchspec, spec_version):
   if spec_version == 2006:
-    base_path = "/bigdata/cpu2006v99/benchspec/CPU2006"
+    base_path = "/nfs/home/share/cpu2006v99/benchspec/CPU2006"
     for dirname in os.listdir(base_path):
       if benchspec in dirname:
         reftime_path = os.path.join(base_path, dirname, "data/ref/reftime")
@@ -308,7 +311,7 @@ def get_spec_reftime(benchspec, spec_version):
         f.close()
         return reftime
   elif spec_version == 2017:
-    base_path = "/bigdata/zfw/17spec/spec2017_slim/benchspec/CPU"
+    base_path = "/nfs/home/share/spec2017_slim/benchspec/CPU"
     for dirname in os.listdir(base_path):
       if benchspec in dirname and dirname.endswith("_r"):
         reftime_path = os.path.join(base_path, dirname, "data/refrate/reftime")
@@ -506,8 +509,11 @@ if __name__ == "__main__":
     args.ref = args.xs
 
   gcpt = load_all_gcpt(args.gcpt_path, args.json_path)
-  gcpt = gcpt#[:170]
-     #state_filter=[GCPT.STATE_RUNNING, GCPT.STATE_NONE, GCPT.STATE_ABORTED], xs_path=args.ref)
+  gcpt = gcpt#[830:]
+  # gcpt = gcpt[810:]
+  #gcpt = load_all_gcpt(args.gcpt_path, args.json_path,
+  #state_filter=[GCPT.STATE_RUNNING, GCPT.STATE_NONE, GCPT.STATE_ABORTED], xs_path=args.ref)#[810:]
+  #gcpt = gcpt[66:] + gcpt[:66]
 
   if args.show:
     # gcpt = load_all_gcpt(args.gcpt_path, args.json_path)
