@@ -104,14 +104,22 @@ def get_master_commits(token, number=10, with_message=True):
     all_rows = get_actions_data(run_numbers, commits, messages if with_message else None)
     return all_rows
 
+def get_pull_request(repo, head_sha):
+    pull_requests = repo.get_pulls(state="open")
+    for pr in pull_requests:
+        if pr.head.sha == head_sha:
+            return True, pr
+    return False, None
+
 def get_pull_requests(token):
     g = Github(token)
     xs = g.get_repo("OpenXiangShan/XiangShan")
     actions = xs.get_workflow_runs(event="pull_request", status="success")
-    for action in actions[:15]:
-        if not action.pull_requests:
+    for i, action in enumerate(actions[:15]):
+        has_open_pr, pull_request = get_pull_request(xs, action.head_sha)
+        if not has_open_pr:
+            print(f"Do not find open pull request for action {action.run_number}")
             continue
-        pull_request = action.pull_requests[0]
         all_comments = list(map(lambda c: c.body, pull_request.get_issue_comments()))
         if not has_robot(all_comments, action.head_sha):
             success, comment = prepare_comment(token, action.head_sha, action.run_number)
