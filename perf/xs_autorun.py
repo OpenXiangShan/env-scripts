@@ -493,6 +493,9 @@ def xs_report(all_gcpt, xs_path, spec_version, isa, num_jobs):
   geomean_specfp_score = specfp_score ** (1 / len(specfp_list))
   print(f"SPECfp{spec_version}@{frequency}GHz: {geomean_specfp_score:6.2f}")
   print(f"SPECfp{spec_version}/GHz: {geomean_specfp_score / frequency:6.2f}")
+  print()
+  print(f"Number of Checkpoints: {len(all_gcpt)}")
+  print(f"SPEC CPU Version: SPEC CPU{spec_version}, {isa}")
 
 
 def xs_show(all_gcpt, xs_path):
