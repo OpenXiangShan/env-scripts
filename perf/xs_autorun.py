@@ -1,12 +1,14 @@
 #! /usr/bin/env python3
 
 import argparse
+from concurrent.futures import process
 import json
 import os
 import random
 import shutil
 import subprocess
 import time
+from multiprocessing import Process, Queue
 
 import perf
 
@@ -169,7 +171,7 @@ def xs_run(workloads, xs_path, warmup, max_instr, threads):
   pending_proc, error_proc = [], []
   free_cores = list(range(max_pending_proc))
   # skip CI cores
-  ci_cores = []#list(range(0, 64))# + list(range(32, 48)) + list(range(56, 64)) + list(range(72, 80))# + list(range(112, 120))
+  ci_cores = []#list(range(0, 64))# + list(range(32, 48))
   for core in list(map(lambda x: x // threads, ci_cores)):
     if core in free_cores:
       free_cores.remove(core)
@@ -277,6 +279,10 @@ def get_total_inst(benchspec, spec_version, isa):
       bench_path = os.path.join(base_path, filename)
     elif isa == "rv64gcb":
       base_path = os.path.join(base_dir, "spec06_rv64gcb_o2_20m/logs/profiling/")
+      filename = benchspec + ".log"
+      bench_path = os.path.join(base_path, filename)
+    elif isa == "rv64gcb_o3":
+      base_path = os.path.join(base_dir, "spec06_rv64gcb_o3_20m/logs/profiling/")
       filename = benchspec + ".log"
       bench_path = os.path.join(base_path, filename)
     else:
@@ -393,24 +399,41 @@ def get_spec_fp(spec_version):
   return None
 
 
-def xs_report(all_gcpt, xs_path, spec_version, isa):
+def xs_report_ipc(xs_path, gcpt_queue, result_queue):
+  while not gcpt_queue.empty():
+    gcpt = gcpt_queue.get()
+    # print(f"Processing {str(gcpt)}...")
+    perf_path = gcpt.err_path(get_perf_base_path(xs_path))
+    counters = perf.PerfCounters(perf_path)
+    counters.add_manip(get_all_manip())
+    # when the spec has not finished, IPC may be None
+    if counters["IPC"] is not None:
+      result_queue.put([gcpt.benchspec, [float(gcpt.weight), float(counters["IPC"])]])
+    else:
+      print("IPC not found in", gcpt.benchspec, gcpt.point, gcpt.weight)
+
+def xs_report(all_gcpt, xs_path, spec_version, isa, num_jobs):
   # frequency/GHz
   frequency = 2
   gcpt_ipc = dict()
   keys = list(map(lambda gcpt: gcpt.benchspec, all_gcpt))
   for k in keys:
     gcpt_ipc[k] = []
-  for i, gcpt in enumerate(all_gcpt):
-    print(f"Processing {i + 1} out of {len(all_gcpt)} {str(gcpt)}...")
-    perf_path = gcpt.err_path(get_perf_base_path(xs_path))
-    counters = perf.PerfCounters(perf_path)
-    counters.add_manip(get_all_manip())
-    # when the spec has not finished, IPC may be None
-    if counters["IPC"] is not None:
-      gcpt_ipc[gcpt.benchspec].append([float(gcpt.weight), float(counters["IPC"])])
-    else:
-      print("IPC not found in", gcpt.benchspec, gcpt.point, gcpt.weight)
-  print()
+  # multi-threading for processing the performance counters
+  gcpt_queue = Queue()
+  for gcpt in all_gcpt:
+    gcpt_queue.put(gcpt)
+  result_queue = Queue()
+  process_list = []
+  for _ in range(num_jobs):
+    p = Process(target=xs_report_ipc, args=(xs_path, gcpt_queue, result_queue))
+    process_list.append(p)
+    p.start()
+  for p in process_list:
+    p.join()
+  while not result_queue.empty():
+    result = result_queue.get()
+    gcpt_ipc[result[0]].append(result[1])
   print("=================== Coverage ==================")
   spec_time = {}
   for benchspec in gcpt_ipc:
@@ -499,6 +522,7 @@ if __name__ == "__main__":
   parser.add_argument('--version', default=2006, type=int, help='SPEC version')
   parser.add_argument('--isa', default="rv64gcb", type=str, help='ISA version')
   parser.add_argument('--dir', default=None, type=str, help='SPECTasks dir')
+  parser.add_argument('--jobs', '-j', default=1, type=int, help="processing files in 'j' threads")
 
   args = parser.parse_args()
 
@@ -509,11 +533,10 @@ if __name__ == "__main__":
     args.ref = args.xs
 
   gcpt = load_all_gcpt(args.gcpt_path, args.json_path)
-  gcpt = gcpt#[830:]
-  # gcpt = gcpt[810:]
+  gcpt = gcpt#[600:720][::-1]#[830:]
   #gcpt = load_all_gcpt(args.gcpt_path, args.json_path,
-  #state_filter=[GCPT.STATE_RUNNING, GCPT.STATE_NONE, GCPT.STATE_ABORTED], xs_path=args.ref)#[810:]
-  #gcpt = gcpt[66:] + gcpt[:66]
+  #        state_filter=[GCPT.STATE_RUNNING, GCPT.STATE_NONE, GCPT.STATE_ABORTED], xs_path=args.ref)[268:]#[::-1]
+  #gcpt = gcpt[:225]# + gcpt[225:421]
 
   if args.show:
     # gcpt = load_all_gcpt(args.gcpt_path, args.json_path)
@@ -532,7 +555,7 @@ if __name__ == "__main__":
   elif args.report:
     gcpt = load_all_gcpt(args.gcpt_path, args.json_path,
       state_filter=[GCPT.STATE_FINISHED], xs_path=args.ref, sorted_by=lambda x: x.benchspec.lower())
-    xs_report(gcpt, args.ref, args.version, args.isa)
+    xs_report(gcpt, args.ref, args.version, args.isa, args.jobs)
   else:
     #gcpt = load_all_gcpt(args.gcpt_path, args.json_path)
     #gcpt = load_all_gcpt(args.gcpt_path, args.json_path,
@@ -542,4 +565,3 @@ if __name__ == "__main__":
       #state_filter=[GCPT.STATE_ABORTED], xs_path=args.ref, sorted_by=lambda x: x.get_ipc())
       #state_filter=[GCPT.STATE_RUNNING], xs_path=args.ref, sorted_by=lambda x: x.benchspec.lower())
     xs_run(gcpt, args.xs, args.warmup, args.max_instr, args.threads)
-
