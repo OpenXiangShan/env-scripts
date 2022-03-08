@@ -293,6 +293,14 @@ def get_total_inst(benchspec, spec_version, isa):
       base_path = os.path.join(base_dir, "spec17_rv64gc_o2_50m/profiling")
       filename = "nemu_out.txt"
       bench_path = os.path.join(base_path, benchspec, filename)
+    elif isa == "rv64gcb":
+      base_path = os.path.join(base_dir, "spec17_rv64gcb_o2_20m/logs/profiling/")
+      filename = benchspec + ".log"
+      bench_path = os.path.join(base_path, filename)
+    elif isa == "rv64gcb_o3":
+      base_path = os.path.join(base_dir, "spec17_rv64gcb_o3_20m/logs/profiling/")
+      filename = benchspec + ".log"
+      bench_path = os.path.join(base_path, filename)
     else:
       print("Unknown ISA\n")
       return None
@@ -325,6 +333,7 @@ def get_spec_reftime(benchspec, spec_version):
         reftime = int(f.readlines()[0].split()[-1])
         f.close()
         return reftime
+  print(f"do not find reftime for {benchspec} {spec_version}")
   return None
 
 def get_spec_int(spec_version):
@@ -451,6 +460,8 @@ def xs_report(all_gcpt, xs_path, spec_version, isa, num_jobs):
   spec_score = dict()
   for spec_name in spec_time:
     reftime = get_spec_reftime(spec_name, spec_version)
+    if reftime is None:
+      continue
     score = reftime / spec_time[spec_name]
     total_count += 1
     total_score *= score
