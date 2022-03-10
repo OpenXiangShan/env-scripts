@@ -46,21 +46,18 @@ void ram_finish() {
 
 
 uint64_t ram_read_helper(uint8_t en, uint64_t rIdx) {
-  
-static int count = 0;
-if (en && rIdx >= EMU_RAM_SIZE / sizeof(uint64_t)) {
+  if (ram == NULL) {
+    return 0;
+  }
+  if (en && rIdx >= EMU_RAM_SIZE / sizeof(uint64_t)) {
     rIdx %= EMU_RAM_SIZE / sizeof(uint64_t);
   }
   uint64_t rdata = (en) ? ram[rIdx] : 0;
-  if (en) {
-    // printf("%d read rIdx %lx, data %lx\n", count, rIdx, rdata);
-  }
-count++;
   return rdata;
 }
 
 void ram_write_helper(uint64_t wIdx, uint64_t wdata, uint64_t wmask, uint8_t wen) {
-  if (wen) {
+  if (wen && ram != NULL) {
     if (wIdx >= EMU_RAM_SIZE / sizeof(uint64_t)) {
       printf("ERROR: ram wIdx = 0x%lx out of bound!\n", wIdx);
       return;
@@ -69,4 +66,3 @@ void ram_write_helper(uint64_t wIdx, uint64_t wdata, uint64_t wmask, uint8_t wen
     ram[wIdx] = (ram[wIdx] & ~wmask) | (wdata & wmask);
   }
 }
-

@@ -1,5 +1,5 @@
 import "DPI-C" function void flash_read
-(  
+(
   input int addr,
   output longint data
 );
