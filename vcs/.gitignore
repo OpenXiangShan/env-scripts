@@ -1,0 +1,10 @@
+csrc
+*.vpd
+ram.bin
+simv*
+ucli.key
+vc_hdrs.h
+*.zip
+xs_nh_release
+testbench/check.h
+

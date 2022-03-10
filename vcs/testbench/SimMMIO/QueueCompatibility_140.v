@@ -1,4 +1,4 @@
-module QueueCompatibility_222(
+module QueueCompatibility_140(
   input        clock,
   input        reset,
   output       io_enq_ready,
@@ -16,53 +16,55 @@ module QueueCompatibility_222(
   reg [31:0] _RAND_2;
   reg [31:0] _RAND_3;
 `endif // RANDOMIZE_REG_INIT
-  reg [5:0] ram [0:1]; // @[Decoupled.scala 218:16]
-  wire [5:0] ram_io_deq_bits_MPORT_data; // @[Decoupled.scala 218:16]
-  wire  ram_io_deq_bits_MPORT_addr; // @[Decoupled.scala 218:16]
-  wire [5:0] ram_MPORT_data; // @[Decoupled.scala 218:16]
-  wire  ram_MPORT_addr; // @[Decoupled.scala 218:16]
-  wire  ram_MPORT_mask; // @[Decoupled.scala 218:16]
-  wire  ram_MPORT_en; // @[Decoupled.scala 218:16]
+  reg [5:0] ram [0:1]; // @[Decoupled.scala 224:95]
+  wire  ram_io_deq_bits_MPORT_en; // @[Decoupled.scala 224:95]
+  wire  ram_io_deq_bits_MPORT_addr; // @[Decoupled.scala 224:95]
+  wire [5:0] ram_io_deq_bits_MPORT_data; // @[Decoupled.scala 224:95]
+  wire [5:0] ram_MPORT_data; // @[Decoupled.scala 224:95]
+  wire  ram_MPORT_addr; // @[Decoupled.scala 224:95]
+  wire  ram_MPORT_mask; // @[Decoupled.scala 224:95]
+  wire  ram_MPORT_en; // @[Decoupled.scala 224:95]
   reg  enq_ptr_value; // @[Counter.scala 60:40]
   reg  deq_ptr_value; // @[Counter.scala 60:40]
-  reg  maybe_full; // @[Decoupled.scala 221:27]
-  wire  ptr_match = enq_ptr_value == deq_ptr_value; // @[Decoupled.scala 223:33]
-  wire  empty = ptr_match & ~maybe_full; // @[Decoupled.scala 224:25]
-  wire  full = ptr_match & maybe_full; // @[Decoupled.scala 225:24]
+  reg  maybe_full; // @[Decoupled.scala 227:27]
+  wire  ptr_match = enq_ptr_value == deq_ptr_value; // @[Decoupled.scala 228:33]
+  wire  empty = ptr_match & ~maybe_full; // @[Decoupled.scala 229:25]
+  wire  full = ptr_match & maybe_full; // @[Decoupled.scala 230:24]
   wire  _do_enq_T = io_enq_ready & io_enq_valid; // @[Decoupled.scala 40:37]
   wire  _do_deq_T = io_deq_ready & io_deq_valid; // @[Decoupled.scala 40:37]
-  wire  _GEN_9 = io_deq_ready ? 1'h0 : _do_enq_T; // @[Decoupled.scala 249:27 Decoupled.scala 249:36]
-  wire  do_enq = empty ? _GEN_9 : _do_enq_T; // @[Decoupled.scala 246:18]
-  wire  do_deq = empty ? 1'h0 : _do_deq_T; // @[Decoupled.scala 246:18 Decoupled.scala 248:14]
+  wire  _GEN_12 = io_deq_ready ? 1'h0 : _do_enq_T; // @[Decoupled.scala 270:{27,36}]
+  wire  do_enq = empty ? _GEN_12 : _do_enq_T; // @[Decoupled.scala 267:18]
+  wire  do_deq = empty ? 1'h0 : _do_deq_T; // @[Decoupled.scala 267:18 269:14]
+  assign ram_io_deq_bits_MPORT_en = 1'h1;
   assign ram_io_deq_bits_MPORT_addr = deq_ptr_value;
-  assign ram_io_deq_bits_MPORT_data = ram[ram_io_deq_bits_MPORT_addr]; // @[Decoupled.scala 218:16]
+  assign ram_io_deq_bits_MPORT_data = ram[ram_io_deq_bits_MPORT_addr]; // @[Decoupled.scala 224:95]
   assign ram_MPORT_data = io_enq_bits;
   assign ram_MPORT_addr = enq_ptr_value;
   assign ram_MPORT_mask = 1'h1;
-  assign ram_MPORT_en = empty ? _GEN_9 : _do_enq_T;
-  assign io_enq_ready = ~full; // @[Decoupled.scala 241:19]
-  assign io_deq_valid = io_enq_valid | ~empty; // @[Decoupled.scala 245:25 Decoupled.scala 245:40 Decoupled.scala 240:16]
-  assign io_deq_bits = empty ? io_enq_bits : ram_io_deq_bits_MPORT_data; // @[Decoupled.scala 246:18 Decoupled.scala 247:19 Decoupled.scala 242:15]
+  assign ram_MPORT_en = empty ? _GEN_12 : _do_enq_T;
+  assign io_enq_ready = ~full; // @[Decoupled.scala 254:19]
+  assign io_deq_valid = io_enq_valid | ~empty; // @[Decoupled.scala 253:16 266:{25,40}]
+  assign io_deq_bits = empty ? io_enq_bits : ram_io_deq_bits_MPORT_data; // @[Decoupled.scala 262:17 267:18 268:19]
   always @(posedge clock) begin
-    if(ram_MPORT_en & ram_MPORT_mask) begin
-      ram[ram_MPORT_addr] <= ram_MPORT_data; // @[Decoupled.scala 218:16]
+    if (ram_MPORT_en & ram_MPORT_mask) begin
+      ram[ram_MPORT_addr] <= ram_MPORT_data; // @[Decoupled.scala 224:95]
     end
     if (reset) begin // @[Counter.scala 60:40]
       enq_ptr_value <= 1'h0; // @[Counter.scala 60:40]
-    end else if (do_enq) begin // @[Decoupled.scala 229:17]
+    end else if (do_enq) begin // @[Decoupled.scala 237:17]
       enq_ptr_value <= enq_ptr_value + 1'h1; // @[Counter.scala 76:15]
     end
     if (reset) begin // @[Counter.scala 60:40]
       deq_ptr_value <= 1'h0; // @[Counter.scala 60:40]
-    end else if (do_deq) begin // @[Decoupled.scala 233:17]
+    end else if (do_deq) begin // @[Decoupled.scala 241:17]
       deq_ptr_value <= deq_ptr_value + 1'h1; // @[Counter.scala 76:15]
     end
-    if (reset) begin // @[Decoupled.scala 221:27]
-      maybe_full <= 1'h0; // @[Decoupled.scala 221:27]
-    end else if (do_enq != do_deq) begin // @[Decoupled.scala 236:28]
-      if (empty) begin // @[Decoupled.scala 246:18]
-        if (io_deq_ready) begin // @[Decoupled.scala 249:27]
-          maybe_full <= 1'h0; // @[Decoupled.scala 249:36]
+    if (reset) begin // @[Decoupled.scala 227:27]
+      maybe_full <= 1'h0; // @[Decoupled.scala 227:27]
+    end else if (do_enq != do_deq) begin // @[Decoupled.scala 244:28]
+      if (empty) begin // @[Decoupled.scala 267:18]
+        if (io_deq_ready) begin // @[Decoupled.scala 270:27]
+          maybe_full <= 1'h0; // @[Decoupled.scala 270:36]
         end else begin
           maybe_full <= _do_enq_T;
         end
