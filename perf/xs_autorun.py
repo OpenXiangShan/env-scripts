@@ -1,11 +1,11 @@
 #! /usr/bin/env python3
 
 import argparse
-from concurrent.futures import process
 import json
 import os
 import random
 import shutil
+import signal
 import subprocess
 import time
 from multiprocessing import Process, Queue
@@ -141,6 +141,8 @@ def load_all_gcpt(gcpt_path, json_path, state_filter=None, xs_path=None, sorted_
             perf_match = False
       if perf_match and state_match:
         all_gcpt.append(gcpt)
+  if sorted_by is not None:
+    all_gcpt = sorted(all_gcpt, key=sorted_by)
   dump_json = True
   dump_json = False
   if dump_json:
@@ -151,10 +153,7 @@ def load_all_gcpt(gcpt_path, json_path, state_filter=None, xs_path=None, sorted_
       json_dict[gcpt.benchspec] = bench_dict
     with open("gcpt.json", "w") as f:
       json.dump(json_dict, f)
-  if sorted_by is None:
-    return all_gcpt
-  else:
-    return sorted(all_gcpt, key=sorted_by)
+  return all_gcpt
 
 tasks_dir = "SPEC06_EmuTasks_10_22_2021"
 
@@ -164,6 +163,7 @@ def get_perf_base_path(xs_path):
 def xs_run(workloads, xs_path, warmup, max_instr, threads):
   emu_path = os.path.join(xs_path, "build/emu")
   nemu_so_path = os.path.join(xs_path, "ready-to-run/riscv64-nemu-interpreter-so")
+  #nemu_so_path = os.path.join(xs_path, "ready-to-run/riscv64-spike-so")
   base_arguments = [emu_path, '--diff', nemu_so_path, '--dump-tl', '--enable-fork', '-W', str(warmup), '-I', str(max_instr), '-i']
   # base_arguments = [emu_path, '-W', str(warmup), '-I', str(max_instr), '-i']
   proc_count, finish_count = 0, 0
@@ -217,7 +217,7 @@ def xs_run(workloads, xs_path, warmup, max_instr, threads):
             run_cmd = numa_cmd + base_arguments + [workload_path] + ["-s", f"{random_seed}"]
             cmd_str = " ".join(run_cmd)
             print(f"cmd {proc_count}: {cmd_str}")
-            proc = subprocess.Popen(run_cmd, stdout=stdout, stderr=stderr)
+            proc = subprocess.Popen(run_cmd, stdout=stdout, stderr=stderr, preexec_fn=os.setsid)
           pending_proc.append((workload, proc, allocate_core))
           free_cores = free_cores[1:]
           proc_count += 1
@@ -226,7 +226,7 @@ def xs_run(workloads, xs_path, warmup, max_instr, threads):
     print("Interrupted. Exiting all programs ...")
     print("Not finished:")
     for i, (workload, proc, _) in enumerate(pending_proc):
-      proc.terminate()
+      os.killpg(os.getpgid(proc.pid), signal.SIGINT)
       print(f"  ({i + 1}) {workload}")
     print("Not started:")
     for i, workload in enumerate(workloads):
@@ -547,10 +547,10 @@ if __name__ == "__main__":
     args.ref = args.xs
 
   gcpt = load_all_gcpt(args.gcpt_path, args.json_path)
-  gcpt = gcpt#[600:720][::-1]#[830:]
+  gcpt = gcpt#[300:]#[::-1]
   #gcpt = load_all_gcpt(args.gcpt_path, args.json_path,
-  #        state_filter=[GCPT.STATE_RUNNING, GCPT.STATE_NONE, GCPT.STATE_ABORTED], xs_path=args.ref)[268:]#[::-1]
-  #gcpt = gcpt[:225]# + gcpt[225:421]
+  #        state_filter=[GCPT.STATE_RUNNING, GCPT.STATE_NONE, GCPT.STATE_ABORTED], xs_path=args.ref)
+  #gcpt = gcpt[242:]#[::-1]
 
   if args.show:
     # gcpt = load_all_gcpt(args.gcpt_path, args.json_path)
@@ -578,4 +578,7 @@ if __name__ == "__main__":
       #state_filter=[GCPT.STATE_ABORTED], xs_path=args.ref, sorted_by=lambda x: x.benchspec.lower())
       #state_filter=[GCPT.STATE_ABORTED], xs_path=args.ref, sorted_by=lambda x: x.get_ipc())
       #state_filter=[GCPT.STATE_RUNNING], xs_path=args.ref, sorted_by=lambda x: x.benchspec.lower())
+    print("All:  ", len(gcpt))
+    print("First:", gcpt[0])
+    print("Last: ", gcpt[-1])
     xs_run(gcpt, args.xs, args.warmup, args.max_instr, args.threads)
