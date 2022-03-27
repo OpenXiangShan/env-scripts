@@ -7,4 +7,4 @@ vc_hdrs.h
 *.zip
 xs_nh_release
 testbench/check.h
-
+*.tcl

@@ -16,10 +16,13 @@ VCS_OPTS := -full64 +v2k -timescale=1ns/1ns \
   +lint=TFIPC-L                             \
   +define+UNIT_DELAY                        \
   +define+no_warning                        \
-  +define+SYNTHESIS                         \
   +define+SNPS_FAST_SIM_FFV                 \
+  +define+RANDOMIZE_REG_INIT                \
+  +define+RANDOMIZE_MEM_INIT                \
+  +define+RANDOMIZE_GARBAGE_ASSIGN          \
+  +define+RANDOMIZE_DELAY=0                 \
   +vcs+initreg+random                       \
-  -F xs_nh_release/flist_emu.f
+  -F release-v12/xs_nh_release/flist_vcs.f
 
 $(EMU_VCS): $(VCS_SRC_FILE) $(VCS_TB_FILE) $(VCS_OTHER_FILE)
 	vcs $(VCS_OPTS) $(VCS_TB_FILE)

@@ -10,15 +10,20 @@ reg clock;
 reg reset;
 wire uart_valid;
 wire [7:0] uart_ch;
+reg verbose;
 
 initial begin
   init_ram();
   init_sd();
   clock = 0;
   reset = 1;
+  verbose = 0;
   if ($test$plusargs("dump-wave")) begin
     $vcdplusfile("simv.vpd");
     $vcdpluson;
+  end
+  if ($test$plusargs("verbose")) begin
+    verbose = 1;
   end
   #100 reset = 0;
 end
@@ -36,7 +41,7 @@ SimTop top (
   .io_uart_out_valid    (uart_valid),
   .io_uart_out_ch       (uart_ch   ),
   .io_uart_in_valid     (          ),
-  .io_uart_in_ch        (8'h0      )
+  .io_uart_in_ch        (8'hff     )
 );
 
 always @(posedge clock) begin
