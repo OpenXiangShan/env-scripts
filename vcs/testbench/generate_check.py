@@ -27,18 +27,18 @@ always @(posedge clock) begin
   else
     cycle_count_{coreid} <= cycle_count_{coreid} + 1;
 
-  if (!reset && stuck_timer_{coreid} > 2000) begin
-    $display("no instruction commits for 2000 cycles in core {coreid}");
+  if (!reset && stuck_timer_{coreid} > 5000) begin
+    $display("no instruction commits for 5000 cycles in core {coreid}");
     $finish;
   end
 
   if (!reset && !`ROB{coreid}.io_commits_isWalk && `ROB{coreid}.io_commits_valid_0) begin
-    // $display("instr commit %b", {{`ROB{coreid}.io_commits_valid_0, `ROB{coreid}.io_commits_valid_1,
+    // $display("CORE {coreid}: instr commit %b", {{`ROB{coreid}.io_commits_valid_0, `ROB{coreid}.io_commits_valid_1,
     //   `ROB{coreid}.io_commits_valid_2,`ROB{coreid}.io_commits_valid_3,
     //   `ROB{coreid}.io_commits_valid_4,`ROB{coreid}.io_commits_valid_5}});
   end
 
-  if (!reset && cycle_count_{coreid} % 10000 == 0) begin
+  if (verbose && !reset && cycle_count_{coreid} % 1000 == 0) begin
     $display("[time=%d] coreid = {coreid}, instrCnt = %d", cycle_count_{coreid}, commit_count_{coreid});
     //$display("[time=%d] mcycle=%d, minstret=%d, bpRight=%d, bpWrong=%d", cycle_count, `CSR.mcycle, `CSR.minstret, `CSR.bpRight, `CSR.bpWrong);
   end
