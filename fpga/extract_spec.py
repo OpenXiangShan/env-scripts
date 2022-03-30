@@ -9,6 +9,7 @@ end_pat   = re.compile(r'======== END   (?P<spec_name>\w*) ========')
 time_pat  = re.compile(r'\w+, \d+ \w+ \d+ \d+:\d+:\d+ \+0000')
 log_path = sys.argv[1]
 output_dir = sys.argv[2]
+sync_to_file = False
 spec_name = "default"
 inside = False
 
@@ -23,18 +24,21 @@ with open(log_path) as log:
       inside = True
       spec_name = begin_match.group("spec_name")
       print(f"Find spec {spec_name}:")
-      output_file = open(output_dir + "/" + spec_name + ".log", "w")
-      output_file.write(line)
+      if sync_to_file:
+        output_file = open(output_dir + "/" + spec_name + ".log", "w")
+        output_file.write(line)
     elif end_match:
       if not inside:
         print(f"error, out but not inside {spec_name}")
         exit()
       inside = False
-      output_file.write(line)
-      output_file.close()
+      if sync_to_file:
+        output_file.write(line)
+        output_file.close()
     else:
       if inside:
-        output_file.write(line)
+        if sync_to_file:
+          output_file.write(line)
         time_match = time_pat.match(line)
         if time_match:
           print(line, end="")

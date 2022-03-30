@@ -1,4 +1,7 @@
 # Watch / log result and run queued cmd
+# Param
+# First: xiangshan path
+# Second: result log
 
 import os
 import time
@@ -8,7 +11,7 @@ current_pos = 0
 fpga_job_list = []
 spec_todo_list = open('spec06-all-time.txt', 'r')
 xs_path = sys.argv[1] # xiangshan edition
-result_path = "/nfs/home/share/fpga/minicom-output/v2-def-1MBL2-2MBL3-noalias/spec_autorun.cap"
+result_path = sys.argv[2] # result log
 
 def wait_fpga_finish():
   while(int(os.popen(f"grep -c END {result_path}").read()) <= current_pos):
@@ -27,7 +30,7 @@ print(fpga_job_list)
 
 while(current_pos < len(fpga_job_list)):
   cmd = fpga_job_list[current_pos]
-  print(f'run command {current_pos}: ' + cmd)
+  os.system(f"echo run command {current_pos}: " + cmd)
   os.system("date")
   os.system(cmd)
   wait_fpga_finish()
