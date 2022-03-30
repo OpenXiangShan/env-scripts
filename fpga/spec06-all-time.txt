@@ -7,12 +7,12 @@ bzip2_chicken
 gcc_typeck
 gcc_expr2
 gcc_s04
-h264ref_foreman.main
+h264ref_foreman_main
 gobmk_trevorc
 gobmk_13x13
 gcc_g23
 bzip2_liberty
-h264ref_foreman.baseline
+h264ref_foreman_baseline
 gobmk_score2
 gobmk_trevord
 perlbench_diffmail
@@ -24,7 +24,7 @@ perlbench_splitmail
 bzip2_program
 gobmk_nngs
 bzip2_html
-soplex_pds-50
+soplex_pds
 hmmer_nph3
 omnetpp
 povray
