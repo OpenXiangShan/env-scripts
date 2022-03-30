@@ -11,7 +11,6 @@ cactusADM
 calculix
 dealII
 gamess_cytosine
-gamess_exam29
 gamess_gradient
 gamess_triazolium
 gcc_166
@@ -35,7 +34,6 @@ h264ref_foreman_main
 h264ref_sss
 hmmer_nph3
 hmmer_retro
-jtagmv.tcl
 lbm
 leslie3d
 libquantum
@@ -47,7 +45,6 @@ perlbench_checkspam
 perlbench_diffmail
 perlbench_splitmail
 povray
-preproc.tcl
 sjeng
 soplex_pds
 soplex_ref
