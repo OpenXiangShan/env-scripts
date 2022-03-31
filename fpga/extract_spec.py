@@ -8,8 +8,8 @@ begin_pat = re.compile(r'======== BEGIN (?P<spec_name>[\w.]+) ========')
 end_pat   = re.compile(r'======== END   (?P<spec_name>[\w.]+) ========')
 time_pat  = re.compile(r'\w+, \d+ \w+ \d+ \d+:\d+:\d+ \+0000')
 log_path = sys.argv[1]
-output_dir = sys.argv[2]
-sync_to_file = False
+sync_to_file = (len(sys.argv) == 3)
+output_dir = sys.argv[2] if sync_to_file else "error"
 spec_name = "default"
 inside = False
 count = 0
@@ -25,7 +25,7 @@ with open(log_path) as log:
       inside = True
       spec_name = begin_match.group("spec_name")
       count = count + 1
-      print(f"Find spec {spec_name}:")
+      print(f"Find spec ** {spec_name} **:")
       if sync_to_file:
         output_file = open(output_dir + "/" + spec_name + ".log", "w")
         output_file.write(line)
