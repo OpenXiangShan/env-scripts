@@ -4,14 +4,15 @@ import re
 # first: spec log file abs path
 # second: output log directory(will output several logs)
 
-begin_pat = re.compile(r'======== BEGIN (?P<spec_name>\w*) ========')
-end_pat   = re.compile(r'======== END   (?P<spec_name>\w*) ========')
+begin_pat = re.compile(r'======== BEGIN (?P<spec_name>[\w.]+) ========')
+end_pat   = re.compile(r'======== END   (?P<spec_name>[\w.]+) ========')
 time_pat  = re.compile(r'\w+, \d+ \w+ \d+ \d+:\d+:\d+ \+0000')
 log_path = sys.argv[1]
 output_dir = sys.argv[2]
 sync_to_file = False
 spec_name = "default"
 inside = False
+count = 0
 
 with open(log_path) as log:
   for line in log:
@@ -23,6 +24,7 @@ with open(log_path) as log:
         exit()
       inside = True
       spec_name = begin_match.group("spec_name")
+      count = count + 1
       print(f"Find spec {spec_name}:")
       if sync_to_file:
         output_file = open(output_dir + "/" + spec_name + ".log", "w")
@@ -43,5 +45,6 @@ with open(log_path) as log:
         if time_match:
           print(line, end="")
 
+print(f"Executed {count} spec")
 if inside:
   print(f"Warning: The last spec {spec_name} doesn't finish")
