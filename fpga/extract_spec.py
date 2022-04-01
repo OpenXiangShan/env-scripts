@@ -4,8 +4,8 @@ import re
 # first: spec log file abs path
 # second: output log directory(will output several logs)
 
-begin_pat = re.compile(r'======== BEGIN (?P<spec_name>[\w.]+) ========')
-end_pat   = re.compile(r'======== END   (?P<spec_name>[\w.]+) ========')
+begin_pat = re.compile(r'======== BEGIN (?P<spec_name>[\w.-]+) ========')
+end_pat   = re.compile(r'======== END   (?P<spec_name>[\w.-]+) ========')
 time_pat  = re.compile(r'\w+, \d+ \w+ \d+ \d+:\d+:\d+ \+0000')
 log_path = sys.argv[1]
 sync_to_file = (len(sys.argv) == 3)
