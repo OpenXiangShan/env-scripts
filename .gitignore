@@ -10,3 +10,7 @@ __pycache__
 *.txt
 *.log
 *.csv
+*.jou
+*.list
+.Xil/
+fpga/.Xil
