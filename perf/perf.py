@@ -22,7 +22,7 @@ class PerfCounters(object):
         all_perf_counters = dict()
         with open(filename) as f:
             for line in f:
-                perf_match = self.perf_re.match(line)
+                perf_match = self.perf_re.match(line.replace("/", "_"))
                 if perf_match:
                     perf_name = ".".join([str(perf_match.group(1)), str(perf_match.group(3))])
                     perf_value = str(perf_match.group(5))
