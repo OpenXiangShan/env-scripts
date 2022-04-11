@@ -22,7 +22,7 @@ class PerfCounters(object):
         all_perf_counters = dict()
         with open(filename) as f:
             for line in f:
-                perf_match = self.perf_re.match(line)
+                perf_match = self.perf_re.match(line.replace("/", "_"))
                 if perf_match:
                     perf_name = ".".join([str(perf_match.group(1)), str(perf_match.group(3))])
                     perf_value = str(perf_match.group(5))
@@ -400,14 +400,16 @@ def get_all_manip():
 def get_prefix_length(names):
     return len(os.path.commonprefix(names))
 
-def merge_perf_counters(filenames, all_perf, verbose=False):
+def merge_perf_counters(all_perf, verbose=False):
     def extract_numbers(s):
         re_digits = re.compile(r"(\d+)")
         pieces = re_digits.split(s)
         # convert int strings to int
-        pieces = list(map(lambda x: int(x) if x.isdecimal() else x, pieces))
+        pieces = list(map(lambda x: int(x) if x.isdecimal() else x.lower(), pieces))
         return pieces
     all_names = sorted(list(set().union(*list(map(lambda s: s.keys(), all_perf)))), key=extract_numbers)
+    all_perf = sorted(all_perf, key=lambda x: extract_numbers(x.filename))
+    filenames = list(map(lambda x: x.filename, all_perf))
     # remove common prefix
     prefix_length = get_prefix_length(filenames) if len(filenames) > 1 else 0
     if prefix_length > 0:
@@ -442,7 +444,7 @@ def perf_work(manip, work_queue, perf_queue):
     perf_queue.put(perf)
 
 def main(pfiles, output_file, include_names, verbose=False, jobs = 1):
-    all_files, all_perf = [], []
+    all_perf = []
     all_manip = get_all_manip()
     files_count = len(pfiles)
     pbar = tqdm(total = files_count, disable = not verbose, position = 1)
@@ -462,7 +464,6 @@ def main(pfiles, output_file, include_names, verbose=False, jobs = 1):
       perf = perf_queue.get()
       perf_lst.append(perf)
       if perf.counters:
-        all_files.append(perf.filename)
         all_perf.append(perf)
       else:
         pbar.write(f"{perf.filename} skipped because it is empty.")
@@ -472,10 +473,10 @@ def main(pfiles, output_file, include_names, verbose=False, jobs = 1):
 
     with open(output_file, 'w') as csvfile:
         csvwriter = csv.writer(csvfile)
-        for output_row in merge_perf_counters(all_files, all_perf, verbose):
+        for output_row in merge_perf_counters(all_perf, verbose):
             if pick(include_names, output_row[0]):
                 csvwriter.writerow(output_row)
-    pbar.write(f"Finished processing {len(all_files)} non-empty files.")
+    pbar.write(f"Finished processing {len(all_perf)} non-empty files.")
 
 def find_simulator_err(pfiles):
     if len(pfiles) > 1:
