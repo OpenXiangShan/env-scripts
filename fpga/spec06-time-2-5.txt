@@ -1,0 +1,10 @@
+povray
+gobmk_nngs
+lbm
+milc
+perlbench_checkspam
+hmmer_nph3
+omnetpp
+libquantum
+GemsFDTD
+namd

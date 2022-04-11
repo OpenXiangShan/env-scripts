@@ -1,0 +1,9 @@
+perlbench_splitmail
+gamess_gradient
+soplex_ref
+bzip2_source
+soplex_pds-50
+astar_biglakes
+gamess_cytosine
+bzip2_program
+bzip2_html
