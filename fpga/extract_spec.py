@@ -17,6 +17,7 @@ inside = False
 count = 0
 fail = False
 
+pure_time = False
 toShell = False
 
 def turnpink(str):
@@ -32,10 +33,13 @@ def turnred(str):
     return "\033[1;31;40m"+str+"\033[0m"
 
 def cal_time(begin_time, end_time):
-  begin = datetime.datetime.strptime(begin_time, '%H:%M:%S')
-  end = datetime.datetime.strptime(end_time, '%H:%M:%S')
-  delta = end - begin
-  return str(delta)
+  if (pure_time):
+    begin = datetime.datetime.strptime(begin_time, '%H:%M:%S')
+    end = datetime.datetime.strptime(end_time, '%H:%M:%S')
+    delta = end - begin
+    return str(delta)
+  else:
+    return begin_time+","+end_time
 
 if toShell:
   print(sys.argv[1]+":")
