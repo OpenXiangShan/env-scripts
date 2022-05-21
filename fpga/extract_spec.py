@@ -1,5 +1,7 @@
 import sys
 import re
+import time
+import datetime
 # Param
 # first: spec log file abs path
 # second: output log directory(will output several logs)
@@ -15,6 +17,7 @@ inside = False
 count = 0
 fail = False
 
+pure_time = False
 toShell = False
 
 def turnpink(str):
@@ -29,8 +32,22 @@ def turnred(str):
   else:
     return "\033[1;31;40m"+str+"\033[0m"
 
+def cal_time(begin_time, end_time):
+  if (pure_time):
+    begin = datetime.datetime.strptime(begin_time, '%H:%M:%S')
+    end = datetime.datetime.strptime(end_time, '%H:%M:%S')
+    delta = end - begin
+    return str(delta)
+  else:
+    return begin_time+","+end_time
+
+if toShell:
+  print(sys.argv[1]+":")
+
 with open(log_path) as log:
   spec_record = ""
+  begin_time = ""
+  end_time = ""
   for line in log:
     begin_match = begin_pat.match(line)
     end_match = end_pat.match(line)
@@ -51,6 +68,7 @@ with open(log_path) as log:
         print(f"error, out but not inside {spec_name}")
         exit()
       inside = False
+      spec_record += ","+cal_time(begin_time, end_time)
       print(spec_record)
       if sync_to_file:
         output_file.write(line)
@@ -66,10 +84,13 @@ with open(log_path) as log:
           output_file.write(line)
         time_match = time_pat.match(line)
         if time_match:
-          spec_record  += ","+time_match.group("time")
+          if (begin_time == ""):
+            begin_time = time_match.group("time")
+          else:
+            end_time = time_match.group("time")
 
 if toShell:
   if inside:
-    print(f"\n{count-1} spec finished\nun-finished spec: {turnpink(spec_name)}")
+    print(f"{count-1} spec finished\nun-finished spec: {turnpink(spec_name)}")
   else:
     print(f"{count} spec finished")
