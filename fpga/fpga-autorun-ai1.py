@@ -45,6 +45,8 @@ def cal_time(begin_time, end_time):
   delta = end - begin
   return str(delta)
 
+ignore_not_finish = True
+
 def extract_output(file_name):
   # extract minicom output, get a list of ["name", "begin", "end"]
   begin_pat = re.compile(r'======== BEGIN (?P<spec_name>[\w.-]+) ========')
@@ -63,8 +65,12 @@ def extract_output(file_name):
       end_match = end_pat.match(line)
       if begin_match:
         if inside:
-          print(f"error, re-inside {spec_name}")
-          exit()
+          # re-inside a spec output, which means last not finish
+          if ignore_not_finish:
+            begin_time = ""
+          else:
+            print(f"error, re-inside {spec_name}")
+            exit()
         inside = True
         fail = False
         spec_name = begin_match.group("spec_name")
@@ -95,13 +101,15 @@ def extract_output(file_name):
 # define FPGA Class
 
 minicom_output = "/nfs/home/share/fpga/minicom-output"
+def output_full_path(file_name):
+  return minicom_output + "/" + file_name
 class FPGA(object):
-  def __init__(self, fpga_name, fpga_ip, fpga_output):
+  def __init__(self, fpga_name, fpga_ip, fpga_output, current_workload = ""):
     self.name = fpga_name
     self.tcl = f"/nfs/home/share/fpga/0210xsmini/tcl/onboard-ai1-{fpga_name}.tcl"
-    self.output = minicom_output + "/" + fpga_output
+    self.output = output_full_path(fpga_output)
     self.ip = fpga_ip
-    self.current_workload = ""
+    self.current_workload = current_workload # if there is a running workload, set it to avoid conflict or re-running
     self.finish_list = []
 
 
@@ -117,16 +125,15 @@ class FPGA(object):
       source ~/.zshrc; \
       {vivado_cmd}\" \
       "
-    os.system(ssh_cmd) # blocked
-    # print(f"cmd: {ssh_cmd}")
-    # os.popen(ssh_cmd) # not blocked
+    # os.system(ssh_cmd) # blocked
+    os.popen(ssh_cmd) # not blocked
     return
 
-  def is_finish(self):
+  def available(self):
     # check if current worload finish
     if (self.current_workload == ""):
       return True
-    fpga_output = extract_output(self.output)
+    fpga_output = extract_output(self.output) # TODO: replace with extract_output.end?
     for s in fpga_output:
       if (s[0] == self.current_workload):
         self.finish_list.append(s)
@@ -137,8 +144,7 @@ class FPGA(object):
         return True
     return False
 
-
-fpga116 = FPGA("116", "172.28.11.119", f"{xs_edition}-spec-116.cap")
+fpga116 = FPGA("116", "172.28.11.119", f"{xs_edition}-spec-116.cap", "bwaves")
 fpga117 = FPGA("117", "172.28.11.117", f"{xs_edition}-spec-117.cap")
 fpga118 = FPGA("118", "172.28.11.118", f"{xs_edition}-spec-118.cap")
 fpga119 = FPGA("119", "172.28.11.119", f"{xs_edition}-spec-119.cap")
@@ -150,12 +156,36 @@ fpga_list = [
   fpga116
 ]
 
+# output that already have
+# use output_full_path(file_name)
+already_output_files = [
+  output_full_path("v111-spec-3-1.cap")
+]
+
+for fpga in fpga_list:
+  already_output_files.append(fpga.output)
+
+def already_finish(file_name, workload_name):
+    fpga_output = extract_output(file_name)
+    for s in fpga_output:
+      if (s[0] == workload_name):
+        global count
+        count = count + 1
+        print(f"                                           ", end="")
+        print(f"{turnpink(s[0])}:{turnpink(s[1])}.   {count} spec is finished")
+        return True
+    return False
+
 # here is the begin
 if __name__ == "__main__":
-  print(f"xs_path: {xs_path}")
-  print("fpga in use:")
+  print(f"xs_path: {turnpink(xs_path)}")
+  print("fpga in use:", end="")
   for fpga in fpga_list:
-    print("  " + fpga.name)
+    print(turnpink("  " + fpga.name), end="")
+  print("")
+  print("already output files:")
+  for aof in already_output_files:
+    print(turnpink("  " + aof))
   print(f"spec_path: {spec_path}")
   print(f"spec_list: {spec_list}")
 
@@ -166,12 +196,25 @@ if __name__ == "__main__":
   for workload in spec_list:
     assigned = False
     while not assigned:
+      # is the workload finished before
+      for output_file in already_output_files:
+        if already_finish(output_file, workload):
+          assigned = True
+          break
+      if assigned:
+        continue
+
+      # is the workload is running at a fpga
       for fpga in fpga_list:
-        if fpga.is_finish():
+        if (fpga.current_workload == workload):
+          assigned = True
+
+      # assgin to a fpga
+      for fpga in fpga_list:
+        if fpga.available():
           fpga.assign(workload)
           assigned = True
-          print(f"{turnpink(workload)} is assgin to {turnpink(fpga.name)}")
+          print(f"{turnpink(workload)} is assgined to {turnpink(fpga.name)}")
           break
       if not assigned:
-        print(f"{workload} has no seats, sleep 5s")
         time.sleep(5)
