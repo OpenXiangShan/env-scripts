@@ -18,7 +18,7 @@ def get_commit_messages(token, sha):
 def get_recent_commits(token, number=10):
     g = Github(token)
     xs = g.get_repo("OpenXiangShan/XiangShan")
-    actions = xs.get_workflow_runs(branch="master")
+    actions = xs.get_workflow_runs(branch="master", event="push")
     recent_commits = list(map(lambda a: a.head_sha, actions[:number]))
     run_numbers = list(map(lambda a: a.run_number, actions[:number]))
     commit_messages = get_commit_messages(token, recent_commits)
