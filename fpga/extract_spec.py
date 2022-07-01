@@ -20,6 +20,15 @@ fail = False
 pure_time = False
 toShell = False
 
+error_words = [
+  "unhandled signal",
+  "Segmentation fault",
+  "Aborted",
+  "Kernel panic",
+  "unhandled kernel",
+  "scause"
+]
+
 def turnpink(str):
   if not toShell:
     return str
@@ -69,16 +78,19 @@ with open(log_path) as log:
         exit()
       inside = False
       spec_record += ","+cal_time(begin_time, end_time)
+      begin_time = ""
+      end_time = ""
       print(spec_record)
       if sync_to_file:
         output_file.write(line)
         output_file.close()
     else:
-      if ("unhandled signal" in line) or ("Segmentation fault" in line) or ("Aborted" in line):
-        if (not fail):
-          fail = True
-          print(f"{turnpink(spec_name)} {turnred('failed')}, please check the log for:")
-        print(turnred(line), end="")
+      for ew in error_words:
+        if (ew in line):
+          if (not fail):
+            fail = True
+            print(f"{turnpink(spec_name)} {turnred('failed')}, please check the log for:")
+          print(turnred(line), end="")
       if inside:
         if sync_to_file:
           output_file.write(line)
