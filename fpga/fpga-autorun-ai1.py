@@ -1,6 +1,7 @@
 # Auto assgin spec workload to multiple FPGAs
 # Param:
-# no currently, please change this script manually
+# First: xs_edition, for example: v111, v2fpu
+# Second: spec_list, for example: spec06-fp.txt
 
 import os
 import time
@@ -8,13 +9,18 @@ import sys
 import datetime
 import re
 
-xs_edition = "v1000"
+xs_edition = sys.argv[1]
+spec_flist = sys.argv[2]
+
 xs_path = f"/nfs/home/share/fpga/bits/{xs_edition}"
 
 # get workload list
 
 spec_path = "/nfs/home/share/fpga/xsbins50m-bk-md5"
-spec_list = os.popen(f"ls {spec_path}").read().strip().split("\n")
+spec_list = []
+for s in open(spec_flist).readlines():
+  spec_list.append(s.strip())
+# spec_list = os.popen(f"ls {spec_path}").read().strip().split("\n")
 if ("gamess_exam29" in spec_list):
   spec_list.remove("gamess_exam29")
 
@@ -144,7 +150,7 @@ class FPGA(object):
         return True
     return False
 
-fpga116 = FPGA("116", "172.28.11.119", f"{xs_edition}-spec-116.cap", "bwaves")
+fpga116 = FPGA("116", "172.28.11.116", f"{xs_edition}-spec-116.cap")
 fpga117 = FPGA("117", "172.28.11.117", f"{xs_edition}-spec-117.cap")
 fpga118 = FPGA("118", "172.28.11.118", f"{xs_edition}-spec-118.cap")
 fpga119 = FPGA("119", "172.28.11.119", f"{xs_edition}-spec-119.cap")
@@ -153,13 +159,14 @@ fpga122 = FPGA("122", "172.28.11.122", f"{xs_edition}-spec-122.cap")
 
 # fpga that we can use
 fpga_list = [
-  fpga116
+  fpga116,
+  fpga117,
+  fpga122
 ]
 
 # output that already have
 # use output_full_path(file_name)
 already_output_files = [
-  output_full_path("v111-spec-3-1.cap")
 ]
 
 for fpga in fpga_list:
@@ -207,7 +214,11 @@ if __name__ == "__main__":
       # is the workload is running at a fpga
       for fpga in fpga_list:
         if (fpga.current_workload == workload):
+          print(f"{turnpink(workload)} is already running on {turnpink(fpga.name)}")
           assigned = True
+          break
+      if assigned:
+        continue
 
       # assgin to a fpga
       for fpga in fpga_list:
@@ -217,4 +228,4 @@ if __name__ == "__main__":
           print(f"{turnpink(workload)} is assgined to {turnpink(fpga.name)}")
           break
       if not assigned:
-        time.sleep(5)
+        time.sleep(60)
