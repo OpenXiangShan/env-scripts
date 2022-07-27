@@ -165,7 +165,7 @@ def xs_run(workloads, xs_path, warmup, max_instr, threads):
   emu_path = os.path.join(xs_path, "build/emu")
   nemu_so_path = os.path.join(xs_path, "ready-to-run/riscv64-nemu-interpreter-so")
   #nemu_so_path = os.path.join(xs_path, "ready-to-run/riscv64-spike-so")
-  base_arguments = [emu_path, '--diff', nemu_so_path, '-W', str(warmup), '-I', str(max_instr), '-i']
+  base_arguments = [emu_path, '-W', str(warmup), '-I', str(max_instr), '-i']
   # base_arguments = [emu_path, '-W', str(warmup), '-I', str(max_instr), '-i']
   proc_count, finish_count = 0, 0
   max_pending_proc = 128 // threads
