@@ -26,5 +26,5 @@ def get_number(elem):
 record.sort(key=get_number, reverse=True)
 
 for r in record:
-  print(r[0], end="")
-  print(r[1], end="")
+  print(r[0].strip(), end=",")
+  print(r[1].strip())
