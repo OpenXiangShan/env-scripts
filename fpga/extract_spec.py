@@ -61,9 +61,9 @@ with open(log_path) as log:
     begin_match = begin_pat.match(line)
     end_match = end_pat.match(line)
     if begin_match:
-      if inside:
-        print(f"error, re-inside {spec_name}")
-        exit()
+      # if inside:
+        # print(f"error, re-inside {spec_name}")
+        # exit()
       inside = True
       fail = False
       spec_name = begin_match.group("spec_name")
@@ -73,17 +73,18 @@ with open(log_path) as log:
         output_file = open(output_dir + "/" + spec_name + ".log", "w")
         output_file.write(line)
     elif end_match:
-      if not inside:
-        print(f"error, out but not inside {spec_name}")
-        exit()
-      inside = False
-      spec_record += ","+cal_time(begin_time, end_time)
-      begin_time = ""
-      end_time = ""
-      print(spec_record)
-      if sync_to_file:
-        output_file.write(line)
-        output_file.close()
+      #if not inside:
+        # print(f"error, out but not inside {spec_name}")
+        # exit()
+      if inside:
+        inside = False
+        spec_record += ","+cal_time(begin_time, end_time)
+        begin_time = ""
+        end_time = ""
+        print(spec_record)
+        if sync_to_file:
+          output_file.write(line)
+          output_file.close()
     else:
       for ew in error_words:
         if (ew in line):
