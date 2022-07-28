@@ -97,7 +97,7 @@ def get_spec_fp(spec_version):
   return None
 
 
-def get_spec_core(spec_time, spec_version, frequency):
+def get_spec_score(spec_time, spec_version, frequency):
   print("==================== Score ===================")
   total_count = 0
   total_score = 1
@@ -109,11 +109,11 @@ def get_spec_core(spec_time, spec_version, frequency):
     score = reftime / spec_time[spec_name]
     total_count += 1
     total_score *= score
-    print(f"{spec_name:>15}: {score:6.2f}, {score / frequency:6.2f}")
+    print(f"{spec_name:>15}: {score:6.3f}, {score / frequency:6.3f}")
     spec_score[spec_name] = score
   geomean_score = total_score ** (1 / total_count)
-  print(f"SPEC{spec_version}@{frequency}GHz: {geomean_score:6.2f}")
-  print(f"SPEC{spec_version}/GHz:  {geomean_score / frequency:6.2f}")
+  print(f"SPEC{spec_version}@{frequency}GHz: {geomean_score:6.3f}")
+  print(f"SPEC{spec_version}/GHz:  {geomean_score / frequency:6.3f}")
   print()
   print(f"********* SPECINT {spec_version} *********")
   specint_list = get_spec_int(spec_version)
@@ -125,12 +125,12 @@ def get_spec_core(spec_time, spec_version, frequency):
         found = True
         score = spec_score[name]
         specint_score *= score
-        print(f"{benchspec:>15}: {score:6.2f}, {score / frequency:6.2f}")
+        print(f"{benchspec:>15}: {score:6.3f}, {score / frequency:6.3f}")
     if not found:
       print(f"{benchspec:>15}: N/A")
   geomean_specint_score = specint_score ** (1 / len(specint_list))
-  print(f"SPECint{spec_version}@{frequency}GHz: {geomean_specint_score:6.2f}")
-  print(f"SPECint{spec_version}/GHz:  {geomean_specint_score / frequency:6.2f}")
+  print(f"SPECint{spec_version}@{frequency}GHz: {geomean_specint_score:6.3f}")
+  print(f"SPECint{spec_version}/GHz:  {geomean_specint_score / frequency:6.3f}")
   print()
   print(f"********* SPECFP  {spec_version} *********")
   specfp_list = get_spec_fp(spec_version)
@@ -142,12 +142,12 @@ def get_spec_core(spec_time, spec_version, frequency):
         found = True
         score = spec_score[name]
         specfp_score *= score
-        print(f"{benchspec:>15}: {score:6.2f}, {score / frequency:6.2f}")
+        print(f"{benchspec:>15}: {score:6.3f}, {score / frequency:6.3f}")
     if not found:
       print(f"{benchspec:>15}: N/A")
   geomean_specfp_score = specfp_score ** (1 / len(specfp_list))
-  print(f"SPECfp{spec_version}@{frequency}GHz: {geomean_specfp_score:6.2f}")
-  print(f"SPECfp{spec_version}/GHz: {geomean_specfp_score / frequency:6.2f}")
+  print(f"SPECfp{spec_version}@{frequency}GHz: {geomean_specfp_score:6.3f}")
+  print(f"SPECfp{spec_version}/GHz: {geomean_specfp_score / frequency:6.3f}")
   print()
 
 
@@ -179,4 +179,4 @@ if __name__ == "__main__":
   args = parser.parse_args()
 
   spec_time = get_spec_time(args.csv_path)
-  get_spec_core(spec_time, args.version, args.frequency)
+  get_spec_score(spec_time, args.version, args.frequency)
