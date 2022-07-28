@@ -22,7 +22,7 @@ def wait_fpga_finish():
 def spec2fpga():
   vivado_cmd = f"vivado -mode batch -source {fpga} -tclargs " + xs_path + " "
   for x in spec_todo_list:
-    fpga_job_list.append(vivado_cmd + "/nfs/home/share/fpga/xsbins50m-md5/" + x.strip() + "/data.txt")
+    fpga_job_list.append(vivado_cmd + "/nfs/home/share/fpga/xsbins50m-bk-md5/" + x.strip() + "/data.txt")
 
 spec2fpga()
 # print(fpga_job_list)
