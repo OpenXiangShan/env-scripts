@@ -268,7 +268,7 @@ def get_all_manip():
     return all_manip
 
 def get_total_inst(benchspec, spec_version, isa):
-  base_dir = "/nfs/home/share/checkpoints_profiles"
+  base_dir = "/nfs-nvme/home/share/checkpoints_profiles"
   if spec_version == 2006:
     if isa == "rv64gc_old":
       base_path = os.path.join(base_dir, "spec06_rv64gc_o2_50m/profiling")
