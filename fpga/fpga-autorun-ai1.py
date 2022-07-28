@@ -29,6 +29,7 @@ def get_workload_path(spec_name):
 
 # extract output
 count = 0
+max_count = len(spec_list)
 
 error_words = [
   "unhandled signal",
@@ -145,8 +146,9 @@ class FPGA(object):
         self.finish_list.append(s)
         global count
         count = count + 1
+        self.current_workload = ""
         print(f"                                           ", end="")
-        print(f"{turnpink(s[0])}:{turnpink(s[1])}.   {count} spec is finished")
+        print(f"{turnpink(s[0])}:{turnpink(s[1])}.   {count}/{max_count} spec is finished")
         return True
     return False
 
@@ -179,7 +181,7 @@ def already_finish(file_name, workload_name):
         global count
         count = count + 1
         print(f"                                           ", end="")
-        print(f"{turnpink(s[0])}:{turnpink(s[1])}.   {count} spec is finished")
+        print(f"{turnpink(s[0])}:{turnpink(s[1])}.   {count}/{max_count} spec is finished")
         return True
     return False
 
@@ -196,9 +198,22 @@ if __name__ == "__main__":
   print(f"spec_path: {spec_path}")
   print(f"spec_list: {spec_list}")
 
+  # pre-check
+  for of in already_output_files:
+    if not (os.path.isfile(of) and os.access(of, os.R_OK)):
+      print(trunred(f"Error: {of} doesn't exist or has no read right"))
+      exit()
+  for sp in spec_list:
+    full_path = get_workload_path(sp)
+    if not (os.path.isfile(full_path) and os.access(full_path, os.R_OK)):
+      print(trunred(f"Error: {full_path} doesn't exist or has no read right"))
+      exit()
+
   print(turnred("IMPORTANT: please manual set minicom output file to "+ xs_edition + "-spec-'fpga'.cap"))
 
   a = input("Ctrl-C to stop. Or any other key to continue.")
+
+  start_time = datetime.datetime.now()
 
   for workload in spec_list:
     assigned = False
@@ -229,3 +244,18 @@ if __name__ == "__main__":
           break
       if not assigned:
         time.sleep(60)
+
+  print("all the spec has been assigned, wait for the unfinished.")
+  if (count < max_count):
+    for fpga in fpga_list:
+      if fpga.current_workload != "":
+        print(f"{turnpink(fpga.current_workload)} is running on {turnpink(fpga.name)}")
+      else:
+        print(f"{turnpink(fpga.name)} is available")
+  while (count < max_count):
+    for fpga in fpga_list:
+      a = fpga.available()
+    time.sleep(60)
+
+  end_time = datetime.datetime.now()
+  print("Time Usage: " + str(end_time -start_time))
