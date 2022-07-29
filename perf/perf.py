@@ -238,6 +238,22 @@ def get_all_manip():
         func = lambda cycle, instr: instr * 1.0 / cycle
     )
     all_manip.append(ipc)
+    for i in range(1, 6):
+        ready_frac = PerfManip(
+            name = f"global.num_ready_frac_{i}",
+            counters = [
+                f"exuBlocks.scheduler.rs.rs_0.statusArray.can_issue_entries_{i}_{i+1}",
+                "clock_cycle"
+            ],
+            func = lambda n, cycle: n / cycle
+        )
+        all_manip.append(ready_frac)
+    ready_frac = PerfManip(
+        name = "global.num_ready_frac_6_or_more",
+        counters = [f"exuBlocks.scheduler.rs.rs_0.statusArray.can_issue_entries_{i}_{i+1}" for i in range(6)] + ["clock_cycle"],
+        func = lambda n0, n1, n2, n3, n4, n5, cycle: (cycle - n0 - n1 - n2 - n3 - n4 - n5) / cycle
+    )
+    all_manip.append(ready_frac)
     branch_mpki = PerfManip(
         name = "global.branch_prediction_mpki",
         counters = [f"ftq.BpWrong",
