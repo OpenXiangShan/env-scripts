@@ -19,10 +19,19 @@ class TimingPath(object):
         return [self.startpoint, self.endpoint, self.input_delay, self.arrival_time, self.slack]
 
     def get_length(self):
-        return self.arrival_time - self.input_delay
+        return float(self.arrival_time) - float(self.input_delay)
 
     def to_csv(self):
         return ",".join(self.get_all())
+
+    def dedup_digits(self):
+        re_digits = re.compile(r"(\d+)")
+        pieces = re_digits.split(self.startpoint)
+        startpoint = "".join(map(lambda x: "*" if x.isdecimal() else x, pieces))
+        pieces = re_digits.split(self.endpoint)
+        endpoint = "".join(map(lambda x: "*" if x.isdecimal() else x, pieces))
+        return (startpoint, endpoint)
+
 
 class TimingReport(object):
     def __init__(self, filenames):
@@ -58,6 +67,25 @@ class TimingReport(object):
             for report in self.all_timing_path:
                 csvwriter.writerow(report.get_all())
 
+    def dedup(self):
+        self.dedup_timing_path = dict()
+        for p in self.all_timing_path:
+            dedup_key = p.dedup_digits()
+            if dedup_key not in self.dedup_timing_path:
+                self.dedup_timing_path[dedup_key] = []
+            self.dedup_timing_path[dedup_key].append(p)
+
+    def to_csv_dedup(self, output_file):
+        with open(output_file, 'w') as csvfile:
+            csvwriter = csv.writer(csvfile)
+            csvwriter.writerow(["startpoint", "endpoint", "max_delay", "min_slack"])
+            for dedup_key in self.dedup_timing_path:
+                startpoint, endpoint = dedup_key
+                dedup_paths = self.dedup_timing_path[dedup_key]
+                delay = max(map(lambda x: x.get_length(), dedup_paths))
+                slack = min(map(lambda x: x.slack, dedup_paths))
+                csvwriter.writerow([startpoint, endpoint, delay, slack])
+
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description='performance counter log parser')
@@ -68,3 +96,5 @@ if __name__ == "__main__":
 
     report = TimingReport(args.pfiles)
     report.to_csv("timing.csv")
+    report.dedup()
+    report.to_csv_dedup("timing_dedup.csv")
