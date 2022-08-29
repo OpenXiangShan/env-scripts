@@ -7,6 +7,7 @@ import os
 import time
 import sys
 
+result = 0
 current_pos = 0
 fpga_job_list = []
 xs_path = sys.argv[1] # xiangshan edition
@@ -17,7 +18,10 @@ fpga = sys.argv[4]
 def wait_fpga_finish():
   while(int(os.popen(f"grep -c '======== END ' {result_path}").read()) < current_pos):
     time.sleep(60)
+    if(int(os.popen(f"grep -c 'xicom: AXI TRANSACTION FAILED' vivado.log").read()) > 0):
+        return 1
   print("get cmd " + str(current_pos) + " result, run next ('0-0')")
+  return 0
 
 def spec2fpga():
   vivado_cmd = f"vivado -mode batch -source {fpga} -tclargs " + xs_path + " "
@@ -30,7 +34,9 @@ spec2fpga()
 # exit()
 
 while(current_pos < len(fpga_job_list)):
-  wait_fpga_finish()
+  result = wait_fpga_finish()
+  if result == 1:
+     current_pos = current_pos - 1
   cmd = fpga_job_list[current_pos]
   os.system(f"echo run command {current_pos}: " + cmd)
   os.system("date")
