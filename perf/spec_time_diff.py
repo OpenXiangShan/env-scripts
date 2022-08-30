@@ -10,6 +10,9 @@ import os
 import sys
 import datetime
 
+if sys.argv[1] == "-h" or sys.argv[1] == "--help":
+  print("Usage: python3 me.py old_file.csv new file.csv")
+
 old_file = sys.argv[1]
 new_file = sys.argv[2]
 
@@ -26,7 +29,8 @@ def time_to_second(f_time):
 def cal_ratio(old_time, new_time):
   o = time_to_second(old_time)
   n = time_to_second(new_time)
-  return (n - o) / o
+  ratio = ((o - n) / o) * 100.0
+  return "%.2f"%ratio+"%"
 
 record = {}
 
@@ -37,7 +41,7 @@ with open(old_file, "r") as f:
       continue
     elif len(items) == 3:
       name, start_time, finish_time = items
-      record[name] = [cal_time(start_time, finish_time),"",0.0]
+      record[name] = [cal_time(start_time, finish_time),"", ""]
 
 with open(new_file, "r") as f:
   for line in f:
@@ -46,13 +50,13 @@ with open(new_file, "r") as f:
       continue
     elif len(items) == 3:
       name, start_time, finish_time = items
+      new_time = cal_time(start_time, finish_time)
       if name in record.keys():
         old = record[name]
-        new_time = cal_time(start_time, finish_time)
         record[name] = [old[0], new_time, cal_ratio(old[0], new_time)]
       else:
-        record[name] = ["", new_time, 0.0]
+        record[name] = ["", new_time, ""]
 
-print(f"spec,{old_file},{new_file},inc ratio")
+print(f"spec,{old_file},{new_file},ratio")
 for r in record.keys():
-  print(f"{r},{record[r][0]},{record[r][1]},"+"%.4f"%record[r][2])
+  print(f"{r},{record[r][0]},{record[r][1]},{record[r][2]}")
