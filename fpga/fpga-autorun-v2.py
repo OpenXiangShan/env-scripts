@@ -50,11 +50,14 @@ def cal_time(begin_time, end_time):
 def fpga_send_email(spec):
   if (spec.state == STATE.FINISHED):
     subject = f"fpga success xs:{bitstream_magic_word} spec:{spec.name} of {spec_magic_word} time:{cal_time(spec.begin_time, spec.end_time)} "
-    content = ""
+    content = f"{spec.info}"
+    send_email(subject, content)
   elif (spec.state == STATE.STATE_ABORTED):
     subject = f"fpga failed xs:{bitstream_magic_word} spec:{spec.name} of {spec_magic_word}"
     content = f"{spec.info}"
-  send_email(subject, content)
+    send_email(subject, content)
+  else:
+    print(f"error state at fpga send email: {spec.name} {spec.state}")
 
 def get_spec_data(spec):
   return spec_base_path + "/" + spec + "/data.txt"
@@ -98,12 +101,13 @@ def extract_output(file_name):
         spec_name = begin_match.group("spec_name")
       elif end_match:
         if not inside:
-          # print(f"error, out but not inside {spec_name}")
           # exit()
           # ignore error, continue
           continue
         inside = False
-        spec_record[spec_name] = RESULT(spec_name, begin_time, end_time, True, "")
+        if (begin_time == "" or end_time == ""):
+          exit()
+        spec_record[spec_name] = RESULT(spec_name, begin_time, end_time, True, file_name)
         begin_time = ""
         end_time = ""
       else:
@@ -111,6 +115,7 @@ def extract_output(file_name):
           if (ew in line):
             if (not fail):
               fail = True
+              inside = False
               spec_record[spec_name] = RESULT(spec_name, "", "", False, ew+" at "+file_name)
         if (inside and (not fail)):
           time_match = time_pat.match(line)
@@ -157,11 +162,11 @@ class FPGA(object):
       if (o.name == self.current_workload):
         self.current_workload = ""
         if o.success:
-          spec_list[o.name].finished(o.begin_time,o.end_time)
-
+          spec_list[o.name].finished(o.begin_time,o.end_time, o.info)
         else:
           spec_list[o.name].aborted(o.info)
         spec_list[o.name].print_result()
+        fpga_send_email(spec_list[o.name])
 
         return True
     return False
@@ -185,10 +190,11 @@ class SPEC(object):
     self.state = STATE.STATE_RUNNING
     self.fpga = fpga
 
-  def finished(self, begin_time, end_time):
+  def finished(self, begin_time, end_time, info):
     self.state = STATE.STATE_FINISHED
     self.begin_time = begin_time
     self.end_time = end_time
+    self.info = info
 
   def aborted(self, info):
     self.state = STATE.STATE_ABORTED
@@ -199,16 +205,19 @@ class SPEC(object):
     count = count + 1
     print("  ", end = "")
     if (self.state == STATE.STATE_FINISHED):
-      print(f"{turnpink(self.name)}    {turnpink(cal_time(self.begin_time, self.end_time))}    {count}/{workload_num}")
+      print(f"{turnpink(self.name)} {turnpink(cal_time(self.begin_time, self.end_time))} {count}/{workload_num} {self.info}")
     else:
-      print(f"{turnred(self.name)}    error    {self.info}")
+      print(f"{turnred(self.name)} {self.info}")
 
 def get_spec_list(f):
   spec_list = []
   state_list = {}
   filter_list = ["gamess_exam29"]
-  for s in open(f).readlines():
-    spec_list.append(s.strip())
+  if (".txt" not in f.strip()):
+    spec_list = f.strip().split(" ")
+  else:
+    for s in open(f).readlines():
+      spec_list.append(s.strip())
   for n in filter_list:
     if n in spec_list:
       spec_list.remove(n)
@@ -235,9 +244,9 @@ def extract_old_log(spec_list):
         if o.name in spec_list.keys():
           # TODO: add print
           if o.success:
-            spec_list[o.name].finished(o.begin_time, o.end_time)
+            spec_list[o.name].finished(o.begin_time, o.end_time, o.info)
           else:
-            spec_list[o.name].abrted(o.info)
+            spec_list[o.name].aborted(o.info)
           # spec_list[o.name].print_result()
     else:
       print(f"  not existed:{log_name}")
@@ -269,7 +278,7 @@ def kill_uart():
       "
     # print(f"stop uart cmd: {ssh_cmd}")
     print(f"kill watch thread of {fpga.name}")
-    os.popen(ssh_cmd)
+    os.system(ssh_cmd)
 
 def kill_vivado():
   for fpga in fpga_list:
@@ -280,7 +289,7 @@ def kill_vivado():
       "
     # print(f"stop vivado cmd: {ssh_cmd}")
     print(f"kill vivado thread of {fpga.name}")
-    os.popen(ssh_cmd)
+    os.system(ssh_cmd)
 
 def wait_unfinished():
   print ("======================")
@@ -354,6 +363,8 @@ if __name__ == "__main__":
   print("Begin Time: ", start_time)
 
   try:
+    kill_uart()
+    kill_vivado()
     create_capture()
     watch_uart()
     print("======================")
