@@ -1,6 +1,7 @@
 
 import sys
 import serial
+import os
 
 class SERIAL_TYPE(object):
   def __init__(self, ip, port, baudrate, output):
@@ -15,12 +16,13 @@ class SERIAL_TYPE(object):
     self.output = output
 
   def read_serial(self):
-    file = open(self.output, 'a')
-    file.close()
+    if not os.path.isfile(self.output):
+      os.popen(f"touch {self.output}")
     while True:
       data = self.serial.readline()
       file = open(self.output, 'a')
       file.writelines(data.decode('utf-8'))
+      file.flush()
       file.close()
 
 
