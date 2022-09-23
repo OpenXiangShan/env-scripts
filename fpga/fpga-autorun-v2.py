@@ -6,7 +6,6 @@
 from enum import Enum
 import os
 import time
-import sys
 import datetime
 import re
 import argparse
@@ -48,8 +47,8 @@ def cal_time(begin_time, end_time):
   return str(delta)
 
 def fpga_send_email(spec):
-  if (spec.state == STATE.FINISHED):
-    subject = f"fpga success xs:{bitstream_magic_word} spec:{spec.name} of {spec_magic_word} time:{cal_time(spec.begin_time, spec.end_time)} "
+  if (spec.state == STATE.STATE_FINISHED):
+    subject = f"fpga success: {bitstream_magic_word}  {spec.name} of {spec_magic_word} {cal_time(spec.begin_time, spec.end_time)} "
     content = f"{spec.info}"
     send_email(subject, content)
   elif (spec.state == STATE.STATE_ABORTED):
@@ -107,7 +106,7 @@ def extract_output(file_name):
         inside = False
         if (begin_time == "" or end_time == ""):
           exit()
-        spec_record[spec_name] = RESULT(spec_name, begin_time, end_time, True, file_name)
+        spec_record[spec_name] = RESULT(spec_name, begin_time, end_time, True, file_name[1:])
         begin_time = ""
         end_time = ""
       else:
@@ -116,7 +115,7 @@ def extract_output(file_name):
             if (not fail):
               fail = True
               inside = False
-              spec_record[spec_name] = RESULT(spec_name, "", "", False, ew+" at "+file_name)
+              spec_record[spec_name] = RESULT(spec_name, "", "", False, ew+" at "+file_name[1:])
         if (inside and (not fail)):
           time_match = time_pat.match(line)
           if time_match:
@@ -148,7 +147,7 @@ class FPGA(object):
       {vivado_cmd}\" \
       "
     # print(f"vivado cmd: {ssh_cmd}")
-    print(f"{turnpink(workload.name)} is assgined to {turnpink(self.name)} at {datetime.datetime.now()}")
+    print(f"<<<<<<<<<< {turnpink(workload.name)} is assgined to {turnpink(self.name)} at {datetime.datetime.now()}")
     # os.system(ssh_cmd) # blocked
     os.popen(ssh_cmd) # not blocked
     return
@@ -203,11 +202,11 @@ class SPEC(object):
   def print_result(self):
     global count
     count = count + 1
-    print("  ", end = "")
+    print(">>>>>>>>>> ", end = "")
     if (self.state == STATE.STATE_FINISHED):
-      print(f"{turnpink(self.name)} {turnpink(cal_time(self.begin_time, self.end_time))} {count}/{workload_num} {self.info}")
+      print(f"{turnpink(self.name)} {turnpink(cal_time(self.begin_time, self.end_time))} {count}/{workload_num} {self.info} {datetime.datetime.now()}")
     else:
-      print(f"{turnred(self.name)} {self.info}")
+      print(f"{turnred(self.name)} {self.info} {datetime.datetime.now()}")
 
 def get_spec_list(f):
   spec_list = []
