@@ -18,7 +18,7 @@ bitstream_path = ""
 bitstream_magic_word = ""
 spec_magic_word = ""
 spec_list = {}
-fpga_list = {}
+fpga_list = []
 workload_num = 0
 count = 0
 spec_base_path = ""
@@ -31,6 +31,8 @@ error_words = [
   "Aborted",
   "Kernel panic",
   "unhandled kernel",
+  "unhandlable trap",
+  "Power off",
   "scause"
 ]
 
@@ -50,13 +52,26 @@ def fpga_send_email(spec):
   if (spec.state == STATE.STATE_FINISHED):
     subject = f"fpga success: {bitstream_magic_word}  {spec.name} of {spec_magic_word} {cal_time(spec.begin_time, spec.end_time)} "
     content = f"{spec.info}"
-    send_email(subject, content)
+    # send_email(subject, content)
   elif (spec.state == STATE.STATE_ABORTED):
     subject = f"fpga failed xs:{bitstream_magic_word} spec:{spec.name} of {spec_magic_word}"
     content = f"{spec.info}"
     send_email(subject, content)
   else:
     print(f"error state at fpga send email: {spec.name} {spec.state}")
+
+def finish_send_email(begin_time, end_time, fpga):
+  spec_num = len(spec_list)
+  spec_success_num = len(list(filter(lambda s:(s.state == STATE.STATE_FINISHED), spec_list.values())))
+  subject = f"fpga finish: {bitstream_magic_word} {spec_magic_word} success:{spec_success_num}/{spec_num}"
+  content = f"Begin Time: {begin_time}\n End Time: {end_time}\n Total Time: {end_time - begin_time}\n"
+  for spec in spec_list.values():
+    content += spec.name + "," + (f"{cal_time(spec.begin_time, spec.end_time)}" if (spec.state == STATE.STATE_FINISHED) else f"failed,{spec.info}") + "\n"
+  content += f"\nfpga used: {fpga}\n"
+  content += "Captured Log:\n"
+  for f in fpga_list:
+    content += f"  {f.output}\n"
+  send_email(subject, content)
 
 def get_spec_data(spec):
   return spec_base_path + "/" + spec + "/data.txt"
@@ -85,6 +100,7 @@ def extract_output(file_name):
     spec_record = {}
     begin_time = ""
     end_time = ""
+    spec_name = "linux-begin"
 
     inside = False
     fail = False
@@ -213,7 +229,7 @@ def get_spec_list(f):
   state_list = {}
   filter_list = ["gamess_exam29"]
   if (".txt" not in f.strip()):
-    spec_list = f.strip().split(" ")
+    spec_list = f.strip().split()
   else:
     for s in open(f).readlines():
       spec_list.append(s.strip())
@@ -227,7 +243,7 @@ def get_spec_list(f):
 
 def get_fpga_list(fpgas):
   fpga = []
-  for f in fpgas.split(" "):
+  for f in fpgas.split():
     fpga.append(FPGA(f, get_full_fpga_ip(f), ))
   return fpga
 
@@ -334,6 +350,9 @@ if __name__ == "__main__":
   log_prefix = log_dir + "/" + bitstream_magic_word + "-" + spec_magic_word
 
   print(f"bitstream: {turnpink(bitstream_path)}")
+  if (os.path.isdir(bitstream_path) and (len(os.listdir(bitstream_path)) >= 2)):
+    print(f"Error: bitstream may not exist at {bitstream_path}:{os.listdir(bitstream_path)}")
+
   print(f"fpga in use: {args.fpga_list}")
   print("fpga output path: %s"%turnpink(output_full_path("fpga")))
   attention_word = "Please make sure /dev/ttyUSB* is not used, or error will happen later"
@@ -377,6 +396,7 @@ if __name__ == "__main__":
         if (spec_list[s].state == STATE.STATE_IDLE):
           time.sleep(60)
     wait_unfinished()
+    finish_send_email(start_time, datetime.datetime.now(), args.fpga_list)
 
   finally:
     kill_uart()
