@@ -10,7 +10,7 @@ ls = b.split('\n')
 
 for i in ls:
     if (("grep" not in i) and (vivado_cmd in i) and (vivado_cmd2 in i) and (user in i)):
-        pid = i.split(" ")[1]
+        pid = i.split()[1]
         # os.system() 运行 Linux 命令没有返回值,直接运行
         print(f'command kill -9 {pid} ({i})')
         os.system(f'kill -9 {pid}')

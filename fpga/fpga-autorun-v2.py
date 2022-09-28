@@ -350,8 +350,9 @@ if __name__ == "__main__":
   log_prefix = log_dir + "/" + bitstream_magic_word + "-" + spec_magic_word
 
   print(f"bitstream: {turnpink(bitstream_path)}")
-  if (os.path.isdir(bitstream_path) and (len(os.listdir(bitstream_path)) >= 2)):
+  if not (os.path.isdir(bitstream_path) and (len(os.listdir(bitstream_path)) >= 2)):
     print(f"Error: bitstream may not exist at {bitstream_path}:{os.listdir(bitstream_path)}")
+    exit()
 
   print(f"fpga in use: {args.fpga_list}")
   print("fpga output path: %s"%turnpink(output_full_path("fpga")))
