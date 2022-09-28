@@ -1,3 +1,5 @@
+#! /usr/bin/env zsh
+# Usage: zsh cp_bs.sh bsDir bsTag
 
 bsSrc=$1
 bsDest=/nfs/home/share/fpga/bits/$2
