@@ -1,0 +1,2 @@
+clockOption -add {technology CAKE 2}
+clockFrequency -add {clock 20MHz}
