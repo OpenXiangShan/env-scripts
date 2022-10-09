@@ -1,0 +1,5 @@
+src/*
+!src/tb_top.v
+images/*
+!images/ram.bin
+
