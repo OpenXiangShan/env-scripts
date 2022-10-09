@@ -1,109 +1,128 @@
+import argparse
+from genericpath import isfile
+import os
 import sys
 import re
 import time
 import datetime
+
 # Param
 # first: spec log file abs path
 # second: output log directory(will output several logs)
 
-begin_pat = re.compile(r'======== BEGIN (?P<spec_name>[\w.-]+) ========')
-end_pat   = re.compile(r'===== Finish running SPEC2006 =====')
-time_pat  = re.compile(r'\w+, \d+ \w+ \d+ (?P<time>\d+:\d+:\d+) \+0000')
-log_path = sys.argv[1]
-sync_to_file = (len(sys.argv) == 3)
-output_dir = sys.argv[2] if sync_to_file else "error"
-spec_name = "default"
-inside = False
-count = 0
-fail = False
-
-pure_time = False
-toShell = False
-
-error_words = [
-  "unhandled signal",
-  "Segmentation fault",
-  "Aborted",
-  "Kernel panic",
-  "unhandled kernel",
-  "scause"
-]
-
-def turnpink(str):
-  if not toShell:
-    return str
+def turnpink(string, highlight = True):
+  if highlight:
+    return "\033[1;35;40m"+string+"\033[0m"
   else:
-    return "\033[1;35;40m"+str+"\033[0m"
+    return string
 
-def turnred(str):
-  if not toShell:
-    return str
+def turnred(string, highlight):
+  if highlight:
+    return "\033[1;31;40m"+string+"\033[0m"
   else:
-    return "\033[1;31;40m"+str+"\033[0m"
+    return string
 
-def cal_time(begin_time, end_time):
-  if (pure_time):
-    begin = datetime.datetime.strptime(begin_time, '%H:%M:%S')
-    end = datetime.datetime.strptime(end_time, '%H:%M:%S')
-    delta = end - begin
-    return str(delta)
-  else:
-    return begin_time+","+end_time
+class RESULT(object):
+  def __init__(self, name, begin_time, end_time, success, info):
+    self.name = name
+    self.begin_time = begin_time
+    self.end_time = end_time
+    self.success = success
+    self.info = info
 
-if toShell:
-  print(sys.argv[1]+":")
+  def print_result(self, highlight):
+    if self.success:
+      print(f"{turnpink(self.name, highlight)},{self.begin_time},{self.end_time}")
+    else:
+      print(f"{turnred(self.name, highlight)},{self.info}")
 
-with open(log_path) as log:
-  spec_record = ""
-  begin_time = ""
-  end_time = ""
-  for line in log:
-    begin_match = begin_pat.match(line)
-    end_match = end_pat.match(line)
-    if begin_match:
-      # if inside:
-        # print(f"error, re-inside {spec_name}")
-        # exit()
-      inside = True
-      fail = False
-      spec_name = begin_match.group("spec_name")
-      count = count + 1
-      spec_record = f"{turnpink(spec_name)}"
-      if sync_to_file:
-        output_file = open(output_dir + "/" + spec_name + ".log", "w")
-        output_file.write(line)
-    elif end_match:
-      #if not inside:
-        # print(f"error, out but not inside {spec_name}")
-        # exit()
-      if inside:
+
+def extract_output(file_name, print_result=False, highlight=True, print_sum=True):
+  succ_times = 0
+  fail_times = 0
+
+  error_words = [
+    "unhandled signal",
+    "Segmentation fault",
+    "Aborted",
+    "Kernel panic",
+    "unhandled kernel",
+    "unhandlable trap",
+    "Power off",
+    "scause"
+  ]
+  # extract fpga output, get a dict of RESULT
+  begin_pat = re.compile(r'======== BEGIN (?P<spec_name>[\w.-]+) ========')
+  end_pat   = re.compile(r'===== Finish running SPEC2006 =====')
+  time_pat  = re.compile(r'\w+, \d+ \w+ \d+ (?P<time>\d+:\d+:\d+) \+0000')
+
+  with open(file_name) as log:
+    spec_record = {}
+    begin_time = ""
+    end_time = ""
+    spec_name = "linux-begin"
+
+    inside = False
+    fail = False
+    for line in log:
+      begin_match = begin_pat.match(line)
+      end_match = end_pat.match(line)
+      if begin_match:
+        if inside:
+          # re-inside a spec output, which means last not finish
+          begin_time = ""
+        inside = True
+        fail = False
+        spec_name = begin_match.group("spec_name")
+      elif end_match:
+        if not inside:
+          # exit()
+          # ignore error, continue
+          continue
         inside = False
-        spec_record += ","+cal_time(begin_time, end_time)
+        if (begin_time == "" or end_time == ""):
+          exit()
+        result = RESULT(spec_name, begin_time, end_time, True, file_name[1:])
+        succ_times = succ_times + 1
+        if print_result:
+          result.print_result(highlight)
+        spec_record[spec_name] = result
         begin_time = ""
         end_time = ""
-        print(spec_record)
-        if sync_to_file:
-          output_file.write(line)
-          output_file.close()
-    else:
-      for ew in error_words:
-        if (ew in line):
-          if (not fail):
-            fail = True
-            print(f"{turnpink(spec_name)} {turnred('failed')}, please check the log for:")
-          print(turnred(line), end="")
-      if inside:
-        if sync_to_file:
-          output_file.write(line)
-        time_match = time_pat.match(line)
-        if time_match:
-          if (begin_time == ""):
-            begin_time = time_match.group("time")
-          else:
-            end_time = time_match.group("time")
+      else:
+        for ew in error_words:
+          if (ew in line):
+            if (not fail):
+              fail = True
+              inside = False
+              result = RESULT(spec_name, "", "", False, ew+" at "+file_name[1:])
+              fail_times = fail_times + 1
+              if print_result:
+                result.print_result(highlight)
+              spec_record[spec_name] = result
+        if (inside and (not fail)):
+          time_match = time_pat.match(line)
+          if time_match:
+            if (begin_time == ""):
+              begin_time = time_match.group("time")
+            else:
+              end_time = time_match.group("time")
+    if print_result and print_sum:
+      print(f"{succ_times} success, {fail_times} fail")
+    return spec_record
 
-if toShell:
-  if inside:
-    print(f"{count-1} spec finished\nun-finished spec: {turnpink(spec_name)}")
-  else:
-    print(f"{count} spec finished")
+if __name__ == "__main__":
+  parser = argparse.ArgumentParser(description="extract fpga spec output")
+  parser.add_argument("capfiles", metavar="logfilename", type=str, nargs="+", help="fpga capture log")
+  parser.add_argument("--highlight", "-H", default=False, action="store_true", help="highlight some key word")
+  parser.add_argument("--print_filename", "-F", default=False, action="store_true", help="print file name")
+
+  args = parser.parse_args()
+  file_list = args.capfiles
+  for f in file_list:
+    if not os.path.isfile(f):
+      print(f"{f} is not exist")
+      continue
+    if args.print_filename:
+      print(f"*****{f}*****")
+    extract_output(f, print_result=True, highlight=args.highlight, print_sum=args.print_filename)

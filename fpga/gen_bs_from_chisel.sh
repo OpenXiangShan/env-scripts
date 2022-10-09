@@ -13,11 +13,12 @@ echo "generating verilog..."
 cd $xsDir
 export NOOP_HOME=$(pwd)
 export NEMU_HOME=$(pwd)
+make clean
 make verilog -j17
 cd -
 
 echo "generating bitstream..."
-zsh gen_bitstreaitstreaitstreaitstreaitstreaitstreaitstreaitstreaitstream.sh $bsDir $xsDir/build
+zsh gen_bitstream.sh $bsDir $xsDir/build
 
 echo "keep watching bitstream log"
 zsh watch_runme.sh $bsDir

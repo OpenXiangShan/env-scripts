@@ -11,6 +11,7 @@ import re
 import argparse
 
 from send_email import send_email
+from extract_spec import extract_output, RESULT, turnpink, turnred
 
 # globle value, assgined below
 workspace = os.popen("pwd").read().strip()
@@ -24,23 +25,6 @@ count = 0
 spec_base_path = ""
 log_prefix = ""
 fpga_max_list = ["116", "117", "118", "119", "120", "122"]
-
-error_words = [
-  "unhandled signal",
-  "Segmentation fault",
-  "Aborted",
-  "Kernel panic",
-  "unhandled kernel",
-  "unhandlable trap",
-  "Power off",
-  "scause"
-]
-
-def turnpink(str):
-    return "\033[1;35;40m"+str+"\033[0m"
-
-def turnred(str):
-    return "\033[1;31;40m"+str+"\033[0m"
 
 def cal_time(begin_time, end_time):
   begin = datetime.datetime.strptime(begin_time, '%H:%M:%S')
@@ -81,65 +65,6 @@ def get_full_fpga_ip(num):
 
 def output_full_path(fpgaid):
   return log_prefix + "-" + fpgaid + ".cap"
-
-class RESULT(object):
-  def __init__(self, name, begin_time, end_time, success, info):
-    self.name = name
-    self.begin_time = begin_time
-    self.end_time = end_time
-    self.success = success
-    self.info = info
-
-def extract_output(file_name):
-  # extract minicom output, get a dict of RESULT
-  begin_pat = re.compile(r'======== BEGIN (?P<spec_name>[\w.-]+) ========')
-  end_pat   = re.compile(r'===== Finish running SPEC2006 =====')
-  time_pat  = re.compile(r'\w+, \d+ \w+ \d+ (?P<time>\d+:\d+:\d+) \+0000')
-
-  with open(file_name) as log:
-    spec_record = {}
-    begin_time = ""
-    end_time = ""
-    spec_name = "linux-begin"
-
-    inside = False
-    fail = False
-    for line in log:
-      begin_match = begin_pat.match(line)
-      end_match = end_pat.match(line)
-      if begin_match:
-        if inside:
-          # re-inside a spec output, which means last not finish
-          begin_time = ""
-        inside = True
-        fail = False
-        spec_name = begin_match.group("spec_name")
-      elif end_match:
-        if not inside:
-          # exit()
-          # ignore error, continue
-          continue
-        inside = False
-        if (begin_time == "" or end_time == ""):
-          exit()
-        spec_record[spec_name] = RESULT(spec_name, begin_time, end_time, True, file_name[1:])
-        begin_time = ""
-        end_time = ""
-      else:
-        for ew in error_words:
-          if (ew in line):
-            if (not fail):
-              fail = True
-              inside = False
-              spec_record[spec_name] = RESULT(spec_name, "", "", False, ew+" at "+file_name[1:])
-        if (inside and (not fail)):
-          time_match = time_pat.match(line)
-          if time_match:
-            if (begin_time == ""):
-              begin_time = time_match.group("time")
-            else:
-              end_time = time_match.group("time")
-    return spec_record
 
 class FPGA(object):
   def __init__(self, fpga_name, fpga_ip):
@@ -330,7 +255,6 @@ if __name__ == "__main__":
 
   if "env-scripts/fpga" not in workspace:
     print("This script should run at env-scripts/fpga")
-
 
   normal_root_path = "/nfs/home/share/fpga"
   if not args.absolute_path:
