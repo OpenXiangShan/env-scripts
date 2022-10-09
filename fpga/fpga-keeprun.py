@@ -8,29 +8,47 @@ import os
 import time
 import sys
 
-current_pos = 0
 xs_path = sys.argv[1] # xiangshan edition
 result_path = sys.argv[2] # result log
 spec = sys.argv[3]
 fpga = sys.argv[4]
+number = 9999 if (len(sys.argv) <= 5) else int(sys.argv[5])
+
 
 xs_path = "/nfs/home/share/fpga/bits/"+xs_path
 result_path = "/nfs/home/share/fpga/minicom-output/"+result_path
 workspace = os.popen("pwd").read().strip()
+spec = "/nfs/home/share/fpga/" + spec.strip() + "/data.txt"
+
+current_pos = 0
+if os.path.isfile(result_path):
+  current_pos = int(os.popen(f"grep -c '======== END ' {result_path}").read())
+max_pos = current_pos + number
+
+if not os.path.isfile(spec):
+  print(f"Error: {spec} not exists")
+  exit()
+
+print(f"xs:{xs_path} spec:{spec} fpga:{fpga} result_path:{result_path} already:{current_pos} todo_time:{number}")
 
 ssh_prefix = f"ssh zhangzifei@172.28.11.{fpga} \"source ~/.zshrc;"
 ssh_suffix = "\""
-vivado_cmd = ssh_prefix + f"vivado -mode batch -source /nfs/home/share/fpga/0210xsmini/tcl/onboard-ai1-{fpga}.tcl -tclargs " + xs_path + " /nfs/home/share/fpga/" + spec + "/data.txt" + ssh_suffix
+vivado_cmd = ssh_prefix + f"vivado -mode batch -source /nfs/home/share/fpga/0210xsmini/tcl/onboard-ai1-{fpga}.tcl -tclargs " + xs_path + " " + spec + " " + ssh_suffix
 uart_cmd = ssh_prefix + f" python3 {workspace}/uart2cap.py \
     {fpga} /dev/ttyUSB0 115200 {result_path} " + ssh_suffix
 kill_uart_cmd = ssh_prefix + f" python3 {workspace}/stop_uart.py" + ssh_suffix
 kill_vivado_cmd = ssh_prefix + f"python3 {workspace}/stop_vivado.py" + ssh_suffix
 
+
 def wait_fpga_finish():
   while(int(os.popen(f"grep -c '======== END ' {result_path}").read()) < current_pos):
     time.sleep(60)
+  if (current_pos >= max_pos):
+    print(f"Execution Times: {number}(this time) + {max_pos-number}(before) = {max_pos}(total)")
+    exit()
   print("get cmd " + str(current_pos) + " result, run next ('0-0')")
 
+a = input("Continue?")
 
 try:
   print("kill existed vivado")
