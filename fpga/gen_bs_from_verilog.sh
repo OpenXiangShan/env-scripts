@@ -3,7 +3,7 @@
 # from chisel. User should prepare all-ready chisel
 set -v
 
-fpga_dir=/nfs/home/zhangzifei/fpga/fpga-gen
+fpga_dir=/nfs/home/share/fpga/fpga-gen
 
 verilogDir=$1
 bsTag=$2

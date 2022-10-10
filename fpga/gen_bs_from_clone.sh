@@ -2,7 +2,7 @@
 # Usage: zsh/bash gen_xs_bitstream.sh whichbranch whichdir(abs path)
 set -v
 
-fpga_dir=/nfs/home/zhangzifei/fpga/fpga-gen
+fpga_dir=/nfs/home/share/fpga/fpga-gen
 
 xsBranch=$1
 bsTag=$2
