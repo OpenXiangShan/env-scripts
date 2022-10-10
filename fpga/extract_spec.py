@@ -16,7 +16,7 @@ def turnpink(string, highlight = True):
   else:
     return string
 
-def turnred(string, highlight):
+def turnred(string, highlight = True):
   if highlight:
     return "\033[1;31;40m"+string+"\033[0m"
   else:
