@@ -6,7 +6,7 @@ PLDM_CLOCK = clock_gen
 PLDM_CLOCK_DEF = $(REPO_PATH)/scripts/$(PLDM_CLOCK).xel
 PLDM_CLOCK_SRC = $(REPO_PATH)/$(PLDM_BUILD_DIR)/$(PLDM_CLOCK).sv
 
-PLDM_BUILD_FLAGS += -64 -ua +sv +ignoreSimVerCheck -xecompile
+PLDM_BUILD_FLAGS += -64 -ua +1xua +sv +ignoreSimVerCheck -xecompile
 PLDM_BUILD_FLAGS += compilerOptions=$(REPO_PATH)/scripts/compilerOptions.qel
 PLDM_BUILD_FLAGS += +tb_import_systf+fwrite +tb_import_systf+fflush
 PLDM_BUILD_FLAGS += +define+PALLADIUM $(MACRO_FLAGS)
