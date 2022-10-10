@@ -1,11 +1,9 @@
+run 1ns
 date
-xc xt0 zt0 run
+xc on -zt0 -xt0 -tbrun
 date
-#database -open -vcd xs
-#probe -create -all -depth all -database xs
 run
 date
-#database -upload
 xc off
 date
 exit
