@@ -8,6 +8,7 @@ if [ $# -ne 3 ]; then
     echo "Usage: $0 whichbranch whichdir(abs path) whichpatch"
     echo "patch path : $fpga_dir/patch"
     echo "$(ls $fpga_dir/patch) : patch"
+    echo "example: $0 nanhu nanhu-6MBL3 fpga-6MBL3.patch"
     exit 1
 fi
 

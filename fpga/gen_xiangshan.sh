@@ -6,6 +6,7 @@ fpga_dir=/nfs/home/share/fpga/fpga-gen
 if [ $# -ne 3 ]; then
     echo "Usage: $0 whichbranch whichdir(abs path) whichpatch"
     echo "$(ls $fpga_dir/patch) : patch"
+    echo "example: $0 nanhu nanhu-6MBL3 fpga-6MBL3.patch"
     exit 1
 fi
 
