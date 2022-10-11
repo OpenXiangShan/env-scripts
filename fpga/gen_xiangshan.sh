@@ -19,7 +19,7 @@ cd $xsDir
 git checkout $xsBranch
 make init
 
-if [ $xsPatch != "0" ]; then
+if [ $xsPatch != "nopatch" ]; then
     if [ -f $fpga_dir/patch/$xsPatch ]; then
         git apply $fpga_dir/patch/$xsPatch
     else
