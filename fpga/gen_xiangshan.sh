@@ -30,4 +30,5 @@ fi
 
 export NOOP_HOME=$(pwd)
 export NEMU_HOME=$(pwd)
-make verilog -j17
+make verilog -j16
+
