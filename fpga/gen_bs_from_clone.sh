@@ -20,7 +20,7 @@ xsPatch=$3
     
 
 echo "generating verilog..."
-zsh gen_xiangshan.sh $xsBranch $xsDir $xsPatch
+bash gen_xiangshan.sh $xsBranch $xsDir $xsPatch
 if [ $? -ne 0 ]; then
     echo "gen_xiangshan.sh failed"
     exit 1
