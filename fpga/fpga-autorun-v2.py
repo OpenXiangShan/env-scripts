@@ -251,6 +251,7 @@ if __name__ == "__main__":
   parser.add_argument("--output-path", "-O", default="/nfs/home/share/fpga/minicom-output", type=str, help="path to fpga uart output")
   parser.add_argument("--confirm", "-C", action="store_true", default=False, help="confirm from command, not keyboard")
 
+  print("Parsing Args...")
   args = parser.parse_args()
 
   if "env-scripts/fpga" not in workspace:

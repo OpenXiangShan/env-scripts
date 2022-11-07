@@ -27,7 +27,7 @@ mod_array=(${xsPatch//-/ })
 for mod in ${mod_array[@]}
 do
   if [ -f $fpga_dir/patch/$mod.patch ]; then
-    git apply $fpga_dir/patch/$mod.patch
+    git apply $fpga_dir/patch/$mod.patch --allow-empty
   else
     echo "$mod.patch not found at $fpga_dir/patch"
     exit 1
