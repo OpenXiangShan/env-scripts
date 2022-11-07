@@ -18,10 +18,13 @@ do
   if [ -f $bs_log ] && [ $(grep -c $end_mw $bs_log) -eq 1 ]; then
     echo "End   time: $(date)"
     echo $end_mw
+    echo "Please cp it manually: $bs_path"
+    python3 send_email_standalone.py "bitstream generated at dir $bs_path" " "
     exit 0
   elif [ -f $bs_log ] && [ $(grep -c $error_mw $bs_log) -eq 1 ]; then
     echo "End   time: $(date)"
     echo $error_mw
+    python3 send_email_standalone.py "bitstream generated failed at dir $bs_path" " "
     exit 1
   elif [ -f $bs_log ]; then
     echo -ne "Now   time: $(date) & runme.log exists\r"
