@@ -1,5 +1,6 @@
-#! /usr/bin/env zsh
-# Usage: zsh/bash gen_xs_bitstream.sh whichbranch whichdir(abs path) whichpatch
+#! /usr/bin/env bash
+# usage: bash gen_xiangshan.sh $xsBranch $xsDir $xsPatch
+# NOTE: use bash, not zsh
 set -v
 
 fpga_dir=/nfs/home/share/fpga/fpga-gen
@@ -33,7 +34,3 @@ do
     exit 1
   fi
 done
-
-export NOOP_HOME=$(pwd)
-export NEMU_HOME=$(pwd)
-make verilog -j16
