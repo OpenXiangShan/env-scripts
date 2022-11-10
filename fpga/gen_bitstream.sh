@@ -6,7 +6,7 @@ set -v
 bsDir=$1
 verilogDir=$2
 
-cp -r /nfs/home/share/fpga/vivado/scripts_v2 $bsDir
+cp -r /nfs/home/share/fpga/fpga-gen/scripts_nh_100m $bsDir
 cd $bsDir
 rm -rf build
 cp -r $verilogDir build

@@ -7,7 +7,6 @@ fpga_dir=/nfs/home/share/fpga/fpga-gen
 
 xsDir=$1
 bsTag=$2
-bsDir=$fpga_dir/bitgen-$bsTag
 
 echo "generating verilog..."
 cd $xsDir
@@ -17,29 +16,4 @@ make clean
 make verilog -j17
 cd -
 
-echo "generating bitstream..."
-zsh gen_bitstream.sh $bsDir $xsDir/build
-if [ $? -ne 0 ]; then
-    echo "gen_bitstream.sh failed"
-    python3 send_email_standalone.py "bitstream generated failed at gen bitstream" "failed"
-    exit 1
-fi
-
-echo "keep watching bitstream log"
-zsh watch_runme.sh $bsDir
-if [ $? -ne 0 ]; then
-    echo "watch_runme.sh failed"
-    python3 send_email_standalone.py "bitstream generated failed at watch runme" "failed"
-    exit 1
-fi
-
-echo "cp bitstream to $bsTag"
-zsh cp_bitstream.sh $bsDir $bsTag
-if [ $? -ne 0 ]; then
-    echo "cp_bitstream.sh failed"
-    python3 send_email_standalone.py "bitstream generated failed at cp bitstream" "failed"
-    exit 1
-fi
-
-echo "send email"
-python3 send_email_standalone.py "bitstream generated $bsTag" "bsDir: $bsDir"
+zsh gen_bs_from_verilog.sh $xsDir/build $bsTag

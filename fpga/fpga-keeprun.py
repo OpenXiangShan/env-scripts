@@ -2,17 +2,19 @@
 # Param
 # First: xiangshan path
 # Second: result log
-# TLDR: python3 fpga-keeprun.py v111 /nfs/home/share/fpga/minicom-output/v111-gcc_166-116.log xsbins50m-bk-md5/gcc_166 116
+# TLDR: python3 fpga-keeprun.py v111 xsbins50m-bk-md5/gcc_166 116
 
 import os
 import time
 import sys
 
+from send_email import send_email
+
 xs_path = sys.argv[1] # xiangshan edition
-result_path = sys.argv[2] # result log
-spec = sys.argv[3]
-fpga = sys.argv[4]
-number = 9999 if (len(sys.argv) <= 5) else int(sys.argv[5])
+spec = sys.argv[2]
+fpga = sys.argv[3]
+result_path = xs_path+"-"+spec.strip().split("/")[0]+"-"+spec.strip().split("/")[1]+"-"+fpga+".cap"
+number = 9999 if (len(sys.argv) <= 4) else int(sys.argv[4])
 
 
 xs_path = "/nfs/home/share/fpga/bits/"+xs_path
@@ -45,6 +47,8 @@ def wait_fpga_finish():
     time.sleep(60)
   if (current_pos >= max_pos):
     print(f"Execution Times: {number}(this time) + {max_pos-number}(before) = {max_pos}(total)")
+    send_email(f"fpga keeprun {sys.argv[1]} run {sys.argv[2]} for {number} times on {fpga}", "log path:{result_path}")
+    print("send email success")
     exit()
   print("get cmd " + str(current_pos) + " result, run next ('0-0')")
 
@@ -65,10 +69,14 @@ try:
     os.system(f"echo run command {current_pos}: " + vivado_cmd)
     os.system("date")
     os.system(vivado_cmd)
+    print(f"fpga keeprun {sys.argv[1]} run {sys.argv[2]} on {fpga} pos: {current_pos} max_pos: {max_pos} number: {number}")
+    print(f"log path: {result_path}")
     current_pos = current_pos + 1
 finally:
   print("kill vivado")
   os.system(kill_vivado_cmd)
   print("kill uart")
   os.system(kill_uart_cmd)
+  print(f"fpga keeprun {sys.argv[1]} run {sys.argv[2]} for {number} times on {fpga}")
+  print(f"log path:{result_path}")
   print("stopped")

@@ -2,7 +2,7 @@
 # Param
 # First: xiangshan path
 # Second: result log
-# TLDR: python3 fpga-keeprun.py v111 /nfs/home/share/fpga/minicom-output/v111-gcc_166-116.log xsbins50m-bk-md5/gcc_166 116
+# TLDR: python3 fpga-keeprun.py v111 /nfs/home/share/fpga/minicom-output/v111-gcc_166-116.log /nfs/home/share/spec_gcc.txt 116
 
 import os
 import time
@@ -36,8 +36,8 @@ print("watch uart")
 os.popen(uart_cmd)
 print("run command : " + vivado_cmd)
 os.system("date")
-os.system(vivado_cmd)
-print("keep tail foga output, please don't kill the script")
+os.popen(vivado_cmd)
+print("keep tail fpga output, please don't kill the script")
 os.system(keep_tail)
 os.system(kill_uart_cmd)
 os.system
