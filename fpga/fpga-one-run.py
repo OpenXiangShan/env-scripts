@@ -26,18 +26,20 @@ kill_uart_cmd = ssh_prefix + f" python3 {workspace}/stop_uart.py" + ssh_suffix
 kill_vivado_cmd = ssh_prefix + f"python3 {workspace}/stop_vivado.py" + ssh_suffix
 keep_tail = f"tail -f {result_path}"
 
-print("kill existed vivado")
-os.system(kill_vivado_cmd)
-print("kill existed uart")
-os.system(kill_uart_cmd)
-if not os.path.isfile(result_path):
-  os.system(f"touch {result_path}")
-print("watch uart")
-os.popen(uart_cmd)
-print("run command : " + vivado_cmd)
-os.system("date")
-os.popen(vivado_cmd)
-print("keep tail fpga output, please don't kill the script")
-os.system(keep_tail)
-os.system(kill_uart_cmd)
-os.system
+try:
+  print("kill existed vivado")
+  os.system(kill_vivado_cmd)
+  print("kill existed uart")
+  os.system(kill_uart_cmd)
+  if not os.path.isfile(result_path):
+    os.system(f"touch {result_path}")
+  print("watch uart")
+  os.popen(uart_cmd)
+  print("run command : " + vivado_cmd)
+  os.system("date")
+  os.popen(vivado_cmd)
+  print("keep tail fpga output, please don't kill the script")
+  os.system(keep_tail)
+finally:
+  os.system(kill_vivado_cmd)
+  os.system(kill_uart_cmd)

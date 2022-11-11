@@ -1,5 +1,7 @@
 #! /usr/bin/env zsh
-# Usage: zsh/bash gen_xs_bitstream.sh whichbranch whichdir(abs path) whichpatch
+# Usage: zsh/bash me.sh xsbranch(or commitId) bitStreamTag patch-list
+# e.g. zsh me.sh nanhu v1111-6MBL3-90delay 6MBL3-90delay
+# NOTE: patch-list will be split by "-"
 set -v
 
 fpga_dir=/nfs/home/share/fpga/fpga-gen
