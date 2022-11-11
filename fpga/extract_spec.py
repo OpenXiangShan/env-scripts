@@ -42,6 +42,7 @@ def extract_output(file_name, print_result=False, highlight=True, print_sum=True
   fail_times = 0
 
   error_words = [
+    "internal error",
     "unhandled signal",
     "Segmentation fault",
     "Aborted",

@@ -1,6 +1,7 @@
 #! /usr/bin/env bash
 # usage: bash gen_xiangshan.sh $xsBranch $xsDir $xsPatch
 # NOTE: use bash, not zsh
+#       git clone xs, make init and apply patch
 set -v
 
 fpga_dir=/nfs/home/share/fpga/fpga-gen

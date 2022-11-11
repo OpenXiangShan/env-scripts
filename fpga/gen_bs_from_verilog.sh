@@ -1,5 +1,5 @@
 #! /usr/bin/env zsh
-# Usage: zsh/bash gen_xs_bitstream.sh whichbranch whichdir(abs path)
+# Usage: zsh/bash me.sh verilogDir bitStreamTag
 # from chisel. User should prepare all-ready chisel
 set -v
 
