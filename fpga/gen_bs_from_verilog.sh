@@ -9,6 +9,11 @@ verilogDir=$1
 bsTag=$2
 bsDir=$fpga_dir/bitgen-$bsTag
 
+if [ ! -f $verilogDir/XSTop.v ]; then
+  echo "XSTop.v not found, maybe add /build to first param"
+  exit
+fi
+
 echo "generating bitstream..."
 zsh gen_bitstream.sh $bsDir $verilogDir
 if [ $? -ne 0 ]; then

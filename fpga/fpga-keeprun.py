@@ -13,7 +13,7 @@ from send_email import send_email
 xs_path = sys.argv[1] # xiangshan edition
 spec = sys.argv[2]
 fpga = sys.argv[3]
-result_path = xs_path+"-"+spec.strip().split("/")[0]+"-"+spec.strip().split("/")[1]+"-"+fpga+".cap"
+result_path = xs_path+"-kr-"+spec.strip().split("/")[0]+"-"+spec.strip().split("/")[1]+"-"+fpga+".cap"
 number = 9999 if (len(sys.argv) <= 4) else int(sys.argv[4])
 
 
