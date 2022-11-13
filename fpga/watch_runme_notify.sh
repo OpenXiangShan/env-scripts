@@ -24,7 +24,13 @@ do
   elif [ -f $bs_log ] && [ $(grep -c $error_mw $bs_log) -eq 1 ]; then
     echo "End   time: $(date)"
     echo $error_mw
-    python3 send_email_standalone.py "bitstream generated failed at dir $bs_path" " "
+    python3 send_email_standalone.py "bitstream generated failed at dir $bs_path with drc error" " "
+    exit 1
+  elif [ -f $bs_log ] && [ $(grep -c $exit_mw $bs_log) -eq 1 ]; then
+    echo "End   time: $(date)"
+    echo $exit_mw
+    echo "Vivado exit with unexpected errors, please check $bs_log"
+    python3 send_email_standalone.py "bitstream generated failed at dir $bs_path with unknown error" " "
     exit 1
   elif [ -f $bs_log ]; then
     echo -ne "Now   time: $(date) & runme.log exists\r"
