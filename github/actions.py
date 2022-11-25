@@ -4,7 +4,10 @@ import os
 import sys
 import time
 
-sys.path.append('../perf')
+script_path = os.path.realpath(__file__)
+perf_dir = os.path.join(os.path.dirname(script_path),"../perf")
+sys.path.append(perf_dir)
+
 import perf
 
 from github import Github
