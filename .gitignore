@@ -2,6 +2,7 @@
 !vcs/testbench/SimMMIO/*.v
 !vcs/testbench/AXI4RAM/*.v
 !vcs/testbench/*.v
+!requirements.txt
 
 __pycache__
 
