@@ -47,27 +47,42 @@ module FlashHelper (
     n_read = $fread(flash_mem, flash_image);
     $fclose(flash_image);
     if (!n_read) begin
-      $fatal(1, "Flash: cannot load image from %s.", `FLASH_IMAGE_S));
+      $fatal(1, "Flash: cannot load image from %s.", `FLASH_IMAGE_S);
     end
     else begin
       $display("Flash: load %d bytes from %s.", n_read, `FLASH_IMAGE_S);
     end
 `else
-    // Used for pc = 0x8000_0000
-    // flash_mem[0] = 64'h01f292930010029b;
-    // Used for pc = 0x20_0000_0000
-    flash_mem[ 0] = 8'h9b;
-    flash_mem[ 1] = 8'h02;
-    flash_mem[ 2] = 8'h10;
-    flash_mem[ 3] = 8'h00;
-    flash_mem[ 4] = 8'h93;
-    flash_mem[ 5] = 8'h92;
-    flash_mem[ 6] = 8'h52;
-    flash_mem[ 7] = 8'h02;
-    flash_mem[ 8] = 8'h67;
-    flash_mem[ 9] = 8'h80;
-    flash_mem[10] = 8'h02;
-    flash_mem[11] = 8'h00;
+    `ifdef NANHU
+      // Used for pc = 0x8000_0000
+      // flash_mem[0] = 64'h01f292930010029b
+      // flash_mem[1] = 64'h00028067
+      flash_mem[ 0] = 8'h9b;
+      flash_mem[ 1] = 8'h02;
+      flash_mem[ 2] = 8'h10;
+      flash_mem[ 3] = 8'h00;
+      flash_mem[ 4] = 8'h93;
+      flash_mem[ 5] = 8'h92;
+      flash_mem[ 6] = 8'hf2;
+      flash_mem[ 7] = 8'h01;
+      flash_mem[ 8] = 8'h67;
+      flash_mem[ 9] = 8'h80;
+      flash_mem[10] = 8'h02;
+    `else
+      // Used for pc = 0x20_0000_0000
+      flash_mem[ 0] = 8'h9b;
+      flash_mem[ 1] = 8'h02;
+      flash_mem[ 2] = 8'h10;
+      flash_mem[ 3] = 8'h00;
+      flash_mem[ 4] = 8'h93;
+      flash_mem[ 5] = 8'h92;
+      flash_mem[ 6] = 8'h52;
+      flash_mem[ 7] = 8'h02;
+      flash_mem[ 8] = 8'h67;
+      flash_mem[ 9] = 8'h80;
+      flash_mem[10] = 8'h02;
+      flash_mem[11] = 8'h00;
+    `endif
 `endif // FLASH_IMAGE
   end
 
