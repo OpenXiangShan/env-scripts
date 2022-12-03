@@ -110,7 +110,7 @@ def get_master_commits(token, number=10, with_message=True):
 def get_pull_request(repo, head_sha):
     pull_requests = repo.get_pulls(state="open")
     for pr in pull_requests:
-        if pr.head.sha == head_sha:
+        if pr.base.label.split(":")[-1] == "master" and pr.head.sha == head_sha:
             return True, pr
     return False, None
 
