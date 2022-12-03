@@ -44,7 +44,10 @@ class PerfCounters(object):
                 # print(f"Some counters for {manip.name} is not found. Please check it.")
                 continue
             numbers = map(lambda name: int(self[name]), manip.counters)
-            self.counters[manip.name] = str(manip.func(*numbers))
+            try:
+                self.counters[manip.name] = str(manip.func(*numbers))
+            except:
+                pass
 
     def get_counter(self, name, strict=False):
         key = self.counters.get(name, "")
@@ -439,9 +442,12 @@ def pick(include_names, name):
 def perf_work(manip, work_queue, perf_queue):
   while not work_queue.empty():
     filename = work_queue.get()
-    perf = PerfCounters(filename)
-    perf.add_manip(manip)
-    perf_queue.put(perf)
+    try:
+      perf = PerfCounters(filename)
+      perf.add_manip(manip)
+      perf_queue.put(perf)
+    except:
+      perf_queue.put(None)
 
 def main(pfiles, output_file, include_names, verbose=False, jobs = 1):
     all_perf = []
@@ -463,9 +469,9 @@ def main(pfiles, output_file, include_names, verbose=False, jobs = 1):
         pbar.display(f"Processing files with {jobs} threads ...", 0)
       perf = perf_queue.get()
       perf_lst.append(perf)
-      if perf.counters:
+      if perf and perf.counters:
         all_perf.append(perf)
-      else:
+      elif perf:
         pbar.write(f"{perf.filename} skipped because it is empty.")
       pbar.update(1)
     for p in process_lst:
