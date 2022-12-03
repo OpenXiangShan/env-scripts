@@ -59,12 +59,15 @@ def get_actions_data(run_numbers, commits, messages):
         for filename in os.listdir(perf_path):
             if filename.endswith(".log"):
                 benchmark = filename[:-4]
-                counters = perf.PerfCounters(os.path.join(perf_path, filename))
-                counters.add_manip(get_all_manip())
-                benchmarks.append(benchmark)
-                results[commit][benchmark] = "{:.3f}".format(float(counters["global.IPC"]))
-                if with_message:
-                    results[commit]["message"] = messages[i]
+                try:
+                    counters = perf.PerfCounters(os.path.join(perf_path, filename))
+                    counters.add_manip(get_all_manip())
+                    benchmarks.append(benchmark)
+                    results[commit][benchmark] = "{:.3f}".format(float(counters["global.IPC"]))
+                    if with_message:
+                        results[commit]["message"] = messages[i]
+                except:
+                    continue
     benchmarks = sorted(list(set(benchmarks)))
     if with_message:
         benchmarks = ["message"] + benchmarks
@@ -163,4 +166,3 @@ if __name__ == "__main__":
     args = parser.parse_args()
 
     main(args.token, args.output, args.number, args.always_on)
-
