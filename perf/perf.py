@@ -423,7 +423,10 @@ def merge_perf_counters(all_perf, verbose=False):
     if suffix_length > 0:
         filenames = list(map(lambda name: name[:-suffix_length], filenames))
     all_sources = filenames
-    yield [""] + all_sources
+
+    # Yield first row as header, use header.cases as [0] to avoid conflict in pick()
+    yield ["header.cases"] + all_sources
+
     pbar = tqdm(total = len(all_names), disable = not verbose, position = 3)
     for name in all_names:
         if verbose:
@@ -432,7 +435,12 @@ def merge_perf_counters(all_perf, verbose=False):
         yield [name] + list(map(lambda perf: perf.get_counter(name, strict=True), all_perf))
 
 def pick(include_names, name):
+    '''
+        Filter output rows by name
+    '''
     if len(include_names) == 0:
+        return True
+    if name == "header.cases": # First row is header, should always be true
         return True
     for r in include_names:
         if r.search(name) != None:
