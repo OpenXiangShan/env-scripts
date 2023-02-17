@@ -79,6 +79,8 @@ class GCPT(object):
     return int(round(self.num_cycles / self.num_seconds))
 
   def get_ipc(self):
+    if self.num_cycles == 0:
+      return -1
     return round(self.num_instrs / self.num_cycles, 3)
 
   def state_str(self):

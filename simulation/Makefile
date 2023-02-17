@@ -30,6 +30,12 @@ ifeq ($(SIM_UART),1)
 MACRO_FLAGS += +define+SIM_UART
 endif
 
+# nanhu or Southlake
+NANHU ?= 0
+ifeq ($(NANHU),1)
+MACRO_FLAGS += +define+NANHU
+endif
+
 include vcs.mk
 include palladium.mk
 
