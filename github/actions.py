@@ -4,7 +4,10 @@ import os
 import sys
 import time
 
-sys.path.append('../perf')
+script_path = os.path.realpath(__file__)
+perf_dir = os.path.join(os.path.dirname(script_path),"../perf")
+sys.path.append(perf_dir)
+
 import perf
 
 from github import Github
@@ -56,12 +59,15 @@ def get_actions_data(run_numbers, commits, messages):
         for filename in os.listdir(perf_path):
             if filename.endswith(".log"):
                 benchmark = filename[:-4]
-                counters = perf.PerfCounters(os.path.join(perf_path, filename))
-                counters.add_manip(get_all_manip())
-                benchmarks.append(benchmark)
-                results[commit][benchmark] = "{:.3f}".format(float(counters["global.IPC"]))
-                if with_message:
-                    results[commit]["message"] = messages[i]
+                try:
+                    counters = perf.PerfCounters(os.path.join(perf_path, filename))
+                    counters.add_manip(get_all_manip())
+                    benchmarks.append(benchmark)
+                    results[commit][benchmark] = "{:.3f}".format(float(counters["global.IPC"]))
+                    if with_message:
+                        results[commit]["message"] = messages[i]
+                except:
+                    continue
     benchmarks = sorted(list(set(benchmarks)))
     if with_message:
         benchmarks = ["message"] + benchmarks
@@ -107,7 +113,7 @@ def get_master_commits(token, number=10, with_message=True):
 def get_pull_request(repo, head_sha):
     pull_requests = repo.get_pulls(state="open")
     for pr in pull_requests:
-        if pr.head.sha == head_sha:
+        if pr.base.label.split(":")[-1] == "master" and pr.head.sha == head_sha:
             return True, pr
     return False, None
 
@@ -160,4 +166,3 @@ if __name__ == "__main__":
     args = parser.parse_args()
 
     main(args.token, args.output, args.number, args.always_on)
-

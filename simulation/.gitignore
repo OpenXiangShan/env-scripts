@@ -1,5 +1,9 @@
 src/*
 !src/tb_top.v
+!src/FlashHelper.v
+!src/RAMHelper.v
+!src/SDHelper.v
+!src/SimJTAG.v
 images/*
 !images/ram.bin
 
