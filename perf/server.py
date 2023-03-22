@@ -51,7 +51,7 @@ class Server(object):
 
     with open(stdout_file, "w") as stdout, open(stderr_file, "w") as stderr:
       proc = subprocess.Popen(run_cmd, stdout=stdout, stderr=stderr, preexec_fn=os.setsid)
-      time.sleep(1)
+      time.sleep(5)
     self.pending_proc.append((test_name, proc, (start, end)))
     if (len(self.pending_proc) > (128 // threads)):
       print(f"Server {self.ip} has more than {len(self.pending_proc)} proc. Is it OK?")
