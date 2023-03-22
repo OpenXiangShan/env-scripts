@@ -3,7 +3,7 @@ import psutil
 def get_free_cores(n):
   # SMT is not allowed
   num_core = psutil.cpu_count(logical=False)
-  core_usage = psutil.cpu_percent(interval=2, percpu=True)
+  core_usage = psutil.cpu_percent(interval=5, percpu=True)
   # print("Core Usage: ",core_uage)
   num_window = num_core // n
   for i in range(num_window):
