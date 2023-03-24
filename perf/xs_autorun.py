@@ -164,11 +164,17 @@ tasks_dir = "SPEC06_EmuTasks_10_22_2021"
 def get_perf_base_path(xs_path):
   return os.path.join(xs_path, tasks_dir)
 
-def xs_run(workloads, xs_path, warmup, max_instr, threads):
+def xs_run(workloads, xs_path, warmup, max_instr, threads, cmdline_opt):
   emu_path = os.path.join(xs_path, "build/emu")
   nemu_so_path = os.path.join(xs_path, "ready-to-run/riscv64-nemu-interpreter-so")
   #nemu_so_path = os.path.join(xs_path, "ready-to-run/riscv64-spike-so")
-  base_arguments = [emu_path, '--diff', nemu_so_path, '--dump-tl', '--enable-fork', '-W', str(warmup), '-I', str(max_instr), '-i']
+  base_arguments = []
+  if cmdline_opt == "nanhu":
+    base_arguments = [emu_path, '--diff', nemu_so_path, '--dump-tl', '--enable-fork', '-W', str(warmup), '-I', str(max_instr), '-i']
+  elif cmdline_opt == "kunminghu":
+    base_arguments = [emu_path, '--diff', nemu_so_path, '--dump-db', '--enable-fork', '-W', str(warmup), '-I', str(max_instr), '-i']
+  else:
+    sys.exit("unsupported xs emu command line options, use nanhu or kunminghu")
   # base_arguments = [emu_path, '-W', str(warmup), '-I', str(max_instr), '-i']
   proc_count, finish_count = 0, 0
   max_pending_proc = 128 // threads
@@ -391,6 +397,7 @@ if __name__ == "__main__":
   parser.add_argument('json_path', metavar='json_path', type=str,
                       help='path to gcpt json')
   parser.add_argument('--xs', help='path to xs')
+  parser.add_argument('--cmdline-opt', default="nanhu", type=str, help='xs emu command line options, nanhu or kunminghu')
   parser.add_argument('--ref', default=None, type=str, help='path to ref')
   parser.add_argument('--warmup', '-W', default=20000000, type=int, help="warmup instr count")
   parser.add_argument('--max-instr', '-I', default=40000000, type=int, help="max instr count")
@@ -460,4 +467,4 @@ if __name__ == "__main__":
     print("First:", gcpt[0])
     print("Last: ", gcpt[-1])
     input("Please check and press enter to continue")
-    xs_run(gcpt, args.xs, args.warmup, args.max_instr, args.threads)
+    xs_run(gcpt, args.xs, args.warmup, args.max_instr, args.threads, args.cmdline_opt)
