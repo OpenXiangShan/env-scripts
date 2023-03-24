@@ -4,6 +4,9 @@ import argparse
 import os
 import re
 
+import perfcounter_list.nanhu_example_pc as nanhu_example
+import perfcounter_list.nanhu_memblock_pc  as nanhu_memblock
+
 # GCPT perf counter collection
 # Input is all the gcpt. This scripts will add all the gcpt into each spec
 # and output the sum
@@ -28,8 +31,8 @@ import re
 
 path_re = re.compile(r'(?P<spec_name>\w+((_\w+)|(_\w+\.\w+)|-\d+|))_(?P<time_point>\d+)_(?P<weight>0\.\d+)')
 
-root_path = "/nfs/home/share/EmuTasks/SPEC06_EmuTasks_08_15_2022"
-spec_list_path = "/nfs/home/zhangzifei/work/env-scripts/fpga/spec06-all-name-new.txt"
+root_path = "/nfs/home/share/EmuTasks/SPEC06_EmuTasks_2022_12_22"
+spec_list_path = "/nfs/home/wanghuaqiang/xs-env/env-scripts/fpga/spec06-all-name-new.txt"
 
 cpt_list = os.listdir(root_path)
 cpt_list.remove("git_commit.txt")
@@ -47,18 +50,15 @@ spec_record = {}
 # selected perf counter
 # 0: key words of perf counter
 # 1: name of perf counter
-perf_conter = [
+# selected perf counter is defined in perfcounter_list
+
+basic_perf_conter = [
   ["ctrlBlock.rob: commitInstr, ", "instrCnt"],
   ["ctrlBlock.rob: clock_cycle, ", "clockCycle"],
-  ["ctrlBlock.fusionDecoder: fused_instr, ", "fused_instr"],
-  ["ctrlBlock.rename: fused_lui_load_instr_count, ", "fused_lui_load"],
-  ["ctrlBlock.rename: in,   ", "rename_in"],
-  ["ctrlBlock.rename: move_instr_count,  ", "move_elimination"],
-  ["ctrlBlock.rob: fmac_instr_cnt_fma,  ", "fmac_instr_cnt"],
-  ["ctrlBlock.rob: fmac_latency_execute_fma,   ", "fmac_latency_execute"],
-  ["ctrlBlock.rob: commitInstrMoveElim,   ", "moveElim"],
-  ["ctrlBlock.rob: commitInstrFused,  ", "commitFused"]
 ]
+
+perf_conter = basic_perf_conter + nanhu_example.get_perf_counter() + nanhu_memblock.get_perf_counter()
+# perf_conter = basic_perf_conter + nanhu_memblock_pc.perf_counter
 
 class SPEC(object):
   def __init__(self, spec_name):
@@ -121,6 +121,8 @@ for key in cpt_record.keys():
 # normalization
 for s in spec_list:
   spec = spec_record[s]
+  if spec.weight_sum == 0:
+    print(s+" weight sum == 0")
   for pc in perf_conter:
     spec.record[pc[1]] = spec.record[pc[1]] / spec.weight_sum
 
@@ -130,21 +132,17 @@ def iprint(str):
 print("spec", end="")
 for pc in perf_conter:
   iprint(pc[1])
-print(",fused+luiload,fused,luiload,move,fmalatency,commitFuesd")
-
+print(",ipc", end="")
+print(nanhu_example.get_perf_counter_name(), end="")
+print(nanhu_memblock.get_perf_counter_name(), end="")
+print()
 
 for s in spec_list:
   spec = spec_record[s]
   print(spec.name, end="")
   for pc in perf_conter:
     iprint("%.2f"%(spec.record[pc[1]]))
-  iprint("%.4f"%((spec.record["fused_instr"]+spec.record["fused_lui_load"])/spec.record["rename_in"]))
-  iprint("%.4f"%(spec.record["fused_instr"] / spec.record["rename_in"]))
-  iprint("%.4f"%(spec.record["fused_lui_load"]/spec.record["rename_in"]))
-  iprint("%.4f"%(spec.record["moveElim"] / spec.record["instrCnt"]))
-  if (spec.record["fmac_instr_cnt"] == 0):
-    iprint("0")
-  else:
-    iprint("%.4f"%(spec.record["fmac_latency_execute"]/spec.record["fmac_instr_cnt"]))
-  iprint("%.4f"%(spec.record["commitFused"]/spec.record["instrCnt"]))
+  iprint("%.4f"%(spec.record["instrCnt"] / spec.record["clockCycle"]))
+  nanhu_example.print_extra_counter(spec)
+  nanhu_memblock.print_extra_counter(spec)
   print()
