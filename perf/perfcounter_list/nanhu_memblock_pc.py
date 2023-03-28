@@ -162,8 +162,9 @@ memblock_extracounter_nanhu_list = [
   "st_tlb_hit_rate_1stissue",
   "lq_full_rate",
   "sq_full_rate",
-  "sq_vaddr_match_really_failed",
+  "dc_missq_full_rate",
   "sbuffer_full_rate",
+  "sq_vaddr_match_really_failed",
   "sbuffer_allocate_rate",
   "sbuffer_merge_rate",
   "st_dcache_stall_rate",
@@ -175,7 +176,6 @@ memblock_extracounter_nanhu_list = [
   "dc_miss_merge_rate",
   "dc_miss_reject_rate",
   "dc_miss_fire_merge_rate",
-  "dc_missq_full_rate",
 ]
 
 perf_counter = memblock_loadpipe_perfcounter_nanhu + memblock_storepipe_perfcounter_nanhu + memblock_lq_perfcounter_nanhu + memblock_sq_perfcounter_nanhu + memblock_sbuffer_perfcounter_nanhu + memblock_dcache_perfcounter_nanhu
@@ -216,15 +216,17 @@ def print_extra_counter(spec):
   # ldst_vio_pki
   iprint("%.4f"%(spec.record["lq_rollback"] / spec.record["instrCnt"] * 1000))
   # st_tlb_hit_rate_1stissue
-  iprint("%.4f"%((spec.record["st0_s1_tlb_miss_first_issue"]+spec.record["st1_s1_tlb_miss_first_issue"]) / (spec.record["st0_s1_in_fire_first_issue"]+spec.record["st1_s1_in_fire_first_issue"])))
+  iprint("%.4f"%(1-(spec.record["st0_s1_tlb_miss_first_issue"]+spec.record["st1_s1_tlb_miss_first_issue"]) / (spec.record["st0_s1_in_fire_first_issue"]+spec.record["st1_s1_in_fire_first_issue"])))
   # lq_full_rate
   iprint("%.4f"%(spec.record["lq_full"] / spec.record["clockCycle"]))
   # sq_full_rate
   iprint("%.4f"%(spec.record["sq_full"] / spec.record["clockCycle"]))
-  # sq_vaddr_match_really_failed
-  iprint("%.4f"%(spec.record["sq_vaddr_match_really_failed"]))
   # sbuffer_full_rate
   iprint("%.4f"%(spec.record["wcb_full"] / spec.record["clockCycle"]))
+  # dc_missq_full_rate
+  iprint("%.4f"%(spec.record["dcmq_full"] / spec.record["clockCycle"]))
+  # sq_vaddr_match_really_failed
+  iprint("%.4f"%(spec.record["sq_vaddr_match_really_failed"]))
   # sbuffer_allocate_rate
   iprint("%.4f"%(spec.record["wcb_sbuffer_newline"] / spec.record["wcb_sbuffer_req_fire"]))
   # sbuffer_merge_rate
@@ -247,7 +249,7 @@ def print_extra_counter(spec):
   iprint("%.4f"%(spec.record["dcmq_miss_req_reject_load"] / (spec.record["dcmq_miss_req_fire"]+spec.record["dcmq_miss_req_reject_load"])))
   # dc_miss_fire_merge_rate
   iprint("%.4f"%(spec.record["dcmq_miss_req_merge_load"] / spec.record["dcmq_miss_req_fire"]))
-  # dc_missq_full_rate
-  iprint("%.4f"%(spec.record["dcmq_full"] / spec.record["clockCycle"]))
+  # dc_probeq_full_rate： TODO
+  # dc_wbq_full_rate： TODO
 
   # iprint("%.4f"%(spec.record["instrCnt"] / spec.record["clockCycle"]))
