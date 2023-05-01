@@ -434,13 +434,15 @@ def merge_perf_counters(all_perf, verbose=False):
             pbar.update(1)
         yield [name] + list(map(lambda perf: perf.get_counter(name, strict=True), all_perf))
 
-def pick(include_names, name):
+def pick(include_names, name, include_manip = False):
     '''
         Filter output rows by name
     '''
     if len(include_names) == 0:
         return True
     if name == "header.cases": # First row is header, should always be true
+        return True
+    if include_manip and name.startswith("global."):
         return True
     for r in include_names:
         if r.search(name) != None:
@@ -457,7 +459,7 @@ def perf_work(manip, work_queue, perf_queue):
     except:
       perf_queue.put(None)
 
-def main(pfiles, output_file, include_names, verbose=False, jobs = 1):
+def main(pfiles, output_file, include_names, include_manip=False, verbose=False, jobs = 1):
     all_perf = []
     all_manip = get_all_manip()
     files_count = len(pfiles)
@@ -488,7 +490,7 @@ def main(pfiles, output_file, include_names, verbose=False, jobs = 1):
     with open(output_file, 'w') as csvfile:
         csvwriter = csv.writer(csvfile)
         for output_row in merge_perf_counters(all_perf, verbose):
-            if pick(include_names, output_row[0]):
+            if pick(include_names, output_row[0], include_manip):
                 csvwriter.writerow(output_row)
     pbar.write(f"Finished processing {len(all_perf)} non-empty files.")
 
@@ -529,6 +531,7 @@ if __name__ == "__main__":
     parser.add_argument('--verbose', '-v', action='store_true', default=False,
         help="show processing logs")
     parser.add_argument('--include', '-I', action='extend', nargs='+', type=str, help="select given counters (using re)")
+    parser.add_argument('--manip', '-M', action='store_true', default=False, help="whether inlcude the manipulations in the res (for --include args)")
     parser.add_argument('--jobs', '-j', default=1, type=int, help="processing files in 'j' threads")
 
     args = parser.parse_args()
@@ -557,5 +560,4 @@ if __name__ == "__main__":
 
     print(f"output file: {args.output}")
 
-    main(args.pfiles, args.output, args.include, args.verbose, args.jobs)
-
+    main(args.pfiles, args.output, args.include, args.manip, args.verbose, args.jobs)
