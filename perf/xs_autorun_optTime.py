@@ -517,5 +517,5 @@ if __name__ == "__main__":
     print("All:  ", len(gcpt))
     print("First:", gcpt[0])
     print("Last: ", gcpt[-1])
-    # input("Please check and press enter to continue")
-    # xs_run(gcpt, args.xs, args.warmup, args.max_instr, args.threads, args.cmdline_opt)
+    input("Please check and press enter to continue")
+    xs_run(gcpt, args.xs, args.warmup, args.max_instr, args.threads, args.cmdline_opt)
