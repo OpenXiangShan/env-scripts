@@ -176,6 +176,8 @@ def xs_run(workloads, xs_path, warmup, max_instr, threads, cmdline_opt):
     base_arguments = [emu_path, '--diff', nemu_so_path, '--dump-tl', '--enable-fork', '-W', str(warmup), '-I', str(max_instr), '-i']
   elif cmdline_opt == "kunminghu":
     base_arguments = [emu_path, '--diff', nemu_so_path, '--dump-db', '--enable-fork', '-W', str(warmup), '-I', str(max_instr), '-i']
+  elif cmdline_opt == "nutshell":
+    base_arguments = [emu_path, '--diff', nemu_so_path, '-i']
   else:
     sys.exit("unsupported xs emu command line options, use nanhu or kunminghu")
   # base_arguments = [emu_path, '-W', str(warmup), '-I', str(max_instr), '-i']
