@@ -457,6 +457,7 @@ if __name__ == "__main__":
   parser.add_argument('--debug', '-D', action='store_true', default=False, help='debug options')
   parser.add_argument('--version', default=2006, type=int, help='SPEC version')
   parser.add_argument('--isa', default="rv64gcb", type=str, help='ISA version')
+  parser.add_argument('--slice', help='select only some checkpoints (only for run)')
   parser.add_argument('--dir', default=None, type=str, help='SPECTasks dir')
   parser.add_argument('--jobs', '-j', default=1, type=int, help="processing files in 'j' threads")
   parser.add_argument('--resume', action='store_true', default=False, help="continue to exe, ignore the aborted and success tests")
@@ -517,6 +518,15 @@ if __name__ == "__main__":
       print("All the tests are already finished.")
       print(f"perf_base_path: {get_perf_base_path(args.xs)}")
       sys.exit()
+    if args.slice:
+      start, end = args.slice.split(":")
+      if not start:
+        start = 0
+      if not end:
+        end = len(gcpt)
+      start, end = int(start), int(end)
+      print(f"select gcpt[{start}:{end}]")
+      gcpt = gcpt[start:end]
     print("All:  ", len(gcpt))
     print("First:", gcpt[0])
     print("Last: ", gcpt[-1])
