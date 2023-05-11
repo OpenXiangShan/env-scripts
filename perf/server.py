@@ -31,7 +31,7 @@ class Server(object):
     return ["numactl", "-m", f"{str(mem)}", "-C", f"{start}-{end}"] + cmd
 
   def remote_get_free_cores(self, threads):
-    pwd = os.getcwd()
+    pwd = os.path.dirname(os.path.abspath(__file__))
     cmd = ["python3", f"{pwd}/get_free_core.py", f"{threads}"]
     ssh_cmd_str = " ".join(self.remote_cmd + cmd)
     proc = os.popen(ssh_cmd_str)
@@ -45,13 +45,17 @@ class Server(object):
     # print((free, mem, start, end))
     if not free:
       return False
+    for running in self.pending_proc:
+      pending_cores = running[2]
+      if (start, end) == pending_cores:
+        return False
     run_cmd = self.numactl(cmd, mem, start, end)
-    run_cmd = self.remote_cmd + [f"NOOP_HOME={xs_path}"] +  run_cmd
+    run_cmd = self.remote_cmd + [f"NOOP_HOME={xs_path}"] + run_cmd
     print(f"{' '.join(run_cmd)}")
 
     with open(stdout_file, "w") as stdout, open(stderr_file, "w") as stderr:
       proc = subprocess.Popen(run_cmd, stdout=stdout, stderr=stderr, preexec_fn=os.setsid)
-      time.sleep(5)
+      time.sleep(1)
     self.pending_proc.append((test_name, proc, (start, end)))
     if (len(self.pending_proc) > (128 // threads)):
       print(f"Server {self.ip} has more than {len(self.pending_proc)} proc. Is it OK?")
@@ -80,7 +84,8 @@ class Server(object):
     # for proc in self.pending_proc:
       # os.killpg(os.getpgid(proc[1].pid), signal.SIGINT)
     # kill emu by ssh kill 'emu.pid'
-    os.popen(" ".join(self.remote_cmd) + f" python3 {os.getcwd()}/stop_emu.py")
+    pwd = os.path.dirname(os.path.abspath(__file__))
+    os.popen(" ".join(self.remote_cmd) + f" python3 {pwd}/stop_emu.py")
 
   def is_epyc(self):
     proc = os.popen(" ".join(self.remote_cmd) + " cat /proc/cpuinfo | grep 'processor' | wc -l")
