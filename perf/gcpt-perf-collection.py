@@ -3,9 +3,13 @@
 import argparse
 import os
 import re
+import sys
+from multiprocessing import Process, Manager
 
-import perfcounter_list.nanhu_example_pc as nanhu_example
-import perfcounter_list.nanhu_memblock_pc  as nanhu_memblock
+from perfcounter_list.nanhu_example_pc import CalculatorExample
+from perfcounter_list.nanhu_memblock_pc import CalculatorMemblock
+from perfcounter_list.nanhu_backend_pc import CalculatorBackend
+
 
 # GCPT perf counter collection
 # Input is all the gcpt. This scripts will add all the gcpt into each spec
@@ -31,20 +35,29 @@ import perfcounter_list.nanhu_memblock_pc  as nanhu_memblock
 
 path_re = re.compile(r'(?P<spec_name>\w+((_\w+)|(_\w+\.\w+)|-\d+|))_(?P<time_point>\d+)_(?P<weight>0\.\d+)')
 
-root_path = "/nfs/home/share/EmuTasks/SPEC06_EmuTasks_2022_12_22"
-spec_list_path = "/nfs/home/wanghuaqiang/xs-env/env-scripts/fpga/spec06-all-name-new.txt"
+abs_path=os.path.dirname(os.path.abspath(__file__))
+# root_path = "/nfs/home/share/EmuTasks/SPEC06_EmuTasks_2023_03_31"
+root_path = "/nfs-nvme/home/share/tanghaojin/SPEC06_EmuTasks_topdown_0430_2023"
+spec_list_path = f"{abs_path}/../fpga/spec06-all-name-new.txt"
+
+# This list controls pc that u need
+
+calculator_list = [
+  CalculatorExample(),
+  # CalculatorMemblock(),
+  CalculatorBackend()
+]
 
 cpt_list = os.listdir(root_path)
-cpt_list.remove("git_commit.txt")
+if ("git_commit.txt" in cpt_list):
+  cpt_list.remove("git_commit.txt")
 # print(cpt)
-cpt_record = {}
 
 spec_list = []
 for s in open(spec_list_path).readlines():
   spec_list.append(s.strip())
 if ("gamess_exam29" in spec_list):
   spec_list.remove("gamess_exam29")
-spec_record = {}
 
 
 # selected perf counter
@@ -57,8 +70,17 @@ basic_perf_conter = [
   ["ctrlBlock.rob: clock_cycle, ", "clockCycle"],
 ]
 
-perf_conter = basic_perf_conter + nanhu_example.get_perf_counter() + nanhu_memblock.get_perf_counter()
-# perf_conter = basic_perf_conter + nanhu_memblock_pc.perf_counter
+perf_conter = basic_perf_conter
+for pc in calculator_list:
+  perf_conter = perf_conter + pc.get_perf_counter_to_parse()
+# print(perf_conter)
+
+perf_counter_to_show_list = []
+for calculator in calculator_list:
+  perf_counter_to_show_list += calculator.get_perf_counter_to_show()
+
+def print_err(msg):
+  print(msg, file=sys.stderr)
 
 class SPEC(object):
   def __init__(self, spec_name):
@@ -84,10 +106,21 @@ class CPT(object):
     self.name = spec_name
     self.weight = float(spec_weight)
     self.record = {}
+
+    count = 0
     for line in file:
+      if ("[NEMU] " in line):
+        self.success = False
+        break
+      if ("ctrlBlock.rob: commitInstr, " in line):
+        count = count + 1
+        self.success = count == 2
+        if (count > 2):
+          print_err("found more than 2 times of commitInstr, what happened")
       for pc in perf_conter:
         if pc[0] in line:
-          number = int(line.split(pc[0])[1].split(", ")[0])
+          # print(f"find: origin {pc[0]} to {pc[1]}")
+          number = float(line.split(pc[0])[1].split(", ")[0])
           self.record[pc[1]] = number
 
     # print(self.name+","+self.weight, end="")
@@ -96,53 +129,73 @@ class CPT(object):
     #     print(","+str(self.record[pc[1]]), end="")
     # print()
 
-
-for cpt in cpt_list:
+def extract_cpt(global_dic, cpt):
   re_match = path_re.match(cpt)
   name = re_match.group("spec_name")
   weight = re_match.group("weight")
   time_point = re_match.group("time_point")
   # print(cpt)
   cpt_path = root_path + "/" + cpt
-  cpt_record[name+","+time_point] = CPT(name, weight, cpt_path)
+  cpt_obj = CPT(name, weight, cpt_path)
+  if cpt_obj.success:
+    global_dic[name+","+time_point] = cpt_obj
 
-  # print(re_match.group("spec_name"))
-  # print(re_match.group("time_point"))
-  # print(re_match.group("weight"))
+def collect_cpt_into_spec(global_dic, spec_name):
+  spec = SPEC(spec_name)
+  for cpt_name, cpt in cpt_record.items():
+    (spec_name_cpt, time_point) = cpt_name.split(",")
+    if (spec_name == spec_name_cpt):
+      spec.add_cpt(cpt)
 
-
-for s in spec_list:
-  spec_record[s] = SPEC(s)
-
-for key in cpt_record.keys():
-  (name, time_point) = key.split(",")
-  spec_record[name].add_cpt(cpt_record[key])
-
-# normalization
-for s in spec_list:
-  spec = spec_record[s]
+  # normalization to wegiht 1
   if spec.weight_sum == 0:
     print(s+" weight sum == 0")
   for pc in perf_conter:
     spec.record[pc[1]] = spec.record[pc[1]] / spec.weight_sum
 
+  # extra calculation should be here
+  for calculator in calculator_list:
+    for key, func in calculator.calculation_list.items():
+      spec.record[key] = func(spec.record)
+
+  global_dic[spec_name] = spec
+
+manager = Manager()
+cpt_record = manager.dict()
+spec_record = manager.dict()
+
+jobs = [Process(target=extract_cpt, args=(cpt_record, cpt)) for cpt in cpt_list]
+_ = [p.start() for p in jobs]
+_ = [p.join()   for p in jobs]
+
+jobs = [Process(target=collect_cpt_into_spec, args=(spec_record, name)) for name in spec_list]
+_ = [p.start() for p in jobs]
+_ = [p.join()   for p in jobs]
+
+# normalization
+# for s in spec_list:
+#   spec = spec_record[s]
+#   if spec.weight_sum == 0:
+#     print(s+" weight sum == 0")
+#   for pc in perf_conter:
+#     spec.record[pc[1]] = spec.record[pc[1]] / spec.weight_sum
+#   # extra calculation should be here
+#   for calculator in calculator_list:
+#     for key, func in calculator.calculation_list.items():
+#       spec.record[key] = func(spec.record)
+
+
 def iprint(str):
   print(","+str, end="")
 
 print("spec", end="")
-for pc in perf_conter:
-  iprint(pc[1])
-print(",ipc", end="")
-print(nanhu_example.get_perf_counter_name(), end="")
-print(nanhu_memblock.get_perf_counter_name(), end="")
+for pc in perf_counter_to_show_list:
+  iprint(pc)
 print()
 
 for s in spec_list:
   spec = spec_record[s]
   print(spec.name, end="")
-  for pc in perf_conter:
-    iprint("%.2f"%(spec.record[pc[1]]))
-  iprint("%.4f"%(spec.record["instrCnt"] / spec.record["clockCycle"]))
-  nanhu_example.print_extra_counter(spec)
-  nanhu_memblock.print_extra_counter(spec)
+  for pc in perf_counter_to_show_list:
+    iprint("%.4f"%spec.record[pc])
   print()
