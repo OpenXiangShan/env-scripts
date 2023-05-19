@@ -304,6 +304,166 @@ def get_fu_manip():
     # all_manip.append(store_replay_frac)
     return all_manip
 
+def get_wpu_manip():
+    all_manip = []
+    # Flip rate
+    all_manip.append(PerfManip(
+        name = "global.T_ICache",
+        counters = [
+            "icache.dataArray.data_read_counter",
+            "ctrlBlock.rob.clock_cycle"
+        ],
+        func = lambda cnt, time: 512.0 * cnt / time
+    ))
+    all_manip.append(PerfManip(
+        name = "global.T_DCache",
+        counters = [
+            "dcache.bankedDataArray.data_read_counter",
+            "ctrlBlock.rob.clock_cycle"
+        ],
+        func = lambda cnt, time: 64.0 * cnt / time
+    ))
+
+    # iwpu precision
+    all_manip.append(PerfManip(
+        name = "global.iwpu_pred_precision",
+        counters = [
+            "icache.iwpu.wpu_pred_succ",
+            "icache.iwpu.wpu_pred_total"
+        ],
+        func = lambda succ, total: 1.0 * succ / total
+    ))
+    all_manip.append(PerfManip(
+        name = "global.iwpu_part_pred_precision",
+        counters = [
+            "icache.mainPipe.iwpu.wpu_pred_succ",
+            "icache.mainPipe.iwpu.wpu_pred_total",
+            "icache.replacePipe.iwpu.wpu_pred_succ",
+            "icache.replacePipe.iwpu.wpu_pred_total",
+        ],
+        func = lambda succ1, total1, succ2, total2: 1.0 * (succ1 + succ2) / (total1 + total2)
+    ))
+    all_manip.append(PerfManip(
+        name = "global.iwpu_part0_pred_precision",
+        counters = [
+            "icache.mainPipe.iwpu.wpu_pred_succ",
+            "icache.mainPipe.iwpu.wpu_pred_total",
+        ],
+        func = lambda succ, total: 1.0 * succ / total
+    ))
+    all_manip.append(PerfManip(
+        name = "global.iwpu_part1_pred_precision",
+        counters = [
+            "icache.replacePipe.iwpu.wpu_pred_succ",
+            "icache.replacePipe.iwpu.wpu_pred_total",
+        ],
+        func = lambda succ, total: 1.0 * succ / total
+    ))
+    # dwpu precision
+    all_manip.append(PerfManip(
+        name = "global.dwpu_pred_precision",
+        counters = [
+            "dcache.dwpu.wpu_pred_succ",
+            "dcache.dwpu.wpu_pred_total"
+        ],
+        func = lambda succ, total: 1.0 * succ / total
+    ))
+    all_manip.append(PerfManip(
+        name = "global.dwpu_part_pred_precision",
+        counters = [
+            "dcache.ldu_0.dwpu.wpu_pred_succ",
+            "dcache.ldu_0.dwpu.wpu_pred_total",
+            "dcache.ldu_1.dwpu.wpu_pred_succ",
+            "dcache.ldu_1.dwpu.wpu_pred_total",
+        ],
+        func = lambda succ1, total1, succ2, total2: (1.0 * succ1 / total1 + 1.0 * succ2 / total2) / 2
+    ))
+    all_manip.append(PerfManip(
+        name = "global.dwpu_part0_pred_precision",
+        counters = [
+            "dcache.ldu_0.dwpu.wpu_pred_succ",
+            "dcache.ldu_0.dwpu.wpu_pred_total",
+        ],
+        func = lambda succ, total: 1.0 * succ / total
+    ))
+    all_manip.append(PerfManip(
+        name = "global.dwpu_part1_pred_precision",
+        counters = [
+            "dcache.ldu_1.dwpu.wpu_pred_succ",
+            "dcache.ldu_1.dwpu.wpu_pred_total",
+        ],
+        func = lambda succ, total: 1.0 * succ / total
+    ))
+    # iwpu mpki
+    all_manip.append(PerfManip(
+        name = "global.iwpu_pred_mpki",
+        counters = [
+            "icache.iwpu.wpu_pred_fail",
+            "commitInstr"
+        ],
+        func = lambda fail, instr: 1000.0 * fail / instr
+    ))
+    all_manip.append(PerfManip(
+        name = "global.iwpu_part_pred_mpki",
+        counters = [
+            "icache.mainPipe.iwpu.wpu_pred_fail",
+            "icache.replacePipe.iwpu.wpu_pred_fail",
+            "commitInstr"
+        ],
+        func = lambda fail1, fail2, instr: 1000.0 * (fail1 + fail2) / instr
+    ))
+    all_manip.append(PerfManip(
+        name = "global.iwpu_part0_pred_mpki",
+        counters = [
+            "icache.mainPipe.iwpu.wpu_pred_fail",
+            "commitInstr"
+        ],
+        func = lambda fail, instr: 1000.0 * fail / instr
+    ))
+    all_manip.append(PerfManip(
+        name = "global.iwpu_part1_pred_mpki",
+        counters = [
+            "icache.replacePipe.iwpu.wpu_pred_fail",
+            "commitInstr"
+        ],
+        func = lambda fail, instr: 1000.0 * fail / instr
+    ))
+    # dwpu mpki
+    all_manip.append(PerfManip(
+        name = "global.dwpu_pred_mpki",
+        counters = [
+            "dcache.dwpu.wpu_pred_fail",
+            "commitInstr"
+        ],
+        func = lambda fail, instr: 1000.0 * fail / instr
+    ))
+    all_manip.append(PerfManip(
+        name = "global.dwpu_part_pred_mpki",
+        counters = [
+            "dcache.ldu_0.dwpu.wpu_pred_fail",
+            "dcache.ldu_1.dwpu.wpu_pred_fail",
+            "commitInstr"
+        ],
+        func = lambda fail1, fail2, instr: 1000.0 * (fail1 + fail2) / instr
+    ))
+    all_manip.append(PerfManip(
+        name = "global.dwpu_part0_pred_mpki",
+        counters = [
+            "dcache.ldu_0.dwpu.wpu_pred_fail",
+            "commitInstr"
+        ],
+        func = lambda fail, instr: 1000.0 * fail / instr
+    ))
+    all_manip.append(PerfManip(
+        name = "global.dwpu_part1_pred_mpki",
+        counters = [
+            "dcache.ldu_1.dwpu.wpu_pred_fail",
+            "commitInstr"
+        ],
+        func = lambda fail, instr: 1000.0 * fail / instr
+    ))
+    return all_manip
+
 def get_all_manip():
     all_manip = []
     ipc = PerfManip(
@@ -471,6 +631,7 @@ def get_all_manip():
             1000 * (fire1 + fire2 + fire3 + fire4 + fire5 + fire6 + fire7 + fire8) / instr
     )
     all_manip.append(l3cache_mpki_load)
+    all_manip += get_wpu_manip()
     # all_manip += get_rs_manip()
     # all_manip += get_fu_manip()
     return all_manip
