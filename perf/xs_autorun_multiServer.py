@@ -114,17 +114,16 @@ def xs_run(server_list, workloads, xs_path, warmup, max_instr, threads):
             count = count + 1
             break
         if not assigned:
-          time.sleep(5)
+          time.sleep(1)
           for s in servers:
             s.check_running()
       for s in servers:
         s.check_running()
-        time.sleep(30)
 
     if not server_all_free():
       print("Waiting for pending tests to finish")
     while not server_all_free():
-      time.sleep(5)
+      time.sleep(1)
   except KeyboardInterrupt:
     print("Interrupted. Exiting all programs ...")
 
