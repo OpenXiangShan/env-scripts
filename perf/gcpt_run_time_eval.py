@@ -173,7 +173,7 @@ def eval_time_and_opt(data: dict, parallel_num: int, reverse = False):
         sorted_by=lambda x: x.hour
     else:
         sorted_by=lambda x: -x.hour
-    sorted(bench_list, sorted_by)
+    bench_list = sorted(bench_list, key=sorted_by)
 
     opt_exe_hours = 0
     opt_hours_list = []
