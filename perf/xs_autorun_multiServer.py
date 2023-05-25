@@ -15,6 +15,7 @@ import perf
 import spec_score
 from server import Server
 from gcpt_run_time_eval import *
+import AutoEmailAlert
 
 tasks_dir = "SPEC06_EmuTasks_10_22_2021"
 perf_base_path = ""
