@@ -4,6 +4,7 @@ import argparse
 import os
 import re
 import sys
+import time
 from multiprocessing import Process, Manager
 
 from perfcounter_list.nanhu_example_pc import CalculatorExample
@@ -33,6 +34,8 @@ from perfcounter_list.nanhu_backend_pc import CalculatorBackend
 # 3. normalization by sum of weight
 # 4. print
 
+parallel_degree = 128
+
 path_re = re.compile(r'(?P<spec_name>\w+((_\w+)|(_\w+\.\w+)|-\d+|))_(?P<time_point>\d+)_(?P<weight>0\.\d+)')
 
 abs_path=os.path.dirname(os.path.abspath(__file__))
@@ -43,15 +46,20 @@ spec_list_path = f"{abs_path}/../fpga/spec06-all-name-new.txt"
 # This list controls pc that u need
 
 calculator_list = [
-  CalculatorExample(),
+  CalculatorExample()
   # CalculatorMemblock(),
-  CalculatorBackend()
+  #CalculatorBackend()
 ]
 
 cpt_list = os.listdir(root_path)
 if ("git_commit.txt" in cpt_list):
   cpt_list.remove("git_commit.txt")
 # print(cpt)
+
+cpt_list_list = []
+stride = len(cpt_list) // parallel_degree
+for i in range(0, len(cpt_list), stride):
+  cpt_list_list.append(cpt_list[i: min(len(cpt_list), i+stride)])
 
 spec_list = []
 for s in open(spec_list_path).readlines():
@@ -102,32 +110,31 @@ class SPEC(object):
 
 class CPT(object):
   def __init__(self, spec_name, spec_weight, spec_path):
-    file = open(spec_path+"/"+"simulator_err.txt", "r")
-    self.name = spec_name
-    self.weight = float(spec_weight)
-    self.record = {}
+    with open(spec_path+"/"+"simulator_err.txt", "r") as file:
+      self.name = spec_name
+      self.weight = float(spec_weight)
+      self.record = {}
 
-    count = 0
-    for line in file:
-      if ("[NEMU] " in line):
-        self.success = False
-        break
-      if ("ctrlBlock.rob: commitInstr, " in line):
-        count = count + 1
-        self.success = count == 2
-        if (count > 2):
-          print_err("found more than 2 times of commitInstr, what happened")
-      for pc in perf_conter:
-        if pc[0] in line:
-          # print(f"find: origin {pc[0]} to {pc[1]}")
-          number = float(line.split(pc[0])[1].split(", ")[0])
-          self.record[pc[1]] = number
-
-    # print(self.name+","+self.weight, end="")
-    # for pc in perf_conter:
-    #   if pc[1] in self.record.keys():
-    #     print(","+str(self.record[pc[1]]), end="")
-    # print()
+      count = 0
+      for line in file:
+        if ("[NEMU] " in line):
+          self.success = False
+          break
+        if ("ctrlBlock.rob: commitInstr, " in line):
+          count = count + 1
+          self.success = count == 2
+          if (count > 2):
+            print_err("found more than 2 times of commitInstr, what happened")
+        for pc in perf_conter:
+          if pc[0] in line:
+            # print(f"find: origin {pc[0]} to {pc[1]}")
+            number = float(line.split(pc[0])[1].split(", ")[0])
+            self.record[pc[1]] = number
+      # print(self.name+","+self.weight, end="")
+      # for pc in perf_conter:
+      #   if pc[1] in self.record.keys():
+      #     print(","+str(self.record[pc[1]]), end="")
+      # print()
 
 def extract_cpt(global_dic, cpt):
   re_match = path_re.match(cpt)
@@ -160,17 +167,21 @@ def collect_cpt_into_spec(global_dic, spec_name):
 
   global_dic[spec_name] = spec
 
+def extract_cpt_multi(global_dic, cpt_list):
+  for cpt in cpt_list:
+    extract_cpt(global_dic, cpt)
+
 manager = Manager()
 cpt_record = manager.dict()
 spec_record = manager.dict()
 
-jobs = [Process(target=extract_cpt, args=(cpt_record, cpt)) for cpt in cpt_list]
+jobs = [Process(target=extract_cpt_multi, args=(cpt_record, cpts)) for cpts in cpt_list_list]
 _ = [p.start() for p in jobs]
-_ = [p.join()   for p in jobs]
+_ = [p.join()  for p in jobs]
 
 jobs = [Process(target=collect_cpt_into_spec, args=(spec_record, name)) for name in spec_list]
 _ = [p.start() for p in jobs]
-_ = [p.join()   for p in jobs]
+_ = [p.join()  for p in jobs]
 
 # normalization
 # for s in spec_list:
