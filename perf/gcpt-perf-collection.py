@@ -46,9 +46,9 @@ spec_list_path = f"{abs_path}/../fpga/spec06-all-name-new.txt"
 # This list controls pc that u need
 
 calculator_list = [
-  CalculatorExample()
+  CalculatorExample(),
   # CalculatorMemblock(),
-  #CalculatorBackend()
+  CalculatorBackend()
 ]
 
 cpt_list = os.listdir(root_path)

@@ -44,8 +44,17 @@ class CptEntry:
         self.point = point
         self.weight = weight
     
-    def get_data(self):
-        return (self.benchspec, self.point, self.weight)
+    def get_benchspec(self):
+        return self.benchspec
+
+    def get_point(self):
+        return self.point
+    
+    def get_weight(self):
+        return self.weight
+
+    def get_hour(self):
+        return self.hour
     
     def set_time(self, hour):
         self.hour = hour
@@ -89,8 +98,31 @@ def get_default_value():
                 wup_cycle_list.append(warmup_cycle)
     return (int(np.array(cycle_list).mean()), int(np.array(wup_cycle_list).mean()))
 
-def eval_time(data: dict, parallel_num: int):
-    print(divide_str_format%"evaluation time")
+def get_eval_hour(benchmark, point, weight) -> float:
+    ### default value
+    # default_cycle, default_wup_cycle = get_default_value()
+    default_cycle = 25461496 
+    default_wup_cycle = 13024213
+    
+    dir_name = "_".join([benchmark, point, weight])
+    base_path = os.path.join(os.path.join(base_dir, dir_name), "simulator_err.txt")
+    cycle = 0
+    warmup_cycle = 0
+    if os.path.exists(base_path):
+        with open(base_path) as f:
+            for line in f:
+                perf_match = clock_cycle_re.match(line.replace("/", "_"))
+                if perf_match:
+                    cycle += float(perf_match.group(3))
+                    if warmup_cycle == 0:
+                        warmup_cycle = float(perf_match.group(3))
+    else:
+        cycle = default_cycle
+        warmup_cycle = default_wup_cycle
+    hour = cycle * 1.0 / (10**7)
+    return hour
+
+def eval_time_and_opt(data: dict, parallel_num: int, reverse = False):
     ### default value
     # default_cycle, default_wup_cycle = get_default_value()
     default_cycle = 25461496 
@@ -133,13 +165,16 @@ def eval_time(data: dict, parallel_num: int):
 
     exe_hours = cal_exe_hours(hours_list, parallel_num)
     wup_hours = cal_exe_hours(wup_hours_list, parallel_num)
-    # print(f"compile {compile_hours} h, warmup {wup_hours} h, execute {exe_hours} h")
-    # print(f"total {compile_hours + exe_hours} h, warmup total {compile_hours + wup_hours} h")
+    print(divide_str_format%"evaluation time")
     print(f"warmup hours:\t\t{wup_hours}")
     print(f"origin execute hours:\t{exe_hours}")
 
-    bench_list.sort()
-    bench_list.reverse()
+    if reverse:
+        sorted_by=lambda x: x.hour
+    else:
+        sorted_by=lambda x: -x.hour
+    bench_list = sorted(bench_list, key=sorted_by)
+
     opt_exe_hours = 0
     opt_hours_list = []
     for be in bench_list:
@@ -165,4 +200,4 @@ if __name__ == "__main__":
     parallel_num = args.core_num/args.thread_num
     with open(args.json_path) as f:
         data = json.load(f)
-    eval_time(data, parallel_num)
+    eval_time_and_opt(data, parallel_num)

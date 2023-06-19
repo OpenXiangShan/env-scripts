@@ -10,105 +10,19 @@ import sys
 import getpass
 import socket
 from multiprocessing import Process, Queue
-
+from gcpt import GCPT
 import perf
 import spec_score
 from server import Server
-
+from gcpt_run_time_eval import *
+import AutoEmailAlert
 
 tasks_dir = "SPEC06_EmuTasks_10_22_2021"
 perf_base_path = ""
+def get_perf_base_path(xs_path):
+  return os.path.join(xs_path, tasks_dir)
 
-class GCPT(object):
-  STATE_NONE     = 0
-  STATE_RUNNING  = 1
-  STATE_FINISHED = 2
-  STATE_ABORTED  = 3
-
-  def __init__(self, bin_base_path, exe_base_path, benchspec, point, weight):
-    self.bin_base_path = bin_base_path
-    self.exe_bash_path = exe_base_path
-    self.benchspec = benchspec
-    self.point = point
-    self.weight = weight
-    self.state = self.STATE_NONE
-    self.num_cycles = -1
-    self.num_instrs = -1
-    self.ipc = -1
-    self.num_seconds = -1
-    self.waveform = []
-    self.result_path = os.path.join(self.exe_bash_path, self.__str__())
-    self.err_path = os.path.join(self.result_path, "simulator_err.txt")
-    self.out_path = os.path.join(self.result_path, "simulator_out.txt")
-
-  def get_path(self):
-    dir_name = self.__str__()
-    bin_dir = os.path.join(self.bin_base_path, dir_name, "0")
-    bin_file = list(os.listdir(bin_dir))
-    assert(len(bin_file) == 1)
-    bin_path = os.path.join(bin_dir, bin_file[0])
-    assert(os.path.isfile(bin_path))
-    return bin_path
-
-  def __str__(self):
-      return "_".join([self.benchspec, self.point, str(self.weight)])
-
-  def get_state(self):
-    self.state = self.STATE_NONE
-    if os.path.exists(self.out_path):
-      self.state = self.STATE_RUNNING
-      with open(self.out_path) as f:
-        for line in f:
-          if "ABORT at pc" in line or "FATAL:" in line or "Error:" in line:
-            self.state = self.STATE_ABORTED
-          elif "EXCEEDING CYCLE/INSTR LIMIT" in line or "GOOD TRAP" in line:
-            self.state = self.STATE_FINISHED
-          else:
-            if "cycleCnt = " in line:
-              cycle_cnt_str = line.split("cycleCnt =")[1].split(", ")[0]
-              self.num_cycles = int(cycle_cnt_str.replace(",", "").strip())
-            if "instrCnt = " in line:
-              instr_cnt_str = line.split("instrCnt =")[1].split(", ")[0]
-              self.num_instrs = int(instr_cnt_str.replace(",", "").strip())
-            if "Host time spent" in line:
-              second_cnt_str = line.split("Host time spent:")[1].replace("ms", "")
-              self.num_seconds = int(second_cnt_str.replace(",", "").strip()) / 1000
-    return self.state
-
-  def get_simulation_cps(self):
-    return int(round(self.num_cycles / self.num_seconds))
-
-  def get_ipc(self):
-    return round(self.num_instrs / self.num_cycles, 3)
-
-  def state_str(self):
-    state_strs = ["S_NONE", "S_RUNNING", "S_FINISHED", "S_ABORTED"]
-    return state_strs[self.state]
-
-  def debug(self):
-    if os.path.exists(self.out_path):
-      with open(self.out_path) as f:
-        for line in f:
-          if "dump wave to" in line:
-            wave_path = line.replace("...", "").replace("dump wave to", "").strip()
-            if not os.path.exists(wave_path):
-              print(f"{wave_path} does not exist!!!")
-            else:
-              print(f"cp {wave_path} {self.result_path}")
-              shutil.copy(wave_path, self.result_path)
-
-  def show(self):
-    self.get_state()
-    attributes = {
-      "instrCnt": self.num_instrs,
-      "cycleCnt": self.num_cycles,
-      "totalIPC": f"{self.get_ipc():.3f}",
-      "simSpeed": self.get_simulation_cps()
-    }
-    attributes_str = ", ".join(map(lambda k: f"{k:>8} = {str(attributes[k]):>9}", attributes))
-    print(f"GCPT {str(self):>50}: {self.state_str():>10}, {attributes_str}")
-
-def load_all_gcpt(gcpt_path, json_path, state_filter=None, xs_path=None, sorted_by=None):
+def load_all_gcpt(gcpt_path, json_path, server_num, threads, state_filter=None, xs_path=None, sorted_by=None):
   perf_filter = [
     ("l3cache_mpki_load",      lambda x: float(x) < 3),
     ("branch_prediction_mpki", lambda x: float(x) > 5),
@@ -117,12 +31,15 @@ def load_all_gcpt(gcpt_path, json_path, state_filter=None, xs_path=None, sorted_
   all_gcpt = []
   with open(json_path) as f:
     data = json.load(f)
+  hour_list=[]
+  perf_base_path = get_perf_base_path(xs_path)
   for benchspec in data:
     #if "gcc" not in benchspec:# or "hmmer" in benchspec:
     #  continue
     for point in data[benchspec]:
       weight = data[benchspec][point]
-      gcpt = GCPT(gcpt_path, perf_base_path, benchspec, point, weight)
+      hour = get_eval_hour(benchspec, point, weight)
+      gcpt = GCPT(gcpt_path, perf_base_path, benchspec, point, weight, hour)
       if state_filter is None and perf_filter is None:
         all_gcpt.append(gcpt)
         continue
@@ -132,16 +49,21 @@ def load_all_gcpt(gcpt_path, json_path, state_filter=None, xs_path=None, sorted_
         if gcpt.get_state() in state_filter:
           state_match = True
       if state_match and perf_filter is not None:
-        perf_path = gcpt.err_path
+        perf_path = gcpt.get_err_path()
         counters = perf.PerfCounters(perf_path)
         counters.add_manip(get_all_manip())
         for fit in perf_filter:
           if not fit[1](counters[fit[0]]):
             perf_match = False
       if perf_match and state_match:
+        hour_list.append(hour)
         all_gcpt.append(gcpt)
+  print(f"evaluate execute hours: {cal_exe_hours(hour_list, (128 * server_num) // threads)}")
+
   if sorted_by is not None:
     all_gcpt = sorted(all_gcpt, key=sorted_by)
+    hour_list = [g.eval_run_hours for g in all_gcpt]
+    print(f"opitimize execute hours: {cal_exe_hours(hour_list, (128 * server_num) // threads)}")
   dump_json = True
   dump_json = False
   if dump_json:
@@ -155,9 +77,6 @@ def load_all_gcpt(gcpt_path, json_path, state_filter=None, xs_path=None, sorted_
   return all_gcpt
 
 
-def get_perf_base_path(xs_path):
-  return os.path.join(xs_path, tasks_dir)
-
 def get_server(server_list):
   l = []
   for s in server_list.strip().split(" "):
@@ -168,7 +87,7 @@ def xs_run(server_list, workloads, xs_path, warmup, max_instr, threads):
   emu_path = os.path.join(xs_path, "build/emu")
   nemu_so_path = os.path.join(xs_path, "ready-to-run/riscv64-nemu-interpreter-so")
   # nemu_so_path = os.path.join(xs_path, "ready-to-run/riscv64-spike-so")
-  base_arguments = [emu_path, '--diff', nemu_so_path, '--dump-db', '--enable-fork', '-W', str(warmup), '-I', str(max_instr), '-i']
+  base_arguments = [emu_path, '--diff', nemu_so_path, '--enable-fork', '-W', str(warmup), '-I', str(max_instr), '-i']
   # base_arguments = [emu_path, '--diff', nemu_so_path, '-W', str(warmup), '-I', str(max_instr), '-i']
   # base_arguments = [emu_path, '-W', str(warmup), '-I', str(max_instr), '-i']
   servers = get_server(server_list)
@@ -184,29 +103,28 @@ def xs_run(server_list, workloads, xs_path, warmup, max_instr, threads):
     for index in range(max_num):
       workload = workloads[index]
       random_seed = random.randint(0, 9999)
-      run_cmd = base_arguments + [workload.get_path()] + ["-s", f"{random_seed}"]
+      run_cmd = base_arguments + [workload.get_bin_path()] + ["-s", f"{random_seed}"]
 
-      if not os.path.exists(workload.result_path):
-        os.makedirs(workload.result_path, exist_ok=True)
+      if not os.path.exists(workload.get_res_dir()):
+        os.makedirs(workload.get_res_dir(), exist_ok=True)
       assigned = False
       while not assigned:
         for s in servers:
-          if s.assign(f"{workload}", run_cmd, threads, xs_path, workload.out_path, workload.err_path):
+          if s.assign(f"{workload}", run_cmd, threads, xs_path, workload.get_out_path(), workload.get_err_path()):
             assigned = True
             count = count + 1
             break
         if not assigned:
-          time.sleep(5)
+          time.sleep(1)
           for s in servers:
             s.check_running()
       for s in servers:
         s.check_running()
 
-
     if not server_all_free():
       print("Waiting for pending tests to finish")
     while not server_all_free():
-      time.sleep(5)
+      time.sleep(1)
   except KeyboardInterrupt:
     print("Interrupted. Exiting all programs ...")
 
@@ -323,7 +241,7 @@ def xs_report_ipc(xs_path, gcpt_queue, result_queue):
   while not gcpt_queue.empty():
     gcpt = gcpt_queue.get()
     # print(f"Processing {str(gcpt)}...")
-    perf_path = gcpt.err_path
+    perf_path = gcpt.get_err_path()
     counters = perf.PerfCounters(perf_path)
     counters.add_manip(get_all_manip())
     # when the spec has not finished, IPC may be None
@@ -418,7 +336,9 @@ if __name__ == "__main__":
 
   if args.server_list is None:
     args.server_list = socket.gethostname()
-
+    server_num = 0
+  else:
+    server_num = len(args.server_list.strip().split(" "))
 
 
   # gcpt = gcpt#[300:]#[::-1]
@@ -427,7 +347,7 @@ if __name__ == "__main__":
   #gcpt = gcpt[242:]#[::-1]
 
   if args.show:
-    gcpt = load_all_gcpt(args.gcpt_path, args.json_path)
+    gcpt = load_all_gcpt(args.gcpt_path, args.json_path, server_num, args.threads)
     #gcpt = load_all_gcpt(args.gcpt_path, args.json_path,
       #state_filter=[GCPT.STATE_FINISHED], xs_path=args.ref, sorted_by=lambda x: x.get_simulation_cps())
       #state_filter=[GCPT.STATE_ABORTED], xs_path=args.ref, sorted_by=lambda x: x.get_ipc())
@@ -437,11 +357,14 @@ if __name__ == "__main__":
       #state_filter=[GCPT.STATE_ABORTED], xs_path=args.ref, sorted_by=lambda x: -x.num_cycles)
     xs_show(gcpt)
   elif args.debug:
-    gcpt = load_all_gcpt(args.gcpt_path, args.json_path,
-      state_filter=[GCPT.STATE_ABORTED], xs_path=args.xs, sorted_by=lambda x: -x.num_cycles)
+    gcpt = load_all_gcpt(args.gcpt_path, args.json_path, server_num, args.threads, 
+                         state_filter=[GCPT.STATE_ABORTED], 
+                         xs_path=args.xs, 
+                         sorted_by=lambda x: -x.num_cycles
+                         )
     xs_debug(gcpt)
   elif args.report:
-    gcpt = load_all_gcpt(args.gcpt_path, args.json_path,
+    gcpt = load_all_gcpt(args.gcpt_path, args.json_path, server_num, args.threads,
       state_filter=[GCPT.STATE_FINISHED], xs_path=args.xs, sorted_by=lambda x: x.benchspec.lower())
     xs_report(gcpt, args.ref, args.version, args.isa, args.jobs)
   else:
@@ -450,7 +373,11 @@ if __name__ == "__main__":
     if args.resume:
       state_filter = [GCPT.STATE_RUNNING, GCPT.STATE_NONE]
     # If just wanna run aborted test, change the script.
-    gcpt = load_all_gcpt(args.gcpt_path, args.json_path, state_filter=state_filter)
+    gcpt = load_all_gcpt(args.gcpt_path, args.json_path, server_num, args.threads, 
+                         state_filter=state_filter,
+                         xs_path=args.xs,
+                         sorted_by=lambda x:-x.eval_run_hours
+                         )
     #gcpt = load_all_gcpt(args.gcpt_path, args.json_path)
     #gcpt = load_all_gcpt(args.gcpt_path, args.json_path,
       #state_filter=[GCPT.STATE_ABORTED], xs_path=args.ref, sorted_by=lambda x: -x.num_cycles)
@@ -466,3 +393,5 @@ if __name__ == "__main__":
     print("First:", gcpt[0])
     print("Last: ", gcpt[-1])
     xs_run(args.server_list, gcpt, args.xs, args.warmup, args.max_instr, args.threads)
+
+    # AutoEmailAlert.inform(0, f"{args.xs}执行完毕", "maxpicca@qq.com")
