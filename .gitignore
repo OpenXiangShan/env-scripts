@@ -1,4 +1,5 @@
 *.v
+!xs_nanhu_fpga/src/rtl/*.v
 !vcs/testbench/SimMMIO/*.v
 !vcs/testbench/AXI4RAM/*.v
 !vcs/testbench/*.v
