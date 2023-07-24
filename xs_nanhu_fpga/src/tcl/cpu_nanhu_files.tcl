@@ -1,0 +1,31 @@
+set cpu_files [list \
+ [file normalize "${core_dir}/array_0_ext.v" ]\
+ [file normalize "${core_dir}/array_10_ext.v" ]\
+ [file normalize "${core_dir}/array_11_ext.v" ]\
+ [file normalize "${core_dir}/array_12_ext.v" ]\
+ [file normalize "${core_dir}/array_13_ext.v" ]\
+ [file normalize "${core_dir}/array_14_ext.v" ]\
+ [file normalize "${core_dir}/array_15_ext.v" ]\
+ [file normalize "${core_dir}/array_16_ext.v" ]\
+ [file normalize "${core_dir}/array_17_ext.v" ]\
+ [file normalize "${core_dir}/array_18_ext.v" ]\
+ [file normalize "${core_dir}/array_19_ext.v" ]\
+ [file normalize "${core_dir}/array_1_ext.v" ]\
+ [file normalize "${core_dir}/array_20_ext.v" ]\
+ [file normalize "${core_dir}/array_21_ext.v" ]\
+ [file normalize "${core_dir}/array_22_ext.v" ]\
+ [file normalize "${core_dir}/array_23_ext.v" ]\
+ [file normalize "${core_dir}/array_24_ext.v" ]\
+ [file normalize "${core_dir}/array_25_ext.v" ]\
+ [file normalize "${core_dir}/array_26_ext.v" ]\
+ [file normalize "${core_dir}/array_2_ext.v" ]\
+ [file normalize "${core_dir}/array_3_ext.v" ]\
+ [file normalize "${core_dir}/array_4_ext.v" ]\
+ [file normalize "${core_dir}/array_5_ext.v" ]\
+ [file normalize "${core_dir}/array_6_ext.v" ]\
+ [file normalize "${core_dir}/array_7_ext.v" ]\
+ [file normalize "${core_dir}/array_8_ext.v" ]\
+ [file normalize "${core_dir}/array_9_ext.v" ]\
+ [file normalize "${core_dir}/array_ext.v" ]\
+ [file normalize "${core_dir}/XSTop.v" ]\
+]
