@@ -296,50 +296,6 @@ def xs_report(all_gcpt, xs_path, spec_version, isa, num_jobs):
   print(f"Number of Checkpoints: {len(all_gcpt)}")
   print(f"SPEC CPU Version: SPEC CPU{spec_version}, {isa}")
 
-def xs_report_top_down(all_gcpt, xs_path, spec_version, isa, num_jobs):
-  gcpt_top_down = dict()
-  keys = list(map(lambda gcpt: gcpt.benchspec, all_gcpt))
-  for k in keys:
-    gcpt_top_down[k.split("_")[0]] = dict()
-  graph_num = top_down_report.xs_report_top_down_tf(get_perf_base_path(xs_path), all_gcpt, gcpt_top_down)
-  plt.figure(figsize=(25,45))
-  for i in range(graph_num):
-    plt.subplot((graph_num + 1) // 2, 2, i + 1)
-    matrix = []
-    name = []
-    boundname = []
-    topname = ''
-    for benchspec,top in gcpt_top_down.items():
-      top = top[i]
-      lst = []
-      name.append(benchspec)
-      topname = top.name
-      for value in top.down:
-        boundname.append(value.name)
-        lst.append(value.percentage)
-      matrix.append(lst)
-    matrix = list(np.array(matrix).T)
-
-    bottom = [0.0] * len(matrix[0])
-    for zipped in zip(boundname, matrix):
-      plt.bar(name, zipped[1], bottom=bottom, label=zipped[0])
-      bottom = list(map(lambda x,y: x + y, bottom, zipped[1]))
-    plt.xticks(rotation=90)
-    plt.legend()
-    plt.title(topname)
-  plt.savefig(f'{get_perf_base_path(xs_path)}_topdown.svg', bbox_inches='tight')
-  # for benchspec,top in gcpt_top_down.items():
-  #   bottom = [0.0]
-  #   for key,value in top.down.items():
-  #     percentage = [value.percentage]
-  #     plt.bar([benchspec], percentage, bottom=bottom, label=key)
-  #     bottom = list(map(lambda x,y: x + y, bottom, percentage))
-  # plt.legend()
-  # plt.savefig(f'{get_perf_base_path(xs_path)}_topdown/{top.name}.png')
-  # plt.clf()
-  #print(f"Number of Checkpoints: {len(all_gcpt)}")
-  #print(f"SPEC CPU Version: SPEC CPU{spec_version}, {isa}")
-
 
 def xs_show(all_gcpt):
   for gcpt in all_gcpt:
@@ -362,7 +318,6 @@ if __name__ == "__main__":
   parser.add_argument('--max-instr', '-I', default=40000000, type=int, help="max instr count")
   parser.add_argument('--threads', '-T', default=1, type=int, help="number of emu threads")
   parser.add_argument('--report', '-R', action='store_true', default=False, help='report only')
-  parser.add_argument('--report-top-down', action='store_true', default=False, help='report top-down only')
   parser.add_argument('--show', '-S', action='store_true', default=False, help='show list of gcpt only')
   parser.add_argument('--debug', '-D', action='store_true', default=False, help='debug options')
   parser.add_argument('--version', default=2006, type=int, help='SPEC version')
@@ -406,10 +361,6 @@ if __name__ == "__main__":
     gcpt = load_all_gcpt(args.gcpt_path, args.json_path, args.threads, 
       state_filter=[GCPT.STATE_FINISHED], xs_path=args.ref, sorted_by=lambda x: x.benchspec.lower())
     xs_report(gcpt, args.ref, args.version, args.isa, args.jobs)
-  elif args.report_top_down:
-    gcpt = load_all_gcpt(args.gcpt_path, args.json_path, args.threads, 
-      state_filter=[GCPT.STATE_FINISHED], xs_path=args.ref, sorted_by=lambda x: x.benchspec.lower())
-    xs_report_top_down(gcpt, args.ref, args.version, args.isa, args.jobs)
   else:
     state_filter = None
     print("RESUME:", args.resume)
