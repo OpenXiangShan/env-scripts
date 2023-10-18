@@ -1,6 +1,7 @@
-run 1ns
-date
-xc on -zt0 -xt0 -tbrun
+debug .
+host bjos_emu
+#run 1ns
+xc zt0 xt0 on -tbrun
 date
 run
 date

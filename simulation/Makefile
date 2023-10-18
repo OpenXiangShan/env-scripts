@@ -10,7 +10,7 @@ MACRO_FLAGS += +define+TOP_MODULE=$(TOP_MODULE)
 endif
 
 # Verilog filelist
-FILELIST ?= $(REPO_PATH)/src/southlake.f
+FILELIST ?= $(REPO_PATH)/src/hw.f
 
 # Memory image
 MEMORY_IMAGE ?= $(REPO_PATH)/images/ram.bin
@@ -31,7 +31,7 @@ MACRO_FLAGS += +define+SIM_UART
 endif
 
 # nanhu or Southlake
-NANHU ?= 0
+NANHU ?= 1
 ifeq ($(NANHU),1)
 MACRO_FLAGS += +define+NANHU
 endif

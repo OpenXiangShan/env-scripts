@@ -1,18 +1,19 @@
 PLDM_BUILD_DIR = pldm-build
 
-AXIS_HOME = /opt/CDNS_tools/VXE185_ISR11/share/vxe
+AXIS_HOME = /nfs/tools/Cadence/IXCOM22.04.s003/share/vxe
 
 PLDM_CLOCK = clock_gen
 PLDM_CLOCK_DEF = $(REPO_PATH)/scripts/$(PLDM_CLOCK).xel
 PLDM_CLOCK_SRC = $(REPO_PATH)/$(PLDM_BUILD_DIR)/$(PLDM_CLOCK).sv
 
-PLDM_BUILD_FLAGS += -64 -ua +1xua +sv +ignoreSimVerCheck -xecompile
+PLDM_BUILD_FLAGS += -64 -ua +1xua +sv +ignoreSimVerCheck +xe_alt_xlm -xecompile
 PLDM_BUILD_FLAGS += compilerOptions=$(REPO_PATH)/scripts/compilerOptions.qel
 PLDM_BUILD_FLAGS += +tb_import_systf+fwrite +tb_import_systf+fflush
-PLDM_BUILD_FLAGS += +define+PALLADIUM $(MACRO_FLAGS)
+PLDM_BUILD_FLAGS += +define+PALLADIUM +define+SYNTHESIS $(MACRO_FLAGS)
 PLDM_BUILD_FLAGS += +dut+$(TB_TOP)
 PLDM_BUILD_FLAGS += +dut+$(PLDM_CLOCK) $(PLDM_CLOCK_SRC)
 PLDM_BUILD_FLAGS += -v $(AXIS_HOME)/etc/ixcom/IXCclkgen.sv
+PLDM_BUILD_FLAGS += +iscdisp+Rob +iscdisp+tb_top +rtlCommentPragma +tran_relax -relativeIXCDIR -rtlNameForGenerate
 
 ifneq ($(FILELIST),)
 PLDM_BUILD_FLAGS += -F $(FILELIST)
@@ -35,13 +36,12 @@ palladium-build: $(PLDM_BUILD_DIR) $(PLDM_CLOCK_SRC)
 
 palladium-run: $(PLDM_BUILD_DIR) $(PLDM_CLOCK_SRC)
 	cd $(PLDM_BUILD_DIR) &&	                      \
-		xrun $(PLDM_RUN_FLAGS)                    \
-		-input $(REPO_PATH)/scripts/run.tcl
+		xeDebug -input $(REPO_PATH)/scripts/run.tcl
 
 palladium-debug: $(PLDM_BUILD_DIR) $(PLDM_CLOCK_SRC)
 	cd $(PLDM_BUILD_DIR) &&                       \
-		xrun $(PLDM_RUN_FLAGS)                    \
-		-xedebug -xedebugargs -vcd                \
+		xeDebug -gui $(PLDM_RUN_FLAGS)                    \
+		-xedebugargs -fsdb                \
 		-input $(REPO_PATH)/scripts/run_debug.tcl
 
 clean-run: palladium-build palladium-run

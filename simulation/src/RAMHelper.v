@@ -49,44 +49,45 @@ module RAMHelper(
 
 `else
 
-  // 256MB memory
-  `define RAM_SIZE (256 * 1024 * 1024)
+  // 1536MB memory
+  `define RAM_SIZE (1536 * 1024 * 1024)
 
   // memory array
-  reg [7:0] memory [0 : `RAM_SIZE - 1];
+  reg [63:0] memory [0 : `RAM_SIZE/8 - 1];
 
   // memory read
-  wire [63:0] raddr = rIdx << 3;
-  for (genvar i = 0; i < 8; i++) begin
-    assign rdata[8 * i + 7 : 8 * i] = memory[raddr + i];
-  end
+  assign rdata = memory[rIdx];
 
   // memory write
-  wire [63:0] waddr = wIdx << 3;
-  for (genvar i = 0; i < 8; i++) begin
-    always @(posedge clk) begin
-      if (wen && en) begin
-        memory[waddr + i] <=
-          (wdata [8 * i + 7 : 8 * i] &   wmask[8 * i + 7 : 8 * i]) |
-          (memory[waddr + i]         & (~wmask[8 * i + 7 : 8 * i]));
-      end
+  always @(posedge clk) begin
+    if (wen && en) begin
+      memory[wIdx] <= (wdata & wmask) | (memory[wIdx] & ~wmask);
     end
   end
 
 `ifdef MEMORY_IMAGE
   integer memory_image, n_read;
+  reg [7:0] word [7:0];
   // Create string-type MEMORY_IMAGE
   `define STRINGIFY(x) `"x`"
   `define MEMORY_IMAGE_S `STRINGIFY(`MEMORY_IMAGE)
 `endif // MEMORY_IMAGE
 
   initial begin
-    for (integer i = 0; i < `RAM_SIZE; i++) begin
-      memory[i] = 8'h0;
+    for (integer i = 0; i < `RAM_SIZE/8; i++) begin
+      memory[i] = 64'h0;
     end
 `ifdef MEMORY_IMAGE
     memory_image = $fopen(`MEMORY_IMAGE_S, "rb");
-    n_read = $fread(memory, memory_image);
+    for (integer j = 0; j < `RAM_SIZE/8; j++) begin
+      if (!$feof(memory_image)) begin
+        n_read = $fread(word, memory_image);
+        memory[j] = {word[7],word[6],word[5],word[4],word[3],word[2],word[1],word[0]};
+      end else begin
+        $display("memory[0]:%h",memory[0]);
+        break;
+      end
+    end
     $fclose(memory_image);
     if (!n_read) begin
       $fatal(1, "Memory: cannot load image from %s.", `MEMORY_IMAGE_S);
