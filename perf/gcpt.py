@@ -7,7 +7,7 @@ class GCPT(object):
   STATE_FINISHED = 2
   STATE_ABORTED  = 3
 
-  def __init__(self, gcpt_bin_dir: str, perf_base_dir: str,benchspec: str, point: str, weight: str, eval_run_hours: float = 0):
+  def __init__(self, gcpt_bin_dir: str, perf_base_dir: str,benchspec: str, point: str, weight: str, eval_run_hours: float = 0, gcc12Enable = False):
     self.bin_base_dir = gcpt_bin_dir
     self.benchspec = benchspec
     self.point = point
@@ -20,14 +20,22 @@ class GCPT(object):
     self.waveform = []
     self.res_dir = os.path.join(perf_base_dir, self.__str__())
     self.eval_run_hours = eval_run_hours
+    self.gcc12Enable = gcc12Enable
 
   def __str__(self):
     return "_".join([self.benchspec, self.point, str(self.weight)])
   
   def get_bin_path(self):
-    dir_name = self.__str__()
-    bin_dir = os.path.join(self.bin_base_dir, dir_name, "0")
+    if self.gcc12Enable:
+      bin_dir = os.path.join(self.bin_base_dir, self.benchspec, str(self.point))
+    else:
+      dir_name = self.__str__()
+      bin_dir = os.path.join(self.bin_base_dir, dir_name, "0")
     bin_file = list(os.listdir(bin_dir))
+    if len(bin_file) != 1:
+      print(bin_file)
+    if self.gcc12Enable:
+      bin_file = list(filter(lambda x: x != '_0_0.000000_.gz', bin_file))
     assert(len(bin_file) == 1)
     bin_path = os.path.join(bin_dir, bin_file[0])
     assert(os.path.isfile(bin_path))

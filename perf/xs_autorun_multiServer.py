@@ -19,6 +19,7 @@ import AutoEmailAlert
 
 tasks_dir = "SPEC06_EmuTasks_10_22_2021"
 perf_base_path = ""
+gcc12Enable=True
 def get_perf_base_path(xs_path):
   return os.path.join(xs_path, tasks_dir)
 
@@ -36,10 +37,11 @@ def load_all_gcpt(gcpt_path, json_path, server_num, threads, state_filter=None, 
   for benchspec in data:
     #if "gcc" not in benchspec:# or "hmmer" in benchspec:
     #  continue
-    for point in data[benchspec]:
-      weight = data[benchspec][point]
+    data_iterator = data[benchspec]["points"] if gcc12Enable else data[benchspec]
+    for point in data_iterator:
+      weight = data_iterator[point]
       hour = get_eval_hour(benchspec, point, weight)
-      gcpt = GCPT(gcpt_path, perf_base_path, benchspec, point, weight, hour)
+      gcpt = GCPT(gcpt_path, perf_base_path, benchspec, point, weight, hour, gcc12Enable)
       if state_filter is None and perf_filter is None:
         all_gcpt.append(gcpt)
         continue
@@ -87,7 +89,10 @@ def xs_run(server_list, workloads, xs_path, warmup, max_instr, threads):
   emu_path = os.path.join(xs_path, "build/emu")
   nemu_so_path = os.path.join(xs_path, "ready-to-run/riscv64-nemu-interpreter-so")
   # nemu_so_path = os.path.join(xs_path, "ready-to-run/riscv64-spike-so")
-  base_arguments = [emu_path, '--diff', nemu_so_path, '--enable-fork', '-W', str(warmup), '-I', str(max_instr), '-i']
+  if gcc12Enable:
+    base_arguments = [emu_path, '--diff', nemu_so_path, '--dump-db', '--enable-fork', '-W', str(warmup), '-I', str(max_instr), '-r', '/nfs-nvme/home/share/zyy/shared_payloads/old-gcpt-restorer/gcpt.bin', '-i']
+  else:
+    base_arguments = [emu_path, '--diff', nemu_so_path, '--enable-fork', '-W', str(warmup), '-I', str(max_instr), '-i']
   # base_arguments = [emu_path, '--diff', nemu_so_path, '-W', str(warmup), '-I', str(max_instr), '-i']
   # base_arguments = [emu_path, '-W', str(warmup), '-I', str(max_instr), '-i']
   servers = get_server(server_list)
