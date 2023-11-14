@@ -6,14 +6,16 @@ PLDM_CLOCK = clock_gen
 PLDM_CLOCK_DEF = $(REPO_PATH)/scripts/$(PLDM_CLOCK).xel
 PLDM_CLOCK_SRC = $(REPO_PATH)/$(PLDM_BUILD_DIR)/$(PLDM_CLOCK).sv
 
-PLDM_BUILD_FLAGS += -64 -ua +1xua +sv +ignoreSimVerCheck +xe_alt_xlm -xecompile
+PLDM_BUILD_FLAGS += -clean
+PLDM_BUILD_FLAGS += -64 -ua +1xua +sv +ignoreSimVerCheck +xe_alt_xlm -xecompile -enableLargeSizeMem
 PLDM_BUILD_FLAGS += compilerOptions=$(REPO_PATH)/scripts/compilerOptions.qel
 PLDM_BUILD_FLAGS += +tb_import_systf+fwrite +tb_import_systf+fflush
+#PLDM_BUILD_FLAGS += +define+PALLADIUM +define+SYNTHESIS $(MACRO_FLAGS)
 PLDM_BUILD_FLAGS += +define+PALLADIUM +define+SYNTHESIS $(MACRO_FLAGS)
 PLDM_BUILD_FLAGS += +dut+$(TB_TOP)
 PLDM_BUILD_FLAGS += +dut+$(PLDM_CLOCK) $(PLDM_CLOCK_SRC)
 PLDM_BUILD_FLAGS += -v $(AXIS_HOME)/etc/ixcom/IXCclkgen.sv
-PLDM_BUILD_FLAGS += +iscdisp+Rob +iscdisp+tb_top +rtlCommentPragma +tran_relax -relativeIXCDIR -rtlNameForGenerate
+PLDM_BUILD_FLAGS += +iscdisp+Rob +iscdisp+tb_top +iscdisp+WBU +iscdisp+MemRWHelper
 
 ifneq ($(FILELIST),)
 PLDM_BUILD_FLAGS += -F $(FILELIST)

@@ -1,10 +1,12 @@
 debug .
 host bjos_emu
 #run 1ns
-xc zt0 xt0 on -tbrun
+#date
+xc on -zt0 -xt0 -tbrun
 date
+run -swap
 run
-date
-xc off
-date
-exit
+#date
+#xc off
+#date
+#exit
