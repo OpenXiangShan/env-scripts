@@ -19,11 +19,14 @@ import AutoEmailAlert
 
 tasks_dir = "SPEC06_EmuTasks_10_22_2021"
 perf_base_path = ""
-gcc12Enable=True
+gcc12Enable = True
+emuArgR = "/nfs-nvme/home/share/zyy/shared_payloads/old-gcpt-restorer/gcpt.bin" # open01
+# emuArgR = "/nfs/home/share/liyanqin/old-gcpt-restorer/gcpt.bin" # node003
+
 def get_perf_base_path(xs_path):
   return os.path.join(xs_path, tasks_dir)
 
-def load_all_gcpt(gcpt_path, json_path, server_num, threads, state_filter=None, xs_path=None, sorted_by=None):
+def load_all_gcpt(gcpt_path, json_path, server_num, threads, state_filter=None, xs_path=None, sorted_by=None, report=False):
   perf_filter = [
     ("l3cache_mpki_load",      lambda x: float(x) < 3),
     ("branch_prediction_mpki", lambda x: float(x) > 5),
@@ -60,12 +63,14 @@ def load_all_gcpt(gcpt_path, json_path, server_num, threads, state_filter=None, 
       if perf_match and state_match:
         hour_list.append(hour)
         all_gcpt.append(gcpt)
-  print(f"evaluate execute hours: {cal_exe_hours(hour_list, (128 * server_num) // threads)}")
+  if not report:
+    print(f"evaluate execute hours: {cal_exe_hours(hour_list, (128 * server_num) // threads)}")
 
   if sorted_by is not None:
     all_gcpt = sorted(all_gcpt, key=sorted_by)
-    hour_list = [g.eval_run_hours for g in all_gcpt]
-    print(f"opitimize execute hours: {cal_exe_hours(hour_list, (128 * server_num) // threads)}")
+    if not report:
+      hour_list = [g.eval_run_hours for g in all_gcpt]
+      print(f"opitimize execute hours: {cal_exe_hours(hour_list, (128 * server_num) // threads)}")
   dump_json = True
   dump_json = False
   if dump_json:
@@ -90,7 +95,7 @@ def xs_run(server_list, workloads, xs_path, warmup, max_instr, threads):
   nemu_so_path = os.path.join(xs_path, "ready-to-run/riscv64-nemu-interpreter-so")
   # nemu_so_path = os.path.join(xs_path, "ready-to-run/riscv64-spike-so")
   if gcc12Enable:
-    base_arguments = [emu_path, '--diff', nemu_so_path, '--dump-db', '--enable-fork', '-W', str(warmup), '-I', str(max_instr), '-r', '/nfs-nvme/home/share/zyy/shared_payloads/old-gcpt-restorer/gcpt.bin', '-i']
+    base_arguments = [emu_path, '--diff', nemu_so_path, '--enable-fork', '-W', str(warmup), '-I', str(max_instr), '-r', emuArgR, '-i']
   else:
     base_arguments = [emu_path, '--diff', nemu_so_path, '--enable-fork', '-W', str(warmup), '-I', str(max_instr), '-i']
   # base_arguments = [emu_path, '--diff', nemu_so_path, '-W', str(warmup), '-I', str(max_instr), '-i']
@@ -370,7 +375,7 @@ if __name__ == "__main__":
     xs_debug(gcpt)
   elif args.report:
     gcpt = load_all_gcpt(args.gcpt_path, args.json_path, server_num, args.threads,
-      state_filter=[GCPT.STATE_FINISHED], xs_path=args.xs, sorted_by=lambda x: x.benchspec.lower())
+      state_filter=[GCPT.STATE_FINISHED], xs_path=args.xs, sorted_by=lambda x: x.benchspec.lower(), report=True)
     xs_report(gcpt, args.ref, args.version, args.isa, args.jobs)
   else:
     state_filter = None

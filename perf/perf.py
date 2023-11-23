@@ -8,7 +8,7 @@ from multiprocessing import Process, Queue
 from tqdm import tqdm
 import json
 
-
+gcc12Enable=True
 class PerfManip(object):
     def __init__(self, name, counters, func):
         self.name = name
@@ -53,8 +53,9 @@ class PerfCounters(object):
         """
         all_perf_counters = dict()
         total_weight = 0
-        for point in spec_json[spec_name]:
-            weight = spec_json[spec_name][point]
+        data_iterator = spec_json[spec_name]["points"] if gcc12Enable else spec_json[spec_name]
+        for point in data_iterator:
+            weight = data_iterator[point]   
             dir_name = "_".join([spec_name, point, weight])
             abs_dir = os.path.join(spec_dir, dir_name)
             if not os.path.exists(abs_dir):
