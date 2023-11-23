@@ -6,6 +6,7 @@ import os
 import re
 from multiprocessing import Process, Queue
 from tqdm import tqdm
+import json
 
 
 class PerfManip(object):
@@ -17,8 +18,16 @@ class PerfManip(object):
 
 class PerfCounters(object):
     perf_re = re.compile(r'.*\[PERF \]\[time=\s+\d+\] (([a-zA-Z0-9_]+\.)+[a-zA-Z0-9_]+): ((\w| |\')+),\s+(\d+)$')
+    path_re = re.compile(r'(?P<spec_name>\w+((_\w+)|(_\w+\.\w+)|-\d+|))_(?P<time_point>\d+)_(?P<weight>0\.\d+)')
 
-    def __init__(self, filename):
+    def __init__(self, args):
+        if isinstance(args, str):
+            self.file_init(args)
+        else:
+            (spec_dir, spec_name, spec_json) = args
+            self.spec_init(spec_dir, spec_name, spec_json)
+
+    def file_init(self, filename: str):
         all_perf_counters = dict()
         with open(filename) as f:
             for line in f:
@@ -34,6 +43,69 @@ class PerfCounters(object):
             updated_perf[key[prefix_length:]] = all_perf_counters[key]
         self.counters = updated_perf
         self.filename = filename
+
+    def spec_init(self, spec_dir: str, spec_name: str, spec_json):
+        """init PerfCounters in SPEC result directory
+
+        Args:
+            spec_dir (str): SPEC result parent directory
+            spec_name (str): spec_name that you need
+        """
+        all_perf_counters = dict()
+        total_weight = 0
+        for point in spec_json[spec_name]:
+            weight = spec_json[spec_name][point]
+            dir_name = "_".join([spec_name, point, weight])
+            abs_dir = os.path.join(spec_dir, dir_name)
+            if not os.path.exists(abs_dir):
+                print(f"{abs_dir}路径不存在")
+                exit()
+        ### 如果没有指定Json，只有spec_name，则按照这种方式处理
+        # for sub_dir in os.listdir(spec_dir):
+        #     re_match = self.path_re.match(sub_dir)
+        #     test_name = re_match.group("spec_name")
+        #     weight = re_match.group("weight")
+        #     if test_name != spec_name:
+        #         continue
+        #     abs_dir = os.path.join(spec_dir, sub_dir)
+            tmp_counters = dict()
+            # check
+            check_file = os.path.join(abs_dir, "simulator_out.txt")
+            flag = False
+            with open(check_file) as f:
+                for line in f:
+                    if "EXCEEDING CYCLE/INSTR LIMIT" in line or "GOOD TRAP" in line:
+                        flag = True
+            if not flag:
+                print(os.path.join(abs_dir),"spec 测试失败，请查看结果")
+            filename = os.path.join(abs_dir, "simulator_err.txt")
+            with open(filename) as f:
+                for line in f:
+                    perf_match = self.perf_re.match(line.replace("/", "_"))
+                    if perf_match:
+                        perf_name = ".".join([str(perf_match.group(1)), str(perf_match.group(3))])
+                        perf_value = str(perf_match.group(5))
+                        perf_name = perf_name.replace(" ", "_").replace("'", "")
+                        ### warmup result will be overwritten
+                        tmp_counters[perf_name] = perf_value
+            ### get the weight accumulation
+            for perf_name in tmp_counters:
+                all_perf_counters[perf_name] = all_perf_counters.get(perf_name,0) + float(tmp_counters[perf_name]) * float(weight)
+            total_weight += float(weight)
+        
+        ### do noramlization
+        if total_weight == 0:
+            print(f"{spec_name} does not exists in {spec_dir}")
+            exit()
+        for perf_name in tmp_counters:
+            all_perf_counters[perf_name] = all_perf_counters[perf_name] / float(total_weight)
+
+        prefix_length = len(os.path.commonprefix(list(all_perf_counters.keys())))
+        updated_perf = dict()
+        for key in all_perf_counters:
+            updated_perf[key[prefix_length:]] = all_perf_counters[key]
+        self.counters = updated_perf
+        self.filename = spec_name
 
     def add_manip(self, all_manip):
         if len(self.counters) == 0:
@@ -232,6 +304,166 @@ def get_fu_manip():
     # all_manip.append(store_replay_frac)
     return all_manip
 
+def get_wpu_manip():
+    all_manip = []
+    # Flip rate
+    all_manip.append(PerfManip(
+        name = "global.T_ICache",
+        counters = [
+            "icache.dataArray.data_read_counter",
+            "ctrlBlock.rob.clock_cycle"
+        ],
+        func = lambda cnt, time: 512.0 * cnt / time
+    ))
+    all_manip.append(PerfManip(
+        name = "global.T_DCache",
+        counters = [
+            "dcache.bankedDataArray.data_read_counter",
+            "ctrlBlock.rob.clock_cycle"
+        ],
+        func = lambda cnt, time: 64.0 * cnt / time
+    ))
+
+    # iwpu precision
+    all_manip.append(PerfManip(
+        name = "global.iwpu_pred_precision",
+        counters = [
+            "icache.iwpu.wpu_pred_succ",
+            "icache.iwpu.wpu_pred_total"
+        ],
+        func = lambda succ, total: 1.0 * succ / total
+    ))
+    all_manip.append(PerfManip(
+        name = "global.iwpu_part_pred_precision",
+        counters = [
+            "icache.mainPipe.iwpu.wpu_pred_succ",
+            "icache.mainPipe.iwpu.wpu_pred_total",
+            "icache.replacePipe.iwpu.wpu_pred_succ",
+            "icache.replacePipe.iwpu.wpu_pred_total",
+        ],
+        func = lambda succ1, total1, succ2, total2: 1.0 * (succ1 + succ2) / (total1 + total2)
+    ))
+    all_manip.append(PerfManip(
+        name = "global.iwpu_part0_pred_precision",
+        counters = [
+            "icache.mainPipe.iwpu.wpu_pred_succ",
+            "icache.mainPipe.iwpu.wpu_pred_total",
+        ],
+        func = lambda succ, total: 1.0 * succ / total
+    ))
+    all_manip.append(PerfManip(
+        name = "global.iwpu_part1_pred_precision",
+        counters = [
+            "icache.replacePipe.iwpu.wpu_pred_succ",
+            "icache.replacePipe.iwpu.wpu_pred_total",
+        ],
+        func = lambda succ, total: 1.0 * succ / total
+    ))
+    # dwpu precision
+    all_manip.append(PerfManip(
+        name = "global.dwpu_pred_precision",
+        counters = [
+            "dcache.dwpu.wpu_pred_succ",
+            "dcache.dwpu.wpu_pred_total"
+        ],
+        func = lambda succ, total: 1.0 * succ / total
+    ))
+    all_manip.append(PerfManip(
+        name = "global.dwpu_part_pred_precision",
+        counters = [
+            "dcache.ldu_0.dwpu.wpu_pred_succ",
+            "dcache.ldu_0.dwpu.wpu_pred_total",
+            "dcache.ldu_1.dwpu.wpu_pred_succ",
+            "dcache.ldu_1.dwpu.wpu_pred_total",
+        ],
+        func = lambda succ1, total1, succ2, total2: (1.0 * succ1 / total1 + 1.0 * succ2 / total2) / 2
+    ))
+    all_manip.append(PerfManip(
+        name = "global.dwpu_part0_pred_precision",
+        counters = [
+            "dcache.ldu_0.dwpu.wpu_pred_succ",
+            "dcache.ldu_0.dwpu.wpu_pred_total",
+        ],
+        func = lambda succ, total: 1.0 * succ / total
+    ))
+    all_manip.append(PerfManip(
+        name = "global.dwpu_part1_pred_precision",
+        counters = [
+            "dcache.ldu_1.dwpu.wpu_pred_succ",
+            "dcache.ldu_1.dwpu.wpu_pred_total",
+        ],
+        func = lambda succ, total: 1.0 * succ / total
+    ))
+    # iwpu mpki
+    all_manip.append(PerfManip(
+        name = "global.iwpu_pred_mpki",
+        counters = [
+            "icache.iwpu.wpu_pred_fail",
+            "commitInstr"
+        ],
+        func = lambda fail, instr: 1000.0 * fail / instr
+    ))
+    all_manip.append(PerfManip(
+        name = "global.iwpu_part_pred_mpki",
+        counters = [
+            "icache.mainPipe.iwpu.wpu_pred_fail",
+            "icache.replacePipe.iwpu.wpu_pred_fail",
+            "commitInstr"
+        ],
+        func = lambda fail1, fail2, instr: 1000.0 * (fail1 + fail2) / instr
+    ))
+    all_manip.append(PerfManip(
+        name = "global.iwpu_part0_pred_mpki",
+        counters = [
+            "icache.mainPipe.iwpu.wpu_pred_fail",
+            "commitInstr"
+        ],
+        func = lambda fail, instr: 1000.0 * fail / instr
+    ))
+    all_manip.append(PerfManip(
+        name = "global.iwpu_part1_pred_mpki",
+        counters = [
+            "icache.replacePipe.iwpu.wpu_pred_fail",
+            "commitInstr"
+        ],
+        func = lambda fail, instr: 1000.0 * fail / instr
+    ))
+    # dwpu mpki
+    all_manip.append(PerfManip(
+        name = "global.dwpu_pred_mpki",
+        counters = [
+            "dcache.dwpu.wpu_pred_fail",
+            "commitInstr"
+        ],
+        func = lambda fail, instr: 1000.0 * fail / instr
+    ))
+    all_manip.append(PerfManip(
+        name = "global.dwpu_part_pred_mpki",
+        counters = [
+            "dcache.ldu_0.dwpu.wpu_pred_fail",
+            "dcache.ldu_1.dwpu.wpu_pred_fail",
+            "commitInstr"
+        ],
+        func = lambda fail1, fail2, instr: 1000.0 * (fail1 + fail2) / instr
+    ))
+    all_manip.append(PerfManip(
+        name = "global.dwpu_part0_pred_mpki",
+        counters = [
+            "dcache.ldu_0.dwpu.wpu_pred_fail",
+            "commitInstr"
+        ],
+        func = lambda fail, instr: 1000.0 * fail / instr
+    ))
+    all_manip.append(PerfManip(
+        name = "global.dwpu_part1_pred_mpki",
+        counters = [
+            "dcache.ldu_1.dwpu.wpu_pred_fail",
+            "commitInstr"
+        ],
+        func = lambda fail, instr: 1000.0 * fail / instr
+    ))
+    return all_manip
+
 def get_all_manip():
     all_manip = []
     ipc = PerfManip(
@@ -286,9 +518,11 @@ def get_all_manip():
     all_manip.append(dtlb_sa_percent)
     ldtlb_miss_rate = PerfManip(
         name = "global.ldtlb_miss_rate",
-        counters = [f"memBlock.TLB.first_access0", f"memBlock.TLB.first_miss0",
-            f"memBlock.TLB_1.first_access0", f"memBlock.TLB_1.first_miss0"],
-        func = lambda req1, miss1, req2, miss2: (miss1 + miss2) / (req1 + req2) if ((req1 + req2) > 0) else 0
+        # counters = [f"memBlock.TLB.first_access0", f"memBlock.TLB.first_miss0",
+        #     f"memBlock.TLB_1.first_access0", f"memBlock.TLB_1.first_miss0"],
+        # func = lambda req1, miss1, req2, miss2: (miss1 + miss2) / (req1 + req2) if ((req1 + req2) > 0) else 0
+        counters = [f"memBlock.dtlb_ld_tlb_ld.first_access0", f"memBlock.dtlb_ld_tlb_ld.first_miss0"],
+        func = lambda req, miss: 1.0*miss / req if (req > 0) else 0
     )
     all_manip.append(ldtlb_miss_rate)
     ldtlb_sa_percent = PerfManip(
@@ -300,9 +534,11 @@ def get_all_manip():
     all_manip.append(ldtlb_sa_percent)
     sttlb_miss_rate = PerfManip(
         name = "global.sttlb_miss_rate",
-        counters = [f"memBlock.TLB_2.first_access0", f"memBlock.TLB_2.first_miss0",
-            f"memBlock.TLB_2.first_access0", f"memBlock.TLB_2.first_miss0"],
-        func = lambda req1, miss1, req2, miss2: (miss1 + miss2) / (req1 + req2) if ((req1 + req2) > 0) else 0
+        # counters = [f"memBlock.TLB_2.first_access0", f"memBlock.TLB_2.first_miss0",
+        #     f"memBlock.TLB_2.first_access0", f"memBlock.TLB_2.first_miss0"],
+        # func = lambda req1, miss1, req2, miss2: (miss1 + miss2) / (req1 + req2) if ((req1 + req2) > 0) else 0
+        counters = [f"memBlock.dtlb_st_tlb_st.first_access0", f"memBlock.dtlb_st_tlb_st.first_miss0"],
+        func = lambda req, miss: 1.0*miss / req if (req > 0) else 0
     )
     all_manip.append(sttlb_miss_rate)
     sttlb_sa_percent = PerfManip(
@@ -395,6 +631,7 @@ def get_all_manip():
             1000 * (fire1 + fire2 + fire3 + fire4 + fire5 + fire6 + fire7 + fire8) / instr
     )
     all_manip.append(l3cache_mpki_load)
+    all_manip += get_wpu_manip()
     # all_manip += get_rs_manip()
     # all_manip += get_fu_manip()
     return all_manip
@@ -434,13 +671,15 @@ def merge_perf_counters(all_perf, verbose=False):
             pbar.update(1)
         yield [name] + list(map(lambda perf: perf.get_counter(name, strict=True), all_perf))
 
-def pick(include_names, name):
+def pick(include_names, name, include_manip = False):
     '''
         Filter output rows by name
     '''
     if len(include_names) == 0:
         return True
     if name == "header.cases": # First row is header, should always be true
+        return True
+    if include_manip and name.startswith("global."):
         return True
     for r in include_names:
         if r.search(name) != None:
@@ -449,30 +688,35 @@ def pick(include_names, name):
 
 def perf_work(manip, work_queue, perf_queue):
   while not work_queue.empty():
-    filename = work_queue.get()
+    item = work_queue.get()
     try:
-      perf = PerfCounters(filename)
-      perf.add_manip(manip)
-      perf_queue.put(perf)
+        perf = PerfCounters(item)
+        perf.add_manip(manip)
+        perf_queue.put(perf)
     except:
       perf_queue.put(None)
 
-def main(pfiles, output_file, include_names, verbose=False, jobs = 1):
+def main(pfiles, output_file, include_names, include_manip=False, verbose=False, jobs = 1, normalize_spec = None, dirs = None):
     all_perf = []
     all_manip = get_all_manip()
-    files_count = len(pfiles)
-    pbar = tqdm(total = files_count, disable = not verbose, position = 1)
+    
     work_queue = Queue()
     perf_queue = Queue()
-    for filename in pfiles:
-      work_queue.put(filename)
     process_lst = []
+    if len(normalize_spec) > 0 and dirs is not None:
+        for spec_name in normalize_spec.keys():
+            work_queue.put((dirs, spec_name, normalize_spec))
+    else:
+        for filename in pfiles:
+            work_queue.put(filename)
+    files_count = work_queue.qsize()
+    pbar = tqdm(total = files_count, disable = not verbose, position = 1)
     for i in range(0, jobs):
-      p = Process(target = perf_work, args=(all_manip, work_queue, perf_queue))
-      process_lst.append(p)
-      p.start()
+        p = Process(target = perf_work, args=(all_manip, work_queue, perf_queue))
+        process_lst.append(p)
+        p.start()
     perf_lst = []
-    while len(perf_lst) != len(pfiles):
+    while len(perf_lst) != files_count:
       if verbose:
         pbar.display(f"Processing files with {jobs} threads ...", 0)
       perf = perf_queue.get()
@@ -488,7 +732,7 @@ def main(pfiles, output_file, include_names, verbose=False, jobs = 1):
     with open(output_file, 'w') as csvfile:
         csvwriter = csv.writer(csvfile)
         for output_row in merge_perf_counters(all_perf, verbose):
-            if pick(include_names, output_row[0]):
+            if pick(include_names, output_row[0], include_manip):
                 csvwriter.writerow(output_row)
     pbar.write(f"Finished processing {len(all_perf)} non-empty files.")
 
@@ -514,7 +758,6 @@ def find_all_in_dir(dir_path):
         if os.path.isfile(sub_path):
             all_files.append(sub_path)
         else:
-            all_files.append(sub_path)
             print("find non-file" + sub_path)
     return all_files
 
@@ -527,9 +770,11 @@ if __name__ == "__main__":
     parser.add_argument('--recursive', '-r', action='store_true', default=False,
         help="recursively find simulator_err.txt")
     parser.add_argument('--dir', '-d', default = None, help="directory")
+    parser.add_argument('--spec_json', '-S', default = None, help="spec test json")
     parser.add_argument('--verbose', '-v', action='store_true', default=False,
         help="show processing logs")
     parser.add_argument('--include', '-I', action='extend', nargs='+', type=str, help="select given counters (using re)")
+    parser.add_argument('--manip', '-M', action='store_true', default=False, help="whether inlcude the manipulations in the res (for --include args)")
     parser.add_argument('--jobs', '-j', default=1, type=int, help="processing files in 'j' threads")
 
     args = parser.parse_args()
@@ -538,13 +783,17 @@ if __name__ == "__main__":
         with open(args.filelist) as f:
             args.pfiles = list(map(lambda x: x.strip(), f.readlines()))
 
-    if args.dir is not None:
-        args.pfiles += find_all_in_dir(args.dir)
-
+    # for every file in SPEC tests
     if args.recursive:
         args.pfiles = find_simulator_err(args.pfiles)
 
-    print(args.pfiles)
+    normalize_spec = dict()
+    if args.dir is not None:
+        if args.spec_json is not None:
+            with open(args.spec_json) as f:
+                normalize_spec = json.load(f)
+        else:
+            args.pfiles += find_all_in_dir(args.dir)
 
     if args.include is not None:
         args.include = list(map(lambda x: re.compile(x), args.include))
@@ -560,5 +809,4 @@ if __name__ == "__main__":
 
     print(f"output file: {args.output}")
 
-    main(args.pfiles, args.output, args.include, args.verbose, args.jobs)
-
+    main(args.pfiles, args.output, args.include, args.manip, args.verbose, args.jobs, normalize_spec, args.dir)
