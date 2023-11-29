@@ -65,29 +65,26 @@ class GCPT(object):
               second_cnt_str = line.split("Host time spent:")[1].replace("ms", "")
               self.num_seconds = int(second_cnt_str.replace(",", "").strip()) / 1000
 
-    if not os.path.exists(self.get_err_path()):
-      print(f"{self.get_err_path()} does not exist!!!")
-      return (-1, -1, -1)
+    if os.path.exists(self.get_err_path()):
+      # print(f"{self.get_err_path()} does not exist!!!")
 
-    instr_count = 0
-    cycle_count = 0
-    instr_key = "rob: commitInstr,"
-    cycle_key = "rob: clock_cycle,"
-    instr_num = 0
-    cycle_num = 0
-    with open(self.get_err_path()) as f:
-      for line in f:
-        if instr_key in line:
-          instr_count += 1
-          instr_num = int(line.split(instr_key)[1])
-        if cycle_key in line:
-          cycle_count += 1
-          cycle_num = int(line.split(cycle_key)[1].split(", ")[-1])
-    if (instr_count == 2) and (cycle_count == 2):
-      self.second_num_cycles = cycle_num
-      self.second_num_instrs = instr_num
-    # else:
-      # print(f"instr_count = {instr_count}, cycle_count = {cycle_count}")
+      instr_count = 0
+      cycle_count = 0
+      instr_key = "rob: commitInstr,"
+      cycle_key = "rob: clock_cycle,"
+      instr_num = 0
+      cycle_num = 0
+      with open(self.get_err_path()) as f:
+        for line in f:
+          if instr_key in line:
+            instr_count += 1
+            instr_num = int(line.split(instr_key)[1])
+          if cycle_key in line:
+            cycle_count += 1
+            cycle_num = int(line.split(cycle_key)[1].split(", ")[-1])
+      if (instr_count == 2) and (cycle_count == 2):
+        self.second_num_cycles = cycle_num
+        self.second_num_instrs = instr_num
 
     return self.state
 
@@ -96,12 +93,12 @@ class GCPT(object):
 
   def get_second_ipc(self):
     # need first execte get_state()
-    if self.second_num_cycles == 0:
+    if self.second_num_cycles == 0 or self.second_num_cycles == -1:
       return -1
     return round(self.second_num_instrs / self.second_num_cycles, 3)
 
   def get_total_ipc(self):
-    if self.total_num_cycles == 0:
+    if self.total_num_cycles == 0 or self.total_num_cycles == -1:
       return -1
     return round(self.total_num_instrs / self.total_num_cycles, 3)
 
