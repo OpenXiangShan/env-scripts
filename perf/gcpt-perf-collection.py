@@ -8,10 +8,10 @@ import time
 from multiprocessing import Process, Manager
 
 from perfcounter_list.nanhu_example_pc import CalculatorExample
-from perfcounter_list.nanhu_memblock_pc import CalculatorMemblock
-from perfcounter_list.nanhu_backend_pc import CalculatorBackend
-from perfcounter_list.kunminghu_topdown import CalculatorTopDown
-from perfcounter_list.kunminghu_dp2iq_count import CalculatorDp2Iq
+# from perfcounter_list.nanhu_memblock_pc import CalculatorMemblock
+# from perfcounter_list.nanhu_backend_pc import CalculatorBackend
+# from perfcounter_list.kunminghu_topdown import CalculatorTopDown
+# from perfcounter_list.kunminghu_dp2iq_count import CalculatorDp2Iq
 
 
 # GCPT perf counter collection
@@ -37,16 +37,12 @@ from perfcounter_list.kunminghu_dp2iq_count import CalculatorDp2Iq
 
 parallel_degree = 128
 root_path = sys.argv[1]
-
-path_re = re.compile(r'(?P<spec_name>\w+((_\w+)|(_\w+\.\w+)|-\d+|))_(?P<time_point>\d+)_(?P<weight>0\.\d+)')
-
-abs_path=os.path.dirname(os.path.abspath(__file__))
-# root_path = "/nfs/home/share/EmuTasks/SPEC06_EmuTasks_2023_03_31"
 # root_path = "/nfs-nvme/home/share/tanghaojin/SPEC06_EmuTasks_topdown_0430_2023"
-spec_list_path = f"{abs_path}/../fpga/spec06-all-name-new.txt"
 
 # This list controls pc that u need
-
+# ===================
+# NOTE: change it to select the perf counter u need
+# ===================
 calculator_list = [
   CalculatorExample(),
   # CalculatorMemblock(),
@@ -54,6 +50,14 @@ calculator_list = [
   # CalculatorTopDown()
   # CalculatorDp2Iq()
 ]
+
+path_re = re.compile(r'(?P<spec_name>\w+((_\w+)|(_\w+\.\w+)|-\d+|))_(?P<time_point>\d+)_(?P<weight>0\.\d+)')
+
+abs_path=os.path.dirname(os.path.abspath(__file__))
+# root_path = "/nfs/home/share/EmuTasks/SPEC06_EmuTasks_2023_03_31"
+spec_list_path = f"{abs_path}/../fpga/spec06-all-name-new.txt"
+
+
 
 cpt_list = os.listdir(root_path)
 if ("git_commit.txt" in cpt_list):
