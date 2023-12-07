@@ -10,6 +10,8 @@ from multiprocessing import Process, Manager
 from perfcounter_list.nanhu_example_pc import CalculatorExample
 from perfcounter_list.nanhu_memblock_pc import CalculatorMemblock
 from perfcounter_list.nanhu_backend_pc import CalculatorBackend
+from perfcounter_list.kunminghu_topdown import CalculatorTopDown
+from perfcounter_list.kunminghu_dp2iq_count import CalculatorDp2Iq
 
 
 # GCPT perf counter collection
@@ -19,8 +21,7 @@ from perfcounter_list.nanhu_backend_pc import CalculatorBackend
 # TODO: collect all the perf counters
 
 # Usage:
-# python3 gcpt-perf-collection.py | tee perf_counter.csv
-# parameters are written in codes
+# python3 gcpt-perf-collection.py path_to_SPEC_EMU_TASKS | tee perf_counter.csv
 # root_path: gcpt path
 
 # Output:
@@ -35,12 +36,13 @@ from perfcounter_list.nanhu_backend_pc import CalculatorBackend
 # 4. print
 
 parallel_degree = 128
+root_path = sys.argv[1]
 
 path_re = re.compile(r'(?P<spec_name>\w+((_\w+)|(_\w+\.\w+)|-\d+|))_(?P<time_point>\d+)_(?P<weight>0\.\d+)')
 
 abs_path=os.path.dirname(os.path.abspath(__file__))
 # root_path = "/nfs/home/share/EmuTasks/SPEC06_EmuTasks_2023_03_31"
-root_path = "/nfs-nvme/home/share/tanghaojin/SPEC06_EmuTasks_topdown_0430_2023"
+# root_path = "/nfs-nvme/home/share/tanghaojin/SPEC06_EmuTasks_topdown_0430_2023"
 spec_list_path = f"{abs_path}/../fpga/spec06-all-name-new.txt"
 
 # This list controls pc that u need
@@ -48,7 +50,9 @@ spec_list_path = f"{abs_path}/../fpga/spec06-all-name-new.txt"
 calculator_list = [
   CalculatorExample(),
   # CalculatorMemblock(),
-  CalculatorBackend()
+  # CalculatorBackend()
+  # CalculatorTopDown()
+  # CalculatorDp2Iq()
 ]
 
 cpt_list = os.listdir(root_path)
@@ -66,7 +70,6 @@ for s in open(spec_list_path).readlines():
   spec_list.append(s.strip())
 if ("gamess_exam29" in spec_list):
   spec_list.remove("gamess_exam29")
-
 
 # selected perf counter
 # 0: key words of perf counter
@@ -114,6 +117,7 @@ class CPT(object):
       self.name = spec_name
       self.weight = float(spec_weight)
       self.record = {}
+      self.success = False
 
       count = 0
       for line in file:
