@@ -20,6 +20,7 @@ class Server(object):
     self.remote_cmd = ["ssh", f"{self.username}@{self.ip}"]
 
   def pending_tests(self):
+    self.check_running()
     tests = []
     for proc in self.pending_proc:
       tests.append(proc[0])
@@ -51,6 +52,7 @@ class Server(object):
         return False
     run_cmd = self.numactl(cmd, mem, start, end)
     run_cmd = self.remote_cmd + [f"NOOP_HOME={xs_path}"] + run_cmd
+    os.system("date")
     print(f"{' '.join(run_cmd)}")
 
     with open(stdout_file, "w") as stdout, open(stderr_file, "w") as stderr:
