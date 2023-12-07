@@ -13,7 +13,12 @@ class Calculator():
     return self.parse_map
 
   def get_perf_counter_to_show(self):
-    return self.calculation_list.keys()
+    l = list(self.calculation_list.keys())
+    for pm in self.parse_map:
+      if len(pm) == 3 and pm[2] == True:
+        l.append(pm[1])
+
+    return l
 
   def get_calculate_func(self):
     return self.calculation_list.values()
