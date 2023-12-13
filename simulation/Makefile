@@ -38,6 +38,7 @@ endif
 
 include vcs.mk
 include palladium.mk
+include pldm_diff.mk
 
 default: vcs-sim
 
