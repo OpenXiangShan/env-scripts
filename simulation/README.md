@@ -18,6 +18,12 @@ tb_top.v
 -F build/sim.f
 ```
 7. Compile:
+# If you're using checkpoint to run it
+```
+copy gcpt.gz in ./images
+make palladium-build-gcpt
+```
+# ELSE
 ```
 make palladium-build
 ```
