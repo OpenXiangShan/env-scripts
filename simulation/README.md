@@ -11,19 +11,19 @@ cp FlashHelper.v build & cp MemRWHelper.v build & cp SDHelper.v build & cp SimJT
 ```
 ls | grep .v > sim.f
 ```
-5. Modify tb_top.v
+5. Modify tb_top.v (if you change clock or reset signal)
 6. Modify src/hw.f
 ```
 tb_top.v
 -F build/sim.f
 ```
-7. Compile:
-# If you're using checkpoint to run it
+7. Compile:  
+  If you're using checkpoint to run it
 ```
 copy gcpt.gz in ./images
 make palladium-build-gcpt
 ```
-# ELSE
+  Else
 ```
 make palladium-build
 ```
@@ -43,7 +43,8 @@ cp FlashHelper.v build & cp MemRWHelper.v build & cp SDHelper.v build & cp SimJT
 ```
 ls | grep .v > sim.f
 ```
-5. Modify tb_top.v
+5. Modify tb_top.v  
+  You should change tb_top.v according to difftest project you run, refer to difftest/src/test/vsrc/vcs/top.v, and modify parameters to use.
 6. Compile:
 ```
 make pldm-diff-build
