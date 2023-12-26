@@ -17,11 +17,14 @@ ls | grep .v > sim.f
 tb_top.v
 -F build/sim.f
 ```
-7. Compile:  
+7. Compile:
   If you're using checkpoint to run it
 ```
-copy gcpt.gz in ./images
-make palladium-build-gcpt
+cp dip-c/MemRWHelper.v build & cp dip-c/xs-MemRam.cpp build/generated-src
+cp checkpoint.gz ./images
+cp gcpt.bin ./images
+make palladium-ungz #First
+make palladium-build GCPT_OVER=true
 ```
   Else
 ```
@@ -46,6 +49,15 @@ ls | grep .v > sim.f
 5. Modify tb_top.v  
   You should change tb_top.v according to difftest project you run, refer to difftest/src/test/vsrc/vcs/top.v, and modify parameters to use.
 6. Compile:
+  If you're using checkpoint to run it
+```
+cp dip-c/MemRWHelper.v build & cp dip-c/xs-MemRam.cpp build/generated-src
+cp checkpoint.gz ./images
+cp gcpt.bin ./images
+make pldm-diff-ungz #First
+make pldm-diff-build GCPT_OVER=true
+```
+  ELSE
 ```
 make pldm-diff-build
 ```

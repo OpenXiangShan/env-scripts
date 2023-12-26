@@ -52,6 +52,9 @@ $(PLDM_CLOCK_SRC): $(PLDM_CLOCK_DEF)
 		-module $(PLDM_CLOCK)                     \
 		-hierarchy "$(TB_TOP)."
 
+pldm-diff-ungz: 
+	gzip -d images/checkpoint.gz && ln images/checkpoint images/ram.bin
+
 pldm-diff-build: $(PLDM_BUILD_DIR)
 	cd $(PLDM_BUILD_DIR) &&	                      \
 	vlan $(VLAN_FLAGS) $(HWFILES) -l vlan.log &&  \
