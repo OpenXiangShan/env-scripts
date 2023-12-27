@@ -3,12 +3,15 @@ CORE_DIR = "/nfs/home/share/wkf/v30-build-default-16KL1-256KL2-1MBL3-clkdiv-dual
 IP_DIR = "/nfs/home/share/fpga/vivado/XS_100NL_ST_V3_TAG_20211229" # do not touch
 PRJ = "./xs_nanhu/xs_nanhu.xpr" # do not touch
 
-.PHONY: nanhu xs_nanhu update_core_flist
+.PHONY: nanhu xs_nanhu nanhu_v3 xs_nanhu_v3 update_core_flist
 nanhu: xs_nanhu
 	vivado -mode batch -source src/tcl/xs_uart.tcl -tclargs --cpu $@ --project_name $^ --core_dir $(CORE_DIR) --ip_dir $(IP_DIR)
+
+nanhu_v3: xs_nanhu
+	vivado -mode batch -source src/tcl/xs_uart_v3.tcl -tclargs --cpu nanhu --project_name $^ --core_dir $(CORE_DIR) --ip_dir $(IP_DIR)
 
 add_sys_option:
 	sed -i "s/reg \[63:0\] ram \[6143:0\];/\(\* ram_style = \"ultra\" \*\)\n \treg \[63:0\] ram \[6143:0\];/g" $(CORE_DIR)/array_*.v
 
 update_core_flist:
-	ls $(CORE_DIR) | grep -E ".*\.v" | awk -f core_flist.awk > ./src/tcl/cpu_nanhu_files.tcl
+	ls $(CORE_DIR) | grep -E ".*\.v|.*\.sv" | awk -f core_flist.awk > ./src/tcl/cpu_nanhu_files.tcl
