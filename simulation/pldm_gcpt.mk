@@ -10,7 +10,8 @@ CHEAD_HOME      = -I$(REPO_PATH)/src/difftest/config \
                   -I$(REPO_PATH)/src/difftest/src/test/csrc/common \
 				  -I$(REPO_PATH)/src/difftest/src/test/csrc/difftest \
 				  -I$(REPO_PATH)/src/difftest/src/test/csrc/plugin/spikedasm \
-				  -I$(REPO_PATH)/src/build/generated-src
+				  -I$(REPO_PATH)/src/build/generated-src \
+			  	  -I$(REPO_PATH)/src/gcpt/
 
 PLDM_BUILD_DIR  = pldm_diff-build
 DPILIB_EMU      = libdpi_emu.so

@@ -72,5 +72,5 @@ make pldm-gcpt-build GCPT_OVER=true
 ```
 7. Run:
 ```
-make pldm-diff-run
+make pldm-gcpt-run
 ```
