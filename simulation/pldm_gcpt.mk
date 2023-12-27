@@ -5,6 +5,7 @@ CFILES          += $(shell find ./src/difftest/src/test/csrc/difftest -name "*.c
 CFILES          += $(shell find ./src/difftest/src/test/csrc/vcs -name "*.cpp") 
 CFILES          += $(shell find ./src/difftest/src/test/csrc/plugin/spikedasm -name "*.cpp") 
 CFILES          += $(shell find ./src/build/generated-src/ -name "*.cpp")
+CFILES          += $(shell find ./src/gcpt/ -name "*.cpp")
 CHEAD_HOME      = -I$(REPO_PATH)/src/difftest/config \
                   -I$(REPO_PATH)/src/difftest/src/test/csrc/common \
 				  -I$(REPO_PATH)/src/difftest/src/test/csrc/difftest \
@@ -52,23 +53,26 @@ $(PLDM_CLOCK_SRC): $(PLDM_CLOCK_DEF)
 		-module $(PLDM_CLOCK)                     \
 		-hierarchy "$(TB_TOP)."
 
-pldm-diff-build: $(PLDM_BUILD_DIR)
+pldm-gcpt-ungz: 
+	gzip -d images/checkpoint.gz && ln images/checkpoint images/ram.bin
+
+pldm-gcpt-build: $(PLDM_BUILD_DIR)
 	cd $(PLDM_BUILD_DIR) &&	                      \
 	vlan $(VLAN_FLAGS) $(HWFILES) -l vlan.log &&  \
 	ixcom $(IXCOM_FLAGS) -l ixcom.log
 
-pldm-diff-run: $(PLDM_BUILD_DIR) $(DPILIB_EMU)
+pldm-gcpt-run: $(PLDM_BUILD_DIR) $(DPILIB_EMU)
 	cd $(PLDM_BUILD_DIR) &&	                      \
 	if [ -e $(DPILIB_EMU) ]; then rm $(DPILIB_EMU); fi &&  ln -sf ../$(DPILIB_EMU) . && \
 	xeDebug --$(EMU_SIM) ${PLDM_RUN_FLAGS} -- -input $(REPO_PATH)/scripts/run.tcl -l run-$$(date +%Y%m%d-%H%M%S).log 
 
-pldm-diff-debug: $(PLDM_BUILD_DIR) $(DPILIB_EMU)
+pldm-gcpt-debug: $(PLDM_BUILD_DIR) $(DPILIB_EMU)
 	cd $(PLDM_BUILD_DIR) &&	                      \
 	if [ -e $(DPILIB_EMU) ]; then rm $(DPILIB_EMU); fi &&  ln -sf ../$(DPILIB_EMU) . && \
 	xeDebug --$(EMU_SIM) ${PLDM_RUN_FLAGS} -- -fsdb -input $(REPO_PATH)/scripts/run_debug.tcl
 #--for xcelium --
 
-pldm-diff-clean: 
+pldm-gcpt-clean: 
 	rm -rf $(PLDM_BUILD_DIR) \
 	rm libdpi_emu.so
 	

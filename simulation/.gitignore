@@ -4,8 +4,7 @@ src/*
 !src/RAMHelper.v
 !src/SDHelper.v
 !src/SimJTAG.v
-!src/dip-c/MemRWHelper.v
-!src/dip-c/xs-MemRam.cpp
+!src/gcpt/*
 images/*
 !images/ram.bin
 

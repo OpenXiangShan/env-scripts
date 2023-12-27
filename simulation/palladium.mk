@@ -32,9 +32,6 @@ $(PLDM_CLOCK_SRC): $(PLDM_CLOCK_DEF)
 		-module $(PLDM_CLOCK)                         \
 		-hierarchy "$(TB_TOP)."
 
-palladium-ungz:
-	gzip -d images/checkpoint.gz && ln images/checkpoint images/ram.bin
-
 palladium-build: $(PLDM_BUILD_DIR) $(PLDM_CLOCK_SRC)
 	cd $(PLDM_BUILD_DIR) &&	                      \
 		ixcom $(PLDM_BUILD_FLAGS)
