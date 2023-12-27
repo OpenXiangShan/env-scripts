@@ -20,7 +20,7 @@ tb_top.v
 7. Compile:
   If you're using checkpoint to run it
 ```
-cp dip-c/MemRWHelper.v build & cp dip-c/xs-MemRam.cpp build/generated-src
+cp ./dpi-c/MemRWHelper.v build & cp ./dpi-c/xs-MemRam.cpp build/generated-src
 cp checkpoint.gz ./images
 cp gcpt.bin ./images
 make palladium-ungz #First
@@ -51,7 +51,7 @@ ls | grep .v > sim.f
 6. Compile:
   If you're using checkpoint to run it
 ```
-cp dip-c/MemRWHelper.v build & cp dip-c/xs-MemRam.cpp build/generated-src
+cp ./dpi-c/MemRWHelper.v build & cp ./dpi-c/xs-MemRam.cpp build/generated-src
 cp checkpoint.gz ./images
 cp gcpt.bin ./images
 make pldm-diff-ungz #First
