@@ -3,6 +3,7 @@
 #include <fstream>
 #include <stdlib.h>
 #include "xs_MemRam.h"
+
 using namespace std;
 #define GCPT_MAX_SIZE 0x700
 
@@ -51,7 +52,7 @@ xs_MemRam::load_bin(char * bin_file)
   }
 	// get size
 	fp.seekg(0, fp.end);
-  int length = fp.tellg();
+  uint64_t length = fp.tellg();
 	fp.seekg(0, fp.beg);
   length = (length > ram_size) ? ram_size : length;
 
