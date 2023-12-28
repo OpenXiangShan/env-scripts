@@ -32,16 +32,9 @@ $(PLDM_CLOCK_SRC): $(PLDM_CLOCK_DEF)
 		-module $(PLDM_CLOCK)                         \
 		-hierarchy "$(TB_TOP)."
 
-un_gzzip:
-	gzip -d images/gcpt.gz && ln images/gcpt images/ram.bin
-
 palladium-build: $(PLDM_BUILD_DIR) $(PLDM_CLOCK_SRC)
 	cd $(PLDM_BUILD_DIR) &&	                      \
 		ixcom $(PLDM_BUILD_FLAGS)
-
-palladium-build-gcpt: 
-	make un_gzzip
-	make palladium-build
 
 palladium-run: $(PLDM_BUILD_DIR) $(PLDM_CLOCK_SRC)
 	cd $(PLDM_BUILD_DIR) &&	                      \

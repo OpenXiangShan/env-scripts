@@ -4,6 +4,7 @@ src/*
 !src/RAMHelper.v
 !src/SDHelper.v
 !src/SimJTAG.v
+!src/gcpt/*
 images/*
 !images/ram.bin
 

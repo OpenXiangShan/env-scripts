@@ -18,6 +18,15 @@ ifneq ($(MEMORY_IMAGE),)
 MACRO_FLAGS += +define+MEMORY_IMAGE=$(MEMORY_IMAGE)
 endif
 
+# Gcpt_restore image
+GCPT_OVER ?=false
+ifeq ($(GCPT_OVER),true)
+GCPT_IMAGE ?= $(REPO_PATH)/src/gcpt/gcpt.bin
+endif
+ifneq ($(GCPT_IMAGE),)
+MACRO_FLAGS += +define+GCPT_IMAGE=$(GCPT_IMAGE)
+endif
+
 # Flash image
 FLASH_IMAGE ?=
 ifneq ($(FLASH_IMAGE),)
@@ -39,6 +48,7 @@ endif
 include vcs.mk
 include palladium.mk
 include pldm_diff.mk
+include pldm_gcpt.mk
 
 default: vcs-sim
 
