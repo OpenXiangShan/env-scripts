@@ -13,7 +13,7 @@ CHEAD_HOME      = -I$(REPO_PATH)/src/difftest/config \
 				  -I$(REPO_PATH)/src/build/generated-src \
 			  	  -I$(REPO_PATH)/src/gcpt/
 
-PLDM_BUILD_DIR  = pldm_diff-build
+PLDM_BUILD_DIR  = pldm_gcpt-build
 DPILIB_EMU      = libdpi_emu.so
 SIMULATOR       = xrun
 EMU_SIM         = xmsim
