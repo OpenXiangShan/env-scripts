@@ -27,6 +27,12 @@ ifneq ($(GCPT_IMAGE),)
 MACRO_FLAGS += +define+GCPT_IMAGE=$(GCPT_IMAGE)
 endif
 
+# Max_inster
+MAX_INSETER ?= 0
+ifneq ($(MAX_INSETER),)
+MACRO_FLAGS += +define+MAX_INSETER=$(MAX_INSETER)
+endif
+
 # Flash image
 FLASH_IMAGE ?=
 ifneq ($(FLASH_IMAGE),)

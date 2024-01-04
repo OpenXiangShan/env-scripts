@@ -44,6 +44,11 @@ endif
 
 PLDM_RUN_FLAGS   = -64 +xcprof -profile -sv_lib ${DPILIB_EMU} +squash-cycles=95159320000
 
+
+ifneq ($(GCPT_IMAGE),)
+CDEF_FLAGS +=-D GCPT_IMAGE=\"$(GCPT_IMAGE)\"
+endif
+
 ################################# EMU ######################################
 $(PLDM_BUILD_DIR):
 	mkdir -p $(PLDM_BUILD_DIR)
@@ -79,7 +84,8 @@ pldm-gcpt-clean:
 	
 ################################# CTB ######################################
 $(DPILIB_EMU) libdpi_emu: $(CFILES)
-	$(CC) -m64 -c -fPIC -g -std=c++11  \
+	$(CC) -D MEMORY_IMAGE=\"$(MEMORY_IMAGE)\" $(CDEF_FLAGS) -D MAX_INSETER=$(MAX_INSETER) \
+		-m64 -c -fPIC -g -std=c++11  \
 		-I${IXCOM_HOME}/share/uxe/etc/ixcom \
 		-I${SIMTOOL_HOME}/tools/include \
 		${CHEAD_HOME} \

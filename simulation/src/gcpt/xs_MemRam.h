@@ -23,7 +23,7 @@ class xs_MemRam
 
     void check_ram_addr(uint64_t addr);
 
-    void load_bin(char * bin_file);
+    void load_bin(const char * bin_file);
 };
 
 #endif
