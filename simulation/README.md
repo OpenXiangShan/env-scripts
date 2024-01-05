@@ -57,7 +57,7 @@ make pldm-diff-run
 ```
 cp FlashHelper.v build & cp MemRWHelper.v build & cp SDHelper.v build & cp SimJTAG.v build
 cp ./gcpt/MemRWHelper.v build
-cp checkpoint.gz ./images
+cp gcpt.bin ./images/
 ```
 4. Generate filelist in src/build:
 ```
@@ -67,8 +67,10 @@ ls | grep .v > sim.f
   You should change tb_top.v according to difftest project you run, refer to difftest/src/test/vsrc/vcs/top.v, and modify parameters to use.
 6. Compile:
 ```
-make pldm-gcpt-ungz #First
-make pldm-gcpt-build GCPT_OVER=true
+make pldm-gcpt-build GCPT_OVER=true  MEMORY_IMAGE=yourcheckpoint.gz MAX_INSETER=checkpoint_arge1
+
+  example : _95_0.0232639.gz
+  make pldm-gcpt-build GCPT_OVER=true  MEMORY_IMAGE=_95_0.0232639.gz MAX_INSETER=0232639    
 ```
 7. Run:
 ```
