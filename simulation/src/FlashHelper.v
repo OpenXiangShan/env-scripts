@@ -7,16 +7,16 @@ import "DPI-C" function void flash_read
 `endif
 
 module FlashHelper (
-  input clk,
-  input [31:0] addr,
-  input ren,
-  output reg [63:0] data
+  input clock,
+  input [31:0] r_addr,
+  input r_en,
+  output reg [63:0] r_data
 );
 
 `ifdef SIM_USE_DPIC
 
-  always @(posedge clk) begin
-    if (ren) flash_read(addr, data);
+  always @(posedge clock) begin
+    if (r_en) flash_read(r_addr, r_data);
   end
 
 `else
@@ -26,8 +26,8 @@ module FlashHelper (
   reg [7:0] flash_mem [0 : `FLASH_SIZE - 1];
 
   for (genvar i = 0; i < 8; i++) begin
-    always @(posedge clk) begin
-      if (ren) data[8 * i + 7 : 8 * i] <= flash_mem[addr + i];
+    always @(posedge clock) begin
+      if (r_en) r_data[8 * i + 7 : 8 * i] <= flash_mem[r_addr + i];
     end
   end
 
