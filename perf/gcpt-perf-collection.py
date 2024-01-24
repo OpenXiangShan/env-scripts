@@ -7,12 +7,7 @@ import sys
 import time
 from multiprocessing import Process, Manager
 
-from perfcounter_list.nanhu_example_pc import CalculatorExample
-# from perfcounter_list.nanhu_memblock_pc import CalculatorMemblock
-# from perfcounter_list.nanhu_backend_pc import CalculatorBackend
-# from perfcounter_list.kunminghu_topdown import CalculatorTopDown
-# from perfcounter_list.kunminghu_dp2iq_count import CalculatorDp2Iq
-
+from perfcounter_list.CalculatorList import *
 
 # GCPT perf counter collection
 # Input is all the gcpt. This scripts will add all the gcpt into each spec
@@ -36,7 +31,15 @@ from perfcounter_list.nanhu_example_pc import CalculatorExample
 # 4. print
 
 parallel_degree = 128
+
+
+if ((sys.argv[1] == "-h") | (sys.argv[1] == "--help") |
+    (len(sys.argv) != 2)):
+  print("Usage: python3 gcpt-perf-collection.py path_to_SPEC_EMU_TASKS | tee perf_counter.csv")
+  exit()
+
 root_path = sys.argv[1]
+
 # root_path = "/nfs-nvme/home/share/tanghaojin/SPEC06_EmuTasks_topdown_0430_2023"
 
 # This list controls pc that u need
