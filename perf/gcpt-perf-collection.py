@@ -31,6 +31,7 @@ from perfcounter_list.CalculatorList import *
 # 4. print
 
 parallel_degree = 128
+# parallel_degree = 1
 
 
 if ((sys.argv[1] == "-h") | (sys.argv[1] == "--help") |
@@ -47,24 +48,24 @@ root_path = sys.argv[1]
 # NOTE: change it to select the perf counter u need
 # ===================
 calculator_list = [
-  CalculatorExample(),
+  # CalculatorExample(),
   # CalculatorMemblock(),
-  # CalculatorBackend()
-  # CalculatorTopDown()
-  # CalculatorDp2Iq()
+  # CalculatorBackend(),
+  # CalculatorTopDown(),
+  # CalculatorDp2Iq(),
+  # CalculatorDataPathRFRead(),
+  CalculatorDataPathRFWrite(),
 ]
 
 path_re = re.compile(r'(?P<spec_name>\w+((_\w+)|(_\w+\.\w+)|-\d+|))_(?P<time_point>\d+)_(?P<weight>0\.\d+)')
 
 abs_path=os.path.dirname(os.path.abspath(__file__))
 # root_path = "/nfs/home/share/EmuTasks/SPEC06_EmuTasks_2023_03_31"
-spec_list_path = f"{abs_path}/../fpga/spec06-all-name-new.txt"
-
-
 
 cpt_list = os.listdir(root_path)
 if ("git_commit.txt" in cpt_list):
   cpt_list.remove("git_commit.txt")
+eg_cpt_err_file_path = os.path.join(root_path, cpt_list[0], "simulator_err.txt")
 # print(cpt)
 
 cpt_list_list = []
@@ -73,10 +74,23 @@ for i in range(0, len(cpt_list), stride):
   cpt_list_list.append(cpt_list[i: min(len(cpt_list), i+stride)])
 
 spec_list = []
-for s in open(spec_list_path).readlines():
-  spec_list.append(s.strip())
-if ("gamess_exam29" in spec_list):
-  spec_list.remove("gamess_exam29")
+
+# get spec_list from prepared list
+# spec_list_path = f"{abs_path}/../fpga/spec06-all-name-new.txt"
+# for s in open(spec_list_path).readlines():
+#   spec_list.append(s.strip())
+# if ("gamess_exam29" in spec_list):
+#   spec_list.remove("gamess_exam29")
+
+# get spec_list from root_path
+cpt_spec_name_list = []
+for cpt in cpt_list:
+  re_match = path_re.match(cpt)
+  name = re_match.group("spec_name")
+  cpt_spec_name_list.append(name)
+spec_list = list(set(cpt_spec_name_list))
+
+
 
 # selected perf counter
 # 0: key words of perf counter
@@ -90,12 +104,16 @@ basic_perf_conter = [
 
 perf_conter = basic_perf_conter
 for pc in calculator_list:
-  perf_conter = perf_conter + pc.get_perf_counter_to_parse()
+  perf_conter = perf_conter + pc.get_perf_counter_to_parse(eg_cpt_err_file_path)
+# print("perf_conter_map: ", end="")
 # print(perf_conter)
 
 perf_counter_to_show_list = []
 for calculator in calculator_list:
-  perf_counter_to_show_list += calculator.get_perf_counter_to_show()
+  perf_counter_to_show_list += calculator.get_perf_counter_to_show(eg_cpt_err_file_path)
+
+# print("perf_counter_to_show_list: ", end="")
+# print(perf_counter_to_show_list)
 
 def print_err(msg):
   print(msg, file=sys.stderr)
@@ -129,6 +147,7 @@ class CPT(object):
       count = 0
       for line in file:
         if ("[NEMU] " in line):
+          print_err("Extract Fail for [NEMU], name:" + self.name + " file:" + spec_path+"/"+"simulator_err.txt")
           self.success = False
           break
         if ("ctrlBlock.rob: commitInstr, " in line):
@@ -146,13 +165,16 @@ class CPT(object):
       #   if pc[1] in self.record.keys():
       #     print(","+str(self.record[pc[1]]), end="")
       # print()
+      if not self.success:
+        print_err("Extrace Failed for nothing")
+        print_err("If you want to skip, manually comment the exit() and print")
+        sys.exit()
 
 def extract_cpt(global_dic, cpt):
   re_match = path_re.match(cpt)
   name = re_match.group("spec_name")
   weight = re_match.group("weight")
   time_point = re_match.group("time_point")
-  # print(cpt)
   cpt_path = root_path + "/" + cpt
   cpt_obj = CPT(name, weight, cpt_path)
   if cpt_obj.success:
