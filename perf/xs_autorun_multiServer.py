@@ -95,8 +95,8 @@ def xs_run(server_list, workloads, xs_path, warmup, max_instr, threads):
   nemu_so_path = os.path.join(xs_path, "ready-to-run/riscv64-nemu-interpreter-so")
   # nemu_so_path = os.path.join(xs_path, "ready-to-run/riscv64-spike-so")
   if gcc12Enable:
-    #base_arguments = [emu_path, '--diff', nemu_so_path, '--enable-fork', '-W', str(warmup), '-I', str(max_instr), '-r', emuArgR, '-i']
-    base_arguments = [emu_path, '--diff', nemu_so_path, '--enable-fork', '--dump-db','-W', str(warmup), '-I', str(max_instr), '-r', emuArgR, '-i']
+    base_arguments = [emu_path, '--diff', nemu_so_path, '--enable-fork', '-W', str(warmup), '-I', str(max_instr), '-r', emuArgR, '-i']
+    #base_arguments = [emu_path, '--diff', nemu_so_path, '--enable-fork', '--dump-db','-W', str(warmup), '-I', str(max_instr), '-r', emuArgR, '-i']
   else:
     base_arguments = [emu_path, '--diff', nemu_so_path, '--enable-fork', '-W', str(warmup), '-I', str(max_instr), '-i']
   # base_arguments = [emu_path, '--diff', nemu_so_path, '-W', str(warmup), '-I', str(max_instr), '-i']
@@ -263,7 +263,7 @@ def xs_report_ipc(xs_path, gcpt_queue, result_queue):
 
 def xs_report(all_gcpt, xs_path, spec_version, isa, num_jobs):
   # frequency/GHz
-  frequency = 2
+  frequency = 3
   gcpt_ipc = dict()
   keys = list(map(lambda gcpt: gcpt.benchspec, all_gcpt))
   for k in keys:
