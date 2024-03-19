@@ -17,6 +17,7 @@ __pycache__
 .Xil/
 fpga/.Xil
 test*
+json/
 
 # python third-party libraries are stored temporarily
 psutil/
