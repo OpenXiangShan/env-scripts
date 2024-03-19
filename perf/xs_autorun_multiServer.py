@@ -261,9 +261,12 @@ def xs_report_ipc(xs_path, gcpt_queue, result_queue):
     else:
       print("IPC not found in", gcpt.benchspec, gcpt.point, gcpt.weight)
 
-def xs_report(all_gcpt, xs_path, spec_version, isa, num_jobs):
+def xs_report(all_gcpt, xs_path, spec_version, isa, num_jobs, json_path = None):
   # frequency/GHz
   frequency = 3
+  if gcc12Enable:
+    with open(json_path) as f:
+      json_data = json.load(f)
   gcpt_ipc = dict()
   keys = list(map(lambda gcpt: gcpt.benchspec, all_gcpt))
   for k in keys:
@@ -288,7 +291,10 @@ def xs_report(all_gcpt, xs_path, spec_version, isa, num_jobs):
   for benchspec in gcpt_ipc:
     total_weight = sum(map(lambda info: info[0], gcpt_ipc[benchspec]))
     total_cpi = sum(map(lambda info: info[0] / info[1], gcpt_ipc[benchspec])) / total_weight
-    num_instr = get_total_inst(benchspec, spec_version, isa)
+    if gcc12Enable:
+      num_instr = int(json_data[benchspec]["insts"])
+    else:
+      num_instr = get_total_inst(benchspec, spec_version, isa)
     num_seconds = total_cpi * num_instr / (frequency * (10 ** 9))
     print(f"{benchspec:>25} coverage: {total_weight:.2f}")
     spec_name = benchspec.split("_")[0]
@@ -377,7 +383,7 @@ if __name__ == "__main__":
   elif args.report:
     gcpt = load_all_gcpt(args.gcpt_path, args.json_path, server_num, args.threads,
       state_filter=[GCPT.STATE_FINISHED], xs_path=args.xs, sorted_by=lambda x: x.benchspec.lower(), report=True)
-    xs_report(gcpt, args.ref, args.version, args.isa, args.jobs)
+    xs_report(gcpt, args.ref, args.version, args.isa, args.jobs, args.json_path)
   else:
     state_filter = None
     print("RESUME:", args.resume)
@@ -404,5 +410,3 @@ if __name__ == "__main__":
     print("First:", gcpt[0])
     print("Last: ", gcpt[-1])
     xs_run(args.server_list, gcpt, args.xs, args.warmup, args.max_instr, args.threads)
-
-    # AutoEmailAlert.inform(0, f"{args.xs}执行完毕", "maxpicca@qq.com")
