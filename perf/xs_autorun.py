@@ -30,7 +30,7 @@ def get_perf_base_path(xs_path):
     return tasks_dir
   return os.path.join(xs_path, tasks_dir)
 
-def load_all_gcpt(gcpt_path, json_path, threads, state_filter=None, xs_path=None, sorted_by=None, report = true):
+def load_all_gcpt(gcpt_path, json_path, threads, state_filter=None, xs_path=None, sorted_by=None, report=True):
   perf_filter = [
     ("l3cache_mpki_load",      lambda x: float(x) < 3),
     ("branch_prediction_mpki", lambda x: float(x) > 5),

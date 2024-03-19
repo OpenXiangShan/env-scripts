@@ -24,6 +24,19 @@ class CalculatorExample(Calculator):
     ["ctrlBlock.rob: commitInstrFused,  ", "commitFused"]
   ]
 
+  """
+  A example for re:
+    1. the re str, should have fullMatch to generate the "From" str
+    2. when use re, the second element should be a func, which can generate the "To" str, func's param is the re result
+    3. the third element is optional, if it is True, the "To" str will be shown in the final result
+
+  parse_map = [
+    ["backend.dataPath: IntRegFileWrite_hist_sampled, ", "IRFW_sampled", True],
+    [r'^.+(?P<fullMatch>backend.dataPath: IntRegFileRead_hist_(?P<indexNum>\d+)_\d+, )\s+\d+$',
+     lambda x:f'W_{x.group("indexNum")}', True],
+  ]
+  """
+
   calculation_list = {
     "ipc": lambda dic: dic["instrCnt"] / dic["clockCycle"],
     # "fused+luiload": lambda dic: (dic["fused_instr"]+dic["fused_lui_load"])/dic["rename_in"],
