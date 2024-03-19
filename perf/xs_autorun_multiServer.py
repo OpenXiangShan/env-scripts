@@ -15,7 +15,7 @@ import perf
 import spec_score
 from server import Server
 from gcpt_run_time_eval import *
-import AutoEmailAlert
+# import AutoEmailAlert
 
 tasks_dir = "SPEC06_EmuTasks_10_22_2021"
 perf_base_path = ""
@@ -157,6 +157,7 @@ def xs_run(server_list, workloads, xs_path, warmup, max_instr, threads):
 
   failed_tests = []
   for s in servers:
+    s.check_running()
     # s.stop()
     # print(f"{s.ip} stopped")
     failed_tests = failed_tests + s.failed_tests
@@ -364,7 +365,7 @@ if __name__ == "__main__":
   #gcpt = gcpt[242:]#[::-1]
 
   if args.show:
-    gcpt = load_all_gcpt(args.gcpt_path, args.json_path, server_num, args.threads)
+    gcpt = load_all_gcpt(args.gcpt_path, args.json_path, server_num, args.threads, xs_path = args.xs)
     #gcpt = load_all_gcpt(args.gcpt_path, args.json_path,
       #state_filter=[GCPT.STATE_FINISHED], xs_path=args.ref, sorted_by=lambda x: x.get_simulation_cps())
       #state_filter=[GCPT.STATE_ABORTED], xs_path=args.ref, sorted_by=lambda x: x.get_ipc())
@@ -374,9 +375,9 @@ if __name__ == "__main__":
       #state_filter=[GCPT.STATE_ABORTED], xs_path=args.ref, sorted_by=lambda x: -x.num_cycles)
     xs_show(gcpt)
   elif args.debug:
-    gcpt = load_all_gcpt(args.gcpt_path, args.json_path, server_num, args.threads, 
-                         state_filter=[GCPT.STATE_ABORTED], 
-                         xs_path=args.xs, 
+    gcpt = load_all_gcpt(args.gcpt_path, args.json_path, server_num, args.threads,
+                         state_filter=[GCPT.STATE_ABORTED],
+                         xs_path=args.xs,
                          sorted_by=lambda x: -x.num_cycles
                          )
     xs_debug(gcpt)
@@ -390,7 +391,7 @@ if __name__ == "__main__":
     if args.resume:
       state_filter = [GCPT.STATE_RUNNING, GCPT.STATE_NONE]
     # If just wanna run aborted test, change the script.
-    gcpt = load_all_gcpt(args.gcpt_path, args.json_path, server_num, args.threads, 
+    gcpt = load_all_gcpt(args.gcpt_path, args.json_path, server_num, args.threads,
                          state_filter=state_filter,
                          xs_path=args.xs,
                          sorted_by=lambda x:-x.eval_run_hours
