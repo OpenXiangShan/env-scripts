@@ -21,13 +21,16 @@ from gcpt import GCPT
 import AutoEmailAlert
 
 tasks_dir = "SPEC06_EmuTasks_10_22_2021"
+gcc12Enable = True
+emuArgR = "/nfs-nvme/home/share/zyy/shared_payloads/old-gcpt-restorer/gcpt.bin" # open01
+# emuArgR = "/nfs/home/share/liyanqin/old-gcpt-restorer/gcpt.bin" # node003
 
 def get_perf_base_path(xs_path):
   if os.path.isabs(tasks_dir):
     return tasks_dir
   return os.path.join(xs_path, tasks_dir)
 
-def load_all_gcpt(gcpt_path, json_path, threads, state_filter=None, xs_path=None, sorted_by=None):
+def load_all_gcpt(gcpt_path, json_path, threads, state_filter=None, xs_path=None, sorted_by=None, report=True):
   perf_filter = [
     ("l3cache_mpki_load",      lambda x: float(x) < 3),
     ("branch_prediction_mpki", lambda x: float(x) > 5),
@@ -39,10 +42,11 @@ def load_all_gcpt(gcpt_path, json_path, threads, state_filter=None, xs_path=None
   hour_list=[]
   perf_base_path = get_perf_base_path(xs_path)
   for benchspec in data:
-    for point in data[benchspec]:
-      weight = data[benchspec][point]
+    data_iterator = data[benchspec]["points"] if gcc12Enable else data[benchspec]
+    for point in data_iterator:
+      weight = data_iterator[point]
       hour = get_eval_hour(benchspec, point, weight)
-      gcpt = GCPT(gcpt_path, perf_base_path, benchspec, point, weight, hour)
+      gcpt = GCPT(gcpt_path, perf_base_path, benchspec, point, weight, hour, gcc12Enable)
       if state_filter is None and perf_filter is None:
         all_gcpt.append(gcpt)
         continue
@@ -61,12 +65,14 @@ def load_all_gcpt(gcpt_path, json_path, threads, state_filter=None, xs_path=None
       if perf_match and state_match:
         hour_list.append(hour)
         all_gcpt.append(gcpt)
-  print(f"evaluate execute hours: {cal_exe_hours(hour_list, 128 // threads)}")
+  if not report:
+    print(f"evaluate execute hours: {cal_exe_hours(hour_list, 128 // threads)}")
 
   if sorted_by is not None:
     all_gcpt = sorted(all_gcpt, key=sorted_by)
-    hour_list = [g.eval_run_hours for g in all_gcpt]
-    print(f"opitimize execute hours: {cal_exe_hours(hour_list, 128 // threads)}")
+    if not report:
+      hour_list = [g.eval_run_hours for g in all_gcpt]
+      print(f"opitimize execute hours: {cal_exe_hours(hour_list, 128 // threads)}")
   
   dump_json = True
   dump_json = False
@@ -259,9 +265,12 @@ def xs_report_ipc(xs_path, gcpt_queue, result_queue):
     else:
       print("IPC not found in", gcpt.benchspec, gcpt.point, gcpt.weight)
 
-def xs_report(all_gcpt, xs_path, spec_version, isa, num_jobs):
+def xs_report(all_gcpt, xs_path, spec_version, isa, num_jobs, json_path = None):
   # frequency/GHz
-  frequency = 2
+  frequency = 3
+  if gcc12Enable:
+    with open(json_path) as f:
+      json_data = json.load(f)
   gcpt_ipc = dict()
   keys = list(map(lambda gcpt: gcpt.benchspec, all_gcpt))
   for k in keys:
@@ -286,7 +295,10 @@ def xs_report(all_gcpt, xs_path, spec_version, isa, num_jobs):
   for benchspec in gcpt_ipc:
     total_weight = sum(map(lambda info: info[0], gcpt_ipc[benchspec]))
     total_cpi = sum(map(lambda info: info[0] / info[1], gcpt_ipc[benchspec])) / total_weight
-    num_instr = get_total_inst(benchspec, spec_version, isa)
+    if gcc12Enable:
+      num_instr = int(json_data[benchspec]["insts"])
+    else:
+      num_instr = get_total_inst(benchspec, spec_version, isa)
     num_seconds = total_cpi * num_instr / (frequency * (10 ** 9))
     print(f"{benchspec:>25} coverage: {total_weight:.2f}")
     spec_name = benchspec.split("_")[0]
@@ -405,7 +417,7 @@ if __name__ == "__main__":
   elif args.report:
     gcpt = load_all_gcpt(args.gcpt_path, args.json_path, args.threads, 
       state_filter=[GCPT.STATE_FINISHED], xs_path=args.ref, sorted_by=lambda x: x.benchspec.lower())
-    xs_report(gcpt, args.ref, args.version, args.isa, args.jobs)
+    xs_report(gcpt, args.ref, args.version, args.isa, args.jobs, args.json_path)
   elif args.report_top_down:
     gcpt = load_all_gcpt(args.gcpt_path, args.json_path, args.threads, 
       state_filter=[GCPT.STATE_FINISHED], xs_path=args.ref, sorted_by=lambda x: x.benchspec.lower())
@@ -445,5 +457,3 @@ if __name__ == "__main__":
     print("Last: ", gcpt[-1])
     input("Please check and press enter to continue")
     xs_run(gcpt, args.xs, args.warmup, args.max_instr, args.threads, args.cmdline_opt)
-    
-    # AutoEmailAlert.inform(0, f"{args.xs}执行完毕", "maxpicca@qq.com")

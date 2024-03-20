@@ -8,7 +8,7 @@ from multiprocessing import Process, Queue
 from tqdm import tqdm
 import json
 
-
+gcc12Enable=True
 class PerfManip(object):
     def __init__(self, name, counters, func):
         self.name = name
@@ -53,8 +53,9 @@ class PerfCounters(object):
         """
         all_perf_counters = dict()
         total_weight = 0
-        for point in spec_json[spec_name]:
-            weight = spec_json[spec_name][point]
+        data_iterator = spec_json[spec_name]["points"] if gcc12Enable else spec_json[spec_name]
+        for point in data_iterator:
+            weight = data_iterator[point]   
             dir_name = "_".join([spec_name, point, weight])
             abs_dir = os.path.join(spec_dir, dir_name)
             if not os.path.exists(abs_dir):
@@ -550,14 +551,14 @@ def get_all_manip():
     all_manip.append(sttlb_sa_percent)
     ptw_access_latency = PerfManip(
         name = "global.ptw_access_latency",
-        counters = [f"dtlbRepeater.inflight_cycle", f"dtlbRepeater.ptw_req_count"],
+        counters = [f"dtlbRepeater1.inflight_cycle", f"dtlbRepeater1.ptw_req_count"],
         func = lambda cycle, count: cycle / count if (count > 0) else 0
     )
     all_manip.append(ptw_access_latency)
     dcache_load_miss_rate = PerfManip(
         name = "global.dcache_load_miss_rate_first_issue",
-        counters = [f"LoadUnit_0.load_s2.in_fire_first_issue", f"LoadUnit_0.load_s2.dcache_miss_first_issue",
-            f"LoadUnit_1.load_s2.in_fire_first_issue", f"LoadUnit_1.load_s2.dcache_miss_first_issue"],
+        counters = [f"LoadUnit_0.s2_in_fire_first_issue", f"LoadUnit_0.s2_dcache_miss_first_issue",
+            f"LoadUnit_1.s2_in_fire_first_issue", f"LoadUnit_1.s2_dcache_miss_first_issue"],
         func = lambda req1, miss1, req2, miss2: (miss1 + miss2) / (req1 + req2)
     )
     all_manip.append(dcache_load_miss_rate)
@@ -576,8 +577,8 @@ def get_all_manip():
     ptw_mem_latency = PerfManip(
         name = "global.ptw_mem_latency",
         counters = [
-            "core.ptw.ptw.mem_count",
-            "core.ptw.ptw.mem_cycle"
+            "core.memBlock.ptw.ptw.mem_count",
+            "core.memBlock.ptw.ptw.mem_cycle"
         ],
         func = lambda count, cycle : cycle / count if count > 0 else 0
     )
@@ -585,8 +586,8 @@ def get_all_manip():
     l2tlb_cache_l2 = PerfManip(
         name = "global.ptw.l2hit_rate",
         counters = [
-            "core.ptw.ptw.cache.l2_hit_first",
-            'core.ptw.ptw.cache.access_first',
+            "core.memBlock.ptw.ptw.cache.l2_hit_first",
+            'core.memBlock.ptw.ptw.cache.access_first',
         ],
         func = lambda hit, access : hit / access if access > 0 else 0
     )
@@ -594,8 +595,8 @@ def get_all_manip():
     l2tlb_cache_pte = PerfManip(
         name = "global.ptw.pte_hit_rate",
         counters = [
-            "core.ptw.ptw.cache.pte_hit_first",
-            'core.ptw.ptw.cache.access_first',
+            "core.memBlock.ptw.ptw.cache.pte_hit_first",
+            'core.memBlock.ptw.ptw.cache.access_first',
         ],
         func = lambda hit, access : hit / access if access > 0 else 0
     )
@@ -603,8 +604,8 @@ def get_all_manip():
     l2tlb_cache_pte_pre = PerfManip(
         name = "global.ptw.pte_hit_pre_rate",
         counters = [
-            "core.ptw.ptw.cache.pte_hit_pre_first",
-            'core.ptw.ptw.cache.pte_hit_first',
+            "core.memBlock.ptw.ptw.cache.pte_hit_pre_first",
+            'core.memBlock.ptw.ptw.cache.pte_hit_first',
         ],
         func = lambda pre, hit : pre / hit if hit > 0 else 0
     )
@@ -612,12 +613,23 @@ def get_all_manip():
     l2tlb_cache_pre_hit = PerfManip(
         name = "global.ptw.pre_pte_hit_rate",
         counters = [
-            "core.ptw.ptw.cache.pre_pte_hit_first",
-            'core.ptw.ptw.cache.pre_access_first',
+            "core.memBlock.ptw.ptw.cache.pre_pte_hit_first",
+            'core.memBlock.ptw.ptw.cache.pre_access_first',
         ],
         func = lambda hit, access : hit / access if access > 0 else 0
     )
     all_manip.append(l2tlb_cache_pre_hit)
+    l2cache_mpki_load = PerfManip(
+        name = "global.l2cache_mpki_load",
+        counters = [
+            "l2cache.slices_0.mainPipe.a_req_miss", "l2cache.slices_1.mainPipe.a_req_miss",
+            "l2cache.slices_2.mainPipe.a_req_miss", "l2cache.slices_3.mainPipe.a_req_miss",
+            "commitInstr"
+        ],
+        func = lambda miss0, miss1, miss2, miss3, instr :
+            1000 * (miss0 + miss1 + miss2 + miss3) / instr
+    )
+    all_manip.append(l2cache_mpki_load)
     l3cache_mpki_load = PerfManip(
         name = "global.l3cache_mpki_load",
         counters = [
