@@ -619,6 +619,28 @@ def get_all_manip():
         func = lambda hit, access : hit / access if access > 0 else 0
     )
     all_manip.append(l2tlb_cache_pre_hit)
+
+    l2cache_hit_rate = PerfManip(
+        name = "global.l2cache_hit_rate",
+        counters = [f"l2top.l2cache.slices_0.mainPipe.a_req_miss", f"l2top.l2cache.slices_0.mainPipe.a_req_hit", 
+                    f"l2top.l2cache.slices_1.mainPipe.a_req_miss", f"l2top.l2cache.slices_1.mainPipe.a_req_hit", 
+                    f"l2top.l2cache.slices_2.mainPipe.a_req_miss", f"l2top.l2cache.slices_2.mainPipe.a_req_hit", 
+                    f"l2top.l2cache.slices_3.mainPipe.a_req_miss", f"l2top.l2cache.slices_3.mainPipe.a_req_hit"],
+        func = lambda miss0, hit0, miss1, hit1, miss2, hit2, miss3, hit3  : 
+            (hit0 + hit1 + hit2 + hit3) / (hit0 + hit1 + hit2 + hit3 + miss0 + miss1 + miss2 + miss3)  if (hit0 + hit1 + hit2 + hit3 + miss0 + miss1 + miss2 + miss3) > 0 else 0
+    )
+    all_manip.append(l2cache_hit_rate)
+    l2cache_acq_hit_rate = PerfManip(
+        name = "global.l2cache_acq_hit_rate",
+        counters = [f"l2top.l2cache.slices_0.mainPipe.acquire_miss", f"l2top.l2cache.slices_0.mainPipe.acquire_hit", 
+                    f"l2top.l2cache.slices_1.mainPipe.acquire_miss", f"l2top.l2cache.slices_1.mainPipe.acquire_hit", 
+                    f"l2top.l2cache.slices_2.mainPipe.acquire_miss", f"l2top.l2cache.slices_2.mainPipe.acquire_hit", 
+                    f"l2top.l2cache.slices_3.mainPipe.acquire_miss", f"l2top.l2cache.slices_3.mainPipe.acquire_hit"],
+        func = lambda miss0, hit0, miss1, hit1, miss2, hit2, miss3, hit3  : 
+            (hit0 + hit1 + hit2 + hit3) / (hit0 + hit1 + hit2 + hit3 + miss0 + miss1 + miss2 + miss3)  if (hit0 + hit1 + hit2 + hit3 + miss0 + miss1 + miss2 + miss3) > 0 else 0
+    )
+    all_manip.append(l2cache_acq_hit_rate)
+
     l2cache_mpki_load = PerfManip(
         name = "global.l2cache_mpki_load",
         counters = [
