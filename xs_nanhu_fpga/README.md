@@ -3,7 +3,7 @@ Core RTL to FPGA Steps
 
 1. modify Makefile.nanhu, assign CORE_DIR
 
-2. make nanhu
+2. make nanhu or nanhu_tango_19p
   (this step compile a project named xs_nanhu)
   (from this step on, you may use vivado gui)
 

@@ -7,6 +7,9 @@ PRJ = "./xs_nanhu/xs_nanhu.xpr" # do not touch
 nanhu: xs_nanhu
 	vivado -mode batch -source src/tcl/xs_uart.tcl -tclargs --cpu $@ --project_name $^ --core_dir $(CORE_DIR) --ip_dir $(IP_DIR)
 
+nanhu_tango_19p: xs_nanhu
+	vivado -mode batch -source src/tcl/xs_uart_tango.tcl -tclargs --cpu $@ --project_name $^ --core_dir $(CORE_DIR) --ip_dir $(IP_DIR)
+
 nanhu_v3: xs_nanhu
 	vivado -mode batch -source src/tcl/xs_uart_v3.tcl -tclargs --cpu nanhu --project_name $^ --core_dir $(CORE_DIR) --ip_dir $(IP_DIR)
 
@@ -15,3 +18,6 @@ add_sys_option:
 
 update_core_flist:
 	ls $(CORE_DIR) | grep -E ".*\.v|.*\.sv" | awk -f core_flist.awk > ./src/tcl/cpu_nanhu_files.tcl
+
+update_core_flist_tango:
+	ls $(CORE_DIR) | grep -E ".*\.v|.*\.sv" | awk -f core_flist.awk > ./src/tcl/cpu_nanhu_tango_19p_files.tcl
