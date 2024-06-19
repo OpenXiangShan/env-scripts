@@ -6,6 +6,7 @@ import signal
 import time
 import getpass
 import ast
+import psutil
 
 class Server(object):
   def __init__(self, ip):
@@ -35,6 +36,7 @@ class Server(object):
     pwd = os.path.dirname(os.path.abspath(__file__))
     cmd = ["python3", f"{pwd}/get_free_core.py", f"{threads}"]
     ssh_cmd_str = " ".join(self.remote_cmd + cmd)
+    # print(ssh_cmd_str)
     proc = os.popen(ssh_cmd_str)
     result = proc.read().strip()
     result = ast.literal_eval(result)
@@ -42,8 +44,8 @@ class Server(object):
 
   def assign(self, test_name, cmd, threads, xs_path, stdout_file, stderr_file):
     self.check_running()
-    (free, mem, start, end) = self.remote_get_free_cores(threads)
-    # print((free, mem, start, end))
+    (free, mem, start, end, server_cores) = self.remote_get_free_cores(threads)
+    # print(free, mem, start, end, server_cores)
     if not free:
       return False
     for running in self.pending_proc:
@@ -59,7 +61,7 @@ class Server(object):
       proc = subprocess.Popen(run_cmd, stdout=stdout, stderr=stderr, preexec_fn=os.setsid)
       time.sleep(1)
     self.pending_proc.append((test_name, proc, (start, end)))
-    if (len(self.pending_proc) > (128 // threads)):
+    if (len(self.pending_proc) > (server_cores // threads)):
       print(f"Server {self.ip} has more than {len(self.pending_proc)} proc. Is it OK?")
     return True
 
@@ -90,6 +92,5 @@ class Server(object):
     os.popen(" ".join(self.remote_cmd) + f" python3 {pwd}/stop_emu.py")
 
   def is_epyc(self):
-    proc = os.popen(" ".join(self.remote_cmd) + " cat /proc/cpuinfo | grep 'processor' | wc -l")
-    result = int(proc.read().strip())
-    return (result == 256)
+    num_core = psutil.cpu_count(logical=False)
+    return num_core > 16

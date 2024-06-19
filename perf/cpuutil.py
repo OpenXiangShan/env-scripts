@@ -13,11 +13,11 @@ def get_free_cores(n):
     free = sum(window_usage) < 30 * n and True not in map(lambda x: x > 80, window_usage if is_epyc() else core_usage)
     if free:
       # return (Success?, memory node, start_core, end_core)
-      return (True, ((i * n) % 128)// 64, i * n, i * n + n - 1)
-  return (False, 0, 0, 0)
+      print(f'num_core: {num_core}, num_window: {num_window}, start: {i * n}, end: {i * n + n - 1}')
+      return (True, ((i * n) % num_core)// (num_core//2), i * n, i * n + n - 1, num_core)
+  return (False, 0, 0, 0, num_core)
   # print(f"No free {n} cores found. CPU usage: {core_usage}\n")
 
 def is_epyc():
-  # has 128 core? equal to is_epyc now.
   num_core = psutil.cpu_count(logical=False)
-  return (num_core == 128)
+  return num_core > 16
