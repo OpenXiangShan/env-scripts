@@ -121,7 +121,7 @@ def xs_run(server_list, workloads, xs_path, warmup, max_instr, threads):
       assigned = False
       while not assigned:
         for s in servers:
-          if s.assign(f"{workload}", run_cmd, threads, xs_path, workload.get_out_path(), workload.get_err_path()):
+          if s.assign(f"{workload}", run_cmd, threads, xs_path, workload.get_out_path(), workload.get_err_path(), dry_run):
             assigned = True
             count = count + 1
             break
@@ -338,6 +338,7 @@ if __name__ == "__main__":
   parser.add_argument('--dir', default=None, type=str, help='SPECTasks dir')
   parser.add_argument('--jobs', '-j', default=1, type=int, help="processing files in 'j' threads")
   parser.add_argument('--resume', action='store_true', default=False, help="continue to exe, ignore the aborted and success tests")
+  parser.add_argument('--dry-run', action='store_true', default=False, help="does not run real simulation")
 
   args = parser.parse_args()
 
@@ -410,4 +411,4 @@ if __name__ == "__main__":
     print("All:  ", len(gcpt))
     print("First:", gcpt[0])
     print("Last: ", gcpt[-1])
-    xs_run(args.server_list, gcpt, args.xs, args.warmup, args.max_instr, args.threads)
+    xs_run(args.server_list, gcpt, args.xs, args.warmup, args.max_instr, args.threads, args.dry_run)
