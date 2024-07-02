@@ -6,3 +6,5 @@ PyYAML==6.0
 tqdm==4.64.1
 yagmail==0.15.293
 PyGithub==1.57
+numpy
+sshconf
