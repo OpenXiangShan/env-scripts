@@ -64,10 +64,10 @@ class Server(object):
     return result
 
   def remote_get_free_cores_glance(self, threads):
-    # curl http://localhost:61208/api/3/core
+    # curl http://localhost:61208/api/4/core
     # return: {"log": 4, "phys": 2}
-    print("url:", f"http://{self.ip}:{Server.glance_port}/api/3/core")
-    core_info = requests.get(f"http://{self.ip}:{Server.glance_port}/api/3/core").json()
+    print("url:", f"http://{self.ip}:{Server.glance_port}/api/4/core")
+    core_info = requests.get(f"http://{self.ip}:{Server.glance_port}/api/4/core").json()
     num_phys_cores = core_info['phys']
     num_log_cores = core_info['log']
     has_smt = num_phys_cores*2 == num_log_cores
@@ -76,8 +76,8 @@ class Server(object):
     rand_windows = np.random.permutation(num_windows)  # use random windows to avoid unexpected waiting on a free window
     window_usage_thres = 20 * threads
 
-    per_core_info = requests.get(f"http://{self.ip}:{Server.glance_port}/api/3/percpu").json()
-    # curl http://localhost:61208/api/3/percpu
+    per_core_info = requests.get(f"http://{self.ip}:{Server.glance_port}/api/4/percpu").json()
+    # curl http://localhost:61208/api/4/percpu
     # return:
     # [{"cpu_number": 0,
     #   ....
@@ -91,16 +91,16 @@ class Server(object):
     # ]
 
     for w in rand_windows:
-      window_uasge = 0
+      window_usage = 0
       for i in range(threads):
         core_id = w * threads + i
-        window_uasge += per_core_info[core_id]['total']
+        window_usage += per_core_info[core_id]['total']
         if has_smt:
           smt_sibling = core_id + num_phys_cores
-          window_uasge += per_core_info[smt_sibling]['total']
+          window_usage += per_core_info[smt_sibling]['total']
       start = w * threads
       end = w * threads + threads - 1
-      if window_uasge < window_usage_thres:
+      if window_usage < window_usage_thres:
         # always assume numa with 2 cpus
         numa_node = int(start >= (num_phys_cores // 2))
         return (True, numa_node, start, end, num_phys_cores)
