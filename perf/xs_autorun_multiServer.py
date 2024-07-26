@@ -15,8 +15,10 @@ import perf
 import spec_score
 from server import Server
 from gcpt_run_time_eval import *
+import copy
 # import AutoEmailAlert
 
+""" PRAMETERS THAT NEED YOU CHECK """
 tasks_dir = "SPEC06_EmuTasks_10_22_2021"
 perf_base_path = ""
 gcc12Enable = True
@@ -26,7 +28,7 @@ emuArgR = "/nfs-nvme/home/share/zyy/shared_payloads/old-gcpt-restorer/gcpt.bin" 
 def get_perf_base_path(xs_path):
   return os.path.join(xs_path, tasks_dir)
 
-def load_all_gcpt(gcpt_path, json_path, server_num, threads, state_filter=None, xs_path=None, sorted_by=None, report=False):
+def load_all_gcpt(gcpt_path, json_path, server_num, threads, state_filter=None, xs_path=None, sorted_by=None, report=False, dump_json_path=None):
   perf_filter = [
     ("l3cache_mpki_load",      lambda x: float(x) < 3),
     ("branch_prediction_mpki", lambda x: float(x) > 5),
@@ -35,6 +37,10 @@ def load_all_gcpt(gcpt_path, json_path, server_num, threads, state_filter=None, 
   all_gcpt = []
   with open(json_path) as f:
     data = json.load(f)
+  is_dump = dump_json_path is not None
+  dump_json = {}
+  if is_dump:
+    dump_json = copy.deepcopy(data)
   hour_list=[]
   perf_base_path = get_perf_base_path(xs_path)
   for benchspec in data:
@@ -63,6 +69,11 @@ def load_all_gcpt(gcpt_path, json_path, server_num, threads, state_filter=None, 
       if perf_match and state_match:
         hour_list.append(hour)
         all_gcpt.append(gcpt)
+      elif is_dump:
+        if gcc12Enable:
+          del dump_json[benchspec]["points"][point]
+        else:
+          del dump_json[benchspec][point]
   if not report:
     print(f"evaluate execute hours: {cal_exe_hours(hour_list, (128 * server_num) // threads)}")
 
@@ -71,16 +82,9 @@ def load_all_gcpt(gcpt_path, json_path, server_num, threads, state_filter=None, 
     if not report:
       hour_list = [g.eval_run_hours for g in all_gcpt]
       print(f"opitimize execute hours: {cal_exe_hours(hour_list, (128 * server_num) // threads)}")
-  dump_json = True
-  dump_json = False
-  if dump_json:
-    json_dict = dict()
-    for gcpt in all_gcpt:
-      bench_dict = json_dict.get(gcpt.benchspec, dict())
-      bench_dict[gcpt.point] = gcpt.weight
-      json_dict[gcpt.benchspec] = bench_dict
-    with open("gcpt.json", "w") as f:
-      json.dump(json_dict, f)
+  if is_dump:
+    with open(dump_json_path, "w") as f:
+      json.dump(dump_json, f, indent=4)
   return all_gcpt
 
 
@@ -333,6 +337,8 @@ if __name__ == "__main__":
   parser.add_argument('--report', '-R', action='store_true', default=False, help='report only')
   parser.add_argument('--show', '-S', action='store_true', default=False, help='show list of gcpt only')
   parser.add_argument('--debug', '-D', action='store_true', default=False, help='debug options')
+  parser.add_argument('--check', '-C', action='store_true', default=False, help='debug options')
+  parser.add_argument('--dump-json-path', type=str, help='dump the json path of filter gcpt')
   parser.add_argument('--version', default=2006, type=int, help='SPEC version')
   parser.add_argument('--isa', default="rv64gcb", type=str, help='ISA version')
   parser.add_argument('--dir', default=None, type=str, help='SPECTasks dir')
@@ -375,6 +381,13 @@ if __name__ == "__main__":
       #state_filter=[GCPT.STATE_FINISHED], xs_path=args.ref, sorted_by=lambda x: -x.num_cycles)
       #state_filter=[GCPT.STATE_ABORTED], xs_path=args.ref, sorted_by=lambda x: -x.num_cycles)
     xs_show(gcpt)
+  elif args.check:
+    gcpt = load_all_gcpt(
+      args.gcpt_path, args.json_path, server_num, args.threads,
+      state_filter=[GCPT.STATE_FINISHED], # what you wanna check
+      xs_path=args.ref,
+      dump_json_path=args.dump_json_path # dump checked json
+    )
   elif args.debug:
     gcpt = load_all_gcpt(args.gcpt_path, args.json_path, server_num, args.threads,
                          state_filter=[GCPT.STATE_ABORTED],
