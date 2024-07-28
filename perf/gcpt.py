@@ -7,7 +7,7 @@ class GCPT(object):
   STATE_FINISHED = 2
   STATE_ABORTED  = 3
 
-  def __init__(self, gcpt_bin_dir: str, perf_base_dir: str,benchspec: str, point: str, weight: str, run_time: int, gcc12Enable = False):
+  def __init__(self, gcpt_bin_dir: str, perf_base_dir: str,benchspec: str, point: str, weight: str, eval_run_time: int, gcc12Enable = False):
     self.bin_base_dir = gcpt_bin_dir
     self.benchspec = benchspec
     self.point = point
@@ -21,7 +21,7 @@ class GCPT(object):
     self.num_seconds = -1
     self.waveform = []
     self.res_dir = os.path.join(perf_base_dir, self.__str__())
-    self.run_time = run_time
+    self.eval_run_time = eval_run_time
     self.gcc12Enable = gcc12Enable
 
   def __str__(self):

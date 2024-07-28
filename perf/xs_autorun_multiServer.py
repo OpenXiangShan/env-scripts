@@ -26,7 +26,6 @@ emuArgR = "/nfs-nvme/home/share/zyy/shared_payloads/old-gcpt-restorer/gcpt.bin" 
 # emuArgR = "/nfs/home/share/liyanqin/old-gcpt-restorer/gcpt.bin" # node003
 
 ref_run_time_path = "/nfs/home/share/liyanqin/env-scripts/perf/json/gcc12o3-incFpcOff-jeMalloc-time.json"
-no_ref_run_time = False
 
 def get_perf_base_path(xs_path):
   return os.path.join(xs_path, tasks_dir)
@@ -42,6 +41,7 @@ def load_all_gcpt(gcpt_path, json_path, server_num, threads, state_filter=None, 
     data = json.load(f)
   with open(ref_run_time_path) as f:
     time_data = json.load(f)
+  no_ref_run_time = False
   is_dump = dump_json_path is not None
   dump_json = {}
   if is_dump:
@@ -87,6 +87,11 @@ def load_all_gcpt(gcpt_path, json_path, server_num, threads, state_filter=None, 
 
   if sorted_by is not None:
     all_gcpt = sorted(all_gcpt, key=sorted_by)
+  elif not no_ref_run_time:
+    all_gcpt = sorted(all_gcpt, key=lambda x:-x.eval_run_time)
+  else:
+    #default sort, prioritize mcf
+    all_gcpt = sorted(all_gcpt, key=lambda x:-1 if x.benchspec=="mcf" else -float(x.weight))
 
   if is_dump:
     with open(dump_json_path, "w") as f:
@@ -412,11 +417,11 @@ if __name__ == "__main__":
     if args.resume:
       state_filter = [GCPT.STATE_RUNNING, GCPT.STATE_NONE]
     # If just wanna run aborted test, change the script.
-    gcpt = load_all_gcpt(args.gcpt_path, args.json_path, server_num, args.threads,
-                         state_filter=state_filter,
-                         xs_path=args.xs,
-                         sorted_by=lambda x:-x.run_time
-                         )
+    gcpt = load_all_gcpt(
+      args.gcpt_path, args.json_path, server_num, args.threads,
+      state_filter=state_filter,
+      xs_path=args.xs,
+    )
     #gcpt = load_all_gcpt(args.gcpt_path, args.json_path)
     #gcpt = load_all_gcpt(args.gcpt_path, args.json_path,
       #state_filter=[GCPT.STATE_ABORTED], xs_path=args.ref, sorted_by=lambda x: -x.num_cycles)
