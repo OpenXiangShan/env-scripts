@@ -30,13 +30,13 @@ def get_unset_cores(cpu_count=None, core_usage=None) -> list[int]:
   for proc in psutil.process_iter(['pid', 'name', 'cpu_affinity']):
     try:
       affinity = proc.info['cpu_affinity']
-      #two methods to judge
-      #but there are lots of stuck emu processes, `judge1` may miss the real free cores 
-      # judge1 = affinity and max(affinity) < cpu_count and "emu" in proc.info['name']
-      judge2 = affinity and max(affinity) < cpu_count and sum(core_usage[i] for i in affinity) > percpu_use_thres * len(affinity)
-      if judge2:
-        for cpu in affinity:
-          cpu_affinity_count[cpu] += 1
+      if affinity and max(affinity) < cpu_count:
+        #there are lots of stuck emu processes, `judge1` may miss the real free cores 
+        # judge1 = "emu" in proc.info['name']
+        judge2 = sum(core_usage[i] for i in affinity) > percpu_use_thres * len(affinity)
+        if judge2:
+          for cpu in affinity:
+            cpu_affinity_count[cpu] += 1
     except (psutil.NoSuchProcess, psutil.AccessDenied, psutil.ZombieProcess):
       pass
 
@@ -60,12 +60,17 @@ def get_free_cores(n):
   num_window = num_core // n
   numa_node = numa_count() # default 2
   for i in range(num_window):
+    window_cores = range(i*n, i*n+n)
     window_usage = core_usage[i * n : i * n + n]
     # print(f"Window{i} Usage: ", window_usage)
     # 5950x only allow 1 emu
+
+    #average unsage of window_cores less than percpu_use_thres
     cond1 = sum(window_usage) < percpu_use_thres * n
-    cond2 = True not in map(lambda x: x > 80, window_usage if is_epyc() else core_usage)
-    cond3 = set(window_usage).issubset(unset_cores)
+    #less than 2 core has high usage in window_cores
+    cond2 = sum(map(lambda x: x > 80, window_usage if is_epyc() else core_usage)) < 2
+    #window_cores is unset
+    cond3 = set(window_cores).issubset(unset_cores)
     if cond1 and cond2 and cond3:
       # return (Success?, memory node, start_core, end_core)
       return (True, ((i * n) % num_core)// (num_core//numa_node), i * n, i * n + n - 1, num_core)
