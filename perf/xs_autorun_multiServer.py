@@ -421,6 +421,8 @@ if __name__ == "__main__":
       args.gcpt_path, args.json_path, server_num, args.threads,
       state_filter=state_filter,
       xs_path=args.xs,
+      #both time and coverage are taken into account, but to be evaluated
+      # sorted_by=lambda x: -(x.eval_run_time * float(x.weight))
     )
     #gcpt = load_all_gcpt(args.gcpt_path, args.json_path)
     #gcpt = load_all_gcpt(args.gcpt_path, args.json_path,
