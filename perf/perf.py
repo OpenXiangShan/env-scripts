@@ -701,7 +701,7 @@ def merge_perf_counters(all_perf, verbose=False):
     pbar = tqdm(total = len(all_names), disable = not verbose, position = 3)
     for name in all_names:
         if verbose:
-            pbar.display(f"Merging perf counter: {name}", 2)
+            # pbar.display(f"Merging perf counter: {name}", 2)
             pbar.update(1)
         yield [name] + list(map(lambda perf: perf.get_counter(name, strict=True), all_perf))
 

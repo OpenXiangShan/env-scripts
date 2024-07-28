@@ -94,7 +94,7 @@ def get_server(server_list):
     l.append(Server(s))
   return l
 
-def xs_run(server_list, workloads, xs_path, warmup, max_instr, threads):
+def xs_run(server_list, workloads, xs_path, warmup, max_instr, threads, dry_run=False):
   emu_path = os.path.join(xs_path, "build/emu")
   nemu_so_path = os.path.join(xs_path, "ready-to-run/riscv64-nemu-interpreter-so")
   # nemu_so_path = os.path.join(xs_path, "ready-to-run/riscv64-spike-so")
@@ -246,6 +246,7 @@ def get_total_inst(benchspec, spec_version, isa):
     if "total guest instructions" in line:
       f.close()
       return int(line.split("instructions = ")[1].replace("\x1b[0m", ""))
+  f.close()
   return None
 
 
@@ -361,7 +362,7 @@ if __name__ == "__main__":
 
   if args.server_list is None:
     args.server_list = socket.gethostname()
-    server_num = 0
+    server_num = 1
   else:
     server_num = len(args.server_list.strip().split(" "))
 
