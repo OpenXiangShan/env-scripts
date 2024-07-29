@@ -67,8 +67,8 @@ def get_free_cores(n):
 
     #average unsage of window_cores less than percpu_use_thres
     cond1 = sum(window_usage) < percpu_use_thres * n
-    #less than 2 core has high usage in window_cores
-    cond2 = sum(map(lambda x: x > 80, window_usage if is_epyc() else core_usage)) < 2
+    #less than 1 core has high usage in window_cores
+    cond2 = sum(map(lambda x: x > 80, window_usage if is_epyc() else core_usage)) < 1
     #window_cores is unset
     cond3 = set(window_cores).issubset(unset_cores)
     if cond1 and cond2 and cond3:
