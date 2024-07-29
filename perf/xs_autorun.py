@@ -139,6 +139,7 @@ def xs_run(workloads, xs_path, warmup, max_instr, threads, cmdline_opt, dry_run)
         finish_count += 1
       if len(finished_proc) == 0:
         time.sleep(1)
+    return len(pending_proc) > 0
   try:
     for workload in workloads:
       assigned = False
@@ -181,6 +182,10 @@ def xs_run(workloads, xs_path, warmup, max_instr, threads, cmdline_opt, dry_run)
         proc = subprocess.Popen(run_cmd, stdout=stdout, stderr=stderr, preexec_fn=os.setsid)
       pending_proc.append((workload, proc, start_core))
       proc_count += 1
+    if check_running():
+      print("Waiting for pending tests to finish")
+    while check_running():
+      time.sleep(1)
   except KeyboardInterrupt:
     print("Interrupted. Exiting all programs ...")
     print("Not finished:")
