@@ -155,7 +155,7 @@ def xs_run(workloads, xs_path, warmup, max_instr, threads, cmdline_opt, dry_run)
               can_run = False
               break
           if not can_run:
-            print("NO FREE CORES, WAITING")
+            # print("NO FREE CORES, WAITING")
             time.sleep(1)
             check_running()
             continue
@@ -190,8 +190,9 @@ def xs_run(workloads, xs_path, warmup, max_instr, threads, cmdline_opt, dry_run)
     print("Interrupted. Exiting all programs ...")
     print("Not finished:")
     for i, (workload, proc, _) in enumerate(pending_proc):
-      os.killpg(os.getpgid(proc.pid), signal.SIGINT)
-      print(f"  ({i + 1}) {workload}")
+      pid = os.getpgid(proc.pid)
+      os.killpg(pid, signal.SIGKILL)
+      print(f"kill {pid}: ({i + 1}) {workload}")
     print("Not started:")
     for i, workload in enumerate(workloads):
       print(f"  ({i + 1}) {workload}")
