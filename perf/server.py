@@ -59,6 +59,8 @@ class Server(object):
     # print(ssh_cmd_str)
     proc = os.popen(ssh_cmd_str)
     result = proc.read().strip()
+    if len(result)==0:
+      result="(False, 0, 0, 0)"
     result = ast.literal_eval(result)
     # (free, mem, start, end, server_cores)
     return result
