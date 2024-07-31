@@ -109,12 +109,13 @@ class Server(object):
     return (False, 0, 0, 0, num_phys_cores)
 
   def remote_get_free_cores(self, threads):
-    try:
-      info = self.remote_get_free_cores_glance(threads)
-    except Exception as e:
-      print("Failed to get free cores from glance, fallback to ssh:", e)
-      info = self.remote_get_free_cores_ssh(threads)
-    return info
+    return self.remote_get_free_cores_ssh(threads)
+    # try:
+    #   info = self.remote_get_free_cores_glance(threads)
+    # except Exception as e:
+    #   print("Failed to get free cores from glance, fallback to ssh:", e)
+    #   info = self.remote_get_free_cores_ssh(threads)
+    # return info
 
   def assign(self, test_name, cmd, threads, xs_path, stdout_file, stderr_file, dry_run=False):
     self.check_running()
