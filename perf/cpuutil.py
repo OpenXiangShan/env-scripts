@@ -1,5 +1,6 @@
 import psutil
 import os
+import numpy as np
 
 percpu_use_thres = 30
 
@@ -26,17 +27,14 @@ def get_unset_cores(cpu_count=None, core_usage=None) -> list[int]:
     core_usage = psutil.cpu_percent(interval=5, percpu=True)
 
   cpu_affinity_count = {i: 0 for i in range(cpu_count)}
-
-  for proc in psutil.process_iter(['pid', 'name', 'cpu_affinity']):
+  valid_list = ['running', 'disk-sleep', 'waking', 'waiting']
+  for proc in psutil.process_iter(['pid', 'name', 'cpu_affinity', 'status']):
     try:
       affinity = proc.info['cpu_affinity']
-      if affinity and max(affinity) < cpu_count:
-        #there are lots of stuck emu processes, `judge1` may miss the real free cores 
-        # judge1 = "emu" in proc.info['name']
-        judge2 = sum(core_usage[i] for i in affinity) > percpu_use_thres * len(affinity)
-        if judge2:
-          for cpu in affinity:
-            cpu_affinity_count[cpu] += 1
+      valid = proc.info['status'] in valid_list
+      if affinity and max(affinity) < cpu_count and len(affinity) > 1 and valid:
+        for cpu in affinity:
+          cpu_affinity_count[cpu] += 1
     except (psutil.NoSuchProcess, psutil.AccessDenied, psutil.ZombieProcess):
       pass
 
@@ -59,7 +57,9 @@ def get_free_cores(n):
   # print(f"Core Count: {num_core}\nCore Usage: {core_usage}\nUnset Cores: {unset_cores}")
   num_window = num_core // n
   numa_node = numa_count() # default 2
-  for i in range(num_window):
+  # use random windows to avoid unexpected waiting on a free window
+  rand_windows = np.random.permutation(num_window)
+  for i in rand_windows:
     window_cores = range(i*n, i*n+n)
     window_usage = core_usage[i * n : i * n + n]
     # print(f"Window{i} Usage: ", window_usage)
