@@ -73,7 +73,7 @@ def get_free_cores(n):
     cond3 = set(window_cores).issubset(unset_cores)
     if cond1 and cond2 and cond3:
       # return (Success?, memory node, start_core, end_core)
-      return (True, ((i * n) % num_core)// (num_core//numa_node), i * n, i * n + n - 1, num_core)
+      return (True, (int)(((i * n) % num_core)// (num_core//numa_node)), (int)(i * n), (int)(i * n + n - 1), num_core)
   return (False, 0, 0, 0, num_core)
   # print(f"No free {n} cores found. CPU usage: {core_usage}\n")
 
