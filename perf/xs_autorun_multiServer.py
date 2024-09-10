@@ -81,8 +81,12 @@ def load_all_gcpt(gcpt_path, json_path, server_num, threads, state_filter=None, 
       elif is_dump:
         if gcc12Enable:
           del dump_json[benchspec]["points"][point]
+          if len(dump_json[benchspec]["points"]) == 0:
+            del dump_json[benchspec]
         else:
           del dump_json[benchspec][point]
+          if len(dump_json[benchspec]) == 0:
+            del dump_json[benchspec]
 
   if sorted_by is not None:
     all_gcpt = sorted(all_gcpt, key=sorted_by)
@@ -396,6 +400,7 @@ if __name__ == "__main__":
     gcpt = load_all_gcpt(
       args.gcpt_path, args.json_path, server_num, args.threads,
       state_filter=[GCPT.STATE_FINISHED], # what you wanna check
+      # state_filter=[GCPT.STATE_NONE, GCPT.STATE_ABORTED, GCPT.STATE_RUNNING],
       xs_path=args.ref,
       dump_json_path=args.dump_json_path # dump checked json
     )
