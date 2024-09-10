@@ -27,6 +27,8 @@ emuArgR = "/nfs/home/share/liyanqin/old-gcpt-restorer/gcpt.bin"
 ref_run_time_path = "/nfs/home/share/liyanqin/env-scripts/perf/json/gcc12o3-incFpcOff-jeMalloc-time.json"
 
 def get_perf_base_path(xs_path):
+  if os.path.isabs(tasks_dir):
+    return tasks_dir
   return os.path.join(xs_path, tasks_dir)
 
 def load_all_gcpt(gcpt_path, json_path, server_num, threads, state_filter=None, xs_path=None, sorted_by=None, report=False, dump_json_path=None):
