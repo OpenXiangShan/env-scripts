@@ -16,6 +16,7 @@ import spec_score
 from server import Server
 from gcpt_run_time_eval import *
 import copy
+from tqdm import tqdm
 # import AutoEmailAlert
 
 """ PRAMETERS THAT NEED YOU CHECK """
@@ -110,7 +111,7 @@ def get_server(server_list):
     l.append(Server(s))
   return l
 
-def xs_run(server_list, workloads, xs_path, warmup, max_instr, threads, version=2006, dry_run=False):
+def xs_run(server_list, workloads, xs_path, warmup, max_instr, threads, version=2006, dry_run=False, verbose=True):
   emu_path = os.path.join(xs_path, "build/emu")
   nemu_so_path = os.path.join(xs_path, "ready-to-run/riscv64-nemu-interpreter-so")
   # nemu_so_path = os.path.join(xs_path, "ready-to-run/riscv64-spike-so")
@@ -133,7 +134,7 @@ def xs_run(server_list, workloads, xs_path, warmup, max_instr, threads, version=
   try:
     max_num = len(workloads)
     count = 0
-    for index in range(max_num):
+    for index in tqdm(range(max_num)):
       workload = workloads[index]
       random_seed = random.randint(0, 9999)
       run_cmd = base_arguments + [workload.get_bin_path()] + ["-s", f"{random_seed}"]
@@ -143,7 +144,7 @@ def xs_run(server_list, workloads, xs_path, warmup, max_instr, threads, version=
       assigned = False
       while not assigned:
         for s in servers:
-          if s.assign(f"{workload}", run_cmd, threads, xs_path, workload.get_out_path(), workload.get_err_path(), dry_run):
+          if s.assign(f"{workload}", run_cmd, threads, xs_path, workload.get_out_path(), workload.get_err_path(), dry_run, verbose):
             assigned = True
             count = count + 1
             break
@@ -364,6 +365,7 @@ if __name__ == "__main__":
   parser.add_argument('--jobs', '-j', default=1, type=int, help="processing files in 'j' threads")
   parser.add_argument('--resume', action='store_true', default=False, help="continue to exe, ignore the aborted and success tests")
   parser.add_argument('--dry-run', action='store_true', default=False, help="does not run real simulation")
+  parser.add_argument('--verbose', '-v', action='store_true', default=True, help="display more outputs")
 
   args = parser.parse_args()
 
@@ -446,4 +448,4 @@ if __name__ == "__main__":
     print("All:  ", len(gcpt))
     print("First:", gcpt[0])
     print("Last: ", gcpt[-1])
-    xs_run(args.server_list, gcpt, args.xs, args.warmup, args.max_instr, args.threads, args.version, args.dry_run)
+    xs_run(args.server_list, gcpt, args.xs, args.warmup, args.max_instr, args.threads, args.version, args.dry_run, args.verbose)
