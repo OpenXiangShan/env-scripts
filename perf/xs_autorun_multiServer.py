@@ -151,8 +151,9 @@ def xs_run(server_list, workloads, xs_path, warmup, max_instr, threads, dry_run=
       print("Waiting for pending tests to finish")
     while not server_all_free():
       time.sleep(1)
-  except KeyboardInterrupt:
-    print("Interrupted. Exiting all programs ...")
+  except (Exception, SystemExit, KeyboardInterrupt, AssertionError) as e:
+    print(f"An error occurred: {e}")
+    print("Exception / Interrupt. Exiting all programs ...")
 
     pending_tests = []
     success_tests= []
