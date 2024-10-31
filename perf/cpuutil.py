@@ -48,7 +48,7 @@ def get_free_cores(n):
       n (int): threads you need
 
   Returns:
-      tuple[bool, int, int, int]: is success, memory node, start_core, end_core
+      tuple[bool, int, int, int, int]: is success, memory node, start_core, end_core, physical cores number
   """
   # SMT is not allowed
   num_core = psutil.cpu_count(logical=False)
