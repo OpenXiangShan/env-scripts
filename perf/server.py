@@ -60,7 +60,7 @@ class Server(object):
     proc = os.popen(ssh_cmd_str)
     result = proc.read().strip()
     if len(result)==0:
-      return "(False, 0, 0, 0)"
+      return "(False, 0, 0, 0, 0)"
     result = ast.literal_eval(result)
     # (free, mem, start, end, server_cores)
     return result
@@ -109,14 +109,9 @@ class Server(object):
     return (False, 0, 0, 0, num_phys_cores)
 
   def remote_get_free_cores(self, threads):
-    try:
-      info = self.remote_get_free_cores_glance(threads)
-    except Exception as e:
-      print("Failed to get free cores from glance, fallback to ssh:", e)
-      info = self.remote_get_free_cores_ssh(threads)
-    return info
+    return self.remote_get_free_cores_ssh(threads)
 
-  def assign(self, test_name, cmd, threads, xs_path, stdout_file, stderr_file, dry_run=False):
+  def assign(self, test_name, cmd, threads, xs_path, stdout_file, stderr_file, dry_run=False, verbose=True):
     self.check_running()
     (free, mem, start, end, server_cores) = self.remote_get_free_cores(threads)
     # print(free, mem, start, end, server_cores)
@@ -131,7 +126,8 @@ class Server(object):
     run_cmd = self.numactl(cmd, mem, start, end, server_cores)
     run_cmd = self.remote_cmd + [f"NOOP_HOME={xs_path}"] + run_cmd
     os.system("date")
-    print(f"{' '.join(run_cmd)}")
+    if verbose:
+      print(f"{' '.join(run_cmd)}")
 
     with open(stdout_file, "w") as stdout, open(stderr_file, "w") as stderr:
       proc = subprocess.Popen(run_cmd, stdout=stdout, stderr=stderr, preexec_fn=os.setsid)
