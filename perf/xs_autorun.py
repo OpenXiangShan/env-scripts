@@ -186,8 +186,9 @@ def xs_run(workloads, xs_path, warmup, max_instr, threads, cmdline_opt, dry_run)
       print("Waiting for pending tests to finish")
     while check_running():
       time.sleep(1)
-  except KeyboardInterrupt:
-    print("Interrupted. Exiting all programs ...")
+  except (Exception, SystemExit, KeyboardInterrupt, AssertionError) as e:
+    print(f"An error occurred: {e}")
+    print("Exception / Interrupt. Exiting all programs ...")
     print("Not finished:")
     for i, (workload, proc, _) in enumerate(pending_proc):
       pid = os.getpgid(proc.pid)
