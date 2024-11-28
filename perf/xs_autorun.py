@@ -21,11 +21,11 @@ from gcpt_run_time_eval import *
 from gcpt import GCPT
 import copy
 import AutoEmailAlert
+from tqdm import tqdm
 
 tasks_dir = "SPEC06_EmuTasks_10_22_2021"
 gcc12Enable = True
-emuArgR = "/nfs-nvme/home/share/zyy/shared_payloads/old-gcpt-restorer/gcpt.bin" # open01
-# emuArgR = "/nfs/home/share/liyanqin/old-gcpt-restorer/gcpt.bin" # node003
+emuArgR = "/nfs/home/share/liyanqin/old-gcpt-restorer/gcpt.bin"
 
 ref_run_time_path = "/nfs/home/share/liyanqin/env-scripts/perf/json/gcc12o3-incFpcOff-jeMalloc-time.json"
 
@@ -102,7 +102,7 @@ def load_all_gcpt(gcpt_path, json_path, threads, state_filter=None, xs_path=None
       json.dump(dump_json, f, indent=4)
   return all_gcpt
 
-def xs_run(workloads, xs_path, warmup, max_instr, threads, cmdline_opt, dry_run):
+def xs_run(workloads, xs_path, warmup, max_instr, threads, cmdline_opt, dry_run, verbose=True):
   emu_path = os.path.join(xs_path, "build/emu")
   nemu_so_path = os.path.join(xs_path, "ready-to-run/riscv64-nemu-interpreter-so")
   #nemu_so_path = os.path.join(xs_path, "ready-to-run/riscv64-spike-so")
@@ -141,6 +141,8 @@ def xs_run(workloads, xs_path, warmup, max_instr, threads, cmdline_opt, dry_run)
         time.sleep(1)
     return len(pending_proc) > 0
   try:
+    if not verbose:
+      workloads = tqdm(workloads)
     for workload in workloads:
       assigned = False
       start_core = proc_count % 128 # avoid repeated start_core
@@ -163,7 +165,8 @@ def xs_run(workloads, xs_path, warmup, max_instr, threads, cmdline_opt, dry_run)
             numa_cmd = ["numactl", "-m", str(mem), "-C", f"{start_core}-{end_core}"]
           else:
             numa_cmd = ["numactl", "-C", f"{start_core}-{end_core}"]
-          print(numa_cmd)
+          if verbose:
+            print(numa_cmd)
           break
       workload_path = workload.get_bin_path()
       result_path = workload.get_res_dir()
@@ -417,6 +420,7 @@ if __name__ == "__main__":
   parser.add_argument('--jobs', '-j', default=1, type=int, help="processing files in 'j' threads")
   parser.add_argument('--resume', action='store_true', default=False, help="continue to exe, ignore the aborted and success tests")
   parser.add_argument('--dry-run', action='store_true', default=False, help="does not run real simulation")
+  parser.add_argument('--verbose', '-v', action='store_true', default=True, help="display more outputs")
 
   args = parser.parse_args()
 
@@ -490,4 +494,4 @@ if __name__ == "__main__":
     print("First:", gcpt[0])
     print("Last: ", gcpt[-1])
     input("Please check and press enter to continue")
-    xs_run(gcpt, args.xs, args.warmup, args.max_instr, args.threads, args.cmdline_opt, args.dry_run)
+    xs_run(gcpt, args.xs, args.warmup, args.max_instr, args.threads, args.cmdline_opt, args.dry_run, args.verbose)
