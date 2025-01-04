@@ -167,7 +167,7 @@ def xs_run(server_list, workloads, xs_path, warmup, max_instr, threads, version=
     success_tests= []
     for s in servers:
       s.stop()
-      print(f"{s.ip} stopped")
+      print(f"{s.ipname} stopped")
       pending_tests = pending_tests + s.pending_tests()
       success_tests = success_tests + s.success_tests
     print(f"Finished {len(success_tests)}/{max_num}")
@@ -183,7 +183,7 @@ def xs_run(server_list, workloads, xs_path, warmup, max_instr, threads, version=
   for s in servers:
     s.check_running()
     # s.stop()
-    # print(f"{s.ip} stopped")
+    # print(f"{s.ipname} stopped")
     failed_tests = failed_tests + s.failed_tests
   if len(failed_tests) > 0:
     print(f"Errors {len(failed_tests)}/{max_num}:")
@@ -366,7 +366,7 @@ if __name__ == "__main__":
   parser.add_argument('--jobs', '-j', default=1, type=int, help="processing files in 'j' threads")
   parser.add_argument('--resume', action='store_true', default=False, help="continue to exe, ignore the aborted and success tests")
   parser.add_argument('--dry-run', action='store_true', default=False, help="does not run real simulation")
-  parser.add_argument('--verbose', '-v', action='store_true', default=True, help="display more outputs")
+  parser.add_argument('--verbose', '-v', action='store_true', default=False, help="display more outputs")
 
   args = parser.parse_args()
 
