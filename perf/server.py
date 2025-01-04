@@ -117,7 +117,10 @@ class Server(object):
 
   def assign(self, test_name, cmd, threads, xs_path, stdout_file, stderr_file, dry_run=False, verbose=True):
     self.check_running()
-    (free, mem, start, end, server_cores) = self.remote_get_free_cores(threads)
+    try:
+      (free, mem, start, end, server_cores) = self.remote_get_free_cores(threads)
+    except:
+      (free, mem, start, end, server_cores) = (False, 0, 0, 0, 0)
     # print(free, mem, start, end, server_cores)
     if not free:
       return False
