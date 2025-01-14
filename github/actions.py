@@ -51,7 +51,9 @@ def get_actions_data(run_numbers, commits, messages):
     benchmarks = []
     for i, (run_number, commit) in enumerate(zip(run_numbers, commits)):
         perf_path = os.path.join(base_dir, str(run_number))
-        if not os.path.isdir(perf_path):
+        os.makedirs(perf_path, exist_ok=True)
+        os.system(f"scp node037:{perf_path}/* {perf_path}")
+        if not os.listdir(perf_path):
             print(f"{commit} perf data {perf_path} not found. Skip.")
             continue
         print(commit, perf_path)
