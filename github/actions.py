@@ -21,9 +21,10 @@ def get_commit_messages(token, sha):
 def get_recent_commits(token, number=10):
     g = Github(token)
     xs = g.get_repo("OpenXiangShan/XiangShan")
-    actions = xs.get_workflow_runs(branch="master", event="push")
-    recent_commits = list(map(lambda a: a.head_sha, actions[:number]))
-    run_numbers = list(map(lambda a: a.run_number, actions[:number]))
+    actions = xs.get_workflow_runs(branch="master", event="push")[:5*number]
+    emu_actions = [a for a in actions if a.name == "EMU Test"][:number]
+    recent_commits = list(map(lambda a: a.head_sha, emu_actions))
+    run_numbers = list(map(lambda a: a.run_number, emu_actions))
     commit_messages = get_commit_messages(token, recent_commits)
     return run_numbers, recent_commits, commit_messages
 
@@ -120,8 +121,9 @@ def get_pull_request(repo, head_sha):
 def get_pull_requests(token):
     g = Github(token)
     xs = g.get_repo("OpenXiangShan/XiangShan")
-    actions = xs.get_workflow_runs(event="pull_request", status="success")
-    for i, action in enumerate(actions[:15]):
+    actions = xs.get_workflow_runs(event="pull_request", status="success")[:75]
+    emu_actions = [a for a in actions if a.name == "EMU Test"][:15]
+    for i, action in enumerate(emu_actions):
         has_open_pr, pull_request = get_pull_request(xs, action.head_sha)
         if not has_open_pr:
             print(f"Do not find open pull request for action {action.run_number}")
