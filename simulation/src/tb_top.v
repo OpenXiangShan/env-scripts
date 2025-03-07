@@ -61,7 +61,9 @@ module tb_top();
 
   `TOP_MODULE top (
     .clock             (clock          ),
-    .reset             (reset          )
+    .reset             (reset          ),
+    .io_dse_rst        (reset          ),
+    .io_reset_vector   (32'h80000000   )
 `ifdef SIM_UART
     ,
     .io_uart_out_valid (uart_out_valid ),
