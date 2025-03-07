@@ -6,4 +6,4 @@ src/*
 !src/SimJTAG.v
 images/*
 !images/ram.bin
-
+!hw.f
