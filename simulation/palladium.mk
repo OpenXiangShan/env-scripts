@@ -35,8 +35,7 @@ palladium-build: $(PLDM_BUILD_DIR) $(PLDM_CLOCK_SRC)
 
 palladium-run: $(PLDM_BUILD_DIR) $(PLDM_CLOCK_SRC)
 	cd $(PLDM_BUILD_DIR) &&	                      \
-		xrun $(PLDM_RUN_FLAGS)                    \
-		-input $(REPO_PATH)/scripts/run.tcl
+		xeDebug -input $(REPO_PATH)/scripts/run.tcl
 
 palladium-debug: $(PLDM_BUILD_DIR) $(PLDM_CLOCK_SRC)
 	cd $(PLDM_BUILD_DIR) &&                       \

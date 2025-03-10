@@ -1,9 +1,6 @@
-run 1ns
-date
+debug .
+host bjos_emu
 xc on -zt0 -xt0 -tbrun
 date
+run -swap
 run
-date
-xc off
-date
-exit
