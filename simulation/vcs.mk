@@ -13,12 +13,20 @@ VCS_FLAGS += -fgp
 VCS_FLAGS += -Mdir=$(VCS_BUILD_DIR)
 VCS_FLAGS += +define+VCS $(MACRO_FLAGS)
 
+VCS_CSRC_DIR  = $(abspath ./src/csrc)
+VCS_CXXFILES  = $(shell find $(VCS_CSRC_DIR) -name "*.cpp")
+VCS_CXXFLAGS  = -I$(VCS_CSRC_DIR)/include
+
+VCS_FLAGS += -CFLAGS "$(VCS_CXXFLAGS)"
+VCS_CXXFLAGS += -std=c++11 -static
+VCS_FLAGS += +incdir+$(REPO_PATH)/src/build
+
 ifneq ($(FILELIST),)
 VCS_FLAGS += -F $(FILELIST)
 endif
 
 $(VCS_TARGET):
-	vcs $(VCS_FLAGS)
+	vcs $(VCS_FLAGS) $(VCS_CXXFILES)
 
 vcs-sim: $(VCS_TARGET)
 

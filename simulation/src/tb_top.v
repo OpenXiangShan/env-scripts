@@ -59,11 +59,21 @@ module tb_top();
   end
 `endif // SIM_UART
 
+  wire dse_reset_valid;
+  wire [35:0] dse_reset_vector;
+
+`include "DSEMacro.v"
+
+  // define performance counter wires
+  `DEFINE_HARDEN_PERFCNT
+
   `TOP_MODULE top (
-    .clock             (clock          ),
-    .reset             (reset          ),
-    .io_dse_rst        (reset          ),
-    .io_reset_vector   (32'h80000000   )
+    .clock              (clock          ),
+    .reset              (reset          ),
+    .io_dse_rst         (reset          ),
+    .io_reset_vector    (36'h10000000   ),
+    `PERFCNT_CONNECTIONS
+    .io_dse_reset_valid (dse_reset_valid)
 `ifdef SIM_UART
     ,
     .io_uart_out_valid (uart_out_valid ),
@@ -72,5 +82,13 @@ module tb_top();
     .io_uart_in_ch     (uart_in_ch     )
 `endif // SIM_UART
   );
+
+  DSEEndpoint dseendpoint (
+    .clock              (clock          ),
+    .reset              (reset          ),
+    `PERFCNT_CONNECTIONS
+    .dse_reset_valid    (dse_reset_valid)
+  );
+  
 
 endmodule

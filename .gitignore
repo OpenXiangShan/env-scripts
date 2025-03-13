@@ -4,6 +4,7 @@
 !vcs/testbench/AXI4RAM/*.v
 !vcs/testbench/*.v
 !requirements.txt
+!simulation/src/*.v
 
 __pycache__
 

@@ -1,9 +1,7 @@
-src/*
-!src/tb_top.v
-!src/FlashHelper.v
-!src/RAMHelper.v
-!src/SDHelper.v
-!src/SimJTAG.v
+src/build
 images/*
 !images/ram.bin
-!hw.f
+*.o
+vc_hdrs.h
+simv.daidir
+simv-compile
