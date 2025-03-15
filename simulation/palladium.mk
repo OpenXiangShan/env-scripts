@@ -20,13 +20,14 @@ PLDM_BUILD_FLAGS += -v $(AXIS_HOME)/etc/ixcom/IXCclkgen.sv
 
 PLDM_BUILD_FLAGS += +incdir+$(REPO_PATH)/src/build
 
+BOOST_DIR      = $(abspath ../boost)
 PLDM_CSRC_DIR  = $(abspath ./src/csrc)
-PLDM_CXXFILES  = $(shell find $(VCS_CSRC_DIR) -name "*.cpp")
-DPILIB_EMU     = $(PLDM_BUILD_DIR)/libdpi_emu.so
-PLDM_CXXFLAGS  = -m64 -c -fPIC -g -std=c++11 -I$(PLDM_IXCOM) -I$(PLDM_SIMTOOL) -I$(PLDM_CSRC_DIR)/include
+PLDM_CXXFILES  = $(shell find $(PLDM_CSRC_DIR) -name "*.cpp")
+DPILIB_EMU     = $(REPO_PATH)/$(PLDM_BUILD_DIR)/libdpi_emu.so
+PLDM_CXXFLAGS  = -m64 -c -fPIC -g -std=c++11 -I$(PLDM_IXCOM) -I$(PLDM_SIMTOOL) -I$(PLDM_CSRC_DIR)/include -I$(BOOST_DIR)
 
 XMSIM_FLAGS = --xmsim -64 +xcprof -profile -PROFTHREAD
-XMSIM_FLAGS += -sv_lib ${DPILIB_EMU}
+XMSIM_FLAGS += -sv_lib $(BOOST_DIR)/stage/lib/libboost_filesystem.1.74.0.so -sv_lib $(BOOST_DIR)/stage/lib/libboost_system.1.74.0.so -sv_lib ${DPILIB_EMU} 
 XMSIM_FLAGS += $(PLDM_EXTRA_ARGS)
 XMSIM_FLAGS += --
 
@@ -37,7 +38,7 @@ endif
 PLDM_RUN_FLAGS += -64 -R -l run-$$(date +%Y%m%d-%H%M%S).log
 
 $(PLDM_BUILD_DIR):
-	mkdir -p $(PLDM_BUILD_DIR)
+	mkdir -p $(REPO_PATH)/$(PLDM_BUILD_DIR)
 
 $(PLDM_CC_OBJ_DIR):
 	mkdir -p $(PLDM_CC_OBJ_DIR)
@@ -49,20 +50,20 @@ $(PLDM_CLOCK_SRC): $(PLDM_CLOCK_DEF)
 		-hierarchy "$(TB_TOP)."
 
 palladium-build: $(PLDM_BUILD_DIR) $(PLDM_CLOCK_SRC) $(DPILIB_EMU)
-	cd $(PLDM_BUILD_DIR) &&	                      \
+	cd $(REPO_PATH)/$(PLDM_BUILD_DIR) &&	                      \
 		ixcom $(PLDM_BUILD_FLAGS)
 
 $(DPILIB_EMU): $(PLDM_CC_OBJ_DIR)
 	cd $(PLDM_CC_OBJ_DIR) 					&& \
 	$(CC) $(PLDM_CXXFLAGS) $(PLDM_CXXFILES)			&& \
-	$(CC) -o $@ -m64 -shared *.o $(PLDM_LD_LIB)
+	$(CC) -o $@ -m64 -shared *.o
 
 palladium-run: $(PLDM_BUILD_DIR) $(PLDM_CLOCK_SRC)
-	cd $(PLDM_BUILD_DIR) &&	                      \
+	cd $(REPO_PATH)/$(PLDM_BUILD_DIR) &&	                      \
 		xeDebug $(XMSIM_FLAGS) -input $(REPO_PATH)/scripts/run.tcl
 
 palladium-debug: $(PLDM_BUILD_DIR) $(PLDM_CLOCK_SRC)
-	cd $(PLDM_BUILD_DIR) &&                       \
+	cd $(REPO_PATH)/$(PLDM_BUILD_DIR) &&                       \
 		xrun $(PLDM_RUN_FLAGS)                    \
 		-xedebug -xedebugargs -vcd                \
 		-input $(REPO_PATH)/scripts/run_debug.tcl
@@ -70,4 +71,4 @@ palladium-debug: $(PLDM_BUILD_DIR) $(PLDM_CLOCK_SRC)
 clean-run: palladium-build palladium-run
 
 palladium-clean:
-	rm -rf $(PLDM_BUILD_DIR)
+	rm -rf $(REPO_PATH)/$(PLDM_BUILD_DIR)

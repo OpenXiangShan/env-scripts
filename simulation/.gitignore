@@ -5,3 +5,5 @@ images/*
 vc_hdrs.h
 simv.daidir
 simv-compile
+simv
+*.so

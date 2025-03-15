@@ -61,6 +61,7 @@ module tb_top();
 
   wire dse_reset_valid;
   wire [35:0] dse_reset_vector;
+  wire [63:0] dse_epoch;
 
 `include "DSEMacro.v"
 
@@ -73,7 +74,9 @@ module tb_top();
     .io_dse_rst         (reset          ),
     .io_reset_vector    (36'h10000000   ),
     `PERFCNT_CONNECTIONS
-    .io_dse_reset_valid (dse_reset_valid)
+    .io_dse_reset_valid (dse_reset_valid),
+    .io_dse_reset_vec   (dse_reset_vector),
+    .io_dse_epoch       (dse_epoch       )
 `ifdef SIM_UART
     ,
     .io_uart_out_valid (uart_out_valid ),
@@ -87,7 +90,9 @@ module tb_top();
     .clock              (clock          ),
     .reset              (reset          ),
     `PERFCNT_CONNECTIONS
-    .dse_reset_valid    (dse_reset_valid)
+    .dse_reset_valid    (dse_reset_valid),
+    .dse_reset_vector   (dse_reset_vector),
+    .dse_epoch          (dse_epoch       )
   );
   
 

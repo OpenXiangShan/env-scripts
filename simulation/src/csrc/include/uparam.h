@@ -2,6 +2,8 @@
 #define __UPARAM_H
 
 #include "common.h"
+#include <vector>
+#include "o3cpu_design_space.h"
 
 struct uparam_t {
     int robsize;
@@ -45,5 +47,9 @@ extern uparam_t uparam;
 
 #define MAX_EPOCH_ADDR      0x1000
 
+void init_uparam(std::vector<int> embedding, int epoch);
+void embedding_to_uparam(std::vector<int> embedding);
+void set_uparam(uint64_t addr, uint64_t data);
+std::vector<int> uparam_to_embedding();
 
 #endif // __UPARAM_H

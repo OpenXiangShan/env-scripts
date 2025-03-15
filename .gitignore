@@ -22,3 +22,5 @@ json/
 
 # python third-party libraries are stored temporarily
 psutil/
+
+boost/

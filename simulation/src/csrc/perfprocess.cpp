@@ -134,7 +134,15 @@ int Perfprocess::update_deg_v2() {
             << " : BlockFromSerial=" << find_perfCnt("BlockFromSerial_" + std::to_string(i));
         
         traces.push_back(trace.str());
-        if (true) {
+        std::ofstream trace_file("traces.txt", std::ios::app);
+        if (trace_file.is_open()) {
+            trace_file << trace.str() << std::endl;
+            trace_file.close();
+        } else {
+            std::cerr << "Failed to open trace file for writing." << std::endl;
+        }
+
+        if (false) {
             std::cout << trace.str() << std::endl;
         }
     }
