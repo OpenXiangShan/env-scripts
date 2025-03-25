@@ -129,7 +129,7 @@ def xs_run(server_list, workloads, xs_path, warmup, max_instr, threads, version=
     for s in servers:
       if not s.is_free():
         return False
-      return True
+    return True
 
   try:
     max_num = len(workloads)
