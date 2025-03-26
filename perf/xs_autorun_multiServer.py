@@ -134,6 +134,9 @@ def xs_run(server_list, workloads, xs_path, warmup, max_instr, threads, version=
   try:
     max_num = len(workloads)
     count = 0
+    server_index_max = len(servers)
+    server_index_flag = 0
+    server_index_flag_next = 0
     for index in tqdm(range(max_num)):
       workload = workloads[index]
       random_seed = random.randint(0, 9999)
@@ -143,11 +146,17 @@ def xs_run(server_list, workloads, xs_path, warmup, max_instr, threads, version=
         os.makedirs(workload.get_res_dir(), exist_ok=True)
       assigned = False
       while not assigned:
-        for s in servers:
-          if s.assign(f"{workload}", run_cmd, threads, xs_path, workload.get_out_path(), workload.get_err_path(), dry_run, verbose):
+        # for sidx in random.sample(range(len(servers)), len(servers)):
+        for sidx in range(server_index_flag, server_index_max):
+          if servers[sidx].assign(f"{workload}", run_cmd, threads, xs_path, workload.get_out_path(), workload.get_err_path(), dry_run, verbose):
             assigned = True
             count = count + 1
+            server_index_flag_next = sidx
             break
+        if server_index_flag_next == server_index_max - 1:
+          server_index_flag = 0
+        else:
+          server_index_flag = server_index_flag_next
         if not assigned:
           time.sleep(1)
           for s in servers:
