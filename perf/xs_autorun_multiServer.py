@@ -153,7 +153,7 @@ def xs_run(server_list, workloads, xs_path, warmup, max_instr, threads, version=
             count = count + 1
             server_index_flag_next = sidx
             break
-        if server_index_flag_next == server_index_max - 1:
+        if not assigned or server_index_flag_next == server_index_max - 1:
           server_index_flag = 0
         else:
           server_index_flag = server_index_flag_next
