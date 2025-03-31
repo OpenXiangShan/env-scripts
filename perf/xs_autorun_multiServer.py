@@ -129,11 +129,14 @@ def xs_run(server_list, workloads, xs_path, warmup, max_instr, threads, version=
     for s in servers:
       if not s.is_free():
         return False
-      return True
+    return True
 
   try:
     max_num = len(workloads)
     count = 0
+    server_index_max = len(servers)
+    server_index_flag = 0
+    server_index_flag_next = 0
     for index in tqdm(range(max_num)):
       workload = workloads[index]
       random_seed = random.randint(0, 9999)
@@ -143,11 +146,17 @@ def xs_run(server_list, workloads, xs_path, warmup, max_instr, threads, version=
         os.makedirs(workload.get_res_dir(), exist_ok=True)
       assigned = False
       while not assigned:
-        for s in servers:
-          if s.assign(f"{workload}", run_cmd, threads, xs_path, workload.get_out_path(), workload.get_err_path(), dry_run, verbose):
+        # for sidx in random.sample(range(len(servers)), len(servers)):
+        for sidx in range(server_index_flag, server_index_max):
+          if servers[sidx].assign(f"{workload}", run_cmd, threads, xs_path, workload.get_out_path(), workload.get_err_path(), dry_run, verbose):
             assigned = True
             count = count + 1
+            server_index_flag_next = sidx
             break
+        if not assigned or server_index_flag_next == server_index_max - 1:
+          server_index_flag = 0
+        else:
+          server_index_flag = server_index_flag_next
         if not assigned:
           time.sleep(1)
           for s in servers:
@@ -167,7 +176,7 @@ def xs_run(server_list, workloads, xs_path, warmup, max_instr, threads, version=
     success_tests= []
     for s in servers:
       s.stop()
-      print(f"{s.ip} stopped")
+      print(f"{s.ipname} stopped")
       pending_tests = pending_tests + s.pending_tests()
       success_tests = success_tests + s.success_tests
     print(f"Finished {len(success_tests)}/{max_num}")
@@ -183,7 +192,7 @@ def xs_run(server_list, workloads, xs_path, warmup, max_instr, threads, version=
   for s in servers:
     s.check_running()
     # s.stop()
-    # print(f"{s.ip} stopped")
+    # print(f"{s.ipname} stopped")
     failed_tests = failed_tests + s.failed_tests
   if len(failed_tests) > 0:
     print(f"Errors {len(failed_tests)}/{max_num}:")
@@ -366,7 +375,7 @@ if __name__ == "__main__":
   parser.add_argument('--jobs', '-j', default=1, type=int, help="processing files in 'j' threads")
   parser.add_argument('--resume', action='store_true', default=False, help="continue to exe, ignore the aborted and success tests")
   parser.add_argument('--dry-run', action='store_true', default=False, help="does not run real simulation")
-  parser.add_argument('--verbose', '-v', action='store_true', default=True, help="display more outputs")
+  parser.add_argument('--verbose', '-v', action='store_true', default=False, help="display more outputs")
 
   args = parser.parse_args()
 

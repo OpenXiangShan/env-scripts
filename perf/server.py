@@ -16,7 +16,7 @@ import numpy as np
 
 class Server(object):
   glance_port = 61208
-  def __init__(self, node_name):
+  def __init__(self, node_name, verbose = False):
     ssh_conf_file = osp.expanduser('~/.ssh/config')
     openssh_config_exist = osp.exists(ssh_conf_file)
     if openssh_config_exist:
@@ -27,12 +27,15 @@ class Server(object):
       found_node_name_in_ssh = False
 
     if openssh_config_exist and found_node_name_in_ssh:
-      print(host_conf)
+      if verbose:
+        print(host_conf)
       self.ip = host_conf['hostname']
+      self.ipname = node_name
       self.username = getpass.getuser()
       self.remote_cmd = ["ssh", node_name]
     else:
       self.ip = node_name
+      self.ipname = node_name
       self.username = getpass.getuser()
       self.remote_cmd = ["ssh", f"{self.username}@{self.ip}"]
 
@@ -65,10 +68,11 @@ class Server(object):
     # (free, mem, start, end, server_cores)
     return result
 
-  def remote_get_free_cores_glance(self, threads):
+  def remote_get_free_cores_glance(self, threads, verbose = False):
     # curl http://localhost:61208/api/4/core
     # return: {"log": 4, "phys": 2}
-    print("url:", f"http://{self.ip}:{Server.glance_port}/api/4/core")
+    if verbose:
+      print("url:", f"http://{self.ip}:{Server.glance_port}/api/4/core")
     core_info = requests.get(f"http://{self.ip}:{Server.glance_port}/api/4/core").json()
     num_phys_cores = core_info['phys']
     num_log_cores = core_info['log']
@@ -113,7 +117,10 @@ class Server(object):
 
   def assign(self, test_name, cmd, threads, xs_path, stdout_file, stderr_file, dry_run=False, verbose=True):
     self.check_running()
-    (free, mem, start, end, server_cores) = self.remote_get_free_cores(threads)
+    try:
+      (free, mem, start, end, server_cores) = self.remote_get_free_cores(threads)
+    except:
+      (free, mem, start, end, server_cores) = (False, 0, 0, 0, 0)
     # print(free, mem, start, end, server_cores)
     if not free:
       return False
@@ -125,8 +132,8 @@ class Server(object):
       cmd = ["hostname;", "sleep", "60"]
     run_cmd = self.numactl(cmd, mem, start, end, server_cores)
     run_cmd = self.remote_cmd + [f"NOOP_HOME={xs_path}"] + run_cmd
-    os.system("date")
     if verbose:
+      os.system("date")
       print(f"{' '.join(run_cmd)}")
 
     with open(stdout_file, "w") as stdout, open(stderr_file, "w") as stderr:
@@ -135,7 +142,7 @@ class Server(object):
         time.sleep(1)
     self.pending_proc.append((test_name, proc, (start, end)))
     if (len(self.pending_proc) > (server_cores // threads)):
-      print(f"Server {self.ip} has more than {len(self.pending_proc)} proc. Is it OK?")
+      print(f"Server {self.ipname} has more than {len(self.pending_proc)} proc. Is it OK?")
     return True
 
   def check_running(self):
