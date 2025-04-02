@@ -67,8 +67,8 @@ def extract_output(file_name, print_result=False, highlight=True, print_sum=True
     inside = False
     fail = False
     for line in log:
-      begin_match = begin_pat.match(line)
-      end_match = end_pat.match(line)
+      begin_match = begin_pat.search(line)
+      end_match = end_pat.search(line)
       if begin_match:
         if inside:
           # re-inside a spec output, which means last not finish
@@ -103,7 +103,7 @@ def extract_output(file_name, print_result=False, highlight=True, print_sum=True
                 result.print_result(highlight)
               spec_record[spec_name] = result
         if (inside and (not fail)):
-          time_match = time_pat.match(line)
+          time_match = time_pat.search(line)
           if time_match:
             if (begin_time == ""):
               begin_time = time_match.group("time")
