@@ -1,5 +1,7 @@
 module tb_top();
 
+`include "DSEMacro.v"
+
   // clock generation
 `ifdef VCS
   reg clock;
@@ -59,41 +61,337 @@ module tb_top();
   end
 `endif // SIM_UART
 
-  wire dse_reset_valid;
-  wire [35:0] dse_reset_vector;
-  wire [63:0] dse_epoch;
-
-`include "DSEMacro.v"
-
-  // define performance counter wires
-  `DEFINE_HARDEN_PERFCNT
-
-  `TOP_MODULE top (
-    .clock              (clock          ),
-    .reset              (reset          ),
-    .io_dse_rst         (reset          ),
-    .io_reset_vector    (36'h10000000   ),
-    `PERFCNT_CONNECTIONS
-    .io_dse_reset_valid (dse_reset_valid),
-    .io_dse_reset_vec   (dse_reset_vector),
-    .io_dse_epoch       (dse_epoch       )
-`ifdef SIM_UART
-    ,
-    .io_uart_out_valid (uart_out_valid ),
-    .io_uart_out_ch    (uart_out_ch    ),
-    .io_uart_in_valid  (uart_in_valid  ),
-    .io_uart_in_ch     (uart_in_ch     )
-`endif // SIM_UART
-  );
-
-  DSEEndpoint dseendpoint (
-    .clock              (clock          ),
-    .reset              (reset          ),
-    `PERFCNT_CONNECTIONS
-    .dse_reset_valid    (dse_reset_valid),
-    .dse_reset_vector   (dse_reset_vector),
-    .dse_epoch          (dse_epoch       )
-  );
+  wire          dma_core_awready;
+  wire           dma_core_awvalid;
+  wire  [13:0]   dma_core_awid;
+  wire  [35:0]   dma_core_awaddr;
+  wire  [7:0]    dma_core_awlen;
+  wire  [2:0]    dma_core_awsize;
+  wire  [1:0]    dma_core_awburst;
+  wire           dma_core_awlock;
+  wire  [3:0]    dma_core_awcache;
+  wire  [2:0]    dma_core_awprot;
+  wire  [3:0]    dma_core_awqos;
+  wire          dma_core_wready;
+  wire           dma_core_wvalid;
+  wire  [255:0]  dma_core_wdata;
+  wire  [31:0]   dma_core_wstrb;
+  wire           dma_core_wlast;
+  wire           dma_core_bready;
+  wire          dma_core_bvalid;
+  wire [13:0]   dma_core_bid;
+  wire [1:0]    dma_core_bresp;
+  wire          dma_core_arready;
+  wire           dma_core_arvalid;
+  wire  [13:0]   dma_core_arid;
+  wire  [35:0]   dma_core_araddr;
+  wire  [7:0]    dma_core_arlen;
+  wire  [2:0]    dma_core_arsize;
+  wire  [1:0]    dma_core_arburst;
+  wire           dma_core_arlock;
+  wire  [3:0]    dma_core_arcache;
+  wire  [2:0]    dma_core_arprot;
+  wire  [3:0]    dma_core_arqos;
+  wire           dma_core_rready;
+  wire          dma_core_rvalid;
+  wire [13:0]   dma_core_rid;
+  wire [255:0]  dma_core_rdata;
+  wire [1:0]    dma_core_rresp;
+  wire          dma_core_rlast;
   
+  wire           peri_awready;
+  wire          peri_awvalid;
+  wire [1:0]    peri_awid;
+  wire [30:0]   peri_awaddr;
+  wire [7:0]    peri_awlen;
+  wire [2:0]    peri_awsize;
+  wire [1:0]    peri_awburst;
+  wire          peri_awlock;
+  wire [3:0]    peri_awcache;
+  wire [2:0]    peri_awprot;
+  wire [3:0]    peri_awqos;
+  wire           peri_wready;
+  wire          peri_wvalid;
+  wire [63:0]   peri_wdata;
+  wire [7:0]    peri_wstrb;
+  wire          peri_wlast;
+  wire          peri_bready;
+  wire           peri_bvalid;
+  wire  [1:0]    peri_bid;
+  wire  [1:0]    peri_bresp;
+  wire           peri_arready;
+  wire          peri_arvalid;
+  wire [1:0]    peri_arid;
+  wire [30:0]   peri_araddr;
+  wire [7:0]    peri_arlen;
+  wire [2:0]    peri_arsize;
+  wire [1:0]    peri_arburst;
+  wire          peri_arlock;
+  wire [3:0]    peri_arcache;
+  wire [2:0]    peri_arprot;
+  wire [3:0]    peri_arqos;
+  wire          peri_rready;
+  wire           peri_rvalid;
+  wire  [1:0]    peri_rid;
+  wire  [63:0]   peri_rdata;
+  wire  [1:0]    peri_rresp;
+  wire           peri_rlast;
+  
+  wire           mem_core_awready;
+  wire          mem_core_awvalid;
+  wire [13:0]   mem_core_awid;
+  wire [35:0]   mem_core_awaddr;
+  wire [7:0]    mem_core_awlen;
+  wire [2:0]    mem_core_awsize;
+  wire [1:0]    mem_core_awburst;
+  wire          mem_core_awlock;
+  wire [3:0]    mem_core_awcache;
+  wire [2:0]    mem_core_awprot;
+  wire [3:0]    mem_core_awqos;
+  wire           mem_core_wready;
+  wire          mem_core_wvalid;
+  wire [255:0]  mem_core_wdata;
+  wire [31:0]   mem_core_wstrb;
+  wire          mem_core_wlast;
+  wire          mem_core_bready;
+  wire           mem_core_bvalid;
+  wire  [13:0]   mem_core_bid;
+  wire  [1:0]    mem_core_bresp;
+  wire           mem_core_arready;
+  wire          mem_core_arvalid;
+  wire [13:0]   mem_core_arid;
+  wire [35:0]   mem_core_araddr;
+  wire [7:0]    mem_core_arlen;
+  wire [2:0]    mem_core_arsize;
+  wire [1:0]    mem_core_arburst;
+  wire          mem_core_arlock;
+  wire [3:0]    mem_core_arcache;
+  wire [2:0]    mem_core_arprot;
+  wire [3:0]    mem_core_arqos;
+  wire          mem_core_rready;
+  wire           mem_core_rvalid;
+  wire  [13:0]   mem_core_rid;
+  wire  [255:0]  mem_core_rdata;
+  wire  [1:0]    mem_core_rresp;
+  wire           mem_core_rlast;
+
+  wire out_enable;
+  wire [`DEG_DATA_WIDTH+`MAGIC_NUM_WIDTH-1:0] out_io_data;
+
+  XSTop_wrapper_dse u_xstop_wrapper_dse (
+    .clock (clock),
+    .reset (reset),
+    .io_extIntrs (/* unused */),
+    .out_enable (out_enable),
+    .out_io_data (out_io_data),
+
+    .mem_core_awvalid                (mem_core_awvalid)                         ,
+    .mem_core_awready                (mem_core_awready )                        ,
+    .mem_core_awid                   (mem_core_awid    )                          ,
+    .mem_core_awaddr                 (mem_core_awaddr  )                            ,
+    .mem_core_awlen                  (mem_core_awlen   )                           ,
+    .mem_core_awsize                 (mem_core_awsize  )                            ,
+    .mem_core_awburst                (mem_core_awburst )                             ,
+    .mem_core_awlock                 (mem_core_awlock  )                            ,
+    .mem_core_awcache                (mem_core_awcache )                             ,
+    .mem_core_awprot                 (mem_core_awprot  )                            ,
+    .mem_core_awqos                  (mem_core_awqos   )                           ,
+    .mem_core_wready                 (mem_core_wready  )                       ,
+    .mem_core_wvalid                 (mem_core_wvalid  )                       ,
+    .mem_core_wdata                  (mem_core_wdata   )                           ,
+    .mem_core_wstrb                  (mem_core_wstrb   )                           ,
+    .mem_core_wlast                  (mem_core_wlast   )                           ,
+    .mem_core_bready                 (mem_core_bready  )                       ,
+    .mem_core_bvalid                 (mem_core_bvalid  )                       ,
+    .mem_core_bid                    (mem_core_bid     )                         ,
+    .mem_core_bresp                  (mem_core_bresp   )                           ,
+    .mem_core_arready                (mem_core_arready )                        ,
+    .mem_core_arvalid                (mem_core_arvalid )                        ,
+    .mem_core_arid                   (mem_core_arid    )                          ,
+    .mem_core_araddr                 (mem_core_araddr  )                            ,
+    .mem_core_arlen                  (mem_core_arlen   )                           ,
+    .mem_core_arsize                 (mem_core_arsize  )                            ,
+    .mem_core_arburst                (mem_core_arburst )                             ,
+    .mem_core_arlock                 (mem_core_arlock  )                            ,
+    .mem_core_arcache                (mem_core_arcache )                             ,
+    .mem_core_arprot                 (mem_core_arprot  )                            ,
+    .mem_core_arqos                  (mem_core_arqos   )                           ,
+    .mem_core_rready                 (mem_core_rready  )                       ,
+    .mem_core_rvalid                 (mem_core_rvalid  )                       ,
+    .mem_core_rid                    (mem_core_rid     )                         ,
+    .mem_core_rdata                  (mem_core_rdata   )                           ,
+    .mem_core_rresp                  (mem_core_rresp   )                           ,
+    .mem_core_rlast                  (mem_core_rlast   )                           ,
+    .peri_awready            (peri_awready  )                            ,
+    .peri_awvalid            (peri_awvalid  )                            ,
+    .peri_awid               (peri_awid     )                              ,
+    .peri_awaddr             (peri_awaddr   )                                ,
+    .peri_awlen              (peri_awlen    )                               ,
+    .peri_awsize             (peri_awsize   )                                ,
+    .peri_awburst            (peri_awburst  )                                 ,
+    .peri_awlock             (peri_awlock   )                                ,
+    .peri_awcache            (peri_awcache  )                                 ,
+    .peri_awprot             (peri_awprot   )                                ,
+    .peri_awqos              (peri_awqos    )                               ,
+    .peri_wready             (peri_wready   )                           ,
+    .peri_wvalid             (peri_wvalid   )                           ,
+    .peri_wdata              (peri_wdata    )                               ,
+    .peri_wstrb              (peri_wstrb    )                               ,
+    .peri_wlast              (peri_wlast    )                               ,
+    .peri_bready             (peri_bready   )                           ,
+    .peri_bvalid             (peri_bvalid   )                           ,
+    .peri_bid                (peri_bid      )                             ,
+    .peri_bresp              (peri_bresp    )                               ,
+    .peri_arready            (peri_arready  )                            ,
+    .peri_arvalid            (peri_arvalid  )                            ,
+    .peri_arid               (peri_arid     )                              ,
+    .peri_araddr             (peri_araddr   )                                ,
+    .peri_arlen              (peri_arlen    )                               ,
+    .peri_arsize             (peri_arsize   )                                ,
+    .peri_arburst            (peri_arburst  )                                 ,
+    .peri_arlock             (peri_arlock   )                                ,
+    .peri_arcache            (peri_arcache  )                                 ,
+    .peri_arprot             (peri_arprot   )                                ,
+    .peri_arqos              (peri_arqos    )                               ,
+    .peri_rready             (peri_rready   )                           ,
+    .peri_rvalid             (peri_rvalid   )                           ,
+    .peri_rid                (peri_rid      )                             ,
+    .peri_rdata              (peri_rdata    )                               ,
+    .peri_rresp              (peri_rresp    )                               ,
+    .peri_rlast              (peri_rlast    )                               ,
+    .dma_core_awready                   (dma_core_awready )                     ,
+    .dma_core_awvalid                   (dma_core_awvalid )                     ,
+    .dma_core_awid                      (dma_core_awid    )                       ,
+    .dma_core_awaddr                    (dma_core_awaddr[35:0]  )                         ,
+    .dma_core_awlen                     (dma_core_awlen   )                        ,
+    .dma_core_awsize                    (dma_core_awsize  )                         ,
+    .dma_core_awburst                   (dma_core_awburst )                          ,
+    .dma_core_awlock                    (dma_core_awlock  )                         ,
+    .dma_core_awcache                   (dma_core_awcache )                          ,
+    .dma_core_awprot                    (dma_core_awprot  )                         ,
+    .dma_core_awqos                     (dma_core_awqos   )                        ,
+    .dma_core_wready                    (dma_core_wready  )                    ,
+    .dma_core_wvalid                    (dma_core_wvalid  )                    ,
+    .dma_core_wdata                     (dma_core_wdata   )                        ,
+    .dma_core_wstrb                     (dma_core_wstrb   )                        ,
+    .dma_core_wlast                     (dma_core_wlast   )                        ,
+    .dma_core_bready                    (dma_core_bready  )                    ,
+    .dma_core_bvalid                    (dma_core_bvalid  )                    ,
+    .dma_core_bid                       (dma_core_bid     )                      ,
+    .dma_core_bresp                     (dma_core_bresp   )                        ,
+    .dma_core_arready                   (dma_core_arready )                     ,
+    .dma_core_arvalid                   (dma_core_arvalid )                     ,
+    .dma_core_arid                      (dma_core_arid    )                       ,
+    .dma_core_araddr                    (dma_core_araddr[35:0]  )                         ,
+    .dma_core_arlen                     (dma_core_arlen   )                        ,
+    .dma_core_arsize                    (dma_core_arsize  )                         ,
+    .dma_core_arburst                   (dma_core_arburst )                          ,
+    .dma_core_arlock                    (dma_core_arlock  )                         ,
+    .dma_core_arcache                   (dma_core_arcache )                          ,
+    .dma_core_arprot                    (dma_core_arprot  )                         ,
+    .dma_core_arqos                     (dma_core_arqos   )                        ,
+    .dma_core_rready                    (dma_core_rready  )                    ,
+    .dma_core_rvalid                    (dma_core_rvalid  )                    ,
+    .dma_core_rid                       (dma_core_rid     )                      ,
+    .dma_core_rdata                     (dma_core_rdata   )                        ,
+    .dma_core_rresp                     (dma_core_rresp   )                        ,
+    .dma_core_rlast                     (dma_core_rlast   )
+  );
+
+  SimMMIO l_simMMIO (	// src/test/scala/top/SimTop.scala:44:23
+    .clock                   (clock),
+    .reset                   (reset),
+    .io_axi4_0_awready      (peri_awready),
+    .io_axi4_0_awvalid      (peri_awvalid),	// src/test/scala/top/SimTop.scala:36:19
+    .io_axi4_0_awid    (peri_awid),	// src/test/scala/top/SimTop.scala:36:19
+    .io_axi4_0_awaddr  (peri_awaddr),	// src/test/scala/top/SimTop.scala:36:19
+    .io_axi4_0_awlen   (peri_awlen),	// src/test/scala/top/SimTop.scala:36:19
+    .io_axi4_0_awsize  (peri_awsize),	// src/test/scala/top/SimTop.scala:36:19
+    .io_axi4_0_awburst (peri_awburst),	// src/test/scala/top/SimTop.scala:36:19
+    .io_axi4_0_awlock  (peri_awlock),	// src/test/scala/top/SimTop.scala:36:19
+    .io_axi4_0_awcache (peri_awcache),	// src/test/scala/top/SimTop.scala:36:19
+    .io_axi4_0_awprot  (peri_awprot),	// src/test/scala/top/SimTop.scala:36:19
+    .io_axi4_0_awqos   (peri_awqos),	// src/test/scala/top/SimTop.scala:36:19
+    .io_axi4_0_wready       (peri_wready),
+    .io_axi4_0_wvalid       (peri_wvalid),	// src/test/scala/top/SimTop.scala:36:19
+    .io_axi4_0_wdata   (peri_wdata),	// src/test/scala/top/SimTop.scala:36:19
+    .io_axi4_0_wstrb   (peri_wstrb),	// src/test/scala/top/SimTop.scala:36:19
+    .io_axi4_0_wlast   (peri_wlast),	// src/test/scala/top/SimTop.scala:36:19
+    .io_axi4_0_bready       (peri_bready),	// src/test/scala/top/SimTop.scala:36:19
+    .io_axi4_0_bvalid       (peri_bvalid),
+    .io_axi4_0_bid     (peri_bid),
+    .io_axi4_0_bresp   (peri_bresp),
+    .io_axi4_0_arready      (peri_arready),
+    .io_axi4_0_arvalid      (peri_arvalid),	// src/test/scala/top/SimTop.scala:36:19
+    .io_axi4_0_arid    (peri_arid),	// src/test/scala/top/SimTop.scala:36:19
+    .io_axi4_0_araddr  (peri_araddr),	// src/test/scala/top/SimTop.scala:36:19
+    .io_axi4_0_arlen   (peri_arlen),	// src/test/scala/top/SimTop.scala:36:19
+    .io_axi4_0_arsize  (peri_arsize),	// src/test/scala/top/SimTop.scala:36:19
+    .io_axi4_0_arburst (peri_arburst),	// src/test/scala/top/SimTop.scala:36:19
+    .io_axi4_0_arlock  (peri_arlock),	// src/test/scala/top/SimTop.scala:36:19
+    .io_axi4_0_arcache (peri_arcache),	// src/test/scala/top/SimTop.scala:36:19
+    .io_axi4_0_arprot  (peri_arprot),	// src/test/scala/top/SimTop.scala:36:19
+    .io_axi4_0_arqos   (peri_arqos),	// src/test/scala/top/SimTop.scala:36:19
+    .io_axi4_0_rready       (peri_rready),	// src/test/scala/top/SimTop.scala:36:19
+    .io_axi4_0_rvalid       (peri_rvalid),
+    .io_axi4_0_rid     (peri_rid),
+    .io_axi4_0_rdata   (peri_rdata),
+    .io_axi4_0_rresp   (peri_rresp),
+    .io_axi4_0_rlast   (peri_rlast),
+    .io_uart_out_valid       (uart_out_valid),
+    .io_uart_out_ch          (uart_out_ch),
+    .io_uart_in_valid        (uart_in_valid),
+    .io_uart_in_ch           (uart_in_ch),
+    .io_interrupt_intrVec    (/* unused */)
+  );
+
+  AXI4RAMWrapper l_simAXIMem (	// src/test/scala/top/SimTop.scala:51:27
+    .clock                   (clock),
+    .reset                   (reset),
+    .io_axi4_0_awready      (mem_core_awready),
+    .io_axi4_0_awvalid      (mem_core_awvalid),	// src/test/scala/top/SimTop.scala:36:19
+    .io_axi4_0_awid    (mem_core_awid),	// src/test/scala/top/SimTop.scala:36:19
+    .io_axi4_0_awaddr  (mem_core_awaddr),	// src/test/scala/top/SimTop.scala:36:19
+    .io_axi4_0_awlen   (mem_core_awlen),	// src/test/scala/top/SimTop.scala:36:19
+    .io_axi4_0_awsize  (mem_core_awsize),	// src/test/scala/top/SimTop.scala:36:19
+    .io_axi4_0_awburst (mem_core_awburst),	// src/test/scala/top/SimTop.scala:36:19
+    .io_axi4_0_awlock  (mem_core_awlock),	// src/test/scala/top/SimTop.scala:36:19
+    .io_axi4_0_awcache (mem_core_awcache),	// src/test/scala/top/SimTop.scala:36:19
+    .io_axi4_0_awprot  (mem_core_awprot),	// src/test/scala/top/SimTop.scala:36:19
+    .io_axi4_0_awqos   (mem_core_awqos),	// src/test/scala/top/SimTop.scala:36:19
+    .io_axi4_0_wready       (mem_core_wready),
+    .io_axi4_0_wvalid       (mem_core_wvalid),	// src/test/scala/top/SimTop.scala:36:19
+    .io_axi4_0_wdata   (mem_core_wdata),	// src/test/scala/top/SimTop.scala:36:19
+    .io_axi4_0_wstrb   (mem_core_wstrb),	// src/test/scala/top/SimTop.scala:36:19
+    .io_axi4_0_wlast   (mem_core_wlast),	// src/test/scala/top/SimTop.scala:36:19
+    .io_axi4_0_bready       (mem_core_bready),	// src/test/scala/top/SimTop.scala:36:19
+    .io_axi4_0_bvalid       (mem_core_bvalid),
+    .io_axi4_0_bid     (mem_core_bid),
+    .io_axi4_0_bresp   (mem_core_bresp),
+    .io_axi4_0_arready      (mem_core_arready),
+    .io_axi4_0_arvalid      (mem_core_arvalid),	// src/test/scala/top/SimTop.scala:36:19
+    .io_axi4_0_arid    (mem_core_arid),	// src/test/scala/top/SimTop.scala:36:19
+    .io_axi4_0_araddr  (mem_core_araddr),	// src/test/scala/top/SimTop.scala:36:19
+    .io_axi4_0_arlen   (mem_core_arlen),	// src/test/scala/top/SimTop.scala:36:19
+    .io_axi4_0_arsize  (mem_core_arsize),	// src/test/scala/top/SimTop.scala:36:19
+    .io_axi4_0_arburst (mem_core_arburst),	// src/test/scala/top/SimTop.scala:36:19
+    .io_axi4_0_arlock  (mem_core_arlock),	// src/test/scala/top/SimTop.scala:36:19
+    .io_axi4_0_arcache (mem_core_arcache),	// src/test/scala/top/SimTop.scala:36:19
+    .io_axi4_0_arprot  (mem_core_arprot),	// src/test/scala/top/SimTop.scala:36:19
+    .io_axi4_0_arqos   (mem_core_arqos),	// src/test/scala/top/SimTop.scala:36:19
+    .io_axi4_0_rready       (mem_core_rready),	// src/test/scala/top/SimTop.scala:36:19
+    .io_axi4_0_rvalid       (mem_core_rvalid),
+    .io_axi4_0_rid     (mem_core_rid),
+    .io_axi4_0_rdata   (mem_core_rdata),
+    .io_axi4_0_rresp   (mem_core_rresp),
+    .io_axi4_0_rlast   (mem_core_rlast)
+  );
+
+  DPIC dpic (
+    .clock              (clock           ),
+    .reset              (reset           ),
+    .out_enable         (out_enable),
+    .out_data           (out_io_data)
+  );
 
 endmodule

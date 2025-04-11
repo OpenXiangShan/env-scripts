@@ -16,7 +16,7 @@ VCS_FLAGS += +define+VCS $(MACRO_FLAGS)
 BOOST_DIR      = $(abspath ../boost)
 VCS_CSRC_DIR  = $(abspath ./src/csrc)
 VCS_CXXFILES  = $(shell find $(VCS_CSRC_DIR) -name "*.cpp")
-VCS_CXXFLAGS  = -I$(VCS_CSRC_DIR)/include
+VCS_CXXFLAGS  = -I$(VCS_CSRC_DIR)/include -I$(VCS_HOME)/include
 
 # VCS_FLAGS += -CFLAGS "$(VCS_CXXFLAGS)"
 VCS_CXXFLAGS += -m64 -c -fPIC -g -std=c++14 -static
