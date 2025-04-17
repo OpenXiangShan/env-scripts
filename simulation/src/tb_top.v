@@ -177,9 +177,10 @@ module tb_top();
 
   wire out_enable;
   wire [`DEG_DATA_WIDTH+`MAGIC_NUM_WIDTH-1:0] out_io_data;
+  wire gate_clock;
 
   XSTop_wrapper_dse u_xstop_wrapper_dse (
-    .clock (clock),
+    .clock (gate_clock),
     .reset (reset),
     .io_extIntrs (/* unused */),
     .out_enable (out_enable),
@@ -387,8 +388,38 @@ module tb_top();
     .io_axi4_0_rlast   (mem_core_rlast)
   );
 
+  wire [511:0] tdata;
+  wire [63:0] tkeep;
+  wire tlast;
+  wire tvalid;
+  wire data_next;
+  wire [4:0] sstate;
+
+  axis_data_packge axis_dp (
+    .core_clk (clock),
+    .m_axis_c2h_aclk (clock),
+    .m_axis_c2h_aresetn (!reset),
+    .rstn (!reset),
+    .m_axis_c2h_tdata (tdata),
+    .m_axis_c2h_tkeep (tkeep),
+    .m_axis_c2h_tlast (tlast),
+    .m_axis_c2h_tready (1'b1),
+    .m_axis_c2h_tvalid (tvalid),
+    .data_valid (out_enable),
+    .data_next (data_next),
+    .sstate (sstate),
+    .data (out_io_data)
+  );
+
+  clock_gating clockgate (
+    .sys_clk(clock),
+    .enable(data_next),
+    .rstn(!reset),
+    .gated_clk(gate_clock)
+  );
+
   DPIC dpic (
-    .clock              (clock           ),
+    .clock              (gate_clock           ),
     .reset              (reset           ),
     .out_enable         (out_enable),
     .out_data           (out_io_data)

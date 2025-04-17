@@ -129,7 +129,7 @@ module XSTop_wrapper_dse(
 
   // define performance counter wires
   wire deg_out_enable;
-  wire [5:0] deg_valids;
+  wire [3:0] deg_valids;
   wire [`DEG_DATA_WIDTH-1:0] deg_out_data;  // [16000:0] is valid data
   wire [`PERF_DATA_WIDTH-1:0] perf_out_data;
   wire dse_endpoint_out_enable;

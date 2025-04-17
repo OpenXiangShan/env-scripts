@@ -82,6 +82,9 @@ module SimJTAG #(
          end // if (enable && init_done_sticky)
       end // else: !if(reset || r_reset)
    end // always @ (posedge clock)
+`else
+   assign jtag_TCK = 0;
+   assign jtag_TRSTn = 1;
 `endif // SIM_USE_DPIC
 
 endmodule

@@ -7,7 +7,7 @@ module DSEEndpoint(
   input wire [35:0] dse_reset_vector,
   input wire [63:0] dse_epoch,
   input wire deg_out_enable,
-  input wire [5:0] deg_valids,
+  input wire [3:0] deg_valids,
   input wire [`DEG_DATA_WIDTH-1:0] deg_out_data,
   input wire [`PERF_DATA_WIDTH-1:0] perf_out_data,
   output wire out_enable,
@@ -16,7 +16,9 @@ module DSEEndpoint(
 
 parameter DEG_RECORD_THRES = 200;
 
+`ifndef SYNTHESIS  // simulation
 import "DPI-C" function byte dse_init(byte dse_reset_valid);
+`endif
 
 /*
  * cycle counter
@@ -122,13 +124,19 @@ always @(posedge clock) begin
     /* decide whether to record and push the DEG information */
     if (new_phase && dse_reset_vector == 36'h80000000) begin
       deg_record <= 1'b1;
+`ifndef SYNTHESIS  // simulation
       $display("=== do DEG record ===");
+`endif
     end else if (new_phase && dse_reset_vector == 36'h10000000) begin
       deg_record <= 1'b0;
+`ifndef SYNTHESIS  // simulation
       $display("=== end DEG record by DSE reset ===");
+`endif
     end else if (deg_record && deg_record_num >= DEG_RECORD_THRES) begin
       deg_record <= 1'b0;
+`ifndef SYNTHESIS  // simulation
       $display("=== end DEG record by record num limit ===");
+`endif
     end
     deg_record_latch <= deg_record;
     // deg_record <= update_deg_record(new_phase, dse_reset_vector, deg_record, dse_epoch);
@@ -136,10 +144,12 @@ always @(posedge clock) begin
     /* update deg_record_num */
     if (deg_record) begin
       if (deg_out_enable) begin
-        deg_record_num <= deg_record_num + deg_valids[0] + deg_valids[1] + deg_valids[2] + deg_valids[3] + deg_valids[4] + deg_valids[5];
+        deg_record_num <= deg_record_num + deg_valids[0] + deg_valids[1] + deg_valids[2] + deg_valids[3];
+`ifndef SYNTHESIS  // simulation
         if (deg_valids == 0) begin
           $display("Error: deg_valids is 0 when deg_out is enabled, maybe timeout?");
         end
+`endif
       end
     end
   end
