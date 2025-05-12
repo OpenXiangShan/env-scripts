@@ -65,42 +65,9 @@ proc write_blk_mem_gen_qspi { blk_mem_gen_qspi_filepath } {
 
   puts $blk_mem_gen_qspi {MEMORY_INITIALIZATION_RADIX=16;}
   puts $blk_mem_gen_qspi {MEMORY_INITIALIZATION_VECTOR=}
-  puts $blk_mem_gen_qspi {00000093,}
-  puts $blk_mem_gen_qspi {00000113,}
-  puts $blk_mem_gen_qspi {00000193,}
-  puts $blk_mem_gen_qspi {00000213,}
-  puts $blk_mem_gen_qspi {00000293,}
-  puts $blk_mem_gen_qspi {00000313,}
-  puts $blk_mem_gen_qspi {00000393,}
-  puts $blk_mem_gen_qspi {00000413,}
-  puts $blk_mem_gen_qspi {00000493,}
-  puts $blk_mem_gen_qspi {00000513,}
-  puts $blk_mem_gen_qspi {00000593,}
-  puts $blk_mem_gen_qspi {00000613,}
-  puts $blk_mem_gen_qspi {00000693,}
-  puts $blk_mem_gen_qspi {00000713,}
-  puts $blk_mem_gen_qspi {00000793,}
-  puts $blk_mem_gen_qspi {00000813,}
-  puts $blk_mem_gen_qspi {00000893,}
-  puts $blk_mem_gen_qspi {00000913,}
-  puts $blk_mem_gen_qspi {00000993,}
-  puts $blk_mem_gen_qspi {00000a13,}
-  puts $blk_mem_gen_qspi {00000a93,}
-  puts $blk_mem_gen_qspi {00000b13,}
-  puts $blk_mem_gen_qspi {00000b93,}
-  puts $blk_mem_gen_qspi {00000c13,}
-  puts $blk_mem_gen_qspi {00000c93,}
-  puts $blk_mem_gen_qspi {00000d13,}
-  puts $blk_mem_gen_qspi {00000d93,}
-  puts $blk_mem_gen_qspi {00000e13,}
-  puts $blk_mem_gen_qspi {00000e93,}
-  puts $blk_mem_gen_qspi {00000f13,}
-  puts $blk_mem_gen_qspi {00000f93,}
-  puts $blk_mem_gen_qspi {00100293,}
+  puts $blk_mem_gen_qspi {0010029b,}
   puts $blk_mem_gen_qspi {01f29293,}
-  puts $blk_mem_gen_qspi {00028067,}
-  puts $blk_mem_gen_qspi {00000093,}
-  puts $blk_mem_gen_qspi {00000093;}
+  puts $blk_mem_gen_qspi {00028067;}
 
   flush $blk_mem_gen_qspi
   close $blk_mem_gen_qspi
