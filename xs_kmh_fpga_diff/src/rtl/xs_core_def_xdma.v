@@ -1049,7 +1049,7 @@ assign i2c2_prdata = 0;
   wire inter_soc_clk;
   wire inter_tmclk;
   xdma_ep xdma_ep_i(
-    .cpu_clk(cpu_clk),
+    .cpu_clk(sys_clk_i),
     .cpu_rstn(sys_rstn),
     .S00_AXIS_0_tdata(PCIE_S00_AXIS_0_tdata),
     .S00_AXIS_0_tkeep(64'hffffffff_ffffffff),
@@ -1071,9 +1071,9 @@ assign i2c2_prdata = 0;
     .DATA_WIDTH(16000),
     .AXIS_DATA_WIDTH(512)
   ) axis_data_packge_i (
-    .core_clk (cpu_clk),
+    .core_clk (sys_clk_i),
     .rstn     (sys_rstn),
-    .m_axis_c2h_aclk   (cpu_clk),
+    .m_axis_c2h_aclk   (sys_clk_i),
     .m_axis_c2h_aresetn(sys_rstn),
     .m_axis_c2h_tdata  (PCIE_S00_AXIS_0_tdata),
     .m_axis_c2h_tkeep  (),
