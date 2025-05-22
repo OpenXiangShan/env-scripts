@@ -495,7 +495,7 @@ def get_all_manip():
     all_manip.append(fma_latency)
     icache_miss_rate = PerfManip(
         name = "global.icache_miss_rate",
-        counters = [f"frontend.ifu.icache.req", f"frontend.ifu.icache.miss"],
+        counters = [f"frontend.inner.ifu.ifu_req", f"frontend.inner.ifu.ifu_miss"],
         func = lambda req, miss: miss / req
     )
     # all_manip.append(icache_miss_rate)
