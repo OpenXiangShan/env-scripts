@@ -1,4 +1,6 @@
 `include "sys_define.vh"
+`include "gateway_interface.svh"
+`include "DifftestMacros.v"
 
 module xs_core_def (
       input                                      ddr_clk_p,
@@ -110,7 +112,6 @@ assign uhs1_swvolt_en = 0;
 assign sd_led_control = 0;
 // }}} Unbind useless output port
 
-wire                       inter_soc_clk               ; 
 wire                       axi_bclk_sync_rstn        ; 
 wire                       ddr_bus_clk               ; 
 wire                       ddr_bclk_sync_rstn        ; 
@@ -1043,11 +1044,10 @@ assign i2c2_prdata = 0;
   wire PCIE_S00_AXIS_0_tready;
   wire PCIE_S00_AXIS_0_tvalid;
 
-  wire [`CONFIG_DIFFTEST_BATCH_IO_WITDH - 1:0] difftest_data;
-  wire difftest_enable;
+  wire [`CONFIG_DIFFTEST_BATCH_IO_WITDH - 1:0] gateway_out_data;
+  wire gateway_out_enable;
   wire inter_dev_clk;
   wire inter_soc_clk;
-  wire inter_tmclk;
   xdma_ep xdma_ep_i(
     .cpu_clk(sys_clk_i),
     .cpu_rstn(sys_rstn),
@@ -1068,11 +1068,9 @@ assign i2c2_prdata = 0;
   );
 
   axis_data_packge  #(
-    .DATA_WIDTH(16000),
+    .DATA_WIDTH(`CONFIG_DIFFTEST_BATCH_IO_WITDH),
     .AXIS_DATA_WIDTH(512)
   ) axis_data_packge_i (
-    .core_clk (sys_clk_i),
-    .rstn     (sys_rstn),
     .m_axis_c2h_aclk   (sys_clk_i),
     .m_axis_c2h_aresetn(sys_rstn),
     .m_axis_c2h_tdata  (PCIE_S00_AXIS_0_tdata),
@@ -1085,13 +1083,11 @@ assign i2c2_prdata = 0;
     .data_next  (data_need_next),
     .data       (difftest_data)
   );
-  interrupt_gen interrupt_gen_diff(
+  fpga_clock_gate fpga_clock_gate_diff(
         .soc_clk_i  (sys_clk_i),
         .soc_clk_o  (inter_soc_clk),
         .dev_clk_i  (dev_clk_i),
         .dev_clk_o  (inter_dev_clk),
-        .tmclk_i    (tmclk),
-        .tmclk_o    (inter_tmclk),
         .data_next  (data_need_next),
         .rstn       (data_rst_ok)
   );
@@ -1161,7 +1157,7 @@ jtag_ddr_subsys_wrapper U_JTAG_DDR_SUBSYS(
     .DDR4_reset_n           (DDR_RESET_N),
     .OSC_SYS_CLK_clk_n      (ddr_clk_n),
     .OSC_SYS_CLK_clk_p      (ddr_clk_p),
-    .SOC_CLK                (ui_clk),
+    .SOC_CLK                (inter_soc_clk),
     .MAC_CLK                (mac_clk),
     .SOC_RESETN             (),
     .SOC_M_AXI_awid         (cpu2ddr_m2s_awid_mix          ),  
@@ -1207,12 +1203,12 @@ jtag_ddr_subsys_wrapper U_JTAG_DDR_SUBSYS(
 );
 
 XSTop_wrapper U_CPU_TOP(
-    .difftest_enable             (difftest_enable),
-    .difftest_data               (difftest_data),
+    .gateway_out_enable             (gateway_out_enable),
+    .gateway_out_data               (gateway_out_data),
 
     .sys_clk_i                      (inter_soc_clk    ),
     .sys_rstn_i                     (cpu_rstn     ),
-    .tmclk                          (inter_tmclk),
+    .tmclk                          (tmclk),
     .osc_clock                      (inter_soc_clk ),
     .outer_clock                    (inter_soc_clk ),
     .global_reset                   (cpu_rstn                  ),

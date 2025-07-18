@@ -1,3 +1,6 @@
+`include "DifftestMacros.v"
+`include "gateway_interface.svh"
+
 module XSTop_wrapper(
   input           sys_clk_i,    
   input           sys_rstn_i, 
@@ -176,8 +179,8 @@ output io_cacheable_check_resp_1_mmio,
 output io_riscv_halt_0,
 output io_riscv_halt_1,
 
-output [15999:0]difftest_data,
-output difftest_enable
+output [`CONFIG_DIFFTEST_BATCH_IO_WITDH - 1:0]gateway_out_data,
+output gateway_out_enable
 );
 
   wire          cpu_clock       ;
@@ -194,7 +197,26 @@ output difftest_enable
 
 assign cpu_to_soc = 32'h0;
 
-XSDiffTop  u_XSTop(
+  gateway_if   gateway_if_in();
+  core_if      core_if_out[0]();
+
+  CoreToGateway u_CoreToGateway(
+    .gateway_out (gateway_if_in.out),
+    .core_in     (core_if_out)
+  );
+
+  GatewayEndpoint u_GatewayEndpoint(
+    .clock       (cpu_clk),
+    .reset       (sys_rstn_i),
+
+    .gateway_in  (gateway_if_in.in),
+
+    .fpgaIO_data    (gateway_out_data),
+    .fpgaIO_enable  (gateway_out_enable),
+    .step        ()
+  );
+
+XSTop  u_XSTop(
   .memory_awready                (mem_core_awready )                        ,
   .memory_awvalid                (mem_core_awvalid )                        ,
   .memory_awid                   (mem_core_awid    )                          ,
@@ -321,11 +343,10 @@ XSDiffTop  u_XSTop(
   .io_clock                        (sys_clk_i/*cpu_clock  */                        ),
   .io_reset                        (~sys_rstn_i/*cpu_global_reset  */                 ),
   .io_extIntrs                     (io_extIntrs  ),
-  .io_rtc_clock (tmclk),
-  .io_riscv_rst_vec_0 (38'h10000000)//,
+  .io_rtc_clock                    (tmclk),
+  .io_riscv_rst_vec_0              (38'h10000000),
 
-  .difftest_data (difftest_data),
-  .difftest_enable (difftest_enable)
+  .gateway_out                     (core_if_out[0]),
 );
 
 

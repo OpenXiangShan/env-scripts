@@ -317,13 +317,7 @@ assign io_systemjtag_reset = ~JTAG_TRSTn;
 xs_core_def xs_core_def
 (
   .ddr_clk_p            (clk7_p),
-  .ddr_clk_n            (clk7_n),
-`ifdef  XS_XDMA   
-  .pcie_sysclk          (pcie_sysclk),
-  .pcie_sysclk_gt       (pcie_sysclk_gt),
-  .pcie2_sysclk         (pcie2_sysclk),
-  .pcie2_sysclk_gt      (pcie2_sysclk_gt),
-`endif     
+  .ddr_clk_n            (clk7_n),  
   .tmclk                (tmclk_buf),
   .cqetmclk             (cqetmclk_buf),
   .ui_clk               (ui_clk),
