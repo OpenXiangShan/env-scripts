@@ -4,6 +4,4 @@ set rtl_files [list \
  [file normalize "${rtl_dir}/button_debounce.v"] \
  [file normalize "${rtl_dir}/xilnx_crg.v"] \
  [file normalize "${rtl_dir}/jtag_ddr_subsys_wrapper.v"] \
- [file normalize "${rtl_dir}/axis_data_packge.v"] \
- [file normalize "${rtl_dir}/fpga_clock_gate.v"] \
 ]
