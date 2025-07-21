@@ -1,4 +1,4 @@
-CORE_DIR ?= "/nfs/home/fengkehan/fpga-temp/XiangShan/XiangShan/build/rtl"
+CORE_DIR ?= "../../XiangShan/build"
 
 IP_DIR = "/nfs/home/share/fpga/vivado/XS_100NL_ST_V3_TAG_20211229" # do not touch
 PRJ = "./xs_kmh/xs_kmh.xpr" # do not touch
@@ -11,5 +11,5 @@ add_sys_option:
 	sed -i "s/reg \[63:0\] ram \[6143:0\];/\(\* ram_style = \"ultra\" \*\)\n \treg \[63:0\] ram \[6143:0\];/g" $(CORE_DIR)/array_*.v
 
 update_core_flist:
-	find "$(CORE_RTL_DIR)" -type f \( -name "*.v" -o -name "*.sv" -o -name "*.svh" \) -printf '%p\n' | \
-	awk -f ./scripts/fpga/core_flist.awk > ./scripts/fpga/tcl/cpu_kmh_files.tcl
+	find "$(CORE_DIR)" -type f \( -name "*.v" -o -name "*.sv" -o -name "*.svh" \) -printf '%p\n' | \
+	awk -f ./core_flist.awk > ./src/tcl/cpu_kmh_files.tcl

@@ -22,3 +22,8 @@ json/
 
 # python third-party libraries are stored temporarily
 psutil/
+
+# Xilinx Vivado project files
+xs_kmh_fpga/*
+*.jou
+cpu_kmh_files.tcl
