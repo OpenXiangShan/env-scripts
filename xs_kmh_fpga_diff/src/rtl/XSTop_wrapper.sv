@@ -198,7 +198,7 @@ output gateway_out_enable
 assign cpu_to_soc = 32'h0;
 
   gateway_if   gateway_if_in();
-  core_if      core_if_out[0]();
+  core_if      core_if_out[1]();
 
   CoreToGateway u_CoreToGateway(
     .gateway_out (gateway_if_in.out),
@@ -346,7 +346,7 @@ XSTop  u_XSTop(
   .io_rtc_clock                    (tmclk),
   .io_riscv_rst_vec_0              (38'h10000000),
 
-  .gateway_out                     (core_if_out[0]),
+  .gateway_out                     (core_if_out[0])
 );
 
 
