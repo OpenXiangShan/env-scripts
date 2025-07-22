@@ -100,7 +100,7 @@ wire vio_sw5;
 wire vio_sw4;
 wire sys_rstn;
 wire cpu_setn_buf;
-wire ui_clk, sys_clk_i, dev_clk_i;
+wire sys_clk_i, dev_clk_i;
 wire pcie_rstn;
 (*mark_debug = "true"*) wire cpu_setn_rflag;
 (*mark_debug = "true"*) reg  cpu_rstn;
@@ -195,8 +195,8 @@ IBUFDS_GTE4 refclk2_ibuf (
     .IB(refclk2_n)
 );
 
-assign        sys_clk_i = ui_clk;
-assign        dev_clk_i = ui_clk;
+assign        sys_clk_i = dbg_clk_buf;
+assign        dev_clk_i = dbg_clk_buf;
 
 vio_0 u_vio(
    .clk        (dbg_clk_buf),
@@ -320,7 +320,6 @@ xs_core_def xs_core_def
   .ddr_clk_n            (clk7_n),  
   .tmclk                (tmclk_buf),
   .cqetmclk             (cqetmclk_buf),
-  .ui_clk               (ui_clk),
   .init_calib_complete  (led3),
   .cpu_rd_qspi_valid    (led2),
   .cpu_wr_ddr_valid     (led0),

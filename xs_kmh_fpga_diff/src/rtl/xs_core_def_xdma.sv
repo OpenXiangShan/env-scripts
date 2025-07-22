@@ -7,7 +7,6 @@ module xs_core_def (
       input                                      ddr_clk_n, 
       input                                      tmclk,
       input                                      cqetmclk,
-      output                                     ui_clk,
       output                                     init_calib_complete,
       output                                     cpu_rd_qspi_valid,
       output                                     cpu_wr_ddr_valid,
