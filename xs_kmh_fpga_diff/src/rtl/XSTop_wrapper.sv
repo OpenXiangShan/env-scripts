@@ -206,7 +206,7 @@ assign cpu_to_soc = 32'h0;
   );
 
   GatewayEndpoint u_GatewayEndpoint(
-    .clock       (cpu_clk),
+    .clock       (sys_clk_i),
     .reset       (sys_rstn_i),
 
     .gateway_in  (gateway_if_in.in),

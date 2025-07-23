@@ -1078,9 +1078,9 @@ assign i2c2_prdata = 0;
     .m_axis_c2h_tready (PCIE_S00_AXIS_0_tready),
     .m_axis_c2h_tvalid (PCIE_S00_AXIS_0_tvalid),
 
-    .data_valid (difftest_enable),
+    .data_valid (gateway_out_enable),
     .data_next  (data_need_next),
-    .data       (difftest_data)
+    .data       (gateway_out_data)
   );
   fpga_clock_gate fpga_clock_gate_diff(
         .soc_clk_i  (sys_clk_i),
