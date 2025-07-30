@@ -5,8 +5,7 @@ module XSTop_wrapper(
   input           sys_clk_i,    
   input           sys_rstn_i, 
   input           tmclk,
-  input           osc_clock,        //24MHz
-  input           outer_clock,      //Max : 2.4GHz
+
   input           global_reset,     //24MHz
 
   input  [3:0]    pll_bypass_sel,   //apb clk : 100MHz

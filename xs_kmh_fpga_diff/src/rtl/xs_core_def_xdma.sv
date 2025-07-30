@@ -980,7 +980,7 @@ wire [1 : 0]                rom_axi_rresp    ;
 blk_mem_gen_0 u_rom (
   .rsta_busy      (rsta_busy),          // output wire rsta_busy
   .rstb_busy      (rstb_busy),          // output wire rstb_busy
-  .s_aclk         (soc_clk_i),                // input wire s_aclk
+  .s_aclk         (sys_clk_i),                // input wire s_aclk
   .s_aresetn      (axi_bclk_sync_rstn ),          // input wire s_aresetn
   .s_axi_awaddr   (rom_axi_awaddr     ),    // input wire [31 : 0] s_axi_awaddr
   .s_axi_awlen    (rom_axi_awlen      ),      // input wire [7 : 0] s_axi_awlen
@@ -1088,7 +1088,7 @@ assign i2c2_prdata = 0;
         .dev_clk_i  (dev_clk_i),
         .dev_clk_o  (inter_dev_clk),
         .data_next  (data_need_next),
-        .rstn       (data_rst_ok)
+        .rstn       (sys_rstn | cpu_rstn)
   );
 
 xilnx_crg xilnx_crg(
@@ -1205,11 +1205,10 @@ XSTop_wrapper U_CPU_TOP(
     .gateway_out_enable             (gateway_out_enable),
     .gateway_out_data               (gateway_out_data),
 
-    .sys_clk_i                      (inter_soc_clk    ),
+    .sys_clk_i                      (inter_soc_clk),
     .sys_rstn_i                     (cpu_rstn     ),
     .tmclk                          (tmclk),
-    .osc_clock                      (inter_soc_clk ),
-    .outer_clock                    (inter_soc_clk ),
+
     .global_reset                   (cpu_rstn                  ),
     .pll_bypass_sel                 (4'b0 ),
     .pll0_lock                      (),
