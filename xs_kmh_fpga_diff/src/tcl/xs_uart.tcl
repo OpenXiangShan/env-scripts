@@ -256,15 +256,15 @@ current_run -synthesis [get_runs synth_1]
 
 # Create 'impl_1' run (if not found)
 if {[string equal [get_runs -quiet impl_1] ""]} {
-    create_run -name impl_1 -part xcvu19p-fsva3824-2-e -flow {Vivado Implementation 2020} -strategy "Performance_ExplorePostRoutePhysOpt" -report_strategy {No Reports} -constrset constrs_1 -parent_run synth_1
+    create_run -name impl_1 -part xcvu19p-fsva3824-2-e -flow {Vivado Implementation 2020} -strategy "Congestion_SSI_SpreadLogic_high" -report_strategy {No Reports} -constrset constrs_1 -parent_run synth_1
 } else {
-  set_property strategy "Performance_ExplorePostRoutePhysOpt" [get_runs impl_1]
+  set_property strategy "Congestion_SSI_SpreadLogic_high" [get_runs impl_1]
   set_property flow "Vivado Implementation 2020" [get_runs impl_1]
 }
 set obj [get_runs impl_1]
 set_property -name "part" -value "xcvu19p-fsva3824-2-e" -objects $obj
 #set_property -name "auto_incremental_checkpoint.directory" -value "/home/zyy/whz/ns_sdmmc_default_xs/ns_uart/ns_uart.srcs/utils_1/imports/sdmmc_xs_impl" -objects $obj
-set_property -name "strategy" -value "Performance_ExplorePostRoutePhysOpt" -objects $obj
+set_property -name "strategy" -value "Congestion_SSI_SpreadLogic_high" -objects $obj
 #set_property -name "steps.place_design.args.directive" -value "AltSpreadLogic_high" -objects $obj
 #set_property -name "steps.phys_opt_design.args.directive" -value "AggressiveExplore" -objects $obj
 #set_property -name "steps.route_design.args.directive" -value "AlternateCLBRouting" -objects $obj
