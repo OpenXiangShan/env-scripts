@@ -205,7 +205,6 @@ proc create_root_design { parentCell } {
    CONFIG.AWUSER_WIDTH {0} \
    CONFIG.BUSER_WIDTH {0} \
    CONFIG.DATA_WIDTH {256} \
-   CONFIG.FREQ_HZ {50000000} \
    CONFIG.HAS_BRESP {1} \
    CONFIG.HAS_BURST {1} \
    CONFIG.HAS_CACHE {1} \
@@ -236,10 +235,9 @@ proc create_root_design { parentCell } {
   set_property -dict [ list \
    CONFIG.FREQ_HZ {25000000} \
  ] $MAC_CLK
-  set SOC_CLK [ create_bd_port -dir O -type clk SOC_CLK ]
+  set SOC_CLK [ create_bd_port -dir I -type clk -freq_hz 50000000 SOC_CLK ]
   set_property -dict [ list \
    CONFIG.ASSOCIATED_BUSIF {SOC_M_AXI} \
-   CONFIG.FREQ_HZ {50000000} \
  ] $SOC_CLK
   set SOC_RESETN [ create_bd_port -dir O -from 0 -to 0 -type rst SOC_RESETN ]
   set calib_complete [ create_bd_port -dir O calib_complete ]
@@ -382,7 +380,8 @@ connect_bd_intf_net -intf_net [get_bd_intf_nets S00_AXI_1] [get_bd_intf_pins jta
 
   # Create port connections
   connect_bd_net -net M00_ACLK_1 [get_bd_pins axi_interconnect_0/ACLK] [get_bd_pins axi_interconnect_0/M00_ACLK] [get_bd_pins axi_interconnect_0/S00_ACLK] [get_bd_pins ddr4_0/c0_ddr4_ui_clk] [get_bd_pins jtag_axi_0/aclk] [get_bd_pins jtag_maxi_ila/clk] [get_bd_pins rst_ddr4_200M/slowest_sync_clk]
-  connect_bd_net -net ddr4_0_addn_ui_clkout1 [get_bd_ports SOC_CLK] [get_bd_pins axi_interconnect_0/S01_ACLK] [get_bd_pins ddr4_0/addn_ui_clkout1] [get_bd_pins rst_sys_50M/slowest_sync_clk]
+  connect_bd_net -net SOC_CLK_1 [get_bd_ports SOC_CLK] [get_bd_pins axi_interconnect_0/S01_ACLK]
+  connect_bd_net -net ddr4_0_addn_ui_clkout1 [get_bd_pins ddr4_0/addn_ui_clkout1] [get_bd_pins rst_sys_50M/slowest_sync_clk]
   connect_bd_net -net ddr4_0_addn_ui_clkout2 [get_bd_ports MAC_CLK] [get_bd_pins ddr4_0/addn_ui_clkout2]
   connect_bd_net -net ddr4_0_c0_ddr4_ui_clk_sync_rst [get_bd_pins ddr4_0/c0_ddr4_ui_clk_sync_rst] [get_bd_pins rst_ddr4_200M/ext_reset_in]
   connect_bd_net -net ddr4_0_c0_init_calib_complete1 [get_bd_ports calib_complete] [get_bd_pins ddr4_0/c0_init_calib_complete] [get_bd_pins rst_ddr4_200M/dcm_locked] [get_bd_pins rst_sys_50M/dcm_locked]

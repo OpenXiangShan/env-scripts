@@ -241,15 +241,15 @@ source "$tcl_dir/data_bridge.tcl"
 
 # Create 'synth_1' run (if not found)
 if {[string equal [get_runs -quiet synth_1] ""]} {
-    create_run -name synth_1 -part xcvu19p-fsva3824-2-e -flow {Vivado Synthesis 2020} -strategy "Vivado Synthesis Defaults" -report_strategy {No Reports} -constrset constrs_1
+    create_run -name synth_1 -part xcvu19p-fsva3824-2-e -flow {Vivado Synthesis 2020} -strategy "Flow_PerfOptimized_high" -report_strategy {No Reports} -constrset constrs_1
 } else {
-  set_property strategy "Vivado Synthesis Defaults" [get_runs synth_1]
+  set_property strategy "Flow_PerfOptimized_high" [get_runs synth_1]
   set_property flow "Vivado Synthesis 2020" [get_runs synth_1]
 }
 set obj [get_runs synth_1]
 set_property -name "part" -value "xcvu19p-fsva3824-2-e" -objects $obj
 #set_property -name "auto_incremental_checkpoint.directory" -value "/home/zyy/whz/ns_sdmmc_default_xs/ns_uart/ns_uart.srcs/utils_1/imports/sdmmc_xs" -objects $obj
-set_property -name "strategy" -value "Vivado Synthesis Defaults" -objects $obj
+set_property -name "strategy" -value "Flow_PerfOptimized_high" -objects $obj
 
 # set the current synth run
 current_run -synthesis [get_runs synth_1]

@@ -1156,6 +1156,7 @@ jtag_ddr_subsys_wrapper U_JTAG_DDR_SUBSYS(
     .DDR4_reset_n           (DDR_RESET_N),
     .OSC_SYS_CLK_clk_n      (ddr_clk_n),
     .OSC_SYS_CLK_clk_p      (ddr_clk_p),
+    // AXI INTERFACE CLK
     .SOC_CLK                (inter_soc_clk),
     .MAC_CLK                (mac_clk),
     .SOC_RESETN             (),
