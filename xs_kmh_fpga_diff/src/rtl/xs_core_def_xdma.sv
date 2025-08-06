@@ -15,7 +15,7 @@ module xs_core_def (
       input                                      sys_rstn,
       input                                      cpu_rstn,
       input                                      rstn_sw4,
-`ifdef  XS_XMDA_EP      
+`ifdef  XS_XDMA_EP      
       input       [7:0]                          pci_ep_rxn,
       input       [7:0]                          pci_ep_rxp,
       output      [7:0]                          pci_ep_txn,
@@ -1043,10 +1043,11 @@ assign i2c2_prdata = 0;
   wire PCIE_S00_AXIS_0_tready;
   wire PCIE_S00_AXIS_0_tvalid;
 
-  wire [`CONFIG_DIFFTEST_BATCH_IO_WITDH - 1:0] gateway_out_data;
+  (* DONT_TOUCH = "TRUE" *) wire [`CONFIG_DIFFTEST_BATCH_IO_WITDH - 1:0] gateway_out_data;
   wire gateway_out_enable;
-  wire inter_dev_clk;
+  wire data_need_next;
   wire inter_soc_clk;
+  wire inter_rtc_clk;
   xdma_ep xdma_ep_i(
     .cpu_clk(sys_clk_i),
     .cpu_rstn(sys_rstn),
@@ -1082,15 +1083,18 @@ assign i2c2_prdata = 0;
     .data_next  (data_need_next),
     .data       (gateway_out_data)
   );
-  fpga_clock_gate fpga_clock_gate_diff(
-        .soc_clk_i  (sys_clk_i),
-        .soc_clk_o  (inter_soc_clk),
-        .dev_clk_i  (dev_clk_i),
-        .dev_clk_o  (inter_dev_clk),
-        .data_next  (data_need_next),
-        .rstn       (sys_rstn | cpu_rstn)
+
+  fpga_clock_gate SOC_CLK_CTRL(
+      .CK  (sys_clk_i),
+      .E   (data_need_next || sys_rstn || cpu_rstn ),
+      .Q   (inter_soc_clk)
   );
 
+   fpga_clock_gate RTC_CLK_CTRL(
+      .CK  (tmclk),
+      .E   (data_need_next || sys_rstn || cpu_rstn ),
+      .Q   (inter_rtc_clk)
+  );
 xilnx_crg xilnx_crg(
    .sys_clk                         (sys_clk_i                     ),
    .dev_clk                         (dev_clk_i                     ),
@@ -1208,7 +1212,7 @@ XSTop_wrapper U_CPU_TOP(
 
     .sys_clk_i                      (inter_soc_clk),
     .sys_rstn_i                     (cpu_rstn     ),
-    .tmclk                          (tmclk),
+    .tmclk                          (inter_rtc_clk),
 
     .global_reset                   (cpu_rstn                  ),
     .pll_bypass_sel                 (4'b0 ),

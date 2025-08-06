@@ -35,7 +35,7 @@ module xs_fpga_top_debug
    input                 refclk2_p, // pcie 100MHz
    input                 refclk2_n,
    output                PERST2_N,
-`ifdef XS_XMDA_EP
+`ifdef XS_XDMA_EP
    input    [7:0]        pci_ep_rxn,
    input    [7:0]        pci_ep_rxp,
    output   [7:0]        pci_ep_txn,
@@ -333,7 +333,7 @@ xs_core_def xs_core_def
   .chip_mode_i          (2'b00), // normal mode
   .dft_crg_rst_n        (1'b1),
   // pcie
-`ifdef XS_XMDA_EP
+`ifdef XS_XDMA_EP
   .pci_ep_rxn           (pci_ep_rxn),
   .pci_ep_rxp           (pci_ep_rxp),
   .pci_ep_txn           (pci_ep_txn),
