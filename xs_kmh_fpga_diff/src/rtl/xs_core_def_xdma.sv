@@ -1086,13 +1086,13 @@ assign i2c2_prdata = 0;
 
   fpga_clock_gate SOC_CLK_CTRL(
       .CK  (sys_clk_i),
-      .E   (data_need_next || sys_rstn || cpu_rstn ),
+      .E   (data_need_next || ~sys_rstn || ~cpu_rstn ),
       .Q   (inter_soc_clk)
   );
 
    fpga_clock_gate RTC_CLK_CTRL(
       .CK  (tmclk),
-      .E   (data_need_next || sys_rstn || cpu_rstn ),
+      .E   (data_need_next || ~sys_rstn || ~cpu_rstn ),
       .Q   (inter_rtc_clk)
   );
 xilnx_crg xilnx_crg(
