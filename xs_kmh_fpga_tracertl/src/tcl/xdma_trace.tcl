@@ -191,6 +191,19 @@ proc create_root_design { parentCell } {
   # Create interface ports
   set M00_AXIS_0 [ create_bd_intf_port -mode Master -vlnv xilinx.com:interface:axis_rtl:1.0 M00_AXIS_0 ]
 
+  set S00_AXIS_0 [ create_bd_intf_port -mode Slave -vlnv xilinx.com:interface:axis_rtl:1.0 S00_AXIS_0 ]
+  set_property -dict [ list \
+   CONFIG.HAS_TKEEP {0} \
+   CONFIG.HAS_TLAST {0} \
+   CONFIG.HAS_TREADY {1} \
+   CONFIG.HAS_TSTRB {0} \
+   CONFIG.LAYERED_METADATA {undef} \
+   CONFIG.TDATA_NUM_BYTES {64} \
+   CONFIG.TDEST_WIDTH {0} \
+   CONFIG.TID_WIDTH {0} \
+   CONFIG.TUSER_WIDTH {0} \
+   ] $S00_AXIS_0
+
   set pcie_ep_gt_ref [ create_bd_intf_port -mode Slave -vlnv xilinx.com:interface:diff_clock_rtl:1.0 pcie_ep_gt_ref ]
 
 
@@ -204,12 +217,20 @@ proc create_root_design { parentCell } {
   set pcie_ep_lnk_up [ create_bd_port -dir O pcie_ep_lnk_up ]
   set pcie_ep_perstn [ create_bd_port -dir I -type rst pcie_ep_perstn ]
 
-  # Create instance: axis_interconnect_0, and set properties
-  set axis_interconnect_0 [ create_bd_cell -type ip -vlnv xilinx.com:ip:axis_interconnect:2.1 axis_interconnect_0 ]
+  # Create instance: cpu_axis_rx_interconnect, and set properties
+  set cpu_axis_rx_interconnect [ create_bd_cell -type ip -vlnv xilinx.com:ip:axis_interconnect:2.1 cpu_axis_rx_interconnect ]
   set_property -dict [ list \
    CONFIG.NUM_MI {1} \
    CONFIG.S00_HAS_REGSLICE {1} \
- ] $axis_interconnect_0
+ ] $cpu_axis_rx_interconnect
+
+  # Create instance: cpu_axis_tx_interconnect, and set properties
+  set cpu_axis_tx_interconnect [ create_bd_cell -type ip -vlnv xilinx.com:ip:axis_interconnect:2.1 cpu_axis_tx_interconnect ]
+  set_property -dict [ list \
+   CONFIG.M00_HAS_REGSLICE {0} \
+   CONFIG.NUM_MI {1} \
+   CONFIG.S00_HAS_REGSLICE {1} \
+ ] $cpu_axis_tx_interconnect
 
   # Create instance: util_ds_buf_0, and set properties
   set util_ds_buf_0 [ create_bd_cell -type ip -vlnv xilinx.com:ip:util_ds_buf:2.1 util_ds_buf_0 ]
@@ -217,8 +238,8 @@ proc create_root_design { parentCell } {
    CONFIG.C_BUF_TYPE {IBUFDSGTE} \
  ] $util_ds_buf_0
 
-  # Create instance: xdma_0, and set properties
-  set xdma_0 [ create_bd_cell -type ip -vlnv xilinx.com:ip:xdma:4.1 xdma_0 ]
+  # Create instance: xdma, and set properties
+  set xdma [ create_bd_cell -type ip -vlnv xilinx.com:ip:xdma:4.1 xdma ]
   set_property -dict [ list \
    CONFIG.PF0_DEVICE_ID_mqdma {9048} \
    CONFIG.PF2_DEVICE_ID_mqdma {9048} \
@@ -237,7 +258,7 @@ proc create_root_design { parentCell } {
    CONFIG.select_quad {GTY_Quad_231} \
    CONFIG.xdma_axi_intf_mm {AXI_Stream} \
    CONFIG.xdma_axilite_slave {false} \
- ] $xdma_0
+ ] $xdma
 
   # Create instance: xlconstant_0, and set properties
   set xlconstant_0 [ create_bd_cell -type ip -vlnv xilinx.com:ip:xlconstant:1.1 xlconstant_0 ]
@@ -247,23 +268,25 @@ proc create_root_design { parentCell } {
 
   # Create interface connections
   connect_bd_intf_net -intf_net CLK_IN_D_0_1 [get_bd_intf_ports pcie_ep_gt_ref] [get_bd_intf_pins util_ds_buf_0/CLK_IN_D]
-  connect_bd_intf_net -intf_net axis_interconnect_0_M00_AXIS [get_bd_intf_ports M00_AXIS_0] [get_bd_intf_pins axis_interconnect_0/M00_AXIS]
-  connect_bd_intf_net -intf_net xdma_0_M_AXIS_H2C_0 [get_bd_intf_pins axis_interconnect_0/S00_AXIS] [get_bd_intf_pins xdma_0/M_AXIS_H2C_0]
+  connect_bd_intf_net -intf_net S00_AXIS_0_1 [get_bd_intf_ports S00_AXIS_0] [get_bd_intf_pins cpu_axis_tx_interconnect/S00_AXIS]
+  connect_bd_intf_net -intf_net axis_interconnect_0_M00_AXIS [get_bd_intf_ports M00_AXIS_0] [get_bd_intf_pins cpu_axis_rx_interconnect/M00_AXIS]
+  connect_bd_intf_net -intf_net cpu_axis_tx_interconnect1_M00_AXIS [get_bd_intf_pins cpu_axis_tx_interconnect/M00_AXIS] [get_bd_intf_pins xdma/S_AXIS_C2H_0]
+  connect_bd_intf_net -intf_net xdma_0_M_AXIS_H2C_0 [get_bd_intf_pins cpu_axis_rx_interconnect/S00_AXIS] [get_bd_intf_pins xdma/M_AXIS_H2C_0]
 
   # Create port connections
-  connect_bd_net -net M00_AXIS_ACLK_0_1 [get_bd_ports cpu_clk] [get_bd_pins axis_interconnect_0/M00_AXIS_ACLK]
-  connect_bd_net -net M00_AXIS_ARESETN_0_1 [get_bd_ports cpu_rstn] [get_bd_pins axis_interconnect_0/M00_AXIS_ARESETN]
-  connect_bd_net -net pci_exp_rxn_0_1 [get_bd_ports pci_exp_rxn] [get_bd_pins xdma_0/pci_exp_rxn]
-  connect_bd_net -net pci_exp_rxp_0_1 [get_bd_ports pci_exp_rxp] [get_bd_pins xdma_0/pci_exp_rxp]
-  connect_bd_net -net sys_rst_n_0_1 [get_bd_ports pcie_ep_perstn] [get_bd_pins xdma_0/sys_rst_n]
-  connect_bd_net -net util_ds_buf_0_IBUF_DS_ODIV2 [get_bd_pins util_ds_buf_0/IBUF_DS_ODIV2] [get_bd_pins xdma_0/sys_clk]
-  connect_bd_net -net util_ds_buf_0_IBUF_OUT [get_bd_pins util_ds_buf_0/IBUF_OUT] [get_bd_pins xdma_0/sys_clk_gt]
-  connect_bd_net -net xdma_0_axi_aclk [get_bd_pins axis_interconnect_0/ACLK] [get_bd_pins axis_interconnect_0/S00_AXIS_ACLK] [get_bd_pins xdma_0/axi_aclk]
-  connect_bd_net -net xdma_0_axi_aresetn [get_bd_pins axis_interconnect_0/ARESETN] [get_bd_pins axis_interconnect_0/S00_AXIS_ARESETN] [get_bd_pins xdma_0/axi_aresetn]
-  connect_bd_net -net xdma_0_pci_exp_txn [get_bd_ports pci_exp_txn] [get_bd_pins xdma_0/pci_exp_txn]
-  connect_bd_net -net xdma_0_pci_exp_txp [get_bd_ports pci_exp_txp] [get_bd_pins xdma_0/pci_exp_txp]
-  connect_bd_net -net xdma_0_user_lnk_up [get_bd_ports pcie_ep_lnk_up] [get_bd_pins xdma_0/user_lnk_up]
-  connect_bd_net -net xlconstant_0_dout [get_bd_pins xdma_0/usr_irq_req] [get_bd_pins xlconstant_0/dout]
+  connect_bd_net -net M00_AXIS_ACLK_0_1 [get_bd_ports cpu_clk] [get_bd_pins cpu_axis_rx_interconnect/M00_AXIS_ACLK] [get_bd_pins cpu_axis_tx_interconnect/ACLK] [get_bd_pins cpu_axis_tx_interconnect/S00_AXIS_ACLK]
+  connect_bd_net -net M00_AXIS_ARESETN_0_1 [get_bd_ports cpu_rstn] [get_bd_pins cpu_axis_rx_interconnect/M00_AXIS_ARESETN] [get_bd_pins cpu_axis_tx_interconnect/ARESETN] [get_bd_pins cpu_axis_tx_interconnect/S00_AXIS_ARESETN]
+  connect_bd_net -net pci_exp_rxn_0_1 [get_bd_ports pci_exp_rxn] [get_bd_pins xdma/pci_exp_rxn]
+  connect_bd_net -net pci_exp_rxp_0_1 [get_bd_ports pci_exp_rxp] [get_bd_pins xdma/pci_exp_rxp]
+  connect_bd_net -net sys_rst_n_0_1 [get_bd_ports pcie_ep_perstn] [get_bd_pins xdma/sys_rst_n]
+  connect_bd_net -net util_ds_buf_0_IBUF_DS_ODIV2 [get_bd_pins util_ds_buf_0/IBUF_DS_ODIV2] [get_bd_pins xdma/sys_clk]
+  connect_bd_net -net util_ds_buf_0_IBUF_OUT [get_bd_pins util_ds_buf_0/IBUF_OUT] [get_bd_pins xdma/sys_clk_gt]
+  connect_bd_net -net xdma_0_axi_aclk [get_bd_pins cpu_axis_rx_interconnect/ACLK] [get_bd_pins cpu_axis_rx_interconnect/S00_AXIS_ACLK] [get_bd_pins cpu_axis_tx_interconnect/M00_AXIS_ACLK] [get_bd_pins xdma/axi_aclk]
+  connect_bd_net -net xdma_0_axi_aresetn [get_bd_pins cpu_axis_rx_interconnect/ARESETN] [get_bd_pins cpu_axis_rx_interconnect/S00_AXIS_ARESETN] [get_bd_pins cpu_axis_tx_interconnect/M00_AXIS_ARESETN] [get_bd_pins xdma/axi_aresetn]
+  connect_bd_net -net xdma_0_pci_exp_txn [get_bd_ports pci_exp_txn] [get_bd_pins xdma/pci_exp_txn]
+  connect_bd_net -net xdma_0_pci_exp_txp [get_bd_ports pci_exp_txp] [get_bd_pins xdma/pci_exp_txp]
+  connect_bd_net -net xdma_0_user_lnk_up [get_bd_ports pcie_ep_lnk_up] [get_bd_pins xdma/user_lnk_up]
+  connect_bd_net -net xlconstant_0_dout [get_bd_pins xdma/usr_irq_req] [get_bd_pins xlconstant_0/dout]
 
   # Create address segments
 
@@ -271,6 +294,7 @@ proc create_root_design { parentCell } {
   # Restore current instance
   current_bd_instance $oldCurInst
 
+  validate_bd_design
   save_bd_design
 }
 # End of create_root_design()
@@ -282,6 +306,4 @@ proc create_root_design { parentCell } {
 
 create_root_design ""
 
-
-common::send_gid_msg -ssname BD::TCL -id 2053 -severity "WARNING" "This Tcl script was generated from a block design that has not been validated. It is possible that design <$design_name> may result in errors during validation."
 

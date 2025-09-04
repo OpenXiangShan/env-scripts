@@ -1,7 +1,7 @@
 //Copyright 1986-2020 Xilinx, Inc. All Rights Reserved.
 //--------------------------------------------------------------------------------
 //Tool Version: Vivado v.2020.2 (lin64) Build 3064766 Wed Nov 18 09:12:47 MST 2020
-//Date        : Wed Sep  3 17:09:17 2025
+//Date        : Thu Sep  4 15:38:34 2025
 //Host        : open18 running 64-bit Ubuntu 22.04.3 LTS
 //Command     : generate_target xdma_trace_wrapper.bd
 //Design      : xdma_trace_wrapper
@@ -15,6 +15,9 @@ module xdma_trace_wrapper
     M00_AXIS_0_tlast,
     M00_AXIS_0_tready,
     M00_AXIS_0_tvalid,
+    S00_AXIS_0_tdata,
+    S00_AXIS_0_tready,
+    S00_AXIS_0_tvalid,
     cpu_clk,
     cpu_rstn,
     pci_exp_rxn,
@@ -30,6 +33,9 @@ module xdma_trace_wrapper
   output M00_AXIS_0_tlast;
   input M00_AXIS_0_tready;
   output M00_AXIS_0_tvalid;
+  input [511:0]S00_AXIS_0_tdata;
+  output S00_AXIS_0_tready;
+  input S00_AXIS_0_tvalid;
   input cpu_clk;
   input cpu_rstn;
   input [7:0]pci_exp_rxn;
@@ -46,6 +52,9 @@ module xdma_trace_wrapper
   wire M00_AXIS_0_tlast;
   wire M00_AXIS_0_tready;
   wire M00_AXIS_0_tvalid;
+  wire [511:0]S00_AXIS_0_tdata;
+  wire S00_AXIS_0_tready;
+  wire S00_AXIS_0_tvalid;
   wire cpu_clk;
   wire cpu_rstn;
   wire [7:0]pci_exp_rxn;
@@ -63,6 +72,9 @@ module xdma_trace_wrapper
         .M00_AXIS_0_tlast(M00_AXIS_0_tlast),
         .M00_AXIS_0_tready(M00_AXIS_0_tready),
         .M00_AXIS_0_tvalid(M00_AXIS_0_tvalid),
+        .S00_AXIS_0_tdata(S00_AXIS_0_tdata),
+        .S00_AXIS_0_tready(S00_AXIS_0_tready),
+        .S00_AXIS_0_tvalid(S00_AXIS_0_tvalid),
         .cpu_clk(cpu_clk),
         .cpu_rstn(cpu_rstn),
         .pci_exp_rxn(pci_exp_rxn),
