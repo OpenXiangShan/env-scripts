@@ -2,8 +2,8 @@
 `include "gateway_interface.svh"
 
 module XSTop_wrapper(
-  input           sys_clk_i,    
-  input           sys_rstn_i, 
+  input           sys_clk_i,
+  input           sys_rstn_i,
   input           tmclk,
 
   input           global_reset,     //24MHz
@@ -68,7 +68,7 @@ module XSTop_wrapper(
   (*mark_debug="true"*) output [255:0]  dma_core_rdata,
   (*mark_debug="true"*) output [1:0]    dma_core_rresp,
   (*mark_debug="true"*) output          dma_core_rlast,
-  
+
   (*mark_debug="true"*) input           peri_awready,
   (*mark_debug="true"*) output          peri_awvalid,
   (*mark_debug="true"*) output [1:0]    peri_awid,
@@ -106,7 +106,7 @@ module XSTop_wrapper(
   (*mark_debug="true"*) input  [63:0]   peri_rdata,
   (*mark_debug="true"*) input  [1:0]    peri_rresp,
   (*mark_debug="true"*) input           peri_rlast,
-  
+
   (*mark_debug="true"*) input           mem_core_awready,
   (*mark_debug="true"*) output          mem_core_awvalid,
   (*mark_debug="true"*) output [13:0]   mem_core_awid,
@@ -178,8 +178,13 @@ output io_cacheable_check_resp_1_mmio,
 output io_riscv_halt_0,
 output io_riscv_halt_1,
 
-output [`CONFIG_DIFFTEST_BATCH_IO_WITDH - 1:0]gateway_out_data,
+`ifdef XS_TRACERTL
+output [`CONFIG_DUT_IN_IO_WIDTH - 1:0] gateway_in_data,
+output gateway_in_enable
+
+output [`CONFIG_DUT_OUT_IO_WIDTH - 1:0]gateway_out_data,
 output gateway_out_enable
+`endif
 );
 
   wire          cpu_clock       ;
@@ -196,24 +201,45 @@ output gateway_out_enable
 
 assign cpu_to_soc = 32'h0;
 
-  gateway_if   gateway_if_in();
-  core_if      core_if_out[1]();
+  // gateway_if   gateway_if_in();
+  // core_if      core_gateway_out[1]();
+  tracertl_core_out_if tracertl_core_out[1]();
+  tracertl_core_in_if  tracertl_core_in[1]();
 
-  CoreToGateway u_CoreToGateway(
-    .gateway_out (gateway_if_in.out),
-    .core_in     (core_if_out)
-  );
+  // CoreToGateway u_CoreToGateway(
+  //   .gateway_out (gateway_if_in.out),
+  //   .core_in     (core_if_out)
+  // );
 
-  GatewayEndpoint u_GatewayEndpoint(
+  // CoreToGateway, just assign core_if_out to gateway_if
+  // TODO: add GateWay to core
+  // Currently, ignore GateWay t core
+
+  TraceRTLOutGatewayEndpoint u_TraceRTLOutGatewayEndpoint(
     .clock       (sys_clk_i),
     .reset       (~sys_rstn_i),
 
-    .gateway_in  (gateway_if_in.in),
+    .cpuIO       (tracertl_core_out),
 
     .fpgaIO_data    (gateway_out_data),
     .fpgaIO_enable  (gateway_out_enable),
     .step        ()
   );
+
+  // gatewayEndPoint perform batch and squash: split, wrap and flat to gateway_out
+  // gateway has delayReg to add RegNext/MemQue(how to perform handshake)
+  // TraceGateWay: unzip raw instruction trace data to standard trace info
+  TraceRTLInGatewayEndpoint u_TraceRTLInGatewayEndpoint(
+    .clock       (sys_clk_i),
+    .reset       (~sys_rstn_i),
+
+    .cpuIO       (tracertl_core_in),
+
+    .fpgaIO_data    (gateway_in_data),
+    .fpgaIO_enable  (gateway_in_enable),
+    .step        ()
+  );
+
 
 XSTop  u_XSTop(
   .memory_awready                (mem_core_awready )                        ,
@@ -327,7 +353,7 @@ XSTop  u_XSTop(
   .dma_rdata                     (dma_core_rdata   )                        ,
   .dma_rresp                     (dma_core_rresp   )                        ,
   .dma_rlast                     (dma_core_rlast   )                        ,
-  
+
   .io_systemjtag_jtag_TCK          (io_systemjtag_jtag_TCK),
   .io_systemjtag_jtag_TMS          (io_systemjtag_jtag_TMS),
   .io_systemjtag_jtag_TDI          (io_systemjtag_jtag_TDI),
@@ -338,14 +364,17 @@ XSTop  u_XSTop(
   .io_systemjtag_part_number       (16'h16),
   .io_systemjtag_version           (4'h4),
 
+`ifdef XS_TRACERTL
+  .gateway_out                     (tracertl_core_out[0]),
+  .gateway_in                      (tracertl_core_in[0]),
+`endif
 
   .io_clock                        (sys_clk_i/*cpu_clock  */                        ),
   .io_reset                        (~sys_rstn_i/*cpu_global_reset  */                 ),
   .io_extIntrs                     (io_extIntrs  ),
   .io_rtc_clock                    (tmclk),
-  .io_riscv_rst_vec_0              (38'h10000000),
+  .io_riscv_rst_vec_0              (38'h10000000)
 
-  .gateway_out                     (core_if_out[0])
 );
 
 

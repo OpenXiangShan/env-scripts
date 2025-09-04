@@ -7,7 +7,7 @@ module xs_fpga_top_debug
    input                 clk8_p, // 1MHz clock
    input                 clk8_n,
    input                 clk7_p, // ddr 80MHz
-   input                 clk7_n, 
+   input                 clk7_n,
    input                 clk6_p, // system 200MHz
    input                 clk6_n,
    input                 clk5_p, // debug 50MHz
@@ -27,15 +27,15 @@ module xs_fpga_top_debug
    output                uart2_sout,
    input                 uart2_sin,
 `endif
-   //PCIE 
+   //PCIE
    input                 refclk_p, // pcie 100MHz
    input                 refclk_n,
    output                PERST_N,
-   
+
    input                 refclk2_p, // pcie 100MHz
    input                 refclk2_n,
    output                PERST2_N,
-`ifdef XS_XDMA_EP
+`ifdef XS_TRACERTL
    input    [7:0]        pci_ep_rxn,
    input    [7:0]        pci_ep_rxp,
    output   [7:0]        pci_ep_txn,
@@ -44,7 +44,7 @@ module xs_fpga_top_debug
    input                 pcie_ep_gt_ref_clk_p,
    output                pcie_ep_lnk_up,
    input                 pcie_ep_perstn,
-`endif 
+`endif
    //DDR
    output    [0:0]       DDR0_CK_T,
    output    [0:0]       DDR0_CK_C,
@@ -60,7 +60,7 @@ module xs_fpga_top_debug
    inout     [63:0]      DDR0_DQ,
    inout     [7:0]       DDR0_DQS_T,
    inout     [7:0]       DDR0_DQS_C,
-   
+
 `ifdef XS_GMAC
    input                RGMII_RXCLK,
    input                RGMII_RXDV,
@@ -78,7 +78,7 @@ module xs_fpga_top_debug
    inout                MDIO,
    output               PHY_RESET_B,
 `endif
-   
+
    //==JTAG
    input                 JTAG_TCK,         // come from gpio
    input                 JTAG_TMS,         // come from gpio
@@ -180,18 +180,18 @@ wire    pcie_sysclk;
 
 
 IBUFDS_GTE4 refclk_ibuf (
-    .O(pcie_sysclk_gt), 
-    .ODIV2(pcie_sysclk), 
-    .I(refclk_p), 
-    .CEB(1'b0), 
+    .O(pcie_sysclk_gt),
+    .ODIV2(pcie_sysclk),
+    .I(refclk_p),
+    .CEB(1'b0),
     .IB(refclk_n)
 );
 
 IBUFDS_GTE4 refclk2_ibuf (
-    .O(pcie2_sysclk_gt), 
-    .ODIV2(pcie2_sysclk), 
-    .I(refclk2_p), 
-    .CEB(1'b0), 
+    .O(pcie2_sysclk_gt),
+    .ODIV2(pcie2_sysclk),
+    .I(refclk2_p),
+    .CEB(1'b0),
     .IB(refclk2_n)
 );
 
@@ -251,7 +251,7 @@ wire DDR0_ZQ = 'h0;
 assign SD_CLK = sdmmc_cclk_card;
 
 assign sdmmc_sd_cmd_in = SD_CMD;
-assign SD_CMD = sdmmc_sd_cmd_out_en ? sdmmc_sd_cmd_out : 1'bz; 
+assign SD_CMD = sdmmc_sd_cmd_out_en ? sdmmc_sd_cmd_out : 1'bz;
 
 assign sdmmc_sd_dat_in[0] = SD_DATA0;
 assign sdmmc_sd_dat_in[1] = SD_DATA1;
@@ -317,7 +317,7 @@ assign io_systemjtag_reset = ~JTAG_TRSTn;
 xs_core_def xs_core_def
 (
   .ddr_clk_p            (clk7_p),
-  .ddr_clk_n            (clk7_n),  
+  .ddr_clk_n            (clk7_n),
   .tmclk                (tmclk_buf),
   .cqetmclk             (cqetmclk_buf),
   .init_calib_complete  (led3),
@@ -333,7 +333,7 @@ xs_core_def xs_core_def
   .chip_mode_i          (2'b00), // normal mode
   .dft_crg_rst_n        (1'b1),
   // pcie
-`ifdef XS_XDMA_EP
+`ifdef XS_TRACERTL
   .pci_ep_rxn           (pci_ep_rxn),
   .pci_ep_rxp           (pci_ep_rxp),
   .pci_ep_txn           (pci_ep_txn),
@@ -351,7 +351,7 @@ xs_core_def xs_core_def
   .uart0_sin            (uart0_sin),
   .uart1_sin            (uart1_sin),
   .uart2_sin            (uart2_sin),
-`endif  
+`endif
   // JTAG
   .io_systemjtag_jtag_TCK         (io_systemjtag_jtag_TCK ),
   .io_systemjtag_jtag_TMS         (io_systemjtag_jtag_TMS ),
@@ -388,7 +388,7 @@ xs_core_def xs_core_def
   .sd_cmd_in            (sdmmc_sd_cmd_in),
   .sd_dat_in            (sdmmc_sd_dat_in),
   .sd_led_control       (          ),
-  
+
   `ifdef XS_GMAC
   // gmac
   .io_gmac_mdo_oe  ( io_gmac_mdo_oe  ),
@@ -404,20 +404,20 @@ xs_core_def xs_core_def
   `endif
 
   // ddr
-  .DDR_CK_T             (DDR0_CK_T        ),   
-  .DDR_CK_C             (DDR0_CK_C        ),   
-  .DDR_CKE              (DDR0_CKE         ),    
-  .DDR_CS_N             (DDR0_CS_N        ),   
-  .DDR_ODT              (DDR0_ODT         ),    
-  .DDR_ACT_N            (DDR0_ACT_N       ),  
-  .DDR_BG               (DDR0_BG          ),     
-  .DDR_BA               (DDR0_BA          ),     
-  .DDR_A                (DDR0_A           ),      
-  .DDR_RESET_N          (DDR0_RESET_N     ), 
-  .DDR_DM_N             (DDR0_DM          ),     
-  .DDR_DQ               (DDR0_DQ          ),     
-  .DDR_DQS_T            (DDR0_DQS_T       ),  
-  .DDR_DQS_C            (DDR0_DQS_C       )/*,  
+  .DDR_CK_T             (DDR0_CK_T        ),
+  .DDR_CK_C             (DDR0_CK_C        ),
+  .DDR_CKE              (DDR0_CKE         ),
+  .DDR_CS_N             (DDR0_CS_N        ),
+  .DDR_ODT              (DDR0_ODT         ),
+  .DDR_ACT_N            (DDR0_ACT_N       ),
+  .DDR_BG               (DDR0_BG          ),
+  .DDR_BA               (DDR0_BA          ),
+  .DDR_A                (DDR0_A           ),
+  .DDR_RESET_N          (DDR0_RESET_N     ),
+  .DDR_DM_N             (DDR0_DM          ),
+  .DDR_DQ               (DDR0_DQ          ),
+  .DDR_DQS_T            (DDR0_DQS_T       ),
+  .DDR_DQS_C            (DDR0_DQS_C       )/*,
   .DDR_ZQ               (DDR0_ZQ),
   .gmac_gmii_mdc_o(gmac_gmii_mdc_o),
   .gmac_gmii_mdo_o(gmac_gmii_mdo_o),
@@ -429,17 +429,17 @@ xs_core_def xs_core_def
   .gmac_clk_rx_i(gmac_clk_rx_i),
   .gmac_phy_rxd(gmac_phy_rxd),
   .gmac_phy_rxdv(gmac_phy_rxdv),
-  
+
   .gpio_porta_ddr(gpio_porta_ddr),
   .gpio_porta_dr(gpio_porta_dr),
   .gpio_ext_porta(gpio_ext_porta),
-  
-  .jtag_tck(jtag_tck), 
-  .jtag_tdi(jtag_tdi), 
-  .jtag_tms(jtag_tms), 
+
+  .jtag_tck(jtag_tck),
+  .jtag_tdi(jtag_tdi),
+  .jtag_tms(jtag_tms),
   .jtag_trstn(jtag_trstn),
-  .jtag_tdo(jtag_tdo), 
-  
+  .jtag_tdo(jtag_tdo),
+
   */
 
 );
