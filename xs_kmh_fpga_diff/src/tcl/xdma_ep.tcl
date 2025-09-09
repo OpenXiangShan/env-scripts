@@ -1,6 +1,6 @@
 
 ################################################################
-# This is a generated script based on design: AXI_bridge
+# This is a generated script based on design: xdma_ep
 #
 # Though there are limitations about the generated script,
 # the main purpose of this utility is to make learning
@@ -35,7 +35,7 @@ if { [string first $scripts_vivado_version $current_vivado_version] == -1 } {
 ################################################################
 
 # To test this script, run the following commands from Vivado Tcl console:
-# source AXI_bridge_script.tcl
+# source xdma_ep_script.tcl
 
 # If there is no project opened, this script will create a
 # project, but make sure you do not have an existing project
@@ -49,7 +49,7 @@ if { $list_projs eq "" } {
 
 # CHANGE DESIGN NAME HERE
 variable design_name
-set design_name AXI_bridge
+set design_name xdma_ep
 
 # If you do not already have an existing IP Integrator design open,
 # you can create a design using the following command:
@@ -123,9 +123,8 @@ set bCheckIPsPassed 1
 set bCheckIPs 1
 if { $bCheckIPs == 1 } {
    set list_check_ips "\ 
-xilinx.com:ip:axi_apb_bridge:3.0\
-xilinx.com:ip:axi_uart16550:2.0\
-xilinx.com:ip:xlconstant:1.1\
+xilinx.com:ip:util_ds_buf:2.1\
+xilinx.com:ip:xdma:4.1\
 "
 
    set list_ips_missing ""
@@ -189,114 +188,92 @@ proc create_root_design { parentCell } {
 
 
   # Create interface ports
-  set S00_AXI [ create_bd_intf_port -mode Slave -vlnv xilinx.com:interface:aximm_rtl:1.0 S00_AXI ]
+  set S00_AXIS_0 [ create_bd_intf_port -mode Slave -vlnv xilinx.com:interface:axis_rtl:1.0 S00_AXIS_0 ]
   set_property -dict [ list \
-   CONFIG.ADDR_WIDTH {31} \
-   CONFIG.ARUSER_WIDTH {0} \
-   CONFIG.AWUSER_WIDTH {0} \
-   CONFIG.BUSER_WIDTH {0} \
-   CONFIG.DATA_WIDTH {64} \
    CONFIG.FREQ_HZ {50000000} \
-   CONFIG.HAS_BRESP {1} \
-   CONFIG.HAS_BURST {1} \
-   CONFIG.HAS_CACHE {1} \
-   CONFIG.HAS_LOCK {1} \
-   CONFIG.HAS_PROT {1} \
-   CONFIG.HAS_QOS {1} \
-   CONFIG.HAS_REGION {0} \
-   CONFIG.HAS_RRESP {1} \
-   CONFIG.HAS_WSTRB {1} \
-   CONFIG.ID_WIDTH {2} \
-   CONFIG.MAX_BURST_LENGTH {256} \
-   CONFIG.NUM_READ_OUTSTANDING {2} \
-   CONFIG.NUM_READ_THREADS {1} \
-   CONFIG.NUM_WRITE_OUTSTANDING {2} \
-   CONFIG.NUM_WRITE_THREADS {1} \
-   CONFIG.PROTOCOL {AXI4} \
-   CONFIG.READ_WRITE_MODE {READ_WRITE} \
-   CONFIG.RUSER_BITS_PER_BYTE {0} \
-   CONFIG.RUSER_WIDTH {0} \
-   CONFIG.SUPPORTS_NARROW_BURST {1} \
-   CONFIG.WUSER_BITS_PER_BYTE {0} \
-   CONFIG.WUSER_WIDTH {0} \
-   ] $S00_AXI
+   CONFIG.HAS_TKEEP {1} \
+   CONFIG.HAS_TLAST {1} \
+   CONFIG.HAS_TREADY {1} \
+   CONFIG.HAS_TSTRB {0} \
+   CONFIG.LAYERED_METADATA {undef} \
+   CONFIG.TDATA_NUM_BYTES {64} \
+   CONFIG.TDEST_WIDTH {0} \
+   CONFIG.TID_WIDTH {0} \
+   CONFIG.TUSER_WIDTH {0} \
+   ] $S00_AXIS_0
 
-  set SYS_CFG_APB [ create_bd_intf_port -mode Master -vlnv xilinx.com:interface:apb_rtl:1.0 SYS_CFG_APB ]
-
-  set UART_0 [ create_bd_intf_port -mode Master -vlnv xilinx.com:interface:uart_rtl:1.0 UART_0 ]
-
-  set rom_axi [ create_bd_intf_port -mode Master -vlnv xilinx.com:interface:aximm_rtl:1.0 rom_axi ]
-  set_property -dict [ list \
-   CONFIG.ADDR_WIDTH {32} \
-   CONFIG.DATA_WIDTH {32} \
-   CONFIG.FREQ_HZ {50000000} \
-   CONFIG.HAS_BURST {0} \
-   CONFIG.HAS_CACHE {0} \
-   CONFIG.HAS_LOCK {0} \
-   CONFIG.HAS_PROT {0} \
-   CONFIG.HAS_QOS {0} \
-   CONFIG.HAS_REGION {0} \
-   CONFIG.NUM_READ_OUTSTANDING {2} \
-   CONFIG.NUM_WRITE_OUTSTANDING {2} \
-   CONFIG.PROTOCOL {AXI4} \
-   ] $rom_axi
+  set pcie_ep_gt_ref [ create_bd_intf_port -mode Slave -vlnv xilinx.com:interface:diff_clock_rtl:1.0 pcie_ep_gt_ref ]
 
 
   # Create ports
-  set ACLK [ create_bd_port -dir I -type clk -freq_hz 50000000 ACLK ]
+  set cpu_clk [ create_bd_port -dir I -type clk -freq_hz 50000000 cpu_clk ]
   set_property -dict [ list \
-   CONFIG.ASSOCIATED_BUSIF {rom_axi} \
- ] $ACLK
-  set ARESETN [ create_bd_port -dir I -type rst ARESETN ]
-  set SYS_INTER_CLK [ create_bd_port -dir I -type clk -freq_hz 50000000 SYS_INTER_CLK ]
-  set_property -dict [ list \
-   CONFIG.ASSOCIATED_BUSIF {S00_AXI} \
- ] $SYS_INTER_CLK
-  set uart0_intc [ create_bd_port -dir O -type intr uart0_intc ]
+   CONFIG.ASSOCIATED_BUSIF {S00_AXIS_0} \
+   CONFIG.ASSOCIATED_RESET {cpu_rstn} \
+ ] $cpu_clk
+  set cpu_rstn [ create_bd_port -dir I -type rst cpu_rstn ]
+  set pci_exp_rxn [ create_bd_port -dir I -from 7 -to 0 pci_exp_rxn ]
+  set pci_exp_rxp [ create_bd_port -dir I -from 7 -to 0 pci_exp_rxp ]
+  set pci_exp_txn [ create_bd_port -dir O -from 7 -to 0 pci_exp_txn ]
+  set pci_exp_txp [ create_bd_port -dir O -from 7 -to 0 pci_exp_txp ]
+  set pcie_ep_lnk_up [ create_bd_port -dir O pcie_ep_lnk_up ]
+  set pcie_ep_perstn [ create_bd_port -dir I -type rst pcie_ep_perstn ]
 
-  # Create instance: axi_apb_bridge_0, and set properties
-  set axi_apb_bridge_0 [ create_bd_cell -type ip -vlnv xilinx.com:ip:axi_apb_bridge:3.0 axi_apb_bridge_0 ]
+  # Create instance: axis_interconnect_0, and set properties
+  set axis_interconnect_0 [ create_bd_cell -type ip -vlnv xilinx.com:ip:axis_interconnect:2.1 axis_interconnect_0 ]
   set_property -dict [ list \
-   CONFIG.C_APB_NUM_SLAVES {1} \
-   CONFIG.C_M_APB_PROTOCOL {apb3} \
- ] $axi_apb_bridge_0
+   CONFIG.NUM_MI {1} \
+   CONFIG.NUM_SI {1} \
+   CONFIG.S00_HAS_REGSLICE {1} \
+ ] $axis_interconnect_0
 
-  # Create instance: axi_interconnect_0, and set properties
-  set axi_interconnect_0 [ create_bd_cell -type ip -vlnv xilinx.com:ip:axi_interconnect:2.1 axi_interconnect_0 ]
+  # Create instance: util_ds_buf_0, and set properties
+  set util_ds_buf_0 [ create_bd_cell -type ip -vlnv xilinx.com:ip:util_ds_buf:2.1 util_ds_buf_0 ]
   set_property -dict [ list \
-   CONFIG.NUM_MI {3} \
- ] $axi_interconnect_0
+   CONFIG.C_BUF_TYPE {IBUFDSGTE} \
+ ] $util_ds_buf_0
 
-  # Create instance: axi_uart16550_0, and set properties
-  set axi_uart16550_0 [ create_bd_cell -type ip -vlnv xilinx.com:ip:axi_uart16550:2.0 axi_uart16550_0 ]
-
-  # Create instance: xlconstant_0, and set properties
-  set xlconstant_0 [ create_bd_cell -type ip -vlnv xilinx.com:ip:xlconstant:1.1 xlconstant_0 ]
+  # Create instance: xdma_0, and set properties
+  set xdma_0 [ create_bd_cell -type ip -vlnv xilinx.com:ip:xdma:4.1 xdma_0 ]
   set_property -dict [ list \
-   CONFIG.CONST_VAL {0} \
- ] $xlconstant_0
+   CONFIG.PF0_DEVICE_ID_mqdma {9048} \
+   CONFIG.PF2_DEVICE_ID_mqdma {9048} \
+   CONFIG.PF3_DEVICE_ID_mqdma {9048} \
+   CONFIG.axi_data_width {512_bit} \
+   CONFIG.axisten_freq {250} \
+   CONFIG.cfg_mgmt_if {false} \
+   CONFIG.coreclk_freq {500} \
+   CONFIG.en_gt_selection {true} \
+   CONFIG.mode_selection {Advanced} \
+   CONFIG.pcie_blk_locn {PCIE4C_X0Y4} \
+   CONFIG.pf0_device_id {9048} \
+   CONFIG.pl_link_cap_max_link_speed {16.0_GT/s} \
+   CONFIG.pl_link_cap_max_link_width {X8} \
+   CONFIG.plltype {QPLL0} \
+   CONFIG.select_quad {GTY_Quad_231} \
+   CONFIG.xdma_axi_intf_mm {AXI_Stream} \
+ ] $xdma_0
 
   # Create interface connections
-  connect_bd_intf_net -intf_net S00_AXI_0_1 [get_bd_intf_ports S00_AXI] [get_bd_intf_pins axi_interconnect_0/S00_AXI]
-  set_property HDL_ATTRIBUTE.DEBUG {true} [get_bd_intf_nets S00_AXI_0_1]
-  connect_bd_intf_net -intf_net axi_apb_bridge_0_APB_M [get_bd_intf_ports SYS_CFG_APB] [get_bd_intf_pins axi_apb_bridge_0/APB_M]
-  connect_bd_intf_net -intf_net axi_interconnect_0_M00_AXI [get_bd_intf_pins axi_apb_bridge_0/AXI4_LITE] [get_bd_intf_pins axi_interconnect_0/M00_AXI]
-  connect_bd_intf_net -intf_net axi_interconnect_0_M01_AXI [get_bd_intf_pins axi_interconnect_0/M01_AXI] [get_bd_intf_pins axi_uart16550_0/S_AXI]
-  set_property HDL_ATTRIBUTE.DEBUG {true} [get_bd_intf_nets axi_interconnect_0_M01_AXI]
-  connect_bd_intf_net -intf_net axi_interconnect_0_M02_AXI [get_bd_intf_ports rom_axi] [get_bd_intf_pins axi_interconnect_0/M02_AXI]
-  connect_bd_intf_net -intf_net axi_uart16550_0_UART [get_bd_intf_ports UART_0] [get_bd_intf_pins axi_uart16550_0/UART]
+  connect_bd_intf_net -intf_net CLK_IN_D_0_1 [get_bd_intf_ports pcie_ep_gt_ref] [get_bd_intf_pins util_ds_buf_0/CLK_IN_D]
+  connect_bd_intf_net -intf_net S00_AXIS_0_1 [get_bd_intf_ports S00_AXIS_0] [get_bd_intf_pins axis_interconnect_0/S00_AXIS]
+  connect_bd_intf_net -intf_net axis_interconnect_0_M00_AXIS [get_bd_intf_pins axis_interconnect_0/M00_AXIS] [get_bd_intf_pins xdma_0/S_AXIS_C2H_0]
 
   # Create port connections
-  connect_bd_net -net ACLK_0_1 [get_bd_ports ACLK] [get_bd_pins axi_apb_bridge_0/s_axi_aclk] [get_bd_pins axi_interconnect_0/ACLK] [get_bd_pins axi_interconnect_0/M00_ACLK] [get_bd_pins axi_interconnect_0/M01_ACLK] [get_bd_pins axi_interconnect_0/M02_ACLK] [get_bd_pins axi_uart16550_0/s_axi_aclk]
-  connect_bd_net -net ARESETN_0_1 [get_bd_ports ARESETN] [get_bd_pins axi_apb_bridge_0/s_axi_aresetn] [get_bd_pins axi_interconnect_0/ARESETN] [get_bd_pins axi_interconnect_0/M00_ARESETN] [get_bd_pins axi_interconnect_0/M01_ARESETN] [get_bd_pins axi_interconnect_0/M02_ARESETN] [get_bd_pins axi_interconnect_0/S00_ARESETN] [get_bd_pins axi_uart16550_0/s_axi_aresetn]
-  connect_bd_net -net SYS_INTER_CLK_1 [get_bd_ports SYS_INTER_CLK] [get_bd_pins axi_interconnect_0/S00_ACLK]
-  connect_bd_net -net axi_uart16550_0_ip2intc_irpt [get_bd_ports uart0_intc] [get_bd_pins axi_uart16550_0/ip2intc_irpt]
-  connect_bd_net -net xlconstant_0_dout [get_bd_pins axi_uart16550_0/freeze] [get_bd_pins xlconstant_0/dout]
+  connect_bd_net -net ARESETN_1 [get_bd_pins axis_interconnect_0/ARESETN] [get_bd_pins axis_interconnect_0/M00_AXIS_ARESETN] [get_bd_pins xdma_0/axi_aresetn]
+  connect_bd_net -net M00_AXIS_ACLK_1 [get_bd_pins axis_interconnect_0/ACLK] [get_bd_pins axis_interconnect_0/M00_AXIS_ACLK] [get_bd_pins xdma_0/axi_aclk]
+  connect_bd_net -net core_clk_0_1 [get_bd_ports cpu_clk] [get_bd_pins axis_interconnect_0/S00_AXIS_ACLK]
+  connect_bd_net -net m_axis_c2h_aresetn_0_1 [get_bd_ports cpu_rstn] [get_bd_pins axis_interconnect_0/S00_AXIS_ARESETN]
+  connect_bd_net -net pci_exp_rxn_0_1 [get_bd_ports pci_exp_rxn] [get_bd_pins xdma_0/pci_exp_rxn]
+  connect_bd_net -net pci_exp_rxp_0_1 [get_bd_ports pci_exp_rxp] [get_bd_pins xdma_0/pci_exp_rxp]
+  connect_bd_net -net sys_rst_n_0_1 [get_bd_ports pcie_ep_perstn] [get_bd_pins xdma_0/sys_rst_n]
+  connect_bd_net -net util_ds_buf_0_IBUF_DS_ODIV2 [get_bd_pins util_ds_buf_0/IBUF_DS_ODIV2] [get_bd_pins xdma_0/sys_clk]
+  connect_bd_net -net util_ds_buf_0_IBUF_OUT [get_bd_pins util_ds_buf_0/IBUF_OUT] [get_bd_pins xdma_0/sys_clk_gt]
+  connect_bd_net -net xdma_0_pci_exp_txn [get_bd_ports pci_exp_txn] [get_bd_pins xdma_0/pci_exp_txn]
+  connect_bd_net -net xdma_0_pci_exp_txp [get_bd_ports pci_exp_txp] [get_bd_pins xdma_0/pci_exp_txp]
+  connect_bd_net -net xdma_0_user_lnk_up [get_bd_ports pcie_ep_lnk_up] [get_bd_pins xdma_0/user_lnk_up]
 
   # Create address segments
-  assign_bd_address -offset 0x31200000 -range 0x00010000 -target_address_space [get_bd_addr_spaces S00_AXI] [get_bd_addr_segs SYS_CFG_APB/Reg] -force
-  assign_bd_address -offset 0x310B0000 -range 0x00010000 -target_address_space [get_bd_addr_spaces S00_AXI] [get_bd_addr_segs axi_uart16550_0/S_AXI/Reg] -force
-  assign_bd_address -offset 0x10000000 -range 0x10000000 -target_address_space [get_bd_addr_spaces S00_AXI] [get_bd_addr_segs rom_axi/Reg] -force
 
 
   # Restore current instance

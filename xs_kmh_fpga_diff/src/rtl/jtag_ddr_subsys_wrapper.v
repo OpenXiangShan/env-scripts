@@ -87,7 +87,7 @@ module jtag_ddr_subsys_wrapper
   output DDR4_reset_n;
   input OSC_SYS_CLK_clk_n;
   input OSC_SYS_CLK_clk_p;
-  output SOC_CLK;
+  input SOC_CLK;
   output MAC_CLK;
   input [32:0]SOC_M_AXI_araddr;
   input [1:0]SOC_M_AXI_arburst;

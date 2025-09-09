@@ -18,8 +18,7 @@
 
 # Check file required for this script exists
 
-set ip_dir "/nfs/home/wanghuizhe/xs_nanhu_fpga/XS_100NL_ST_V3_TAG_20211229"
-set core_dir "/nfs/home/wanghuizhe/nanhu_cores/v90-build-default-1MBL2-2MBL3-alias-clkdiv-0417-all"
+set core_dir "../XiangShan/build/rtl"
 
 set cpu "kmh"
 set cpu_candidates [list "kmh" "xiangshan" "dualcore"]
@@ -96,7 +95,6 @@ if { $::argc > 0 } {
       "--cpu"          { incr i; set cpu [lindex $::argv $i] }
       "--origin_dir"   { incr i; set origin_dir [lindex $::argv $i] }
       "--project_name" { incr i; set _xil_proj_name_ [lindex $::argv $i] }
-      "--ip_dir"       { incr i; set ip_dir [lindex $::argv $i] }
       "--core_dir"     { incr i; set core_dir [lindex $::argv $i] }
       "--help"         { print_help "$cpu_candidates" }
       default {
@@ -232,7 +230,7 @@ source "$tcl_dir/jtag_ddr_subsys.tcl"
 # source "$tcl_dir/ahblite_axi_bridge_0.tcl"
 source "$tcl_dir/blk_mem_gen_0.tcl"
 source "$tcl_dir/vio_0.tcl"
-source "$tcl_dir/xdma.tcl"
+source "$tcl_dir/xdma_ep.tcl"
 source "$tcl_dir/AXI_bridge.tcl"
 source "$tcl_dir/data_bridge.tcl"
 # source "$tcl_dir/pcie4c_uscale_plus_0.tcl"
@@ -241,30 +239,30 @@ source "$tcl_dir/data_bridge.tcl"
 
 # Create 'synth_1' run (if not found)
 if {[string equal [get_runs -quiet synth_1] ""]} {
-    create_run -name synth_1 -part xcvu19p-fsva3824-2-e -flow {Vivado Synthesis 2020} -strategy "Vivado Synthesis Defaults" -report_strategy {No Reports} -constrset constrs_1
+    create_run -name synth_1 -part xcvu19p-fsva3824-2-e -flow {Vivado Synthesis 2020} -strategy "Flow_PerfOptimized_high" -report_strategy {No Reports} -constrset constrs_1
 } else {
-  set_property strategy "Vivado Synthesis Defaults" [get_runs synth_1]
+  set_property strategy "Flow_PerfOptimized_high" [get_runs synth_1]
   set_property flow "Vivado Synthesis 2020" [get_runs synth_1]
 }
 set obj [get_runs synth_1]
 set_property -name "part" -value "xcvu19p-fsva3824-2-e" -objects $obj
 #set_property -name "auto_incremental_checkpoint.directory" -value "/home/zyy/whz/ns_sdmmc_default_xs/ns_uart/ns_uart.srcs/utils_1/imports/sdmmc_xs" -objects $obj
-set_property -name "strategy" -value "Vivado Synthesis Defaults" -objects $obj
+set_property -name "strategy" -value "Flow_PerfOptimized_high" -objects $obj
 
 # set the current synth run
 current_run -synthesis [get_runs synth_1]
 
 # Create 'impl_1' run (if not found)
 if {[string equal [get_runs -quiet impl_1] ""]} {
-    create_run -name impl_1 -part xcvu19p-fsva3824-2-e -flow {Vivado Implementation 2020} -strategy "Performance_ExplorePostRoutePhysOpt" -report_strategy {No Reports} -constrset constrs_1 -parent_run synth_1
+    create_run -name impl_1 -part xcvu19p-fsva3824-2-e -flow {Vivado Implementation 2020} -strategy "Congestion_SSI_SpreadLogic_high" -report_strategy {No Reports} -constrset constrs_1 -parent_run synth_1
 } else {
-  set_property strategy "Performance_ExplorePostRoutePhysOpt" [get_runs impl_1]
+  set_property strategy "Congestion_SSI_SpreadLogic_high" [get_runs impl_1]
   set_property flow "Vivado Implementation 2020" [get_runs impl_1]
 }
 set obj [get_runs impl_1]
 set_property -name "part" -value "xcvu19p-fsva3824-2-e" -objects $obj
 #set_property -name "auto_incremental_checkpoint.directory" -value "/home/zyy/whz/ns_sdmmc_default_xs/ns_uart/ns_uart.srcs/utils_1/imports/sdmmc_xs_impl" -objects $obj
-set_property -name "strategy" -value "Performance_ExplorePostRoutePhysOpt" -objects $obj
+set_property -name "strategy" -value "Congestion_SSI_SpreadLogic_high" -objects $obj
 #set_property -name "steps.place_design.args.directive" -value "AltSpreadLogic_high" -objects $obj
 #set_property -name "steps.phys_opt_design.args.directive" -value "AggressiveExplore" -objects $obj
 #set_property -name "steps.route_design.args.directive" -value "AlternateCLBRouting" -objects $obj

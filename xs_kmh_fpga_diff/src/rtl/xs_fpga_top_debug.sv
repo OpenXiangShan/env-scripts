@@ -35,16 +35,16 @@ module xs_fpga_top_debug
    input                 refclk2_p, // pcie 100MHz
    input                 refclk2_n,
    output                PERST2_N,
-   `ifdef XS_XDMA
-   input     [3:0]       PCIE_RXN,
-   input     [3:0]       PCIE_RXP,
-   output    [3:0]       PCIE_TXN,
-   output    [3:0]       PCIE_TXP,
-   input     [3:0]       PCIE2_RXN,
-   input     [3:0]       PCIE2_RXP,
-   output    [3:0]       PCIE2_TXN,
-   output    [3:0]       PCIE2_TXP,
-   `endif
+`ifdef XS_XDMA_EP
+   input    [7:0]        pci_ep_rxn,
+   input    [7:0]        pci_ep_rxp,
+   output   [7:0]        pci_ep_txn,
+   output   [7:0]        pci_ep_txp,
+   input                 pcie_ep_gt_ref_clk_n,
+   input                 pcie_ep_gt_ref_clk_p,
+   output                pcie_ep_lnk_up,
+   input                 pcie_ep_perstn,
+`endif 
    //DDR
    output    [0:0]       DDR0_CK_T,
    output    [0:0]       DDR0_CK_C,
@@ -100,7 +100,7 @@ wire vio_sw5;
 wire vio_sw4;
 wire sys_rstn;
 wire cpu_setn_buf;
-wire ui_clk, sys_clk_i, dev_clk_i;
+wire sys_clk_i, dev_clk_i;
 wire pcie_rstn;
 (*mark_debug = "true"*) wire cpu_setn_rflag;
 (*mark_debug = "true"*) reg  cpu_rstn;
@@ -195,8 +195,8 @@ IBUFDS_GTE4 refclk2_ibuf (
     .IB(refclk2_n)
 );
 
-assign        sys_clk_i = ui_clk;
-assign        dev_clk_i = ui_clk;
+assign        sys_clk_i = dbg_clk_buf;
+assign        dev_clk_i = dbg_clk_buf;
 
 vio_0 u_vio(
    .clk        (dbg_clk_buf),
@@ -317,16 +317,9 @@ assign io_systemjtag_reset = ~JTAG_TRSTn;
 xs_core_def xs_core_def
 (
   .ddr_clk_p            (clk7_p),
-  .ddr_clk_n            (clk7_n),
-`ifdef  XS_XDMA   
-  .pcie_sysclk          (pcie_sysclk),
-  .pcie_sysclk_gt       (pcie_sysclk_gt),
-  .pcie2_sysclk         (pcie2_sysclk),
-  .pcie2_sysclk_gt      (pcie2_sysclk_gt),
-`endif     
+  .ddr_clk_n            (clk7_n),  
   .tmclk                (tmclk_buf),
   .cqetmclk             (cqetmclk_buf),
-  .ui_clk               (ui_clk),
   .init_calib_complete  (led3),
   .cpu_rd_qspi_valid    (led2),
   .cpu_wr_ddr_valid     (led0),
@@ -340,15 +333,15 @@ xs_core_def xs_core_def
   .chip_mode_i          (2'b00), // normal mode
   .dft_crg_rst_n        (1'b1),
   // pcie
-`ifdef XS_XDMA
-  .PCIE_RXN             (PCIE_RXN),  
-  .PCIE_RXP             (PCIE_RXP),  
-  .PCIE_TXN             (PCIE_TXN),  
-  .PCIE_TXP             (PCIE_TXP),  
-  .PCIE2_RXN            (PCIE2_RXN),  
-  .PCIE2_RXP            (PCIE2_RXP),  
-  .PCIE2_TXN            (PCIE2_TXN),  
-  .PCIE2_TXP            (PCIE2_TXP),
+`ifdef XS_XDMA_EP
+  .pci_ep_rxn           (pci_ep_rxn),
+  .pci_ep_rxp           (pci_ep_rxp),
+  .pci_ep_txn           (pci_ep_txn),
+  .pci_ep_txp           (pci_ep_txp),
+  .pcie_ep_gt_ref_clk_n (pcie_ep_gt_ref_clk_n),
+  .pcie_ep_gt_ref_clk_p (pcie_ep_gt_ref_clk_p),
+  .pcie_ep_lnk_up       (pcie_ep_lnk_up),
+  .pcie_ep_perstn       (pcie_ep_perstn),
 `endif
 `ifdef XS_UART
   // uart

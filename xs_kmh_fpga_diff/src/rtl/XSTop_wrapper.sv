@@ -1,9 +1,11 @@
+`include "DifftestMacros.v"
+`include "gateway_interface.svh"
+
 module XSTop_wrapper(
   input           sys_clk_i,    
   input           sys_rstn_i, 
- input  tmclk,
-  input           osc_clock,        //24MHz
-  input           outer_clock,      //Max : 2.4GHz
+  input           tmclk,
+
   input           global_reset,     //24MHz
 
   input  [3:0]    pll_bypass_sel,   //apb clk : 100MHz
@@ -174,7 +176,10 @@ output io_cacheable_check_resp_1_st,
 output io_cacheable_check_resp_1_instr,
 output io_cacheable_check_resp_1_mmio,
 output io_riscv_halt_0,
-output io_riscv_halt_1
+output io_riscv_halt_1,
+
+output [`CONFIG_DIFFTEST_BATCH_IO_WITDH - 1:0]gateway_out_data,
+output gateway_out_enable
 );
 
   wire          cpu_clock       ;
@@ -191,8 +196,26 @@ output io_riscv_halt_1
 
 assign cpu_to_soc = 32'h0;
 
+  gateway_if   gateway_if_in();
+  core_if      core_if_out[1]();
 
-XSTop  u_XSTop(
+  CoreToGateway u_CoreToGateway(
+    .gateway_out (gateway_if_in.out),
+    .core_in     (core_if_out)
+  );
+
+  GatewayEndpoint u_GatewayEndpoint(
+    .clock       (sys_clk_i),
+    .reset       (~sys_rstn_i),
+
+    .gateway_in  (gateway_if_in.in),
+
+    .fpgaIO_data    (gateway_out_data),
+    .fpgaIO_enable  (gateway_out_enable),
+    .step        ()
+  );
+
+SimTop  u_XSTop(
   .memory_awready                (mem_core_awready )                        ,
   .memory_awvalid                (mem_core_awvalid )                        ,
   .memory_awid                   (mem_core_awid    )                          ,
@@ -315,11 +338,15 @@ XSTop  u_XSTop(
   .io_systemjtag_part_number       (16'h16),
   .io_systemjtag_version           (4'h4),
 
+
   .io_clock                        (sys_clk_i/*cpu_clock  */                        ),
   .io_reset                        (~sys_rstn_i/*cpu_global_reset  */                 ),
   .io_extIntrs                     (io_extIntrs  ),
-  .io_rtc_clock (tmclk),
-  .io_riscv_rst_vec_0 (38'h10000000)
+  .io_rtc_clock                    (tmclk),
+  .io_riscv_rst_vec_0              (38'h10000000),
+
+  .gateway_out                     (core_if_out[0])
 );
+
 
 endmodule

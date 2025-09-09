@@ -1,17 +1,12 @@
 `include "sys_define.vh"
+`include "gateway_interface.svh"
+`include "DifftestMacros.v"
 
 module xs_core_def (
       input                                      ddr_clk_p,
-      input                                      ddr_clk_n,
-`ifdef  XS_XDMA      
-      input                                      pcie_sysclk,      // 100MHz
-      input                                      pcie_sysclk_gt,   // 100MHz
-      input                                      pcie2_sysclk,   // 100MHz
-      input                                      pcie2_sysclk_gt,   // 100MHz
-`endif      
+      input                                      ddr_clk_n, 
       input                                      tmclk,
       input                                      cqetmclk,
-      output                                     ui_clk,
       output                                     init_calib_complete,
       output                                     cpu_rd_qspi_valid,
       output                                     cpu_wr_ddr_valid,
@@ -20,15 +15,15 @@ module xs_core_def (
       input                                      sys_rstn,
       input                                      cpu_rstn,
       input                                      rstn_sw4,
-`ifdef  XS_XDMA      
-      input          [3:0]                       PCIE_RXN,
-      input          [3:0]                       PCIE_RXP,
-      output         [3:0]                       PCIE_TXN,
-      output         [3:0]                       PCIE_TXP,
-      input          [3:0]                       PCIE2_RXN,
-      input          [3:0]                       PCIE2_RXP,
-      output         [3:0]                       PCIE2_TXN,
-      output         [3:0]                       PCIE2_TXP,
+`ifdef  XS_XDMA_EP      
+      input       [7:0]                          pci_ep_rxn,
+      input       [7:0]                          pci_ep_rxp,
+      output      [7:0]                          pci_ep_txn,
+      output      [7:0]                          pci_ep_txp,
+      input                                      pcie_ep_gt_ref_clk_n,
+      input                                      pcie_ep_gt_ref_clk_p,
+      output                                     pcie_ep_lnk_up,
+      input                                      pcie_ep_perstn,
 `endif  
 `ifdef  XS_UART   
       input                                      uart0_sin,
@@ -116,7 +111,6 @@ assign uhs1_swvolt_en = 0;
 assign sd_led_control = 0;
 // }}} Unbind useless output port
 
-wire                       axi_bus_clk               ; 
 wire                       axi_bclk_sync_rstn        ; 
 wire                       ddr_bus_clk               ; 
 wire                       ddr_bclk_sync_rstn        ; 
@@ -159,8 +153,6 @@ wire                                           dp_qos_sel_cfg                 ;
 wire                                           gpu_qos_sel_cfg                ;
 wire                                           gmac_qos_sel_cfg               ;
 wire                                           dma_qos_sel_cfg                ;
-wire                                           pcie1_qos_sel_cfg              ;
-wire                                           pcie0_qos_sel_cfg              ;
 wire                                           usb_qos_sel_cfg                ;
 wire            [11:0]                         hpm_data_svt                   ;
 wire            [11:0]                         hpm_data_lvt                   ;
@@ -175,10 +167,6 @@ wire            [3:0]                          cfg_sd_m_awqos                 ;
 wire            [3:0]                          cfg_sd_m_arqos                 ;
 wire            [3:0]                          cfg_dma_m_awqos                ;
 wire            [3:0]                          cfg_dma_m_arqos                ;
-wire            [3:0]                          cfg_pcie1_m_awqos              ;
-wire            [3:0]                          cfg_pcie1_m_arqos              ;
-wire            [3:0]                          cfg_pcie0_m_awqos              ;
-wire            [3:0]                          cfg_pcie0_m_arqos              ;
 wire                                           cfg_gpu_addr_offset_en         ;
 wire                                           cfg_gmac_addr_offset_en        ;
 wire                                           sdio_voltage_sw_cfg            ;
@@ -189,7 +177,6 @@ wire                                           ddr_data_sram_rme_cfg          ;
 wire            [3:0]                          ddr_data_sram_rm_cfg           ;
 wire            [15:0]                         cpu_sram_cfg                   ;
 wire            [1:0]                          usb3_timing_opt_cfg            ;
-wire            [1:0]                          pcie_timing_opt_cfg            ;
 wire                                           dp_frame_start                 ;
 wire                                           ahb_bus_clk_200m               ;
 wire                                           axi_bus_clk_400m               ;
@@ -278,27 +265,6 @@ wire            [63:0]                         usb_haddr_mix                  ;
 wire            [31:0]                         qos_haddr_mix                  ;
 wire                                           sd_wakeup_int                  ;
 wire                                           sd_int                         ;
-//`ifdef  XS_XDMA    
-wire                                           pcie1_int                      ;
-(*mark_debug = "true"*) wire                   pcie0_int                      ;
-(*mark_debug = "true"*) wire                   interrupt_out;
-(*mark_debug = "true"*) wire                   interrupt_out_msi_vec0to31;
-(*mark_debug = "true"*) wire                   interrupt_out_msi_vec32to63;
-(*mark_debug = "true"*) wire                   interrupt_out_2;
-(*mark_debug = "true"*) wire                   interrupt_out_msi_vec0to31_2;
-(*mark_debug = "true"*) wire                   interrupt_out_msi_vec32to63_2;
-(*mark_debug = "true"*) wire                   pcie_cfg_phy_link_down         ;
-(*mark_debug = "true"*) wire         [1:0]     pcie_cfg_phy_link_status       ;
-(*mark_debug = "true"*) wire         [2:0]     pcie_cfg_negotiated_width      ;
-(*mark_debug = "true"*) wire         [1:0]     pcie_cfg_current_speed         ;
-(*mark_debug = "true"*) wire         [1:0]     pcie_cfg_max_payload           ;
-(*mark_debug = "true"*) wire         [2:0]     pcie_cfg_max_read_req          ;
-(*mark_debug = "true"*) wire        [15:0]     pcie_cfg_function_status       ;
-(*mark_debug = "true"*) wire         [4:0]     pcie_cfg_local_error_out       ;
-(*mark_debug = "true"*) wire                   pcie_cfg_pl_status_change      ;
-(*mark_debug = "true"*) wire                   pcie_user_lnk_up               ;
-(*mark_debug = "true"*) wire                   pcie_phy_rdy_out               ;
-//`endif
 wire                                           dp_de_int                      ;
 wire                                           dp_se_int                      ;
 wire                                           hdmiphy_int                    ;
@@ -340,10 +306,6 @@ wire            [3:0]                          dma_m_awqos_mix                ;
 wire            [3:0]                          dma_m_arqos_mix                ;
 wire            [3:0]                          gpu_m_awqos_mix                ;
 wire            [3:0]                          gpu_m_arqos_mix                ;
-wire            [3:0]                          pcie0_m_awqos_mix              ;
-wire            [3:0]                          pcie0_m_arqos_mix              ;
-wire            [3:0]                          pcie1_m_awqos_mix              ;
-wire            [3:0]                          pcie1_m_arqos_mix              ;
 wire                                           cpu_pll_clk_test               ;
 wire                                           cpu_pll_lock_test              ;
 wire            [1:0]                          soc_pll_clk_test               ;
@@ -351,49 +313,7 @@ wire            [4:0]                          soc_pll_lock_test              ;
 wire                                           ddr_pll_lock_test              ;
 wire                                           dft_mode                       ;
 wire                                           scan_mode                      ;
-wire                                           pcie_aux_clk_src               ;
 wire                                           sys_peri_rst_n                 ;
-`ifdef  XS_XDMA
-wire            [7:0]                         pcie_bridge_m_awid             ;
-wire            [39:0]                         pcie_bridge_m_awaddr           ;
-wire            [7:0]                          pcie_bridge_m_awlen            ;
-wire            [2:0]                          pcie_bridge_m_awsize           ;
-wire            [1:0]                          pcie_bridge_m_awburst          ;
-wire                                           pcie_bridge_m_awlock           ;
-wire            [3:0]                          pcie_bridge_m_awcache          ;
-wire            [2:0]                          pcie_bridge_m_awprot           ;
-wire                                           pcie_bridge_m_awvalid          ;
-wire            [255:0]                        pcie_bridge_m_wdata            ;
-wire            [31:0]                         pcie_bridge_m_wstrb            ;
-wire                                           pcie_bridge_m_wlast            ;
-wire                                           pcie_bridge_m_wvalid           ;
-wire                                           pcie_bridge_m_bready           ;
-wire            [7:0]                         pcie_bridge_m_arid             ;
-wire            [39:0]                         pcie_bridge_m_araddr           ;
-wire            [7:0]                          pcie_bridge_m_arlen            ;
-wire            [2:0]                          pcie_bridge_m_arsize           ;
-wire            [1:0]                          pcie_bridge_m_arburst          ;
-wire                                           pcie_bridge_m_arlock           ;
-wire            [3:0]                          pcie_bridge_m_arcache          ;
-wire            [2:0]                          pcie_bridge_m_arprot           ;
-wire                                           pcie_bridge_m_arvalid          ;
-wire                                           pcie_bridge_m_rready           ;
-wire                                           pcie_bridge_m_awready          ;
-wire                                           pcie_bridge_m_wready           ;
-wire            [14:0]                         pcie_bridge_m_bid_mix              ;
-wire            [7:0]                          pcie_bridge_m_bid              ;
-wire            [1:0]                          pcie_bridge_m_bresp            ;
-wire                                           pcie_bridge_m_bvalid           ;
-wire                                           pcie_bridge_m_arready          ;
-wire            [14:0]                         pcie_bridge_m_rid_mix              ;
-wire            [7:0]                          pcie_bridge_m_rid              ;
-wire            [255:0]                        pcie_bridge_m_rdata            ;
-wire            [1:0]                          pcie_bridge_m_rresp            ;
-wire                                           pcie_bridge_m_rlast            ;
-wire                                           pcie_bridge_m_rvalid           ;
-wire            [3:0]                          pcie_bridge_m_awqos            ;
-wire            [3:0]                          pcie_bridge_m_arqos            ;
-`endif
 wire            [13:0]                         data_cpu_bridge_m2s_awid       ;
 wire            [35:0]                         data_cpu_bridge_m2s_awaddr     ;
 wire            [7:0]                          data_cpu_bridge_m2s_awlen      ;
@@ -711,17 +631,6 @@ wire                                           i2s_apb_cken                   ;
 wire                                           i2s_srst_req                   ;
 wire                                           dft_clk_60m                    ;
 wire                                           dft_clk_125m                   ;
-wire                                           pciephy_dft_clk_250m           ;
-wire                                           pcie_ref_clk_src               ;
-wire                                           pcie_ref_cken                  ;
-wire                                           pcie1_aux_cken                 ;
-wire                                           pcie0_aux_cken                 ;
-wire                                           pcie1_axi_cken                 ;
-wire                                           pcie0_axi_cken                 ;
-wire                                           pcie1_apb_cken                 ;
-wire                                           pcie0_apb_cken                 ;
-wire                                           pcie1_srst_req                 ;
-wire                                           pcie0_srst_req                 ;
 wire                                           ddr_cken                       ;
 wire                                           ddr_pcken                      ;
 wire                                           ddr_acken                      ;
@@ -931,80 +840,6 @@ wire            [63:0]                         peri_bridge_m_rdata            ;
 wire            [1:0]                          peri_bridge_m_rresp            ;
 wire                                           peri_bridge_m_rlast            ;
 wire                                           peri_bridge_m_rvalid           ;
-`ifdef  XS_XDMA
-wire            [14:0]                         cfg_pcie0_m2s_arid_mix         ;
-wire            [14:0]                         cfg_pcie0_m2s_awid_mix         ;
-wire            [14:0]                         cfg_pcie0_m2s_wid_mix          ;
-wire            [31:0]                         cfg_pcie0_m2s_araddr           ;
-wire            [1:0]                          cfg_pcie0_m2s_arburst          ;
-wire            [3:0]                          cfg_pcie0_m2s_arcache          ;
-wire            [3:0]                          cfg_pcie0_m2s_arlen            ;
-wire            [1:0]                          cfg_pcie0_m2s_arlock           ;
-wire            [2:0]                          cfg_pcie0_m2s_arprot           ;
-wire            [2:0]                          cfg_pcie0_m2s_arsize           ;
-wire                                           cfg_pcie0_m2s_arvalid          ;
-wire            [31:0]                         cfg_pcie0_m2s_awaddr           ;
-wire            [1:0]                          cfg_pcie0_m2s_awburst          ;
-wire            [3:0]                          cfg_pcie0_m2s_awcache          ;
-wire            [3:0]                          cfg_pcie0_m2s_awlen            ;
-wire            [1:0]                          cfg_pcie0_m2s_awlock           ;
-wire            [2:0]                          cfg_pcie0_m2s_awprot           ;
-wire            [2:0]                          cfg_pcie0_m2s_awsize           ;
-wire                                           cfg_pcie0_m2s_awvalid          ;
-wire                                           cfg_pcie0_m2s_bready           ;
-wire                                           cfg_pcie0_m2s_rready           ;
-wire            [255:0]                        cfg_pcie0_m2s_wdata            ;
-wire                                           cfg_pcie0_m2s_wlast            ;
-wire            [31:0]                         cfg_pcie0_m2s_wstrb            ;
-wire                                           cfg_pcie0_m2s_wvalid           ;
-wire            [14:0]                         cfg_pcie0_s2m_rid              ;
-wire            [14:0]                         cfg_pcie0_s2m_bid              ;
-wire                                           cfg_pcie0_s2m_arready          ;
-wire                                           cfg_pcie0_s2m_awready          ;
-wire            [1:0]                          cfg_pcie0_s2m_bresp            ;
-wire                                           cfg_pcie0_s2m_bvalid           ;
-wire            [255:0]                        cfg_pcie0_s2m_rdata            ;
-wire                                           cfg_pcie0_s2m_rlast            ;
-wire            [1:0]                          cfg_pcie0_s2m_rresp            ;
-wire                                           cfg_pcie0_s2m_rvalid           ;
-wire                                           cfg_pcie0_s2m_wready           ;
-wire            [14:0]                         cfg_pcie1_m2s_arid_mix         ;
-wire            [14:0]                         cfg_pcie1_m2s_awid_mix         ;
-wire            [14:0]                         cfg_pcie1_m2s_wid_mix          ;
-wire            [31:0]                         cfg_pcie1_m2s_araddr           ;
-wire            [1:0]                          cfg_pcie1_m2s_arburst          ;
-wire            [3:0]                          cfg_pcie1_m2s_arcache          ;
-wire            [3:0]                          cfg_pcie1_m2s_arlen            ;
-wire            [1:0]                          cfg_pcie1_m2s_arlock           ;
-wire            [2:0]                          cfg_pcie1_m2s_arprot           ;
-wire            [2:0]                          cfg_pcie1_m2s_arsize           ;
-wire                                           cfg_pcie1_m2s_arvalid          ;
-wire            [31:0]                         cfg_pcie1_m2s_awaddr           ;
-wire            [1:0]                          cfg_pcie1_m2s_awburst          ;
-wire            [3:0]                          cfg_pcie1_m2s_awcache          ;
-wire            [3:0]                          cfg_pcie1_m2s_awlen            ;
-wire            [1:0]                          cfg_pcie1_m2s_awlock           ;
-wire            [2:0]                          cfg_pcie1_m2s_awprot           ;
-wire            [2:0]                          cfg_pcie1_m2s_awsize           ;
-wire                                           cfg_pcie1_m2s_awvalid          ;
-wire                                           cfg_pcie1_m2s_bready           ;
-wire                                           cfg_pcie1_m2s_rready           ;
-wire            [255:0]                        cfg_pcie1_m2s_wdata            ;
-wire                                           cfg_pcie1_m2s_wlast            ;
-wire            [31:0]                         cfg_pcie1_m2s_wstrb            ;
-wire                                           cfg_pcie1_m2s_wvalid           ;
-wire            [14:0]                         cfg_pcie1_s2m_rid              ;
-wire            [14:0]                         cfg_pcie1_s2m_bid              ;
-wire                                           cfg_pcie1_s2m_arready          ;
-wire                                           cfg_pcie1_s2m_awready          ;
-wire            [1:0]                          cfg_pcie1_s2m_bresp            ;
-wire                                           cfg_pcie1_s2m_bvalid           ;
-wire            [255:0]                        cfg_pcie1_s2m_rdata            ;
-wire                                           cfg_pcie1_s2m_rlast            ;
-wire            [1:0]                          cfg_pcie1_s2m_rresp            ;
-wire                                           cfg_pcie1_s2m_rvalid           ;
-wire                                           cfg_pcie1_s2m_wready           ;
-`endif
 `ifdef  XS_GMAC
 wire            [31:0]                         gmac_paddr                     ;
 `endif
@@ -1029,48 +864,26 @@ wire            [3:0]                          qspi_hprot                     ;
 wire                                           sd_hresp_mix                   ;
 wire            [2:0]                          sd_hburst                      ;
 wire            [3:0]                          sd_hprot                       ;
-`ifdef  XS_XDMA
-wire            [4:0]                          cfg_pcie0_s2m_bid_mix          ;
-wire            [4:0]                          cfg_pcie0_s2m_rid_mix          ;
-wire            [4:0]                          cfg_pcie0_m2s_awid             ;
-wire            [4:0]                          cfg_pcie0_m2s_wid              ;
-wire            [4:0]                          cfg_pcie0_m2s_arid             ;
-wire            [4:0]                          cfg_pcie1_s2m_bid_mix          ;
-wire            [4:0]                          cfg_pcie1_s2m_rid_mix          ;
-wire            [4:0]                          cfg_pcie1_m2s_awid             ;
-wire            [4:0]                          cfg_pcie1_m2s_wid              ;
-wire            [4:0]                          cfg_pcie1_m2s_arid             ;
-`endif
+
 assign dma_ack_rx = dma_ack[1] ;
 assign dma_ack_tx = dma_ack[0] ;
 assign dma_breq_mix  = {dma_breq_rx ,dma_breq_tx } ;
 assign dma_blast_mix = {dma_blast_rx,dma_blast_tx} ;
-`ifdef  XS_XDMA
-assign cfg_pcie0_s2m_bid_mix = cfg_pcie0_s2m_bid[4:0] ;
-assign cfg_pcie0_s2m_rid_mix = cfg_pcie0_s2m_rid[4:0] ;
-assign cfg_pcie0_m2s_wid_mix = {9'b0,cfg_pcie0_m2s_wid[4:0]};
-assign cfg_pcie0_m2s_awid_mix = {9'b0,cfg_pcie0_m2s_awid[4:0]};
-assign cfg_pcie0_m2s_arid_mix = {9'b0,cfg_pcie0_m2s_arid[4:0]};
-assign cfg_pcie1_s2m_bid_mix = cfg_pcie1_s2m_bid[4:0] ;
-assign cfg_pcie1_s2m_rid_mix = cfg_pcie1_s2m_rid[4:0] ;
-assign cfg_pcie1_m2s_wid_mix = {9'b0,cfg_pcie1_m2s_wid[4:0]};
-assign cfg_pcie1_m2s_awid_mix = {9'b0,cfg_pcie1_m2s_awid[4:0]};
-assign cfg_pcie1_m2s_arid_mix = {9'b0,cfg_pcie1_m2s_arid[4:0]};
-`endif
+
 wire [58:0] cpu_int ;  // 11-26 add sd 2 int
 wire [104:0] cpu_pll_config ;
 
 assign cpu_int = {
-      interrupt_out_2   ,
-      interrupt_out_msi_vec0to31_2   ,
-      interrupt_out_msi_vec32to63_2   ,
+      0   ,
+      0   ,
+      0   ,
 	  sd_wakeup_int   ,
 	  sd_int          ,
       pcie1_int       ,
 //`ifdef  XS_XDMA
-      interrupt_out   ,
-      interrupt_out_msi_vec0to31   ,
-      interrupt_out_msi_vec32to63  ,
+      0   ,
+      0   ,
+      0  ,
 //`endif
       dp_de_int       ,
       dp_se_int       ,
@@ -1167,7 +980,7 @@ wire [1 : 0]                rom_axi_rresp    ;
 blk_mem_gen_0 u_rom (
   .rsta_busy      (rsta_busy),          // output wire rsta_busy
   .rstb_busy      (rstb_busy),          // output wire rstb_busy
-  .s_aclk         (axi_bus_clk),                // input wire s_aclk
+  .s_aclk         (sys_clk_i),                // input wire s_aclk
   .s_aresetn      (axi_bclk_sync_rstn ),          // input wire s_aresetn
   .s_axi_awaddr   (rom_axi_awaddr     ),    // input wire [31 : 0] s_axi_awaddr
   .s_axi_awlen    (rom_axi_awlen      ),      // input wire [7 : 0] s_axi_awlen
@@ -1210,97 +1023,7 @@ assign cfg_pcie1_s2m_bresp = 0;
 assign cfg_pcie1_s2m_rdata = 0;
 assign cfg_pcie1_s2m_rvalid = 1;
 `endif
-`ifdef  XS_XDMA
-assign pcie_bridge_m_bid_mix = {8'h0,pcie_bridge_m_bid};
-assign pcie_bridge_m_rid_mix = {8'h0,pcie_bridge_m_rid};
-`endif
-wire [31:0]XDMA_M01_AXI_araddr;
-wire [2:0]XDMA_M01_AXI_arprot;
-wire XDMA_M01_AXI_arready;
-wire XDMA_M01_AXI_arvalid;
-wire [31:0]XDMA_M01_AXI_awaddr;
-wire [2:0]XDMA_M01_AXI_awprot;
-wire XDMA_M01_AXI_awready;
-wire XDMA_M01_AXI_awvalid;
-wire XDMA_M01_AXI_bready;
-wire [1:0]XDMA_M01_AXI_bresp;
-wire XDMA_M01_AXI_bvalid;
-wire [31:0]XDMA_M01_AXI_rdata;
-wire XDMA_M01_AXI_rready;
-wire [1:0]XDMA_M01_AXI_rresp;
-wire XDMA_M01_AXI_rvalid;
-wire [31:0]XDMA_M01_AXI_wdata;
-wire XDMA_M01_AXI_wready;
-wire [3:0]XDMA_M01_AXI_wstrb;
-wire XDMA_M01_AXI_wvalid;
 
-`ifdef  XS_XDMA
-xdma u0_xdma (
-  .aclk                        ( axi_bus_clk),
-  .aresetn                     ( axi_bclk_sync_rstn),
-        
-  .frontbus_axi_araddr         ( pcie_bridge_m_araddr),
-  .frontbus_axi_arburst        ( pcie_bridge_m_arburst),
-  .frontbus_axi_arcache        ( pcie_bridge_m_arcache),
-  .frontbus_axi_arid           ( pcie_bridge_m_arid),
-  .frontbus_axi_arlen          ( pcie_bridge_m_arlen),
-  .frontbus_axi_arlock         ( pcie_bridge_m_arlock),
-  .frontbus_axi_arprot         ( pcie_bridge_m_arprot),
-  .frontbus_axi_arqos          ( pcie_bridge_m_arqos),
-  .frontbus_axi_arready        ( pcie_bridge_m_arready),
-  .frontbus_axi_arregion       ( pcie_bridge_m_arregion),
-  .frontbus_axi_arsize         ( pcie_bridge_m_arsize),
-  .frontbus_axi_arvalid        ( pcie_bridge_m_arvalid),
-  .frontbus_axi_awaddr         ( pcie_bridge_m_awaddr),
-  .frontbus_axi_awburst        ( pcie_bridge_m_awburst),
-  .frontbus_axi_awcache        ( pcie_bridge_m_awcache),
-  .frontbus_axi_awid           ( pcie_bridge_m_awid),
-  .frontbus_axi_awlen          ( pcie_bridge_m_awlen),
-  .frontbus_axi_awlock         ( pcie_bridge_m_awlock),
-  .frontbus_axi_awprot         ( pcie_bridge_m_awprot),
-  .frontbus_axi_awqos          ( pcie_bridge_m_awqos),
-  .frontbus_axi_awready        ( pcie_bridge_m_awready),
-  .frontbus_axi_awregion       ( pcie_bridge_m_awregion),
-  .frontbus_axi_awsize         ( pcie_bridge_m_awsize),
-  .frontbus_axi_awvalid        ( pcie_bridge_m_awvalid),
-  .frontbus_axi_bid            ( {pcie_bridge_m_awid[7],pcie_bridge_m_bid[6:0]}),
-  .frontbus_axi_bready         ( pcie_bridge_m_bready),
-  .frontbus_axi_bresp          ( pcie_bridge_m_bresp),
-  .frontbus_axi_bvalid         ( pcie_bridge_m_bvalid),
-  .frontbus_axi_rdata          ( pcie_bridge_m_rdata),
-  .frontbus_axi_rlast          ( pcie_bridge_m_rlast),
-  .frontbus_axi_rid            ( {pcie_bridge_m_arid[7],pcie_bridge_m_rid[6:0]}),
-  .frontbus_axi_rready         ( pcie_bridge_m_rready),
-  .frontbus_axi_rresp          ( pcie_bridge_m_rresp),
-  .frontbus_axi_rvalid         ( pcie_bridge_m_rvalid),
-  .frontbus_axi_wdata          ( pcie_bridge_m_wdata),
-  .frontbus_axi_wlast          ( pcie_bridge_m_wlast),
-  .frontbus_axi_wready         ( pcie_bridge_m_wready),
-  .frontbus_axi_wstrb          ( pcie_bridge_m_wstrb),
-  .frontbus_axi_wvalid         ( pcie_bridge_m_wvalid),
-  
-  
-  .interrupt_out               ( interrupt_out),
-  .interrupt_out_msi_vec0to31  ( interrupt_out_msi_vec0to31),
-  .interrupt_out_msi_vec32to63 ( interrupt_out_msi_vec32to63),
-  .interrupt_out_2               ( interrupt_out_2),
-  .interrupt_out_msi_vec0to31_2  ( interrupt_out_msi_vec0to31_2),
-  .interrupt_out_msi_vec32to63_2 ( interrupt_out_msi_vec32to63_2),        
-  
-  .pcie_mgt_2_rxn              ( PCIE2_RXN),
-  .pcie_mgt_2_rxp              ( PCIE2_RXP),
-  .pcie_mgt_2_txn              ( PCIE2_TXN),
-  .pcie_mgt_2_txp              ( PCIE2_TXP),
-  .sys_clk2                    ( pcie2_sysclk),
-  .sys_clk2_gt                 ( pcie2_sysclk_gt),
-  .pcie_mgt_rxn                ( PCIE_RXN),
-  .pcie_mgt_rxp                ( PCIE_RXP),
-  .pcie_mgt_txn                ( PCIE_TXN),
-  .pcie_mgt_txp                ( PCIE_TXP),
-  .sys_clk                     ( pcie_sysclk),
-  .sys_clk_gt                  ( pcie_sysclk_gt)
-);
-`endif
 assign pcie1_int = 0;
 assign gpu_m_arvalid = 0;
 assign gpu_m_awvalid = 0;
@@ -1315,6 +1038,63 @@ assign i2c1_prdata = 0;
 assign i2c2_int = 0;
 assign i2c2_prdata = 0;
 
+  wire [511:0] PCIE_S00_AXIS_0_tdata;
+  wire PCIE_S00_AXIS_0_tlast;
+  wire PCIE_S00_AXIS_0_tready;
+  wire PCIE_S00_AXIS_0_tvalid;
+
+  (* DONT_TOUCH = "TRUE" *) wire [`CONFIG_DIFFTEST_BATCH_IO_WITDH - 1:0] gateway_out_data;
+  wire gateway_out_enable;
+  wire data_need_next;
+  wire inter_soc_clk;
+  wire inter_rtc_clk;
+  xdma_ep xdma_ep_i(
+    .cpu_clk(sys_clk_i),
+    .cpu_rstn(sys_rstn),
+    .S00_AXIS_0_tdata(PCIE_S00_AXIS_0_tdata),
+    .S00_AXIS_0_tkeep(64'hffffffff_ffffffff),
+    .S00_AXIS_0_tlast(PCIE_S00_AXIS_0_tlast),
+    .S00_AXIS_0_tready(PCIE_S00_AXIS_0_tready),
+    .S00_AXIS_0_tvalid(PCIE_S00_AXIS_0_tvalid),
+
+    .pci_exp_rxn(pci_ep_rxn),
+    .pci_exp_rxp(pci_ep_rxp),
+    .pci_exp_txn(pci_ep_txn),
+    .pci_exp_txp(pci_ep_txp),
+    .pcie_ep_gt_ref_clk_n(pcie_ep_gt_ref_clk_n),
+    .pcie_ep_gt_ref_clk_p(pcie_ep_gt_ref_clk_p),
+    .pcie_ep_lnk_up(pcie_ep_lnk_up),
+    .pcie_ep_perstn(pcie_ep_perstn)
+  );
+
+  axis_data_packge  #(
+    .DATA_WIDTH(`CONFIG_DIFFTEST_BATCH_IO_WITDH),
+    .AXIS_DATA_WIDTH(512)
+  ) axis_data_packge_i (
+    .m_axis_c2h_aclk   (sys_clk_i),
+    .m_axis_c2h_aresetn(sys_rstn),
+    .m_axis_c2h_tdata  (PCIE_S00_AXIS_0_tdata),
+    .m_axis_c2h_tkeep  (),
+    .m_axis_c2h_tlast  (PCIE_S00_AXIS_0_tlast),
+    .m_axis_c2h_tready (PCIE_S00_AXIS_0_tready),
+    .m_axis_c2h_tvalid (PCIE_S00_AXIS_0_tvalid),
+
+    .data_valid (gateway_out_enable),
+    .data_next  (data_need_next),
+    .data       (gateway_out_data)
+  );
+
+  fpga_clock_gate SOC_CLK_CTRL(
+      .CK  (sys_clk_i),
+      .E   (data_need_next || ~sys_rstn || ~cpu_rstn ),
+      .Q   (inter_soc_clk)
+  );
+
+   fpga_clock_gate RTC_CLK_CTRL(
+      .CK  (tmclk),
+      .E   (data_need_next || ~sys_rstn || ~cpu_rstn ),
+      .Q   (inter_rtc_clk)
+  );
 xilnx_crg xilnx_crg(
    .sys_clk                         (sys_clk_i                     ),
    .dev_clk                         (dev_clk_i                     ),
@@ -1380,7 +1160,8 @@ jtag_ddr_subsys_wrapper U_JTAG_DDR_SUBSYS(
     .DDR4_reset_n           (DDR_RESET_N),
     .OSC_SYS_CLK_clk_n      (ddr_clk_n),
     .OSC_SYS_CLK_clk_p      (ddr_clk_p),
-    .SOC_CLK                (ui_clk),
+    // AXI INTERFACE CLK
+    .SOC_CLK                (inter_soc_clk),
     .MAC_CLK                (mac_clk),
     .SOC_RESETN             (),
     .SOC_M_AXI_awid         (cpu2ddr_m2s_awid_mix          ),  
@@ -1426,11 +1207,13 @@ jtag_ddr_subsys_wrapper U_JTAG_DDR_SUBSYS(
 );
 
 XSTop_wrapper U_CPU_TOP(
-    .sys_clk_i                      (sys_clk_i    ),
+    .gateway_out_enable             (gateway_out_enable),
+    .gateway_out_data               (gateway_out_data),
+
+    .sys_clk_i                      (inter_soc_clk),
     .sys_rstn_i                     (cpu_rstn     ),
-    .tmclk                          (tmclk),
-    .osc_clock                      (axi_bus_clk ),
-    .outer_clock                    (sys_clk_i ),
+    .tmclk                          (inter_rtc_clk),
+
     .global_reset                   (cpu_rstn                  ),
     .pll_bypass_sel                 (4'b0 ),
     .pll0_lock                      (),
@@ -1584,7 +1367,8 @@ syscfg U_SYS_CFG(
 assign hpm_dig_result = 0;
 
 AXI_bridge CFG_AXI_bridge_i
-       (.ACLK                   (axi_bus_clk),
+       (.SYS_INTER_CLK          (inter_soc_clk),          
+        .ACLK                   (sys_clk_i),
         .ARESETN                (axi_bclk_sync_rstn),    
     
         .S00_AXI_araddr         (cpu2cfg_m2s_araddr),
@@ -1730,45 +1514,45 @@ AXI_bridge CFG_AXI_bridge_i
         .M00_AXI_wstrb          (data_cpu_bridge_m2s_wstrb),
         .M00_AXI_wvalid         (data_cpu_bridge_m2s_wvalid),
         
-        .S00_AXI_araddr         (pcie_bridge_m_araddr),
-        .S00_AXI_arburst        (pcie_bridge_m_arburst),
-        .S00_AXI_arcache        (pcie_bridge_m_arcache),
-        .S00_AXI_arid           (pcie_bridge_m_arid),
-        .S00_AXI_arlen          (pcie_bridge_m_arlen),
-        .S00_AXI_arlock         (pcie_bridge_m_arlock),
-        .S00_AXI_arprot         (pcie_bridge_m_arprot),
-        .S00_AXI_arqos          (pcie_bridge_m_arqos),
-        .S00_AXI_arready        (pcie_bridge_m_arready),
-        .S00_AXI_arregion       (pcie_bridge_m_arregion),
-        .S00_AXI_arsize         (pcie_bridge_m_arsize),
-        .S00_AXI_arvalid        (pcie_bridge_m_arvalid),
-        .S00_AXI_awaddr         (pcie_bridge_m_awaddr),
-        .S00_AXI_awburst        (pcie_bridge_m_awburst),
-        .S00_AXI_awcache        (pcie_bridge_m_awcache),
-        .S00_AXI_awid           (pcie_bridge_m_awid),
-        .S00_AXI_awlen          (pcie_bridge_m_awlen),
-        .S00_AXI_awlock         (pcie_bridge_m_awlock),
-        .S00_AXI_awprot         (pcie_bridge_m_awprot),
-        .S00_AXI_awqos          (pcie_bridge_m_awqos),
-        .S00_AXI_awready        (pcie_bridge_m_awready),
-        .S00_AXI_awregion       (pcie_bridge_m_awregion),
-        .S00_AXI_awsize         (pcie_bridge_m_awsize),
-        .S00_AXI_awvalid        (pcie_bridge_m_awvalid),
-        .S00_AXI_bid            (pcie_bridge_m_bid_mix),
-        .S00_AXI_bready         (pcie_bridge_m_bready),
-        .S00_AXI_bresp          (pcie_bridge_m_bresp),
-        .S00_AXI_bvalid         (pcie_bridge_m_bvalid),
-        .S00_AXI_rdata          (pcie_bridge_m_rdata),
-        .S00_AXI_rid            (pcie_bridge_m_rid_mix),
-        .S00_AXI_rlast          (pcie_bridge_m_rlast),
-        .S00_AXI_rready         (pcie_bridge_m_rready),
-        .S00_AXI_rresp          (pcie_bridge_m_rresp),
-        .S00_AXI_rvalid         (pcie_bridge_m_rvalid),
-        .S00_AXI_wdata          (pcie_bridge_m_wdata),
-        .S00_AXI_wlast          (pcie_bridge_m_wlast),
-        .S00_AXI_wready         (pcie_bridge_m_wready),
-        .S00_AXI_wstrb          (pcie_bridge_m_wstrb),
-        .S00_AXI_wvalid         (pcie_bridge_m_wvalid),
+      //   .S00_AXI_araddr         (pcie_bridge_m_araddr),
+      //   .S00_AXI_arburst        (pcie_bridge_m_arburst),
+      //   .S00_AXI_arcache        (pcie_bridge_m_arcache),
+      //   .S00_AXI_arid           (pcie_bridge_m_arid),
+      //   .S00_AXI_arlen          (pcie_bridge_m_arlen),
+      //   .S00_AXI_arlock         (pcie_bridge_m_arlock),
+      //   .S00_AXI_arprot         (pcie_bridge_m_arprot),
+      //   .S00_AXI_arqos          (pcie_bridge_m_arqos),
+      //   .S00_AXI_arready        (pcie_bridge_m_arready),
+      //   .S00_AXI_arregion       (pcie_bridge_m_arregion),
+      //   .S00_AXI_arsize         (pcie_bridge_m_arsize),
+      //   .S00_AXI_arvalid        (pcie_bridge_m_arvalid),
+      //   .S00_AXI_awaddr         (pcie_bridge_m_awaddr),
+      //   .S00_AXI_awburst        (pcie_bridge_m_awburst),
+      //   .S00_AXI_awcache        (pcie_bridge_m_awcache),
+      //   .S00_AXI_awid           (pcie_bridge_m_awid),
+      //   .S00_AXI_awlen          (pcie_bridge_m_awlen),
+      //   .S00_AXI_awlock         (pcie_bridge_m_awlock),
+      //   .S00_AXI_awprot         (pcie_bridge_m_awprot),
+      //   .S00_AXI_awqos          (pcie_bridge_m_awqos),
+      //   .S00_AXI_awready        (pcie_bridge_m_awready),
+      //   .S00_AXI_awregion       (pcie_bridge_m_awregion),
+      //   .S00_AXI_awsize         (pcie_bridge_m_awsize),
+      //   .S00_AXI_awvalid        (pcie_bridge_m_awvalid),
+      //   .S00_AXI_bid            (pcie_bridge_m_bid_mix),
+      //   .S00_AXI_bready         (pcie_bridge_m_bready),
+      //   .S00_AXI_bresp          (pcie_bridge_m_bresp),
+      //   .S00_AXI_bvalid         (pcie_bridge_m_bvalid),
+      //   .S00_AXI_rdata          (pcie_bridge_m_rdata),
+      //   .S00_AXI_rid            (pcie_bridge_m_rid_mix),
+      //   .S00_AXI_rlast          (pcie_bridge_m_rlast),
+      //   .S00_AXI_rready         (pcie_bridge_m_rready),
+      //   .S00_AXI_rresp          (pcie_bridge_m_rresp),
+      //   .S00_AXI_rvalid         (pcie_bridge_m_rvalid),
+      //   .S00_AXI_wdata          (pcie_bridge_m_wdata),
+      //   .S00_AXI_wlast          (pcie_bridge_m_wlast),
+      //   .S00_AXI_wready         (pcie_bridge_m_wready),
+      //   .S00_AXI_wstrb          (pcie_bridge_m_wstrb),
+      //   .S00_AXI_wvalid         (pcie_bridge_m_wvalid),
         
         .S01_AXI_araddr         (gmac_m_araddr),
         .S01_AXI_arburst        (gmac_m_arburst),
@@ -1809,4 +1593,6 @@ AXI_bridge CFG_AXI_bridge_i
         .S01_AXI_wready         (gmac_m_wready),
         .S01_AXI_wstrb          (gmac_m_wstrb),
         .S01_AXI_wvalid         (gmac_m_wvalid));
+
+
 endmodule
