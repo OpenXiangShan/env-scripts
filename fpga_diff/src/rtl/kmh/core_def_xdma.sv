@@ -2,7 +2,7 @@
 `include "gateway_interface.svh"
 `include "DifftestMacros.v"
 
-module xs_core_def (
+module core_def (
       input                                      ddr_clk_p,
       input                                      ddr_clk_n, 
       input                                      tmclk,
@@ -1206,7 +1206,7 @@ jtag_ddr_subsys_wrapper U_JTAG_DDR_SUBSYS(
     .calib_complete         (init_calib_complete)
 );
 
-XSTop_wrapper U_CPU_TOP(
+SimTop_wrapper U_CPU_TOP(
     .gateway_out_enable             (gateway_out_enable),
     .gateway_out_data               (gateway_out_data),
 

@@ -2,7 +2,7 @@
 
 `include "sys_define.vh"
 
-module xs_fpga_top_debug
+module fpga_top_debug
 (
    input                 clk8_p, // 1MHz clock
    input                 clk8_n,
