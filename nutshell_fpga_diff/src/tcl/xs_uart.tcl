@@ -18,10 +18,10 @@
 
 # Check file required for this script exists
 
-set core_dir "../XiangShan/build/rtl"
+set core_dir "../Nutshell/build/rtl"
 
-set cpu "kmh"
-set cpu_candidates [list "kmh" "xiangshan" "dualcore"]
+set cpu "nutshell"
+set cpu_candidates [list "kmh" "xiangshan" "dualcore" "nutshell"]
 
 proc checkRequiredFiles {files} {
   set status true

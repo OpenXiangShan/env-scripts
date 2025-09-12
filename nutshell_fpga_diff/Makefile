@@ -1,4 +1,4 @@
-include Makefile.kmh
+include Makefile.nutshell
 
 PRJ ?=
 
