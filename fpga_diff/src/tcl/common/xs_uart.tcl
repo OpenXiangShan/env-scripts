@@ -18,8 +18,6 @@
 
 # Check file required for this script exists
 
-set core_dir "../XiangShan/build/rtl"
-
 set cpu "kmh"
 set cpu_candidates [list "kmh" "xiangshan" "dualcore"]
 
@@ -95,7 +93,6 @@ if { $::argc > 0 } {
       "--cpu"          { incr i; set cpu [lindex $::argv $i] }
       "--origin_dir"   { incr i; set origin_dir [lindex $::argv $i] }
       "--project_name" { incr i; set _xil_proj_name_ [lindex $::argv $i] }
-      "--core_dir"     { incr i; set core_dir [lindex $::argv $i] }
       "--help"         { print_help "$cpu_candidates" }
       default {
         if { [regexp {^-} $option] } {
@@ -111,13 +108,13 @@ if { $::argc > 0 } {
 set orig_proj_dir "[file normalize "$origin_dir/"]"
 set tcl_dir "[file normalize "$origin_dir/src/tcl"]"
 set rtl_dir "[file normalize "$origin_dir/src/rtl"]"
-set constr_dir "[file normalize "$origin_dir/src/constr"]"
+set constr_dir "[file normalize "$origin_dir/src/constr/common"]"
 
-source "$tcl_dir/ip_files.tcl"
-source "$tcl_dir/rtl_files.tcl"
-source "$tcl_dir/constraints.tcl"
-source "$tcl_dir/defines.tcl"
-source "$tcl_dir/include_dirs.tcl"
+source "$tcl_dir/common/ip_files.tcl"
+source "$tcl_dir/common/rtl_files.tcl"
+source "$tcl_dir/common/constraints.tcl"
+source "$tcl_dir/common/defines.tcl"
+source "$tcl_dir/common/include_dirs.tcl"
 
 set cpu_hit "no"
 foreach cpu_candidate $cpu_candidates {
@@ -129,7 +126,7 @@ if {[string equal $cpu_hit "no"]} {
   puts "ERROR: Unknown cpu target '$cpu' specified by '--cpu', please select one from {$cpu_candidates}.\n"
   return 1
 } else {
-  source "$tcl_dir/cpu_${cpu}_files.tcl"
+  source "$tcl_dir/cpu_files.tcl"
 }
 
 set xs_files [list {*}$cpu_files {*}$ip_files {*}$rtl_files]
@@ -183,10 +180,10 @@ add_files -norecurse -fileset $obj $xs_files
 # Set 'sources_1' fileset properties
 set obj [get_filesets sources_1]
 set_property -name "include_dirs" -value "$include_dirs" -objects $obj
-set_property -name "top" -value "xs_fpga_top_debug" -objects $obj
+set_property -name "top" -value "fpga_top_debug" -objects $obj
 set_property -name "top_auto_set" -value "0" -objects $obj
 set_property -name "verilog_define" -value "$defines" -objects $obj
-source "$tcl_dir/global_includes.tcl"
+source "$tcl_dir/common/global_includes.tcl"
 
 # Create 'constrs_1' fileset (if not found)
 if {[string equal [get_filesets -quiet constrs_1] ""]} {
@@ -224,15 +221,15 @@ set_property -name "top_lib" -value "xil_defaultlib" -objects $obj
 
 # Create BD for JTAG and DDR4 Subsystem
 # source "$tcl_dir/bd_jtag.tcl"
-source "$tcl_dir/jtag_ddr_subsys.tcl"
+source "$tcl_dir/$cpu/jtag_ddr_subsys.tcl"
 
 # Create IP for Debug
 # source "$tcl_dir/ahblite_axi_bridge_0.tcl"
-source "$tcl_dir/blk_mem_gen_0.tcl"
-source "$tcl_dir/vio_0.tcl"
-source "$tcl_dir/xdma_ep.tcl"
-source "$tcl_dir/AXI_bridge.tcl"
-source "$tcl_dir/data_bridge.tcl"
+source "$tcl_dir/common/blk_mem_gen_0.tcl"
+source "$tcl_dir/common/vio_0.tcl"
+source "$tcl_dir/common/xdma_ep.tcl"
+source "$tcl_dir/common/AXI_bridge.tcl"
+source "$tcl_dir/common/data_bridge.tcl"
 # source "$tcl_dir/pcie4c_uscale_plus_0.tcl"
 # source "$tcl_dir/pcie_axi_axis_bd.tcl"
 # source "$tcl_dir/axi_interconnect_0.tcl"
