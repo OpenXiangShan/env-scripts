@@ -314,7 +314,7 @@ assign JTAG_TDO = io_systemjtag_jtag_TDO_driven ? io_systemjtag_jtag_TDO_data : 
 assign io_systemjtag_reset = ~JTAG_TRSTn;
 
 // core
-xs_core_def xs_core_def
+core_def core_def
 (
   .ddr_clk_p            (clk7_p),
   .ddr_clk_n            (clk7_n),  
@@ -485,3 +485,4 @@ assign GPIO_O1 = |gpio_porta_dr;
 */
 
 endmodule
+
