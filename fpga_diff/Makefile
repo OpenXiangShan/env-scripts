@@ -4,6 +4,7 @@ CORE_DIR ?= ""
 
 # Supported CPU parameters:
 #   kmh
+#   nutshell
 CPU ?= ""
 
 .PHONY: bitstream vivado

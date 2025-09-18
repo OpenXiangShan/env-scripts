@@ -8,6 +8,7 @@
 //Purpose     : IP block netlist
 //--------------------------------------------------------------------------------
 `timescale 1 ps / 1 ps
+`include "DifftestMacros.v"
 
 module jtag_ddr_subsys_wrapper
    (DDR4_act_n,
@@ -117,13 +118,25 @@ module jtag_ddr_subsys_wrapper
   input SOC_M_AXI_bready;
   output [1:0]SOC_M_AXI_bresp;
   output SOC_M_AXI_bvalid;
+
+`ifdef CPU_NUTSHELL
+  output [63:0]SOC_M_AXI_rdata;
+`else
   output [255:0]SOC_M_AXI_rdata;
+`endif // CPU_NUTSHELL
+
   output [17:0]SOC_M_AXI_rid;
   output SOC_M_AXI_rlast;
   input SOC_M_AXI_rready;
   output [1:0]SOC_M_AXI_rresp;
   output SOC_M_AXI_rvalid;
+
+`ifdef CPU_NUTSHELL
+  input [63:0]SOC_M_AXI_wdata;
+`else
   input [255:0]SOC_M_AXI_wdata;
+`endif // CPU_NUTSHELL
+
   input SOC_M_AXI_wlast;
   output SOC_M_AXI_wready;
   input [31:0]SOC_M_AXI_wstrb;

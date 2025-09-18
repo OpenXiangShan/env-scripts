@@ -19,7 +19,7 @@
 # Check file required for this script exists
 
 set cpu "kmh"
-set cpu_candidates [list "kmh" "xiangshan" "dualcore"]
+set cpu_candidates [list "kmh" "xiangshan" "dualcore" "nutshell"]
 
 proc checkRequiredFiles {files} {
   set status true
@@ -221,7 +221,7 @@ set_property -name "top_lib" -value "xil_defaultlib" -objects $obj
 
 # Create BD for JTAG and DDR4 Subsystem
 # source "$tcl_dir/bd_jtag.tcl"
-source "$tcl_dir/$cpu/jtag_ddr_subsys.tcl"
+source "$tcl_dir/common/jtag_ddr_subsys.tcl"
 
 # Create IP for Debug
 # source "$tcl_dir/ahblite_axi_bridge_0.tcl"

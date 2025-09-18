@@ -198,13 +198,20 @@ proc create_root_design { parentCell } {
    CONFIG.FREQ_HZ {80000000} \
    ] $OSC_SYS_CLK
 
+   if { $::cpu == "nutshell" } {
+      set SOC_M_AXI_DATA_WIDTH 64
+   } else {
+      set SOC_M_AXI_DATA_WIDTH 256
+   }
+
   set SOC_M_AXI [ create_bd_intf_port -mode Slave -vlnv xilinx.com:interface:aximm_rtl:1.0 SOC_M_AXI ]
   set_property -dict [ list \
    CONFIG.ADDR_WIDTH {33} \
    CONFIG.ARUSER_WIDTH {0} \
    CONFIG.AWUSER_WIDTH {0} \
    CONFIG.BUSER_WIDTH {0} \
-   CONFIG.DATA_WIDTH {256} \
+   CONFIG.DATA_WIDTH $SOC_M_AXI_DATA_WIDTH \
+   CONFIG.FREQ_HZ {50000000} \
    CONFIG.HAS_BRESP {1} \
    CONFIG.HAS_BURST {1} \
    CONFIG.HAS_CACHE {1} \
