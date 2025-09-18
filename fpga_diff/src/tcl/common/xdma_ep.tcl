@@ -202,13 +202,26 @@ proc create_root_design { parentCell } {
    CONFIG.TUSER_WIDTH {0} \
    ] $S00_AXIS_0
 
+  set XDMA_AXI_LITE [ create_bd_intf_port -mode Master -vlnv xilinx.com:interface:aximm_rtl:1.0 XDMA_AXI_LITE ]
+  set_property -dict [ list \
+   CONFIG.ADDR_WIDTH {32} \
+   CONFIG.DATA_WIDTH {32} \
+   CONFIG.FREQ_HZ {50000000} \
+   CONFIG.HAS_BURST {0} \
+   CONFIG.HAS_CACHE {0} \
+   CONFIG.HAS_LOCK {0} \
+   CONFIG.HAS_QOS {0} \
+   CONFIG.HAS_REGION {0} \
+   CONFIG.PROTOCOL {AXI4LITE} \
+   ] $XDMA_AXI_LITE
+
   set pcie_ep_gt_ref [ create_bd_intf_port -mode Slave -vlnv xilinx.com:interface:diff_clock_rtl:1.0 pcie_ep_gt_ref ]
 
 
   # Create ports
   set cpu_clk [ create_bd_port -dir I -type clk -freq_hz 50000000 cpu_clk ]
   set_property -dict [ list \
-   CONFIG.ASSOCIATED_BUSIF {S00_AXIS_0} \
+   CONFIG.ASSOCIATED_BUSIF {S00_AXIS_0:XDMA_AXI_LITE} \
    CONFIG.ASSOCIATED_RESET {cpu_rstn} \
  ] $cpu_clk
   set cpu_rstn [ create_bd_port -dir I -type rst cpu_rstn ]
@@ -218,6 +231,12 @@ proc create_root_design { parentCell } {
   set pci_exp_txp [ create_bd_port -dir O -from 7 -to 0 pci_exp_txp ]
   set pcie_ep_lnk_up [ create_bd_port -dir O pcie_ep_lnk_up ]
   set pcie_ep_perstn [ create_bd_port -dir I -type rst pcie_ep_perstn ]
+
+  # Create instance: axi_interconnect_0, and set properties
+  set axi_interconnect_0 [ create_bd_cell -type ip -vlnv xilinx.com:ip:axi_interconnect:2.1 axi_interconnect_0 ]
+  set_property -dict [ list \
+   CONFIG.NUM_MI {1} \
+ ] $axi_interconnect_0
 
   # Create instance: axis_interconnect_0, and set properties
   set axis_interconnect_0 [ create_bd_cell -type ip -vlnv xilinx.com:ip:axis_interconnect:2.1 axis_interconnect_0 ]
@@ -240,6 +259,7 @@ proc create_root_design { parentCell } {
    CONFIG.PF2_DEVICE_ID_mqdma {9048} \
    CONFIG.PF3_DEVICE_ID_mqdma {9048} \
    CONFIG.axi_data_width {512_bit} \
+   CONFIG.axilite_master_en {true} \
    CONFIG.axisten_freq {250} \
    CONFIG.cfg_mgmt_if {false} \
    CONFIG.coreclk_freq {500} \
@@ -247,6 +267,8 @@ proc create_root_design { parentCell } {
    CONFIG.mode_selection {Advanced} \
    CONFIG.pcie_blk_locn {PCIE4C_X0Y4} \
    CONFIG.pf0_device_id {9048} \
+   CONFIG.pf0_msix_cap_pba_bir {BAR_1} \
+   CONFIG.pf0_msix_cap_table_bir {BAR_1} \
    CONFIG.pl_link_cap_max_link_speed {16.0_GT/s} \
    CONFIG.pl_link_cap_max_link_width {X8} \
    CONFIG.plltype {QPLL0} \
@@ -257,13 +279,15 @@ proc create_root_design { parentCell } {
   # Create interface connections
   connect_bd_intf_net -intf_net CLK_IN_D_0_1 [get_bd_intf_ports pcie_ep_gt_ref] [get_bd_intf_pins util_ds_buf_0/CLK_IN_D]
   connect_bd_intf_net -intf_net S00_AXIS_0_1 [get_bd_intf_ports S00_AXIS_0] [get_bd_intf_pins axis_interconnect_0/S00_AXIS]
+  connect_bd_intf_net -intf_net axi_interconnect_0_M00_AXI [get_bd_intf_ports XDMA_AXI_LITE] [get_bd_intf_pins axi_interconnect_0/M00_AXI]
   connect_bd_intf_net -intf_net axis_interconnect_0_M00_AXIS [get_bd_intf_pins axis_interconnect_0/M00_AXIS] [get_bd_intf_pins xdma_0/S_AXIS_C2H_0]
+  connect_bd_intf_net -intf_net xdma_0_M_AXI_LITE [get_bd_intf_pins axi_interconnect_0/S00_AXI] [get_bd_intf_pins xdma_0/M_AXI_LITE]
 
   # Create port connections
-  connect_bd_net -net ARESETN_1 [get_bd_pins axis_interconnect_0/ARESETN] [get_bd_pins axis_interconnect_0/M00_AXIS_ARESETN] [get_bd_pins xdma_0/axi_aresetn]
-  connect_bd_net -net M00_AXIS_ACLK_1 [get_bd_pins axis_interconnect_0/ACLK] [get_bd_pins axis_interconnect_0/M00_AXIS_ACLK] [get_bd_pins xdma_0/axi_aclk]
-  connect_bd_net -net core_clk_0_1 [get_bd_ports cpu_clk] [get_bd_pins axis_interconnect_0/S00_AXIS_ACLK]
-  connect_bd_net -net m_axis_c2h_aresetn_0_1 [get_bd_ports cpu_rstn] [get_bd_pins axis_interconnect_0/S00_AXIS_ARESETN]
+  connect_bd_net -net ARESETN_1 [get_bd_pins axi_interconnect_0/ARESETN] [get_bd_pins axi_interconnect_0/S00_ARESETN] [get_bd_pins axis_interconnect_0/ARESETN] [get_bd_pins axis_interconnect_0/M00_AXIS_ARESETN] [get_bd_pins xdma_0/axi_aresetn]
+  connect_bd_net -net M00_AXIS_ACLK_1 [get_bd_pins axi_interconnect_0/ACLK] [get_bd_pins axi_interconnect_0/S00_ACLK] [get_bd_pins axis_interconnect_0/ACLK] [get_bd_pins axis_interconnect_0/M00_AXIS_ACLK] [get_bd_pins xdma_0/axi_aclk]
+  connect_bd_net -net core_clk_0_1 [get_bd_ports cpu_clk] [get_bd_pins axi_interconnect_0/M00_ACLK] [get_bd_pins axis_interconnect_0/S00_AXIS_ACLK]
+  connect_bd_net -net m_axis_c2h_aresetn_0_1 [get_bd_ports cpu_rstn] [get_bd_pins axi_interconnect_0/M00_ARESETN] [get_bd_pins axis_interconnect_0/S00_AXIS_ARESETN]
   connect_bd_net -net pci_exp_rxn_0_1 [get_bd_ports pci_exp_rxn] [get_bd_pins xdma_0/pci_exp_rxn]
   connect_bd_net -net pci_exp_rxp_0_1 [get_bd_ports pci_exp_rxp] [get_bd_pins xdma_0/pci_exp_rxp]
   connect_bd_net -net sys_rst_n_0_1 [get_bd_ports pcie_ep_perstn] [get_bd_pins xdma_0/sys_rst_n]
@@ -274,6 +298,7 @@ proc create_root_design { parentCell } {
   connect_bd_net -net xdma_0_user_lnk_up [get_bd_ports pcie_ep_lnk_up] [get_bd_pins xdma_0/user_lnk_up]
 
   # Create address segments
+  assign_bd_address -offset 0x00000000 -range 0x00100000 -target_address_space [get_bd_addr_spaces xdma_0/M_AXI_LITE] [get_bd_addr_segs XDMA_AXI_LITE/Reg] -force
 
 
   # Restore current instance
