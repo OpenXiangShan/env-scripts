@@ -1048,7 +1048,7 @@ assign i2c2_prdata = 0;
 
   (* DONT_TOUCH = "TRUE" *) wire [`CONFIG_DIFFTEST_BATCH_IO_WITDH - 1:0] gateway_out_data;
   wire gateway_out_enable;
-  wire data_need_next;
+  wire diff_core_clock_enable;
   wire inter_soc_clk;
   wire inter_rtc_clk;
   xdma_ep xdma_ep_i(
@@ -1070,32 +1070,33 @@ assign i2c2_prdata = 0;
     .pcie_ep_perstn(pcie_ep_perstn)
   );
 
-  axis_data_packge  #(
+  Difftest2AXI  #(
     .DATA_WIDTH(`CONFIG_DIFFTEST_BATCH_IO_WITDH),
     .AXIS_DATA_WIDTH(512)
-  ) axis_data_packge_i (
-    .m_axis_c2h_aclk   (sys_clk_i),
-    .m_axis_c2h_aresetn(sys_rstn),
-    .m_axis_c2h_tdata  (PCIE_S00_AXIS_0_tdata),
-    .m_axis_c2h_tkeep  (),
-    .m_axis_c2h_tlast  (PCIE_S00_AXIS_0_tlast),
-    .m_axis_c2h_tready (PCIE_S00_AXIS_0_tready),
-    .m_axis_c2h_tvalid (PCIE_S00_AXIS_0_tvalid),
+	) axis_data_send_i (
+    .clock   	  (sys_clk_i),
+    .reset      (sys_rstn),
 
-    .data_valid (gateway_out_enable),
-    .data_next  (data_need_next),
-    .data       (gateway_out_data)
+    .axi_tdata  (PCIE_S00_AXIS_0_tdata),
+    .axi_tkeep  (),
+    .axi_tlast  (PCIE_S00_AXIS_0_tlast),
+    .axi_tready (PCIE_S00_AXIS_0_tready),
+    .axi_tvalid (PCIE_S00_AXIS_0_tvalid),
+
+    .difftest_enable    (gateway_out_enable),
+    .difftest_data      (gateway_out_data),
+    .core_clock_enable  (diff_core_clock_enable)
   );
 
   fpga_clock_gate SOC_CLK_CTRL(
       .CK  (sys_clk_i),
-      .E   (data_need_next || ~sys_rstn || ~cpu_rstn ),
+      .E   (diff_core_clock_enable || ~sys_rstn || ~cpu_rstn ),
       .Q   (inter_soc_clk)
   );
 
    fpga_clock_gate RTC_CLK_CTRL(
       .CK  (tmclk),
-      .E   (data_need_next || ~sys_rstn || ~cpu_rstn ),
+      .E   (diff_core_clock_enable || ~sys_rstn || ~cpu_rstn ),
       .Q   (inter_rtc_clk)
   );
 xilnx_crg xilnx_crg(
