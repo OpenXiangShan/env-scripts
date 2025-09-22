@@ -1046,11 +1046,37 @@ assign i2c2_prdata = 0;
   wire PCIE_S00_AXIS_0_tready;
   wire PCIE_S00_AXIS_0_tvalid;
 
+	wire [31:0] XDMA_AXI_LITE_awaddr;
+	wire        XDMA_AXI_LITE_awvalid;
+	wire        XDMA_AXI_LITE_awready;
+	wire [31:0] XDMA_AXI_LITE_wdata;
+	wire [3:0]  XDMA_AXI_LITE_wstrb;
+	wire        XDMA_AXI_LITE_wvalid;
+	wire        XDMA_AXI_LITE_wready;
+	wire [1:0]  XDMA_AXI_LITE_bresp;
+	wire        XDMA_AXI_LITE_bvalid;
+	wire        XDMA_AXI_LITE_bready;
+	wire [31:0] XDMA_AXI_LITE_araddr;
+	wire        XDMA_AXI_LITE_arvalid;
+	wire        XDMA_AXI_LITE_arready;
+	wire [31:0] XDMA_AXI_LITE_rdata;
+	wire [1:0]  XDMA_AXI_LITE_rresp;
+	wire        XDMA_AXI_LITE_rvalid;
+	wire        XDMA_AXI_LITE_rready;
+
   (* DONT_TOUCH = "TRUE" *) wire [`CONFIG_DIFFTEST_BATCH_IO_WITDH - 1:0] gateway_out_data;
   wire gateway_out_enable;
   wire diff_core_clock_enable;
   wire inter_soc_clk;
   wire inter_rtc_clk;
+
+  wire host_io_reset;
+  wire clock_enable;
+  wire sys_rstn_io;
+  wire cpu_rstn_io;
+  assign sys_rstn_io = sys_rstn & ~host_io_reset;
+  assign cpu_rstn_io = cpu_rstn & ~host_io_reset;
+
   xdma_ep xdma_ep_i(
     .cpu_clk(sys_clk_i),
     .cpu_rstn(sys_rstn),
@@ -1059,7 +1085,27 @@ assign i2c2_prdata = 0;
     .S00_AXIS_0_tlast(PCIE_S00_AXIS_0_tlast),
     .S00_AXIS_0_tready(PCIE_S00_AXIS_0_tready),
     .S00_AXIS_0_tvalid(PCIE_S00_AXIS_0_tvalid),
-
+    
+    .XDMA_AXI_LITE_awaddr (XDMA_AXI_LITE_awaddr),
+    .XDMA_AXI_LITE_awprot (3'b000),
+    .XDMA_AXI_LITE_awvalid(XDMA_AXI_LITE_awvalid),
+    .XDMA_AXI_LITE_awready(XDMA_AXI_LITE_awready),
+    .XDMA_AXI_LITE_wdata  (XDMA_AXI_LITE_wdata),
+    .XDMA_AXI_LITE_wstrb  (XDMA_AXI_LITE_wstrb),
+    .XDMA_AXI_LITE_wvalid (XDMA_AXI_LITE_wvalid),
+    .XDMA_AXI_LITE_wready (XDMA_AXI_LITE_wready),
+    .XDMA_AXI_LITE_bresp  (XDMA_AXI_LITE_bresp),
+    .XDMA_AXI_LITE_bvalid (XDMA_AXI_LITE_bvalid),
+    .XDMA_AXI_LITE_bready (XDMA_AXI_LITE_bready),
+    .XDMA_AXI_LITE_araddr (XDMA_AXI_LITE_araddr),
+    .XDMA_AXI_LITE_arprot (3'b000),
+    .XDMA_AXI_LITE_arvalid(XDMA_AXI_LITE_arvalid),
+    .XDMA_AXI_LITE_arready(XDMA_AXI_LITE_arready),
+    .XDMA_AXI_LITE_rdata  (XDMA_AXI_LITE_rdata),
+    .XDMA_AXI_LITE_rresp  (XDMA_AXI_LITE_rresp),
+    .XDMA_AXI_LITE_rvalid (XDMA_AXI_LITE_rvalid),
+    .XDMA_AXI_LITE_rready (XDMA_AXI_LITE_rready),
+    
     .pci_exp_rxn(pci_ep_rxn),
     .pci_exp_rxp(pci_ep_rxp),
     .pci_exp_txn(pci_ep_txn),
@@ -1070,12 +1116,68 @@ assign i2c2_prdata = 0;
     .pcie_ep_perstn(pcie_ep_perstn)
   );
 
+  xdma_axi4lite_bar #(
+      .ADDR_WIDTH(32),
+      .DATA_WIDTH(32)
+  ) u_xdma_axi4lite_bar (
+      .ACLK           (sys_clk_i),
+      .ARESETN        (sys_rstn),
+
+      .AWADDR         (XDMA_AXI_LITE_awaddr),
+      .AWVALID        (XDMA_AXI_LITE_awvalid),
+      .AWREADY        (XDMA_AXI_LITE_awready),
+      .WDATA          (XDMA_AXI_LITE_wdata),
+      .WSTRB          (XDMA_AXI_LITE_wstrb),
+      .WVALID         (XDMA_AXI_LITE_wvalid),
+      .WREADY         (XDMA_AXI_LITE_wready),
+      .BRESP          (XDMA_AXI_LITE_bresp),
+      .BVALID         (XDMA_AXI_LITE_bvalid),
+      .BREADY         (XDMA_AXI_LITE_bready),
+      .ARADDR         (XDMA_AXI_LITE_araddr),
+      .ARVALID        (XDMA_AXI_LITE_arvalid),
+      .ARREADY        (XDMA_AXI_LITE_arready),
+      .RDATA          (XDMA_AXI_LITE_rdata),
+      .RRESP          (XDMA_AXI_LITE_rresp),
+      .RVALID         (XDMA_AXI_LITE_rvalid),
+      .RREADY         (XDMA_AXI_LITE_rready),
+
+      .host_io_reset      (host_io_reset)
+  );
+
+  xdma_axi4lite_bar #(
+      .ADDR_WIDTH(32),
+      .DATA_WIDTH(32)
+  ) u_xdma_axi4lite_bar (
+      .ACLK           (sys_clk_i),
+      .ARESETN        (sys_rstn),
+
+      .AWADDR         (XDMA_AXI_LITE_awaddr),
+      .AWVALID        (XDMA_AXI_LITE_awvalid),
+      .AWREADY        (XDMA_AXI_LITE_awready),
+      .WDATA          (XDMA_AXI_LITE_wdata),
+      .WSTRB          (XDMA_AXI_LITE_wstrb),
+      .WVALID         (XDMA_AXI_LITE_wvalid),
+      .WREADY         (XDMA_AXI_LITE_wready),
+      .BRESP          (XDMA_AXI_LITE_bresp),
+      .BVALID         (XDMA_AXI_LITE_bvalid),
+      .BREADY         (XDMA_AXI_LITE_bready),
+      .ARADDR         (XDMA_AXI_LITE_araddr),
+      .ARVALID        (XDMA_AXI_LITE_arvalid),
+      .ARREADY        (XDMA_AXI_LITE_arready),
+      .RDATA          (XDMA_AXI_LITE_rdata),
+      .RRESP          (XDMA_AXI_LITE_rresp),
+      .RVALID         (XDMA_AXI_LITE_rvalid),
+      .RREADY         (XDMA_AXI_LITE_rready),
+
+      .host_io_reset      (host_io_reset)
+  );
+
   Difftest2AXI  #(
     .DATA_WIDTH(`CONFIG_DIFFTEST_BATCH_IO_WITDH),
     .AXIS_DATA_WIDTH(512)
-	) axis_data_send_i (
-    .clock   	  (sys_clk_i),
-    .reset      (sys_rstn),
+  ) axis_data_send_i (
+    .clock      (sys_clk_i),
+    .reset      (sys_rstn_io),
 
     .axi_tdata  (PCIE_S00_AXIS_0_tdata),
     .axi_tkeep  (),
@@ -1090,21 +1192,22 @@ assign i2c2_prdata = 0;
 
   fpga_clock_gate SOC_CLK_CTRL(
       .CK  (sys_clk_i),
-      .E   (diff_core_clock_enable || ~sys_rstn || ~cpu_rstn ),
+      .E   (diff_core_clock_enable || ~sys_rstn_io || ~cpu_rstn_io ),
       .Q   (inter_soc_clk)
   );
 
    fpga_clock_gate RTC_CLK_CTRL(
       .CK  (tmclk),
-      .E   (diff_core_clock_enable || ~sys_rstn || ~cpu_rstn ),
+      .E   (diff_core_clock_enable || ~sys_rstn_io || ~cpu_rstn_io ),
       .Q   (inter_rtc_clk)
   );
+
 xilnx_crg xilnx_crg(
    .sys_clk                         (sys_clk_i                     ),
    .dev_clk                         (dev_clk_i                     ),
    .tmclk                           (tmclk                         ),
    .cqetmclk                        (cqetmclk                      ),
-   .sys_rstn                        (sys_rstn                      ),
+   .sys_rstn                        (sys_rstn_io                   ),
    .axi_bus_clk                     (axi_bus_clk                   ),
    .axi_bclk_sync_rstn              (axi_bclk_sync_rstn            ),
    .ddr_bus_clk                     (ddr_bus_clk                   ),
@@ -1215,7 +1318,7 @@ SimTop_wrapper U_CPU_TOP(
     .gateway_out_data               (gateway_out_data),
 
     .sys_clk_i                      (inter_soc_clk),
-    .sys_rstn_i                     (cpu_rstn     ),
+    .sys_rstn_i                     (cpu_rstn_io  ),
     .tmclk                          (inter_rtc_clk),
 
     .global_reset                   (cpu_rstn                  ),
@@ -1231,7 +1334,7 @@ SimTop_wrapper U_CPU_TOP(
     .io_systemjtag_jtag_TDO_data    (io_systemjtag_jtag_TDO_data),
     .io_systemjtag_jtag_TDO_driven  (io_systemjtag_jtag_TDO_driven),
 //    .io_systemjtag_reset            (io_systemjtag_reset),
-    .io_systemjtag_reset            (~sys_rstn),
+    .io_systemjtag_reset            (~sys_rstn_io),
     .io_sram_config                 (5'b0  ),
     
     .dma_core_awready               (data_cpu_bridge_s2m_awready),
