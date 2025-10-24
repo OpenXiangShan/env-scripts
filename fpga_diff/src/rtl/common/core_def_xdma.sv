@@ -1144,32 +1144,30 @@ assign i2c2_prdata = 0;
       .host_io_reset      (host_io_reset)
   );
 
-  xdma_axi4lite_bar #(
-      .ADDR_WIDTH(32),
-      .DATA_WIDTH(32)
-  ) u_xdma_axi4lite_bar (
-      .ACLK           (sys_clk_i),
-      .ARESETN        (sys_rstn),
+  XDMA_AXI4LiteBar u_xdma_axi4lite_bar (
+      .clock           (sys_clk_i),
+      .reset           (~sys_rstn),
 
-      .AWADDR         (XDMA_AXI_LITE_awaddr),
-      .AWVALID        (XDMA_AXI_LITE_awvalid),
-      .AWREADY        (XDMA_AXI_LITE_awready),
-      .WDATA          (XDMA_AXI_LITE_wdata),
-      .WSTRB          (XDMA_AXI_LITE_wstrb),
-      .WVALID         (XDMA_AXI_LITE_wvalid),
-      .WREADY         (XDMA_AXI_LITE_wready),
-      .BRESP          (XDMA_AXI_LITE_bresp),
-      .BVALID         (XDMA_AXI_LITE_bvalid),
-      .BREADY         (XDMA_AXI_LITE_bready),
-      .ARADDR         (XDMA_AXI_LITE_araddr),
-      .ARVALID        (XDMA_AXI_LITE_arvalid),
-      .ARREADY        (XDMA_AXI_LITE_arready),
-      .RDATA          (XDMA_AXI_LITE_rdata),
-      .RRESP          (XDMA_AXI_LITE_rresp),
-      .RVALID         (XDMA_AXI_LITE_rvalid),
-      .RREADY         (XDMA_AXI_LITE_rready),
+      .io_axi_write_awaddr   (XDMA_AXI_LITE_awaddr),
+      .io_axi_write_awvalid  (XDMA_AXI_LITE_awvalid),
+      .io_axi_write_awready  (XDMA_AXI_LITE_awready),
+      .io_axi_write_wdata    (XDMA_AXI_LITE_wdata),
+      .io_axi_write_wstrb    (XDMA_AXI_LITE_wstrb),
+      .io_axi_write_wvalid   (XDMA_AXI_LITE_wvalid),
+      .io_axi_write_wready   (XDMA_AXI_LITE_wready),
+      .io_axi_write_bresp    (XDMA_AXI_LITE_bresp),
+      .io_axi_write_bvalid   (XDMA_AXI_LITE_bvalid),
+      .io_axi_write_bready   (XDMA_AXI_LITE_bready),
 
-      .host_io_reset      (host_io_reset)
+      .io_axi_read_araddr    (XDMA_AXI_LITE_araddr),
+      .io_axi_read_arvalid   (XDMA_AXI_LITE_arvalid),
+      .io_axi_read_arready   (XDMA_AXI_LITE_arready),
+      .io_axi_read_rdata     (XDMA_AXI_LITE_rdata),
+      .io_axi_read_rresp     (XDMA_AXI_LITE_rresp),
+      .io_axi_read_rvalid    (XDMA_AXI_LITE_rvalid),
+      .io_axi_read_rready    (XDMA_AXI_LITE_rready),
+
+      .io_host_reset         (io_host_reset)
   );
 
   Difftest2AXI  #(
