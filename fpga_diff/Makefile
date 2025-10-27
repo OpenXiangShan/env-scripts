@@ -10,7 +10,7 @@ CPU ?= ""
 .PHONY: bitstream vivado
 
 bitstream:
-	vivado -mode batch $(PRJ) -source ./src/tcl/gen_bitstream.tcl
+	vivado -mode batch $(PRJ) -source ./src/tools/gen_bitstream.tcl
 
 update_core_flist:
 	find "$(CORE_DIR)" -type f \( -name "*.v" -o -name "*.sv" -o -name "*.svh" \) -printf '%p\n' | \
