@@ -1116,34 +1116,6 @@ assign i2c2_prdata = 0;
     .pcie_ep_perstn(pcie_ep_perstn)
   );
 
-  xdma_axi4lite_bar #(
-      .ADDR_WIDTH(32),
-      .DATA_WIDTH(32)
-  ) u_xdma_axi4lite_bar (
-      .ACLK           (sys_clk_i),
-      .ARESETN        (sys_rstn),
-
-      .AWADDR         (XDMA_AXI_LITE_awaddr),
-      .AWVALID        (XDMA_AXI_LITE_awvalid),
-      .AWREADY        (XDMA_AXI_LITE_awready),
-      .WDATA          (XDMA_AXI_LITE_wdata),
-      .WSTRB          (XDMA_AXI_LITE_wstrb),
-      .WVALID         (XDMA_AXI_LITE_wvalid),
-      .WREADY         (XDMA_AXI_LITE_wready),
-      .BRESP          (XDMA_AXI_LITE_bresp),
-      .BVALID         (XDMA_AXI_LITE_bvalid),
-      .BREADY         (XDMA_AXI_LITE_bready),
-      .ARADDR         (XDMA_AXI_LITE_araddr),
-      .ARVALID        (XDMA_AXI_LITE_arvalid),
-      .ARREADY        (XDMA_AXI_LITE_arready),
-      .RDATA          (XDMA_AXI_LITE_rdata),
-      .RRESP          (XDMA_AXI_LITE_rresp),
-      .RVALID         (XDMA_AXI_LITE_rvalid),
-      .RREADY         (XDMA_AXI_LITE_rready),
-
-      .host_io_reset      (host_io_reset)
-  );
-
   XDMA_AXI4LiteBar u_xdma_axi4lite_bar (
       .clock           (sys_clk_i),
       .reset           (~sys_rstn),
