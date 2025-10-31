@@ -6,6 +6,7 @@ WORKLOAD ?=
 # Supported CPU parameters:
 #   kmh
 #   nutshell
+#   nanhu
 CPU ?= ""
 
 .PHONY: bitstream vivado
