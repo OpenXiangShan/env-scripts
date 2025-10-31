@@ -4,7 +4,7 @@ Core RTL to FPGA Steps
 1. modify Makefile, assign CORE_DIR
 
 2. make vivado CPU=XXX
-  (this step compile a project,CPU Parameter support "kmh" "nutshell")
+  (this step compile a project,CPU Parameter support "kmh" "nutshell" "nanhu")
   (from this step on, you may use vivado gui)
 
 3. make bitstream
