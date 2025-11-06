@@ -15,6 +15,7 @@ bitstream:
 	vivado -mode batch $(PRJ) -source ./tools/gen_bitstream.tcl
 
 update_core_flist:
+    rm -rf $(CORE_DIR)/build/rtl/verification
 	find "$(CORE_DIR)" -type f \( -name "*.v" -o -name "*.sv" -o -name "*.svh" \) -printf '%p\n' | \
 	awk -f ./core_flist.awk > ./src/tcl/cpu_files.tcl
 
