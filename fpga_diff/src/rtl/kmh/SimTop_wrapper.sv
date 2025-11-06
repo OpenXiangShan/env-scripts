@@ -1,8 +1,5 @@
-`include "DifftestMacros.v"
-`include "gateway_interface.svh"
-
 module SimTop_wrapper(
-  input           sys_clk_i,    
+  input           inter_soc_clk,    
   input           sys_rstn_i, 
   input           tmclk,
 
@@ -159,27 +156,15 @@ input [10:0] io_systemjtag_mfr_id,
 input [15:0] io_systemjtag_part_number,
 input [3:0] io_systemjtag_version,
 output io_debug_reset,
-input io_cacheable_check_req_0_valid,
-input [35:0] io_cacheable_check_req_0_bits_addr,
-input [1:0] io_cacheable_check_req_0_bits_size,
-input [2:0] io_cacheable_check_req_0_bits_cmd,
-input io_cacheable_check_req_1_bits_valid,
-input [35:0] io_cacheable_check_req_1_bits_addr,
-input [1:0] io_cacheable_check_req_1_bits_size,
-input [2:0] io_cacheable_check_req_1_bits_cmd,
-output io_cacheable_check_resp_0_1d,
-output io_cacheable_check_resp_0_st,
-output io_cacheable_check_resp_0_instr,
-output io_cacheable_check_resp_0_mmio,
-output io_cacheable_check_resp_1_1d,
-output io_cacheable_check_resp_1_st,
-output io_cacheable_check_resp_1_instr,
-output io_cacheable_check_resp_1_mmio,
 output io_riscv_halt_0,
 output io_riscv_halt_1,
 
-output [`CONFIG_DIFFTEST_BATCH_IO_WITDH - 1:0]gateway_out_data,
-output gateway_out_enable
+input          difftest_ref_clock,
+               difftest_to_host_axis_ready,
+output         difftest_to_host_axis_valid,
+output [511:0] difftest_to_host_axis_bits_data,
+output         difftest_to_host_axis_bits_last,
+               difftest_clock_enable
 );
 
   wire          cpu_clock       ;
@@ -196,30 +181,31 @@ output gateway_out_enable
 
 assign cpu_to_soc = 32'h0;
 
-  gateway_if   gateway_if_in();
-  core_if      core_if_out[1]();
-
-  CoreToGateway u_CoreToGateway(
-    .gateway_out (gateway_if_in.out),
-    .core_in     (core_if_out)
-  );
-
-  GatewayEndpoint u_GatewayEndpoint(
-    .clock       (sys_clk_i),
-    .reset       (~sys_rstn_i),
-
-    .gateway_in  (gateway_if_in.in),
-
-    .fpgaIO_data    (gateway_out_data),
-    .fpgaIO_enable  (gateway_out_enable),
-    .step        ()
-  );
+// Internal tie-offs / local wires for XSTop new ports (keep wrapper external interface stable)
+wire nmi_0_0 = 1'b0;
+wire nmi_0_1 = 1'b0;
+// PLL: use existing wrapper outputs to reflect inner registers directly
+// XSTop provides ctrl outputs; connect them directly (no intermediate *_int wires needed)
+wire io_debug_reset_int;
+wire io_riscv_critical_error_0_int;
+// Trace interface (ignored internally)
+wire trace_en   = 1'b0;
+wire trace_stall= 1'b0;
+wire [63:0]  trace_cause;
+wire [49:0]  trace_tval;
+wire [2:0]   trace_priv;
+wire [149:0] trace_iaddr;
+wire [11:0]  trace_itype;
+wire [20:0]  trace_iretire;
+wire [2:0]   trace_ilastsize;
 
 SimTop  u_XSTop(
+  .nmi_0_0                       (nmi_0_0),
+  .nmi_0_1                       (nmi_0_1),
   .memory_awready                (mem_core_awready )                        ,
   .memory_awvalid                (mem_core_awvalid )                        ,
-  .memory_awid                   (mem_core_awid    )                          ,
-  .memory_awaddr                 (mem_core_awaddr  )                            ,
+  .memory_awid                   (mem_core_awid    )                        ,
+  .memory_awaddr                 ({12'd0, mem_core_awaddr})                  ,
   .memory_awlen                  (mem_core_awlen   )                           ,
   .memory_awsize                 (mem_core_awsize  )                            ,
   .memory_awburst                (mem_core_awburst )                             ,
@@ -239,7 +225,7 @@ SimTop  u_XSTop(
   .memory_arready                (mem_core_arready )                        ,
   .memory_arvalid                (mem_core_arvalid )                        ,
   .memory_arid                   (mem_core_arid    )                          ,
-  .memory_araddr                 (mem_core_araddr  )                            ,
+  .memory_araddr                 ({12'd0, mem_core_araddr})                  ,
   .memory_arlen                  (mem_core_arlen   )                           ,
   .memory_arsize                 (mem_core_arsize  )                            ,
   .memory_arburst                (mem_core_arburst )                             ,
@@ -256,7 +242,7 @@ SimTop  u_XSTop(
   .peripheral_awready            (peri_awready  )                            ,
   .peripheral_awvalid            (peri_awvalid  )                            ,
   .peripheral_awid               (peri_awid     )                              ,
-  .peripheral_awaddr             (peri_awaddr   )                                ,
+  .peripheral_awaddr             ({16'd0, peri_awaddr})                        ,
   .peripheral_awlen              (peri_awlen    )                               ,
   .peripheral_awsize             (peri_awsize   )                                ,
   .peripheral_awburst            (peri_awburst  )                                 ,
@@ -276,7 +262,7 @@ SimTop  u_XSTop(
   .peripheral_arready            (peri_arready  )                            ,
   .peripheral_arvalid            (peri_arvalid  )                            ,
   .peripheral_arid               (peri_arid     )                              ,
-  .peripheral_araddr             (peri_araddr   )                                ,
+  .peripheral_araddr             ({16'd0, peri_araddr})                        ,
   .peripheral_arlen              (peri_arlen    )                               ,
   .peripheral_arsize             (peri_arsize   )                                ,
   .peripheral_arburst            (peri_arburst  )                                 ,
@@ -337,16 +323,61 @@ SimTop  u_XSTop(
   .io_systemjtag_mfr_id            (11'h11),
   .io_systemjtag_part_number       (16'h16),
   .io_systemjtag_version           (4'h4),
+  .io_debug_reset                  (io_debug_reset_int),
 
 
-  .io_clock                        (sys_clk_i/*cpu_clock  */                        ),
-  .io_reset                        (~sys_rstn_i/*cpu_global_reset  */                 ),
+  .io_clock                        (inter_soc_clk),
+  .io_reset                        (~sys_rstn_i),
+  .io_sram_config                  (io_sram_config),
+  .io_pll0_lock                    (pll0_lock),
+  .io_pll0_ctrl_0                  (io_pll0_ctrl_0),
+  .io_pll0_ctrl_1                  (io_pll0_ctrl_1),
+  .io_pll0_ctrl_2                  (io_pll0_ctrl_2),
+  .io_pll0_ctrl_3                  (io_pll0_ctrl_3),
+  .io_pll0_ctrl_4                  (io_pll0_ctrl_4),
+  .io_pll0_ctrl_5                  (io_pll0_ctrl_5),
   .io_extIntrs                     (io_extIntrs  ),
   .io_rtc_clock                    (tmclk),
   .io_riscv_rst_vec_0              (38'h10000000),
 
-  .gateway_out                     (core_if_out[0])
-);
 
+  //difftest
+  .difftest_ref_clock              (difftest_ref_clock),
+  .difftest_to_host_axis_ready     (difftest_to_host_axis_ready),
+  .difftest_to_host_axis_valid     (difftest_to_host_axis_valid),
+  .difftest_to_host_axis_bits_data (difftest_to_host_axis_bits_data),
+  .difftest_to_host_axis_bits_last (difftest_to_host_axis_bits_last),
+  .difftest_clock_enable           (difftest_clock_enable),
+
+  .io_cacheable_check_req_0_valid    ('b0),
+  .io_cacheable_check_req_0_bits_addr('b0),
+  .io_cacheable_check_req_0_bits_size('b0),
+  .io_cacheable_check_req_0_bits_cmd ('b0),
+  .io_cacheable_check_req_1_valid    ('b0),
+  .io_cacheable_check_req_1_bits_addr('b0),
+  .io_cacheable_check_req_1_bits_size('b0),
+  .io_cacheable_check_req_1_bits_cmd ('b0),
+  .io_cacheable_check_resp_0_ld      (),
+  .io_cacheable_check_resp_0_st      (),
+  .io_cacheable_check_resp_0_instr   (),
+  .io_cacheable_check_resp_0_mmio    (),
+  .io_cacheable_check_resp_0_atomic    (),
+  .io_cacheable_check_resp_1_ld      (),
+  .io_cacheable_check_resp_1_st      (),
+  .io_cacheable_check_resp_1_instr   (),
+  .io_cacheable_check_resp_1_mmio    (),
+  .io_cacheable_check_resp_1_atomic    (),
+  .io_riscv_halt_0                     (),
+  .io_riscv_critical_error_0           (io_riscv_critical_error_0_int),
+  .io_traceCoreInterface_0_fromEncoder_enable (trace_en),
+  .io_traceCoreInterface_0_fromEncoder_stall  (trace_stall),
+  .io_traceCoreInterface_0_toEncoder_cause    (trace_cause),
+  .io_traceCoreInterface_0_toEncoder_tval     (trace_tval),
+  .io_traceCoreInterface_0_toEncoder_priv     (trace_priv),
+  .io_traceCoreInterface_0_toEncoder_iaddr    (trace_iaddr),
+  .io_traceCoreInterface_0_toEncoder_itype    (trace_itype),
+  .io_traceCoreInterface_0_toEncoder_iretire  (trace_iretire),
+  .io_traceCoreInterface_0_toEncoder_ilastsize(trace_ilastsize)
+);
 
 endmodule

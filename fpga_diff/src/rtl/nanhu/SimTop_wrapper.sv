@@ -1,8 +1,5 @@
-`include "DifftestMacros.v"
-`include "gateway_interface.svh"
-
 module SimTop_wrapper(
-  input           sys_clk_i,    
+  input           inter_soc_clk,    
   input           sys_rstn_i, 
   input           tmclk,
 
@@ -178,8 +175,12 @@ output io_cacheable_check_resp_1_mmio,
 output io_riscv_halt_0,
 output io_riscv_halt_1,
 
-output [`CONFIG_DIFFTEST_BATCH_IO_WITDH - 1:0]gateway_out_data,
-output gateway_out_enable
+input          difftest_ref_clock,
+               difftest_to_host_axis_ready,
+output         difftest_to_host_axis_valid,
+output [511:0] difftest_to_host_axis_bits_data,
+output         difftest_to_host_axis_bits_last,
+               difftest_clock_enable
 );
 
   wire          cpu_clock       ;
@@ -204,30 +205,11 @@ output gateway_out_enable
 
 assign cpu_to_soc = 32'h0;
 
-  gateway_if   gateway_if_in();
-  core_if      core_if_out[1]();
-
-  CoreToGateway u_CoreToGateway(
-    .gateway_out (gateway_if_in.out),
-    .core_in     (core_if_out)
-  );
-
-  GatewayEndpoint u_GatewayEndpoint(
-    .clock       (sys_clk_i),
-    .reset       (~sys_rstn_i),
-
-    .gateway_in  (gateway_if_in.in),
-
-    .fpgaIO_data    (gateway_out_data),
-    .fpgaIO_enable  (gateway_out_enable),
-    .step        ()
-  );
-
 XlnFpgaTop  XlnFpgaTop_inst(
   // Basic clocks and resets
   .io_aresetn                      (sys_rstn_i),
-  .io_aclk                         (sys_clk_i),
-  .io_core_clk_0                   (sys_clk_i),
+  .io_aclk                         (inter_soc_clk),
+  .io_core_clk_0                   (inter_soc_clk),
   .io_rtc_clk                      (tmclk),
   .io_reset_vector                 (48'h10000000),
   .io_ddr_offset                   (48'h80000000),
@@ -406,7 +388,13 @@ XlnFpgaTop  XlnFpgaTop_inst(
   .s_axi_hs_rresp                  (dma_core_rresp),
   .s_axi_hs_rlast                  (dma_core_rlast),
 
-  .gateway_out                     (core_if_out[0])
+  //difftest
+  .difftest_ref_clock              (difftest_ref_clock),
+  .difftest_to_host_axis_ready     (difftest_to_host_axis_ready),
+  .difftest_to_host_axis_valid     (difftest_to_host_axis_valid),
+  .difftest_to_host_axis_bits_data (difftest_to_host_axis_bits_data),
+  .difftest_to_host_axis_bits_last (difftest_to_host_axis_bits_last),
+  .difftest_clock_enable           (difftest_clock_enable)
 );
 
 
