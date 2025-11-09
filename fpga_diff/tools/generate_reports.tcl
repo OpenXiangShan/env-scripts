@@ -160,11 +160,11 @@ puts $fh "Vivado Version: [version -short]"
 puts $fh "Project: $proj"
 open_project $proj
 # Prefer implementation; if not available or not launched, fall back to synthesis; otherwise report not found
-;# Allow overriding HIER_MAX_DEPTH via environment variable, default to 4 (within 3..5)
+# Allow overriding HIER_MAX_DEPTH via environment variable, default to 7 (clamped within 3..7)
 if {[info exists ::env(HIER_MAX_DEPTH)]} {
-  set HIER_MAX_DEPTH [expr {$::env(HIER_MAX_DEPTH) < 3 ? 3 : ($::env(HIER_MAX_DEPTH) > 5 ? 5 : $::env(HIER_MAX_DEPTH))}]
+  set HIER_MAX_DEPTH [expr {$::env(HIER_MAX_DEPTH) < 3 ? 3 : ($::env(HIER_MAX_DEPTH) > 7 ? 7 : $::env(HIER_MAX_DEPTH))}]
 } else {
-  set HIER_MAX_DEPTH 4
+  set HIER_MAX_DEPTH 7
 }
 set reported_run ""
 if {[llength [get_runs impl_1]]} {
