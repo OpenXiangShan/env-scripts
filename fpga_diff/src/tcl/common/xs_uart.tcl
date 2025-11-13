@@ -19,7 +19,7 @@
 # Check file required for this script exists
 
 set cpu "kmh"
-set cpu_candidates [list "kmh" "xiangshan" "dualcore" "nutshell"]
+set cpu_candidates [list "kmh" "nanhu" "dualcore" "nutshell"]
 
 proc checkRequiredFiles {files} {
   set status true
@@ -176,6 +176,15 @@ if {[string equal [get_filesets -quiet sources_1] ""]} {
 # Set 'sources_1' fileset object
 set obj [get_filesets sources_1]
 add_files -norecurse -fileset $obj $xs_files
+
+# If DifftestMacros.v exists, set its file_type to 'Verilog Header' to avoid being treated as a top/regular synthesizable source
+set difftest_hdr [get_files -quiet *DifftestMacros.v]
+if {[llength $difftest_hdr] > 0} {
+  puts "INFO: Setting DifftestMacros.v file_type to 'Verilog Header'"
+  set_property -name file_type -value {Verilog Header} -objects $difftest_hdr
+} else {
+  puts "INFO: DifftestMacros.v not found at add phase; skip header type setting"
+}
 
 # Set 'sources_1' fileset properties
 set obj [get_filesets sources_1]

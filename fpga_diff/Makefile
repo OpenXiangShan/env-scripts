@@ -11,11 +11,14 @@ CPU ?= ""
 
 .PHONY: bitstream vivado
 
+synth:
+	vivado -mode batch -source ./tools/gen_synth.tcl -tclargs $(PRJ)
+
 bitstream:
-	vivado -mode batch $(PRJ) -source ./tools/gen_bitstream.tcl
+	vivado -mode batch -source ./tools/gen_bitstream.tcl -tclargs $(PRJ)
 
 update_core_flist:
-	rm -rf $(CORE_DIR)/build/rtl/verification
+	rm -rf $(CORE_DIR)/rtl/verification
 	find "$(CORE_DIR)" -type f \( -name "*.v" -o -name "*.sv" -o -name "*.svh" \) -printf '%p\n' | \
 	awk -f ./core_flist.awk > ./src/tcl/cpu_files.tcl
 
@@ -36,3 +39,9 @@ reset_cpu:
 
 add_sys_option:
 	sed -i "s/reg \[63:0\] ram \[6143:0\];/\(\* ram_style = \"ultra\" \*\)\n \treg \[63:0\] ram \[6143:0\];/g" $(CORE_DIR)/array_*.v
+
+get_impl_log:
+	cat fpga_$(CPU)/fpga_$(CPU).runs/impl_1/runme.log
+
+get_synth_log:
+	cat fpga_$(CPU)/fpga_$(CPU).runs/synth_1/runme.log
