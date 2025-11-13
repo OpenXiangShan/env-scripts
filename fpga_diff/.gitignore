@@ -1,5 +1,5 @@
 # Ignore build files
-src/tcl/cpu_files.tcl
+src/cpu_files.tcl
 fpga_*/
 
 !*.v
