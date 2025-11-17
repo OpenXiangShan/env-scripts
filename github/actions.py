@@ -18,10 +18,10 @@ def get_commit_messages(token, sha):
     xs = g.get_repo("OpenXiangShan/XiangShan")
     return list(map(lambda s: xs.get_commit(s).commit.message.splitlines()[0], sha))
 
-def get_recent_commits(token, number=10):
+def get_recent_commits(token, branch, number=10):
     g = Github(token)
     xs = g.get_repo("OpenXiangShan/XiangShan")
-    actions = xs.get_workflow_runs(branch="master", event="push")[:5*number]
+    actions = xs.get_workflow_runs(branch=branch, event="push")[:5*number]
     emu_actions = [a for a in actions if a.name == "EMU Test"][:number]
     recent_commits = list(map(lambda a: a.head_sha, emu_actions))
     run_numbers = list(map(lambda a: a.run_number, emu_actions))
@@ -87,7 +87,7 @@ def has_robot(comments, commit):
             return True
     return False
 
-def prepare_comment(token, commit_sha, number):
+def prepare_comment(token, commit_sha, number, branch):
     data = get_actions_data([number], [commit_sha], None)
     if len(data[0]) - 2 > 0:
         print(f"Generate comment for {commit_sha} ...")
@@ -96,9 +96,9 @@ def prepare_comment(token, commit_sha, number):
         table_rows = csv_to_markdown_table(data)
         comment += table_rows
         comment.append("")
-        comment.append(f"master branch:")
-        master_data = get_master_commits(token, with_message=False)
-        comment += csv_to_markdown_table(master_data)
+        comment.append(f"{branch} branch:")
+        branch_data = get_branch_commits(token, branch, with_message=False)
+        comment += csv_to_markdown_table(branch_data)
         return True, "\n".join(comment)
     return False, ""
 
@@ -108,31 +108,31 @@ def csv_to_markdown_table(csv_rows):
     align_row = "| :---: " * columns + " |"
     return [tables_rows[0], align_row] + tables_rows[1:]
 
-def get_master_commits(token, number=10, with_message=True):
-    run_numbers, commits, messages = get_recent_commits(token, number)
+def get_branch_commits(token, branch, number=10, with_message=True):
+    run_numbers, commits, messages = get_recent_commits(token, branch, number)
     all_rows = get_actions_data(run_numbers, commits, messages if with_message else None)
     return all_rows
 
-def get_pull_request(repo, head_sha):
+def get_pull_request(repo, head_sha, branch):
     pull_requests = repo.get_pulls(state="open")
     for pr in pull_requests:
-        if pr.base.label.split(":")[-1] == "master" and pr.head.sha == head_sha:
+        if pr.base.label.split(":")[-1] == branch and pr.head.sha == head_sha:
             return True, pr
     return False, None
 
-def get_pull_requests(token):
+def get_pull_requests(token, branch):
     g = Github(token)
     xs = g.get_repo("OpenXiangShan/XiangShan")
     actions = xs.get_workflow_runs(event="pull_request", status="success")[:75]
     emu_actions = [a for a in actions if a.name == "EMU Test"][:15]
     for i, action in enumerate(emu_actions):
-        has_open_pr, pull_request = get_pull_request(xs, action.head_sha)
+        has_open_pr, pull_request = get_pull_request(xs, action.head_sha, branch)
         if not has_open_pr:
             print(f"Do not find open pull request for action {action.run_number}")
             continue
         all_comments = list(map(lambda c: c.body, pull_request.get_issue_comments()))
         if not has_robot(all_comments, action.head_sha):
-            success, comment = prepare_comment(token, action.head_sha, action.run_number)
+            success, comment = prepare_comment(token, action.head_sha, action.run_number, branch)
             if success:
                 print(f"Create comment at {pull_request.html_url}:")
                 print(comment)
@@ -143,11 +143,11 @@ def get_pull_requests(token):
         else:
             print(f"{pull_request.html_url} {action.head_sha} has been commented")
 
-def main(token, output_csv, number, always_on):
+def main(token, output_csv, number, always_on, branch):
     error_count = 0
     while always_on:
         try:
-            get_pull_requests(token)
+            get_pull_requests(token, branch)
         except KeyboardInterrupt:
             sys.exit()
         except:
@@ -156,7 +156,7 @@ def main(token, output_csv, number, always_on):
         else:
             # check PRs every 5 minutes
             time.sleep(300)
-    run_numbers, commits, messages = get_recent_commits(token, number)
+    run_numbers, commits, messages = get_recent_commits(token, branch, number)
     all_rows = get_actions_data(run_numbers, commits, messages)
     write_to_csv(all_rows, output_csv)
 
@@ -166,7 +166,8 @@ if __name__ == "__main__":
     parser.add_argument('--output', '-o', default="actions.csv", help='output csv file')
     parser.add_argument('--number', '-n', default=20, type=int, help='number of commits')
     parser.add_argument('--always-on', '-a', default=False, action="store_true", help='always check PRs')
+    parser.add_argument('--branch', '-b', default="master", help='branch name to track (default: master)')
 
     args = parser.parse_args()
 
-    main(args.token, args.output, args.number, args.always_on)
+    main(args.token, args.output, args.number, args.always_on, args.branch)
