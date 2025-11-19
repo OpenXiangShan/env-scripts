@@ -23,6 +23,7 @@ from tqdm import tqdm
 tasks_dir = "SPEC06_EmuTasks_10_22_2021"
 perf_base_path = ""
 gcc12Enable = True
+simFrontendTraceDir = "/nfs/home/wangzhizun/anzo/xs-env/NEMU/trace/2025-09-10_13-04-38"
 emuArgR = "/nfs/home/share/liyanqin/old-gcpt-restorer/gcpt.bin"
 
 ref_run_time_path = "/nfs/home/share/liyanqin/env-scripts/perf/json/gcc12o3-incFpcOff-jeMalloc-time.json"
@@ -32,7 +33,7 @@ def get_perf_base_path(xs_path):
     return tasks_dir
   return os.path.join(xs_path, tasks_dir)
 
-def load_all_gcpt(gcpt_path, json_path, server_num, threads, state_filter=None, xs_path=None, sorted_by=None, report=False, dump_json_path=None):
+def load_all_gcpt(gcpt_path, json_path, server_num, threads, state_filter=None, xs_path=None, sorted_by=None, report=False, dump_json_path=None, trace_dir=""):
   perf_filter = [
     ("l3cache_mpki_load",      lambda x: float(x) < 3),
     ("branch_prediction_mpki", lambda x: float(x) > 5),
@@ -63,7 +64,7 @@ def load_all_gcpt(gcpt_path, json_path, server_num, threads, state_filter=None, 
       elif not no_ref_run_time:
         no_ref_run_time = True
         print("The checkpoints of this json has NO REF RUN TIME.")
-      gcpt = GCPT(gcpt_path, perf_base_path, benchspec, point, weight, hour, gcc12Enable)
+      gcpt = GCPT(gcpt_path, perf_base_path, benchspec, point, weight, hour, gcc12Enable, trace_dir)
       if state_filter is None and perf_filter is None:
         all_gcpt.append(gcpt)
         continue
@@ -111,19 +112,18 @@ def get_server(server_list):
     l.append(Server(s))
   return l
 
-def xs_run(server_list, workloads, xs_path, warmup, max_instr, threads, version=2006, dry_run=False, verbose=True):
+def xs_run(server_list, workloads, xs_path, warmup, max_instr, threads, simFrontend = False, version=2006, dry_run=False, verbose=True, dump_db=False):
   emu_path = os.path.join(xs_path, "build/emu")
   nemu_so_path = os.path.join(xs_path, "ready-to-run/riscv64-nemu-interpreter-so")
   # nemu_so_path = os.path.join(xs_path, "ready-to-run/riscv64-spike-so")
-  if gcc12Enable:
-    base_arguments = [emu_path, '--diff', nemu_so_path, '--enable-fork', '-W', str(warmup), '-I', str(max_instr), '-r', emuArgR, '-i']
-    # base_arguments = [emu_path, '--diff', nemu_so_path, '--enable-fork', '--dump-db','-W', str(warmup), '-I', str(max_instr), '-r', emuArgR, '-i']
-  else:
-    base_arguments = [emu_path, '--diff', nemu_so_path, '--enable-fork', '-W', str(warmup), '-I', str(max_instr), '-i']
-    # base_arguments = [emu_path, '--diff', nemu_so_path, '-W', str(warmup), '-I', str(max_instr), '-i']
-    # base_arguments = [emu_path, '-W', str(warmup), '-I', str(max_instr), '-i']
-  if version == 2017:
-    base_arguments = [emu_path, '--diff', nemu_so_path, '--enable-fork', '-W', str(warmup), '-I', str(max_instr), '-i']
+  base_arguments = [emu_path, '--diff', nemu_so_path, '--enable-fork', '-W', str(warmup), '-I', str(max_instr)]
+  # base_arguments = [emu_path, '--diff', nemu_so_path, '-W', str(warmup), '-I', str(max_instr)]
+  # base_arguments = [emu_path, '-W', str(warmup), '-I', str(max_instr)]
+  if gcc12Enable and not simFrontend and not version == 2017:
+    base_arguments = base_arguments + ['-r', emuArgR]
+  if dump_db:
+    base_arguments = base_arguments + ['--dump-db']
+  base_arguments = base_arguments + ['-i']
   servers = get_server(server_list)
   def server_all_free():
     for s in servers:
@@ -141,6 +141,8 @@ def xs_run(server_list, workloads, xs_path, warmup, max_instr, threads, version=
       workload = workloads[index]
       random_seed = random.randint(0, 9999)
       run_cmd = base_arguments + [workload.get_bin_path()] + ["-s", f"{random_seed}"]
+      if simFrontend:
+        run_cmd = run_cmd + ['--instr-trace', workload.get_trace_path()]
 
       if not os.path.exists(workload.get_res_dir()):
         os.makedirs(workload.get_res_dir(), exist_ok=True)
@@ -148,6 +150,9 @@ def xs_run(server_list, workloads, xs_path, warmup, max_instr, threads, version=
       while not assigned:
         # for sidx in random.sample(range(len(servers)), len(servers)):
         for sidx in range(server_index_flag, server_index_max):
+          if dry_run and verbose:
+            # dry_run will impact run_cmd print, so output it here
+            print(run_cmd)
           if servers[sidx].assign(f"{workload}", run_cmd, threads, xs_path, workload.get_out_path(), workload.get_err_path(), dry_run, verbose):
             assigned = True
             count = count + 1
@@ -368,6 +373,7 @@ if __name__ == "__main__":
   parser.add_argument('--show', '-S', action='store_true', default=False, help='show list of gcpt only')
   parser.add_argument('--debug', '-D', action='store_true', default=False, help='debug options')
   parser.add_argument('--check', '-C', action='store_true', default=False, help='debug options')
+  parser.add_argument('--sim-frontend', '-F', action='store_true', default=False, help='use trace for sim frontend')
   parser.add_argument('--dump-json-path', type=str, help='dump the json path of filter gcpt')
   parser.add_argument('--version', default=2006, type=int, help='SPEC version')
   parser.add_argument('--isa', default="rv64gcb", type=str, help='ISA version')
@@ -376,6 +382,7 @@ if __name__ == "__main__":
   parser.add_argument('--resume', action='store_true', default=False, help="continue to exe, ignore the aborted and success tests")
   parser.add_argument('--dry-run', action='store_true', default=False, help="does not run real simulation")
   parser.add_argument('--verbose', '-v', action='store_true', default=False, help="display more outputs")
+  parser.add_argument('--dump-db', action='store_true', default=False, help="dump database for necessary tests")
 
   args = parser.parse_args()
 
@@ -441,6 +448,7 @@ if __name__ == "__main__":
       args.gcpt_path, args.json_path, server_num, args.threads,
       state_filter=state_filter,
       xs_path=args.xs,
+      trace_dir=simFrontendTraceDir if args.sim_frontend else "",
       #both time and coverage are taken into account, but to be evaluated
       # sorted_by=lambda x: -(x.eval_run_time * float(x.weight))
     )
@@ -458,4 +466,4 @@ if __name__ == "__main__":
     print("All:  ", len(gcpt))
     print("First:", gcpt[0])
     print("Last: ", gcpt[-1])
-    xs_run(args.server_list, gcpt, args.xs, args.warmup, args.max_instr, args.threads, args.version, args.dry_run, args.verbose)
+    xs_run(args.server_list, gcpt, args.xs, args.warmup, args.max_instr, args.threads, args.sim_frontend, args.version, args.dry_run, args.verbose, args.dump_db)
