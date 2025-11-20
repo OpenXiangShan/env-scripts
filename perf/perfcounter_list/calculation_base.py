@@ -32,6 +32,7 @@ class Calculator():
       return self.parse_map
     else:
       res = []
+      re_tmp = []
       with open(eg_file, "r") as file:
         res_from_set = set()
         res_to_set = set()
@@ -39,20 +40,28 @@ class Calculator():
           if isinstance(pm[1], str):
             # normal patten
             res.append(pm)
+          elif callable(pm[1]):
+            pm_tmp = pm.copy()
+            pm_tmp[0] = re.compile(pm_tmp[0])
+            re_tmp.append(pm_tmp)
           else:
-            patten_re = re.compile(pm[0])
-            name_func = pm[1]
-            for line in file:
-              res_re = patten_re.match(line)
-              if res_re != None:
-                from_str = res_re.group("fullMatch")
-                to_str = name_func(res_re)
-                to_show = False if len(pm) < 3 else pm[2]
-                if not (from_str in res_from_set) and not (to_str in res_to_set):
-                  res_from_set.add(from_str)
-                  res_to_set.add(to_str)
-                  res.append([from_str, to_str, to_show])
-                  # print("re counter:" + res_re.group("fullMatch") + " name: " + name_func(res_re) + " to_show: " + str(to_show))
+            print(f"{__file__} {__name__} parse_map error. Second variable should be string or function")
+            sys.exit(1)
+
+        if len(re_tmp) == 0:
+          return res
+
+        for line in file:
+          for pm in re_tmp:
+            res_re = pm[0].match(line)
+            if res_re != None:
+              from_str = res_re.group("fullMatch")
+              to_str = pm[1](res_re)
+              to_show = False if len(pm) < 3 else pm[2]
+              if not (from_str in res_from_set) and not (to_str in res_to_set):
+                res_from_set.add(from_str)
+                res_to_set.add(to_str)
+                res.append([from_str, to_str, to_show])
         return res
 
   def get_perf_counter_to_show(self, eg_file = None):
