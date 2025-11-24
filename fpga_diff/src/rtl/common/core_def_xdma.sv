@@ -1046,27 +1046,29 @@ assign i2c2_prdata = 0;
   wire PCIE_S00_AXIS_0_tready;
   wire PCIE_S00_AXIS_0_tvalid;
 
-	wire [31:0] XDMA_AXI_LITE_awaddr;
-	wire        XDMA_AXI_LITE_awvalid;
-	wire        XDMA_AXI_LITE_awready;
-	wire [31:0] XDMA_AXI_LITE_wdata;
-	wire [3:0]  XDMA_AXI_LITE_wstrb;
-	wire        XDMA_AXI_LITE_wvalid;
-	wire        XDMA_AXI_LITE_wready;
-	wire [1:0]  XDMA_AXI_LITE_bresp;
-	wire        XDMA_AXI_LITE_bvalid;
-	wire        XDMA_AXI_LITE_bready;
-	wire [31:0] XDMA_AXI_LITE_araddr;
-	wire        XDMA_AXI_LITE_arvalid;
-	wire        XDMA_AXI_LITE_arready;
-	wire [31:0] XDMA_AXI_LITE_rdata;
-	wire [1:0]  XDMA_AXI_LITE_rresp;
-	wire        XDMA_AXI_LITE_rvalid;
-	wire        XDMA_AXI_LITE_rready;
+  wire [31:0] XDMA_AXI_LITE_awaddr;
+  wire        XDMA_AXI_LITE_awvalid;
+  wire        XDMA_AXI_LITE_awready;
+  wire [31:0] XDMA_AXI_LITE_wdata;
+  wire [3:0]  XDMA_AXI_LITE_wstrb;
+  wire        XDMA_AXI_LITE_wvalid;
+  wire        XDMA_AXI_LITE_wready;
+  wire [1:0]  XDMA_AXI_LITE_bresp;
+  wire        XDMA_AXI_LITE_bvalid;
+  wire        XDMA_AXI_LITE_bready;
+  wire [31:0] XDMA_AXI_LITE_araddr;
+  wire        XDMA_AXI_LITE_arvalid;
+  wire        XDMA_AXI_LITE_arready;
+  wire [31:0] XDMA_AXI_LITE_rdata;
+  wire [1:0]  XDMA_AXI_LITE_rresp;
+  wire        XDMA_AXI_LITE_rvalid;
+  wire        XDMA_AXI_LITE_rready;
 
-  (* DONT_TOUCH = "TRUE" *) wire [`CONFIG_DIFFTEST_BATCH_IO_WITDH - 1:0] gateway_out_data;
-  wire gateway_out_enable;
-  wire diff_core_clock_enable;
+  wire difftest_to_host_axis_ready;
+  wire difftest_to_host_axis_valid;
+  wire [511:0] difftest_to_host_axis_bits_data;
+  wire difftest_to_host_axis_bits_last;
+  wire difftest_clock_enable;
   wire inter_soc_clk;
   wire inter_rtc_clk;
 
@@ -1080,11 +1082,11 @@ assign i2c2_prdata = 0;
   xdma_ep xdma_ep_i(
     .cpu_clk(sys_clk_i),
     .cpu_rstn(sys_rstn),
-    .S00_AXIS_0_tdata(PCIE_S00_AXIS_0_tdata),
+    .S00_AXIS_0_tdata(difftest_to_host_axis_bits_data),
     .S00_AXIS_0_tkeep(64'hffffffff_ffffffff),
-    .S00_AXIS_0_tlast(PCIE_S00_AXIS_0_tlast),
-    .S00_AXIS_0_tready(PCIE_S00_AXIS_0_tready),
-    .S00_AXIS_0_tvalid(PCIE_S00_AXIS_0_tvalid),
+    .S00_AXIS_0_tlast(difftest_to_host_axis_bits_last),
+    .S00_AXIS_0_tready(difftest_to_host_axis_ready),
+    .S00_AXIS_0_tvalid(difftest_to_host_axis_valid),
     
     .XDMA_AXI_LITE_awaddr (XDMA_AXI_LITE_awaddr),
     .XDMA_AXI_LITE_awprot (3'b000),
@@ -1142,33 +1144,15 @@ assign i2c2_prdata = 0;
       .io_host_reset         (io_host_reset)
   );
 
-  Difftest2AXI  #(
-    .DATA_WIDTH(`CONFIG_DIFFTEST_BATCH_IO_WITDH),
-    .AXIS_DATA_WIDTH(512)
-  ) axis_data_send_i (
-    .clock      (sys_clk_i),
-    .reset      (sys_rstn_io),
-
-    .axi_tdata  (PCIE_S00_AXIS_0_tdata),
-    .axi_tkeep  (),
-    .axi_tlast  (PCIE_S00_AXIS_0_tlast),
-    .axi_tready (PCIE_S00_AXIS_0_tready),
-    .axi_tvalid (PCIE_S00_AXIS_0_tvalid),
-
-    .difftest_enable    (gateway_out_enable),
-    .difftest_data      (gateway_out_data),
-    .core_clock_enable  (diff_core_clock_enable)
-  );
-
   fpga_clock_gate SOC_CLK_CTRL(
       .CK  (sys_clk_i),
-      .E   (diff_core_clock_enable || ~sys_rstn_io || ~cpu_rstn_io ),
+      .E   (difftest_clock_enable || ~sys_rstn_io || ~cpu_rstn_io ),
       .Q   (inter_soc_clk)
   );
 
    fpga_clock_gate RTC_CLK_CTRL(
       .CK  (tmclk),
-      .E   (diff_core_clock_enable || ~sys_rstn_io || ~cpu_rstn_io ),
+      .E   (difftest_clock_enable || ~sys_rstn_io || ~cpu_rstn_io ),
       .Q   (inter_rtc_clk)
   );
 
@@ -1284,10 +1268,13 @@ jtag_ddr_subsys_wrapper U_JTAG_DDR_SUBSYS(
 );
 
 SimTop_wrapper U_CPU_TOP(
-    .gateway_out_enable             (gateway_out_enable),
-    .gateway_out_data               (gateway_out_data),
-
-    .sys_clk_i                      (inter_soc_clk),
+    .difftest_to_host_axis_ready     (difftest_to_host_axis_ready),
+    .difftest_to_host_axis_valid     (difftest_to_host_axis_valid),
+    .difftest_to_host_axis_bits_data (difftest_to_host_axis_bits_data),
+    .difftest_to_host_axis_bits_last (difftest_to_host_axis_bits_last),
+    .difftest_clock_enable           (difftest_clock_enable),
+    .difftest_ref_clock             (sys_clk_i    ),
+    .inter_soc_clk                  (inter_soc_clk),
     .sys_rstn_i                     (cpu_rstn_io  ),
     .tmclk                          (inter_rtc_clk),
 
