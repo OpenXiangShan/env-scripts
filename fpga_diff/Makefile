@@ -38,7 +38,7 @@ reset_cpu:
 	vivado -mode tcl -source tools/reset_cpu.tcl -tclargs $(FPGA_BIT_HOME)/fpga_top_debug.ltx
 
 add_sys_option:
-	sed -i "s/reg \[63:0\] ram \[6143:0\];/\(\* ram_style = \"ultra\" \*\)\n \treg \[63:0\] ram \[6143:0\];/g" $(CORE_DIR)/array_*.v
+	sed -i "s/reg \(\[[0-9]*:[0-9]*\]\) ram \[\([4-9][0-9]\{3,\}\|[1-9][0-9]\{4,\}\):0\];/(\* ram_style = \"ultra\" \*)\treg \1 ram \[\2:0\];/g" $(CORE_DIR)/rtl/array_*.v
 
 get_impl_log:
 	cat fpga_$(CPU)/fpga_$(CPU).runs/impl_1/runme.log
