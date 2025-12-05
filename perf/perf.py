@@ -8,6 +8,26 @@ from multiprocessing import Process, Queue
 from tqdm import tqdm
 import json
 
+'''
+* $WORK_DIR/dir.txt is the list of error output files or just a directory of all the error output files.
+* $WORK_DIR/static.csv is the output statistic file.
+* $CR_DIR is the SPEC result parent directory.
+* $CR_json is the json file of $CR_DIR, which contains the spec_name and its weights.
+
+usage: statistic of single file and use regular expression to filter the counter
+    python3 $SCR_DIR/perf/perf.py $WORK_DIR/sim_err.txt -o $WORK_DIR/static.csv -M -v -j `nproc` -I "prefetch*"
+
+usage: multiple seperate files
+    python3 $SCR_DIR/perf/perf.py -d $WORK_DIR/dir.txt -o $WORK_DIR/static.csv -M -v -j `nproc`
+    python3 $SCR_DIR/perf/perf.py -d $WORK_DIR/dir/ -o $WORK_DIR/static.csv -M -v -j `nproc`
+
+usage: statistic of SPEC result with weight
+    python3 $SCR_DIR/perf/perf.py -d $CR_DIR -S $CR_json -o $WORK_DIR/static.csv -M -v -j`nproc`
+
+usage: statistic of SPEC result without weight, which means counting each file independently
+    python3 $SCR_DIR/perf/perf.py -d $CR_DIR -r -o $WORK_DIR/static.csv -M -v -j`nproc`
+'''
+
 gcc12Enable=True
 class PerfManip(object):
     def __init__(self, name, counters, func):
@@ -17,7 +37,7 @@ class PerfManip(object):
 
 
 class PerfCounters(object):
-    perf_re = re.compile(r'.*\[PERF \]\[time=\s+\d+\] (([a-zA-Z0-9_]+\.)+[a-zA-Z0-9_]+): ((\w| |\')+),\s+(\d+)$')
+    perf_re = re.compile(r'.*\[PERF \]\[time=\s+\d+\] (([a-zA-Z0-9_]+\.)+[a-zA-Z0-9_@]+): ((\w| |\')+),\s+(\d+)$')
     path_re = re.compile(r'(?P<spec_name>\w+((_\w+)|(_\w+\.\w+)|-\d+|))_(?P<time_point>\d+)_(?P<weight>0\.\d+)')
 
     def __init__(self, args):
@@ -50,6 +70,7 @@ class PerfCounters(object):
         Args:
             spec_dir (str): SPEC result parent directory
             spec_name (str): spec_name that you need
+            spec_json (dict): the json file that contains the spec_name and its weights
         """
         all_perf_counters = dict()
         total_weight = 0
@@ -79,6 +100,7 @@ class PerfCounters(object):
                         flag = True
             if not flag:
                 print(os.path.join(abs_dir),"spec 测试失败，请查看结果")
+                continue
             filename = os.path.join(abs_dir, "simulator_err.txt")
             with open(filename) as f:
                 for line in f:
@@ -784,6 +806,11 @@ def find_simulator_err(pfiles):
             all_files += find_simulator_err([sub_path])
     return all_files
 
+def find_all_in_file(file_path):
+    with open(file_path) as f:
+        all_files = list(map(lambda x: x.strip(), f.readlines()))
+    return all_files
+
 def find_all_in_dir(dir_path):
     base_path = dir_path
     all_files = []
@@ -800,7 +827,6 @@ if __name__ == "__main__":
     parser.add_argument('pfiles', metavar='filename', type=str, nargs='*', default=None,
                         help='performance counter log')
     parser.add_argument('--output', '-o', default="stats.csv", help='output file')
-    parser.add_argument('--filelist', '-f', default=None, help="filelist")
     parser.add_argument('--recursive', '-r', action='store_true', default=False,
         help="recursively find simulator_err.txt")
     parser.add_argument('--dir', '-d', default = None, help="directory")
@@ -813,21 +839,18 @@ if __name__ == "__main__":
 
     args = parser.parse_args()
 
-    if args.filelist is not None:
-        with open(args.filelist) as f:
-            args.pfiles = list(map(lambda x: x.strip(), f.readlines()))
-
-    # for every file in SPEC tests
-    if args.recursive:
-        args.pfiles = find_simulator_err(args.pfiles)
-
     normalize_spec = dict()
     if args.dir is not None:
-        if args.spec_json is not None:
+        if args.recursive:
+            args.pfiles = find_simulator_err([args.dir])
+        elif args.spec_json is not None:
             with open(args.spec_json) as f:
                 normalize_spec = json.load(f)
         else:
-            args.pfiles += find_all_in_dir(args.dir)
+            if os.path.isdir(args.dir):
+                args.pfiles += find_all_in_dir(args.dir)
+            else:
+                args.pfiles += find_all_in_file(args.dir)
 
     if args.include is not None:
         args.include = list(map(lambda x: re.compile(x), args.include))

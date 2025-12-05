@@ -1,0 +1,9 @@
+# Ignore build files
+src/tcl/cpu_files.tcl
+fpga_*/
+
+!*.v
+!*.sv
+!*.vh
+!*.xdc
+!*.tcl

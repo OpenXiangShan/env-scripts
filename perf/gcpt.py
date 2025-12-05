@@ -7,7 +7,7 @@ class GCPT(object):
   STATE_FINISHED = 2
   STATE_ABORTED  = 3
 
-  def __init__(self, gcpt_bin_dir: str, perf_base_dir: str,benchspec: str, point: str, weight: str, eval_run_time: int, gcc12Enable = False):
+  def __init__(self, gcpt_bin_dir: str, perf_base_dir: str,benchspec: str, point: str, weight: str, eval_run_time: int, gcc12Enable = False, trace_dir = ""):
     self.bin_base_dir = gcpt_bin_dir
     self.benchspec = benchspec
     self.point = point
@@ -23,6 +23,7 @@ class GCPT(object):
     self.res_dir = os.path.join(perf_base_dir, self.__str__())
     self.eval_run_time = eval_run_time
     self.gcc12Enable = gcc12Enable
+    self.trace_dir = trace_dir
 
   def __str__(self):
     return "_".join([self.benchspec, self.point, str(self.weight)])
@@ -42,6 +43,13 @@ class GCPT(object):
     bin_path = os.path.join(bin_dir, bin_file[0])
     assert(os.path.isfile(bin_path))
     return bin_path
+
+  def get_trace_path(self):
+    assert(self.gcc12Enable)
+    assert(self.trace_dir != "")
+    trace_path = os.path.join(self.trace_dir, self.benchspec, f"{self.benchspec}_{str(self.point)}.trace")
+    assert(os.path.isfile(trace_path))
+    return trace_path
 
   def get_res_dir(self):
     return self.res_dir
