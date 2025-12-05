@@ -112,8 +112,9 @@ def get_server(server_list):
     l.append(Server(s))
   return l
 
-def xs_run(server_list, workloads, xs_path, warmup, max_instr, threads, simFrontend = False, version=2006, dry_run=False, verbose=True, dump_db=False):
-  emu_path = os.path.join(xs_path, "build/emu")
+def xs_run(server_list, workloads, xs_path, warmup, max_instr, threads, simFrontend = False, version=2006, dry_run=False, verbose=True, dump_db=False, emu_path=None):
+  if emu_path is None:
+    emu_path = os.path.join(xs_path, "build/emu")
   nemu_so_path = os.path.join(xs_path, "ready-to-run/riscv64-nemu-interpreter-so")
   # nemu_so_path = os.path.join(xs_path, "ready-to-run/riscv64-spike-so")
   base_arguments = [emu_path, '--diff', nemu_so_path, '--enable-fork', '-W', str(warmup), '-I', str(max_instr)]
@@ -364,6 +365,7 @@ if __name__ == "__main__":
   parser.add_argument('json_path', metavar='json_path', type=str,
                       help='path to gcpt json')
   parser.add_argument('--xs', help='path to xs')
+  parser.add_argument('--xs-emu', default=None, type=str, help='path to xs emulator elf (overrides default xs_path/build/emu)')
   parser.add_argument('--ref', default=None, type=str, help='path to ref')
   parser.add_argument('--warmup', '-W', default=20000000, type=int, help="warmup instr count")
   parser.add_argument('--max-instr', '-I', default=40000000, type=int, help="max instr count")
@@ -466,4 +468,4 @@ if __name__ == "__main__":
     print("All:  ", len(gcpt))
     print("First:", gcpt[0])
     print("Last: ", gcpt[-1])
-    xs_run(args.server_list, gcpt, args.xs, args.warmup, args.max_instr, args.threads, args.sim_frontend, args.version, args.dry_run, args.verbose, args.dump_db)
+    xs_run(args.server_list, gcpt, args.xs, args.warmup, args.max_instr, args.threads, args.sim_frontend, args.version, args.dry_run, args.verbose, args.dump_db, args.xs_emu)
