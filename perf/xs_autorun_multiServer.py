@@ -345,8 +345,11 @@ def xs_report(all_gcpt, xs_path, spec_version, isa, num_jobs, json_path = None):
   while not result_queue.empty():
     result = result_queue.get()
     gcpt_ipc[result[0]].append(result[1])
-  print("=================== Coverage ==================")
+  # print("=================== Coverage ==================")
   spec_time = {}
+  spec_weight = {}
+  spec_weight_list = {}
+  spec_instr_list = {}
   for benchspec in gcpt_ipc:
     total_weight = sum(map(lambda info: info[0], gcpt_ipc[benchspec]))
     total_cpi = sum(map(lambda info: info[0] / info[1], gcpt_ipc[benchspec])) / total_weight
@@ -355,11 +358,15 @@ def xs_report(all_gcpt, xs_path, spec_version, isa, num_jobs, json_path = None):
     else:
       num_instr = get_total_inst(benchspec, spec_version, isa)
     num_seconds = total_cpi * num_instr / (frequency * (10 ** 9))
-    print(f"{benchspec:>25} coverage: {total_weight:.2f}")
+    # print(f"{benchspec:>25} coverage: {total_weight:.2f}")
     spec_name = benchspec.split("_")[0]
     spec_time[spec_name] = spec_time.get(spec_name, 0) + num_seconds
-  print()
-  spec_score.get_spec_score(spec_time, spec_version, frequency)
+    spec_weight_list[spec_name] = spec_weight_list.get(spec_name, []) + [total_weight]
+    spec_instr_list[spec_name] = spec_instr_list.get(spec_name, []) + [num_instr]
+  for key in spec_weight_list:
+    spec_weight[key] = np.sum(np.multiply(spec_weight_list[key], spec_instr_list[key]))/np.sum(spec_instr_list[key])
+  # print()
+  spec_score.get_spec_score(spec_time, spec_version, frequency, spec_weight)
   print(f"Number of Checkpoints: {len(all_gcpt)}")
   print(f"SPEC CPU Version: SPEC CPU{spec_version}, {isa}")
   # check dramsim3

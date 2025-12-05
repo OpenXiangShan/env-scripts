@@ -1,6 +1,7 @@
 #! /usr/bin/env python3
 import argparse
 import os
+import pandas as pd
 
 def get_spec_reftime(benchspec, spec_version):
   if spec_version == 2006:
@@ -97,7 +98,73 @@ def get_spec_fp(spec_version):
   return None
 
 
-def get_spec_score(spec_time, spec_version, frequency):
+def get_spec_score_new(spec_time, spec_version, frequency, spec_weight):
+  pd.set_option('display.float_format', '{:.3f}'.format)
+  print("==================== Score ===================")
+  alldf = pd.DataFrame(index=spec_time.keys(), columns=["time", "ref_time", "score", "coverage"])
+  total_count = 0
+  total_score = 1
+  for spec_name in spec_time:
+    reftime = get_spec_reftime(spec_name, spec_version)
+    if reftime is None:
+      continue
+    score = reftime / spec_time[spec_name] / frequency
+    total_count += 1
+    total_score *= score
+    alldf.loc[spec_name, "time"] = spec_time[spec_name]
+    alldf.loc[spec_name, "ref_time"] = reftime
+    alldf.loc[spec_name, "score"] = score
+    alldf.loc[spec_name, "coverage"] = spec_weight[spec_name]
+  geomean_score = total_score ** (1 / total_count)
+  print(f"********* SPECINT {spec_version} *********")
+  specint_list = get_spec_int(spec_version)
+  intdf = pd.DataFrame(index=specint_list, columns=["time", "ref_time", "score", "coverage"])
+  specint_score = 1
+  for benchspec in specint_list:
+    found = False
+    for name in spec_time:
+      if name.lower() in benchspec.lower():
+        found = True
+        score = alldf.loc[name, "score"]
+        specint_score *= score
+        intdf.loc[benchspec] = alldf.loc[name]
+    if not found:
+      intdf.loc[benchspec] = {}
+  geomean_specint_score = specint_score ** (1 / len(specint_list))
+  intdf.loc[f"SPECint{spec_version}/GHz"] = {
+    'score': geomean_specint_score,
+  }
+  print(intdf)
+  print()
+  print(f"********* SPECFP  {spec_version} *********")
+  specfp_list = get_spec_fp(spec_version)
+  fpdf = pd.DataFrame(index=specfp_list, columns=["time", "ref_time", "score", "coverage"])
+  specfp_score = 1
+  for benchspec in specfp_list:
+    found = False
+    for name in spec_time:
+      if name.lower() in benchspec.lower():
+        found = True
+        score = alldf.loc[name, "score"]
+        specfp_score *= score
+        fpdf.loc[benchspec] = alldf.loc[name]
+    if not found:
+      fpdf.loc[benchspec] = {}
+  geomean_specfp_score = specfp_score ** (1 / len(specfp_list))
+  fpdf.loc[f"SPECfp{spec_version}/GHz"] = {
+    'score': geomean_specfp_score,
+  }
+  print(fpdf)
+  print()
+  print(f"SPEC{spec_version}/GHz:  {geomean_score:6.3f}")
+  print(f"SPEC{spec_version}@{frequency}GHz: {geomean_score * frequency:6.3f}")
+  print()
+
+
+def get_spec_score(spec_time, spec_version, frequency, spec_weight = None):
+  if spec_weight:
+    get_spec_score_new(spec_time, spec_version, frequency, spec_weight)
+    return
   print("==================== Score ===================")
   total_count = 0
   total_score = 1
