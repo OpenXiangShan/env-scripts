@@ -1,7 +1,7 @@
 `include "sys_define.vh"
 `include "DifftestMacros.v"
 
-`ifdef CPU_XIANGSHAN
+`ifndef CONFIG_USE_XSCORE_AXI
 `include "gateway_interface.svh"
 `endif
 
