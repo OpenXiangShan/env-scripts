@@ -47,8 +47,11 @@ def load_all_gcpt(gcpt_path, json_path, server_num, threads, state_filter=None, 
   no_ref_run_time = False
   is_dump = dump_json_path is not None
   dump_json = {}
+  error_json = {}
   if is_dump:
     dump_json = copy.deepcopy(data)
+  if report:
+    error_json = copy.deepcopy(data)
   perf_base_path = get_perf_base_path(xs_path)
   for benchspec in data:
     #if "gcc" not in benchspec:# or "hmmer" in benchspec:
@@ -91,18 +94,33 @@ def load_all_gcpt(gcpt_path, json_path, server_num, threads, state_filter=None, 
           del dump_json[benchspec][point]
           if len(dump_json[benchspec]) == 0:
             del dump_json[benchspec]
+      # report error tests, which are not matched state_filter
+      if state_match and report:
+        if gcc12Enable:
+          del error_json[benchspec]["points"][point]
+          if len(error_json[benchspec]["points"]) == 0:
+            del error_json[benchspec]
+        else:
+          del error_json[benchspec][point]
+          if len(error_json[benchspec]) == 0:
+            del error_json[benchspec]
 
-  if sorted_by is not None:
-    all_gcpt = sorted(all_gcpt, key=sorted_by)
-  elif not no_ref_run_time:
-    all_gcpt = sorted(all_gcpt, key=lambda x:-x.eval_run_time)
-  else:
-    #default sort, prioritize mcf
-    all_gcpt = sorted(all_gcpt, key=lambda x:-1 if x.benchspec=="mcf" else -float(x.weight))
+  if not report:
+    if sorted_by is not None:
+      all_gcpt = sorted(all_gcpt, key=sorted_by)
+    elif not no_ref_run_time:
+      all_gcpt = sorted(all_gcpt, key=lambda x:-x.eval_run_time)
+    else:
+      #default sort, prioritize mcf
+      all_gcpt = sorted(all_gcpt, key=lambda x:-1 if x.benchspec=="mcf" else -float(x.weight))
 
   if is_dump:
     with open(dump_json_path, "w") as f:
       json.dump(dump_json, f, indent=4)
+  if report:
+    print("=================== Unfinished / Aborted Tests ===================")
+    json.dump(error_json, fp=sys.stdout, indent=4)
+    print("\n")
   return all_gcpt
 
 
@@ -344,6 +362,17 @@ def xs_report(all_gcpt, xs_path, spec_version, isa, num_jobs, json_path = None):
   spec_score.get_spec_score(spec_time, spec_version, frequency)
   print(f"Number of Checkpoints: {len(all_gcpt)}")
   print(f"SPEC CPU Version: SPEC CPU{spec_version}, {isa}")
+  # check dramsim3
+  with open(all_gcpt[0].get_out_path()) as f:
+    flag = True
+    for line in f:
+      if "DRAMSIM3 config" in line:
+        print("DRAMSIM3 config:", line.split("DRAMSIM3 config:")[1].strip())
+        flag = False
+        break
+    if flag:
+      print("[WARNING] No DRAMSIM3 config found! Please check whether DRAMSIM3 is enabled correctly.")
+      return
 
 
 def xs_show(all_gcpt):
@@ -380,7 +409,7 @@ if __name__ == "__main__":
   parser.add_argument('--version', default=2006, type=int, help='SPEC version')
   parser.add_argument('--isa', default="rv64gcb", type=str, help='ISA version')
   parser.add_argument('--dir', default=None, type=str, help='SPECTasks dir')
-  parser.add_argument('--jobs', '-j', default=1, type=int, help="processing files in 'j' threads")
+  parser.add_argument('--jobs', '-j', default=32, type=int, help="processing files in 'j' threads")
   parser.add_argument('--resume', action='store_true', default=False, help="continue to exe, ignore the aborted and success tests")
   parser.add_argument('--dry-run', action='store_true', default=False, help="does not run real simulation")
   parser.add_argument('--verbose', '-v', action='store_true', default=False, help="display more outputs")
