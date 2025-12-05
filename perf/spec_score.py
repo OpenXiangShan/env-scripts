@@ -150,6 +150,9 @@ def get_spec_score_new(spec_time, spec_version, frequency, spec_weight):
   formatDF.loc[f"SPECfp{spec_version}/GHz"] = {
     'score': geomean_specfp_score,
   }
+  formatDF.loc[f"SPEC{spec_version}/GHz"] = {
+    'score': geomean_score,
+  }
   print(formatDF)
   print()
   print(f"SPEC{spec_version}/GHz:  {geomean_score:6.3f}")
