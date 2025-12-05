@@ -116,9 +116,9 @@ def get_spec_score_new(spec_time, spec_version, frequency, spec_weight):
     alldf.loc[spec_name, "score"] = score
     alldf.loc[spec_name, "coverage"] = spec_weight[spec_name]
   geomean_score = total_score ** (1 / total_count)
-  print(f"********* SPECINT {spec_version} *********")
   specint_list = get_spec_int(spec_version)
-  intdf = pd.DataFrame(index=specint_list, columns=["time", "ref_time", "score", "coverage"])
+  formatDF = pd.DataFrame(index=specint_list, columns=["time", "ref_time", "score", "coverage"])
+  empty_row={'coverage':0.0}
   specint_score = 1
   for benchspec in specint_list:
     found = False
@@ -127,18 +127,14 @@ def get_spec_score_new(spec_time, spec_version, frequency, spec_weight):
         found = True
         score = alldf.loc[name, "score"]
         specint_score *= score
-        intdf.loc[benchspec] = alldf.loc[name]
+        formatDF.loc[benchspec] = alldf.loc[name]
     if not found:
-      intdf.loc[benchspec] = {}
+      formatDF.loc[benchspec] = empty_row
   geomean_specint_score = specint_score ** (1 / len(specint_list))
-  intdf.loc[f"SPECint{spec_version}/GHz"] = {
+  formatDF.loc[f"SPECint{spec_version}/GHz"] = {
     'score': geomean_specint_score,
   }
-  print(intdf)
-  print()
-  print(f"********* SPECFP  {spec_version} *********")
   specfp_list = get_spec_fp(spec_version)
-  fpdf = pd.DataFrame(index=specfp_list, columns=["time", "ref_time", "score", "coverage"])
   specfp_score = 1
   for benchspec in specfp_list:
     found = False
@@ -147,14 +143,14 @@ def get_spec_score_new(spec_time, spec_version, frequency, spec_weight):
         found = True
         score = alldf.loc[name, "score"]
         specfp_score *= score
-        fpdf.loc[benchspec] = alldf.loc[name]
+        formatDF.loc[benchspec] = alldf.loc[name]
     if not found:
-      fpdf.loc[benchspec] = {}
+      formatDF.loc[benchspec] = empty_row
   geomean_specfp_score = specfp_score ** (1 / len(specfp_list))
-  fpdf.loc[f"SPECfp{spec_version}/GHz"] = {
+  formatDF.loc[f"SPECfp{spec_version}/GHz"] = {
     'score': geomean_specfp_score,
   }
-  print(fpdf)
+  print(formatDF)
   print()
   print(f"SPEC{spec_version}/GHz:  {geomean_score:6.3f}")
   print(f"SPEC{spec_version}@{frequency}GHz: {geomean_score * frequency:6.3f}")
