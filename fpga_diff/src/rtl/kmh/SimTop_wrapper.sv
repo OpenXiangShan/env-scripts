@@ -1,6 +1,6 @@
 module SimTop_wrapper(
-  input           inter_soc_clk,    
-  input           sys_rstn_i, 
+  input           inter_soc_clk,
+  input           sys_rstn_i,
   input           tmclk,
 
   input           global_reset,     //24MHz
@@ -65,7 +65,7 @@ module SimTop_wrapper(
   (*mark_debug="true"*) output [255:0]  dma_core_rdata,
   (*mark_debug="true"*) output [1:0]    dma_core_rresp,
   (*mark_debug="true"*) output          dma_core_rlast,
-  
+
   (*mark_debug="true"*) input           peri_awready,
   (*mark_debug="true"*) output          peri_awvalid,
   (*mark_debug="true"*) output [1:0]    peri_awid,
@@ -103,7 +103,7 @@ module SimTop_wrapper(
   (*mark_debug="true"*) input  [63:0]   peri_rdata,
   (*mark_debug="true"*) input  [1:0]    peri_rresp,
   (*mark_debug="true"*) input           peri_rlast,
-  
+
   (*mark_debug="true"*) input           mem_core_awready,
   (*mark_debug="true"*) output          mem_core_awvalid,
   (*mark_debug="true"*) output [13:0]   mem_core_awid,
@@ -143,8 +143,6 @@ module SimTop_wrapper(
   (*mark_debug="true"*) input           mem_core_rlast,
 input [1:0] memory_0_rresp,
 input memory_0_rlast,
-input io_clock,
-input io_reset,
 input io_pll0_lock,
 output [31:0] io_pll0_ctrl_0,
 output [31:0] io_pll0_ctrl_1,
@@ -200,6 +198,9 @@ wire [20:0]  trace_iretire;
 wire [2:0]   trace_ilastsize;
 
 SimTop  u_XSTop(
+  .clock                         (inter_soc_clk),
+  .reset                         (~sys_rstn_i),
+
   .nmi_0_0                       (nmi_0_0),
   .nmi_0_1                       (nmi_0_1),
   .memory_awready                (mem_core_awready )                        ,
@@ -313,7 +314,7 @@ SimTop  u_XSTop(
   .dma_rdata                     (dma_core_rdata   )                        ,
   .dma_rresp                     (dma_core_rresp   )                        ,
   .dma_rlast                     (dma_core_rlast   )                        ,
-  
+
   .io_systemjtag_jtag_TCK          (io_systemjtag_jtag_TCK),
   .io_systemjtag_jtag_TMS          (io_systemjtag_jtag_TMS),
   .io_systemjtag_jtag_TDI          (io_systemjtag_jtag_TDI),
@@ -326,8 +327,6 @@ SimTop  u_XSTop(
   .io_debug_reset                  (io_debug_reset_int),
 
 
-  .io_clock                        (inter_soc_clk),
-  .io_reset                        (~sys_rstn_i),
   .io_sram_config                  (io_sram_config),
   .io_pll0_lock                    (pll0_lock),
   .io_pll0_ctrl_0                  (io_pll0_ctrl_0),
