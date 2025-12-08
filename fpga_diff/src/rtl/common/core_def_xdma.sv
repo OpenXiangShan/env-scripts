@@ -1,10 +1,6 @@
 `include "sys_define.vh"
 `include "DifftestMacros.v"
 
-`ifdef CPU_XIANGSHAN
-`include "gateway_interface.svh"
-`endif
-
 module core_def (
       input                                      ddr_clk_p,
       input                                      ddr_clk_n, 
