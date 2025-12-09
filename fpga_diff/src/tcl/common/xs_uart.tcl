@@ -20,6 +20,7 @@
 
 set cpu "kmh"
 set cpu_candidates [list "kmh" "nanhu" "dualcore" "nutshell"]
+set vivado_version ""
 
 proc checkRequiredFiles {files} {
   set status true
@@ -64,6 +65,7 @@ proc print_help { cpu_candidates } {
   puts "$script_file -tclargs \[--cpu {$cpu_candidates}\]"
   puts "$script_file -tclargs \[--origin_dir <path>\]"
   puts "$script_file -tclargs \[--project_name <name>\]"
+  puts "$script_file -tclargs \[--vivado_version <version>\]"
   puts "$script_file -tclargs \[--help\]\n"
   puts "Usage:"
   puts "Name                   Description"
@@ -81,6 +83,7 @@ proc print_help { cpu_candidates } {
   puts "\[--project_name <name>\] Create project with the specified name. Default"
   puts "                       name is the name of the project from where this"
   puts "                       script was generated.\n"
+  puts "\[--vivado_version <version>\] Pass in the Vivado version from environment.\n"
   puts "\[--help\]               Print help information for this script"
   puts "-------------------------------------------------------------------------\n"
   exit 0
@@ -93,6 +96,7 @@ if { $::argc > 0 } {
       "--cpu"          { incr i; set cpu [lindex $::argv $i] }
       "--origin_dir"   { incr i; set origin_dir [lindex $::argv $i] }
       "--project_name" { incr i; set _xil_proj_name_ [lindex $::argv $i] }
+      "--vivado_version" { incr i; set vivado_version [lindex $::argv $i] }
       "--help"         { print_help "$cpu_candidates" }
       default {
         if { [regexp {^-} $option] } {
@@ -101,6 +105,19 @@ if { $::argc > 0 } {
         }
       }
     }
+  }
+}
+
+# Print Vivado version information if provided
+if { $vivado_version ne "" } {
+  puts "Vivado version passed from environment: $vivado_version"
+  set current_vivado_version [version -short]
+  puts "Current Vivado version: $current_vivado_version"
+  
+  if { $vivado_version ne $current_vivado_version } {
+    puts "WARNING: Version mismatch detected!"
+  } else {
+    puts "Version check: OK"
   }
 }
 
@@ -226,6 +243,10 @@ set_property -name "top_auto_set" -value "0" -objects $obj
 set_property -name "top_lib" -value "xil_defaultlib" -objects $obj
 
 # Create BD cdc_ddr4
+if { [info exists vivado_version] } {
+    set ::vivado_version $vivado_version
+}
+
 # source "$tcl_dir/cdc_ddr4.tcl"
 
 # Create BD for JTAG and DDR4 Subsystem

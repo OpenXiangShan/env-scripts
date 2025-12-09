@@ -1,4 +1,5 @@
 PRJ ?=
+ENV_SCRIPTS_HOME ?= $(CURDIR)
 
 CORE_DIR ?= ""
 FPGA_BIT_HOME ?=
@@ -11,6 +12,12 @@ CPU ?= ""
 
 .PHONY: bitstream vivado
 
+# Get Vivado version
+VIVADO_VERSION := $(shell vivado -version 2>/dev/null | head -1 | grep -o '[0-9]\{4\}\.[0-9]' || echo "unknown")
+
+check_vivado_version:
+	@vivado -version 2>/dev/null | head -1 | grep -o '[0-9]\{4\}\.[0-9]' || echo "unknown"
+
 synth:
 	vivado -mode batch -source ./tools/gen_synth.tcl -tclargs $(PRJ)
 
@@ -22,8 +29,11 @@ update_core_flist:
 	find "$(CORE_DIR)" -type f \( -name "*.v" -o -name "*.sv" -o -name "*.svh" \) -printf '%p\n' | \
 	awk -f ./core_flist.awk > ./src/tcl/cpu_files.tcl
 
-vivado:
-	vivado -mode batch -source src/tcl/common/xs_uart.tcl -tclargs --cpu $(CPU) --project_name fpga_$(CPU)
+vivado: check_vivado_version
+	vivado -mode batch -source src/tcl/common/xs_uart.tcl -tclargs --cpu $(CPU) --project_name fpga_$(CPU) --vivado_version $(VIVADO_VERSION)
+
+check_version:
+	vivado -mode batch -source src/tcl/common/check_version.tcl -tclargs --vivado_version $(VIVADO_VERSION) --cpu $(CPU) --project_name fpga_$(CPU)
 
 write_bitstream:
 	sh tools/pcie-remove.sh
@@ -45,3 +55,7 @@ get_impl_log:
 
 get_synth_log:
 	cat fpga_$(CPU)/fpga_$(CPU).runs/synth_1/runme.log
+
+all:
+	$(MAKE) update_core_flist CORE_DIR=$(CORE_DIR)
+	$(MAKE) vivado CPU=$(CPU)
