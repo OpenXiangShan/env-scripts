@@ -39,11 +39,11 @@ def load_all_gcpt(gcpt_path, json_path, server_num, threads, state_filter=None, 
   ]
   perf_filter = None
   all_gcpt = []
-  benchmark_filter = set(benchmarks.replace(" ", "").split(","))
 
   with open(json_path) as f:
     data = json.load(f)
-  if benchmark_filter:
+  if benchmarks != "":
+    benchmark_filter = set(benchmarks.replace(" ", "").split(","))
     data = {k:v for k,v in data.items() if k in benchmark_filter}
   with open(ref_run_time_path) as f:
     time_data = json.load(f)
