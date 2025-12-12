@@ -1060,6 +1060,8 @@ assign i2c2_prdata = 0;
   wire        XDMA_AXI_LITE_rvalid;
   wire        XDMA_AXI_LITE_rready;
 
+  wire difftest_to_host_axis_ready_io;
+  wire difftest_to_host_axis_valid_io;
   wire difftest_to_host_axis_ready;
   wire difftest_to_host_axis_valid;
   wire [511:0] difftest_to_host_axis_bits_data;
@@ -1075,14 +1077,17 @@ assign i2c2_prdata = 0;
   assign sys_rstn_io = sys_rstn & ~host_io_reset;
   assign cpu_rstn_io = cpu_rstn & ~host_io_reset;
 
+  assign difftest_to_host_axis_ready =  difftest_to_host_axis_ready_io & pcie_ep_lnk_up;
+  assign difftest_to_host_axis_valid_io = difftest_to_host_axis_valid & pcie_ep_lnk_up;
+
   xdma_ep xdma_ep_i(
     .cpu_clk(sys_clk_i),
     .cpu_rstn(sys_rstn),
     .S00_AXIS_0_tdata(difftest_to_host_axis_bits_data),
     .S00_AXIS_0_tkeep(64'hffffffff_ffffffff),
     .S00_AXIS_0_tlast(difftest_to_host_axis_bits_last),
-    .S00_AXIS_0_tready(difftest_to_host_axis_ready),
-    .S00_AXIS_0_tvalid(difftest_to_host_axis_valid),
+    .S00_AXIS_0_tready(difftest_to_host_axis_ready_io),
+    .S00_AXIS_0_tvalid(difftest_to_host_axis_valid_io),
     
     .XDMA_AXI_LITE_awaddr (XDMA_AXI_LITE_awaddr),
     .XDMA_AXI_LITE_awprot (3'b000),
