@@ -17,7 +17,6 @@ from server import Server
 from gcpt_run_time_eval import *
 import copy
 from tqdm import tqdm
-# import AutoEmailAlert
 
 """ PRAMETERS THAT NEED YOU CHECK """
 tasks_dir = "SPEC06_EmuTasks_10_22_2021"
@@ -33,15 +32,19 @@ def get_perf_base_path(xs_path):
     return tasks_dir
   return os.path.join(xs_path, tasks_dir)
 
-def load_all_gcpt(gcpt_path, json_path, server_num, threads, state_filter=None, xs_path=None, sorted_by=None, report=False, dump_json_path=None, trace_dir=""):
+def load_all_gcpt(gcpt_path, json_path, server_num, threads, state_filter=None, xs_path=None, sorted_by=None, report=False, dump_json_path=None, trace_dir="", benchmarks=""):
   perf_filter = [
     ("l3cache_mpki_load",      lambda x: float(x) < 3),
     ("branch_prediction_mpki", lambda x: float(x) > 5),
   ]
   perf_filter = None
   all_gcpt = []
+  benchmark_filter = set(benchmarks.replace(" ", "").split(","))
+
   with open(json_path) as f:
     data = json.load(f)
+  if benchmark_filter:
+    data = {k:v for k,v in data.items() if k in benchmark_filter}
   with open(ref_run_time_path) as f:
     time_data = json.load(f)
   no_ref_run_time = False
@@ -122,7 +125,6 @@ def load_all_gcpt(gcpt_path, json_path, server_num, threads, state_filter=None, 
     json.dump(error_json, fp=sys.stdout, indent=4)
     print("\n")
   return all_gcpt
-
 
 def get_server(server_list):
   l = []
@@ -225,33 +227,33 @@ def xs_run(server_list, workloads, xs_path, warmup, max_instr, threads, simFront
 
 
 def get_all_manip():
-    all_manip = []
-    ipc = perf.PerfManip(
-        name = "IPC",
-        counters = [f"clock_cycle", f"commitInstr"],
-        func = lambda cycle, instr: instr * 1.0 / cycle
-    )
-    all_manip.append(ipc)
-    l3cache_mpki_load = perf.PerfManip(
-      name = "global.l3cache_mpki_load",
-      counters = [
-          "L3_bank_0_A_channel_AcquireBlock_fire", "L3_bank_0_A_channel_Get_fire",
-          "L3_bank_1_A_channel_AcquireBlock_fire", "L3_bank_1_A_channel_Get_fire",
-          "L3_bank_2_A_channel_AcquireBlock_fire", "L3_bank_2_A_channel_Get_fire",
-          "L3_bank_3_A_channel_AcquireBlock_fire", "L3_bank_3_A_channel_Get_fire",
-          "commitInstr"
-      ],
-      func = lambda fire1, fire2, fire3, fire4, fire5, fire6, fire7, fire8, instr :
-          1000 * (fire1 + fire2 + fire3 + fire4 + fire5 + fire6 + fire7 + fire8) / instr
-    )
-    all_manip.append(l3cache_mpki_load)
-    branch_mpki = perf.PerfManip(
-      name = "global.branch_prediction_mpki",
-      counters = ["ftq.BpWrong", "commitInstr"],
-      func = lambda wrong, instr: 1000 * wrong / instr
-    )
-    all_manip.append(branch_mpki)
-    return all_manip
+  all_manip = []
+  ipc = perf.PerfManip(
+    name = "IPC",
+    counters = [f"clock_cycle", f"commitInstr"],
+    func = lambda cycle, instr: instr * 1.0 / cycle
+  )
+  all_manip.append(ipc)
+  l3cache_mpki_load = perf.PerfManip(
+    name = "global.l3cache_mpki_load",
+    counters = [
+      "L3_bank_0_A_channel_AcquireBlock_fire", "L3_bank_0_A_channel_Get_fire",
+      "L3_bank_1_A_channel_AcquireBlock_fire", "L3_bank_1_A_channel_Get_fire",
+      "L3_bank_2_A_channel_AcquireBlock_fire", "L3_bank_2_A_channel_Get_fire",
+      "L3_bank_3_A_channel_AcquireBlock_fire", "L3_bank_3_A_channel_Get_fire",
+      "commitInstr"
+    ],
+    func = lambda fire1, fire2, fire3, fire4, fire5, fire6, fire7, fire8, instr :
+    1000 * (fire1 + fire2 + fire3 + fire4 + fire5 + fire6 + fire7 + fire8) / instr
+  )
+  all_manip.append(l3cache_mpki_load)
+  branch_mpki = perf.PerfManip(
+    name = "global.branch_prediction_mpki",
+    counters = ["ftq.BpWrong", "commitInstr"],
+    func = lambda wrong, instr: 1000 * wrong / instr
+  )
+  all_manip.append(branch_mpki)
+  return all_manip
 
 def get_total_inst(benchspec, spec_version, isa):
   base_dir = "/nfs-nvme/home/share/checkpoints_profiles"
@@ -301,11 +303,6 @@ def get_total_inst(benchspec, spec_version, isa):
       return int(line.split("instructions = ")[1].replace("\x1b[0m", ""))
   f.close()
   return None
-
-
-
-
-
 
 def xs_report_ipc(xs_path, gcpt_queue, result_queue):
   while not gcpt_queue.empty():
@@ -381,7 +378,6 @@ def xs_report(all_gcpt, xs_path, spec_version, isa, num_jobs, json_path = None):
       print("[WARNING] No DRAMSIM3 config found! Please check whether DRAMSIM3 is enabled correctly.")
       return
 
-
 def xs_show(all_gcpt):
   for gcpt in all_gcpt:
     gcpt.show()
@@ -391,7 +387,6 @@ def xs_debug(all_gcpt):
     gcpt.debug()
 
 if __name__ == "__main__":
-  # python3 xs_autorun_v2.py  /nfs-nvme/home/share/checkpoints_profiles/spec06_rv64gcb_o2_20m/take_cpt /nfs-nvme/home/share/checkpoints_profiles/spec06_rv64gc_o2_20m/simpoint_coverage0.8_test.json --xs /nfs/home/username/XiangShan --threads 16 --dir SPEC06_EmuTasks_02_16_2023 -L "107 104"
   # --show for already running result, including "name, state, ipc, sim speed"
   # --debug for error tests
   # --report for spec scores
@@ -421,6 +416,7 @@ if __name__ == "__main__":
   parser.add_argument('--dry-run', action='store_true', default=False, help="does not run real simulation")
   parser.add_argument('--verbose', '-v', action='store_true', default=False, help="display more outputs")
   parser.add_argument('--dump-db', action='store_true', default=False, help="dump database for necessary tests")
+  parser.add_argument('--benchmarks', default='', type=str, help='Specific benchmarks to run (comma-separated), leave empty to run all')
 
   args = parser.parse_args()
 
@@ -441,14 +437,8 @@ if __name__ == "__main__":
   else:
     server_num = len(args.server_list.strip().split(" "))
 
-
-  # gcpt = gcpt#[300:]#[::-1]
-  #gcpt = load_all_gcpt(args.gcpt_path, args.json_path,
-  #        state_filter=[GCPT.STATE_RUNNING, GCPT.STATE_NONE, GCPT.STATE_ABORTED], xs_path=args.ref)
-  #gcpt = gcpt[242:]#[::-1]
-
   if args.show:
-    gcpt = load_all_gcpt(args.gcpt_path, args.json_path, server_num, args.threads, xs_path = args.xs)
+    gcpt = load_all_gcpt(args.gcpt_path, args.json_path, server_num, args.threads, xs_path=args.xs, benchmarks=args.benchmarks)
     #gcpt = load_all_gcpt(args.gcpt_path, args.json_path,
       #state_filter=[GCPT.STATE_FINISHED], xs_path=args.ref, sorted_by=lambda x: x.get_simulation_cps())
       #state_filter=[GCPT.STATE_ABORTED], xs_path=args.ref, sorted_by=lambda x: x.get_ipc())
@@ -463,18 +453,20 @@ if __name__ == "__main__":
       # state_filter=[GCPT.STATE_FINISHED], # what you wanna check
       state_filter=[GCPT.STATE_NONE, GCPT.STATE_ABORTED, GCPT.STATE_RUNNING],
       xs_path=args.ref,
-      dump_json_path=args.dump_json_path # dump checked json
+      dump_json_path=args.dump_json_path, # dump checked json
+      benchmarks=args.benchmarks
     )
   elif args.debug:
     gcpt = load_all_gcpt(args.gcpt_path, args.json_path, server_num, args.threads,
                          state_filter=[GCPT.STATE_ABORTED],
                          xs_path=args.xs,
-                         sorted_by=lambda x: -x.num_cycles
+                         sorted_by=lambda x: -x.num_cycles,
+                         benchmarks=args.benchmarks
                          )
     xs_debug(gcpt)
   elif args.report:
     gcpt = load_all_gcpt(args.gcpt_path, args.json_path, server_num, args.threads,
-      state_filter=[GCPT.STATE_FINISHED], xs_path=args.xs, sorted_by=lambda x: x.benchspec.lower(), report=True)
+                         state_filter=[GCPT.STATE_FINISHED], xs_path=args.xs, sorted_by=lambda x: x.benchspec.lower(), report=True, benchmarks=args.benchmarks)
     xs_report(gcpt, args.ref, args.version, args.isa, args.jobs, args.json_path)
   else:
     state_filter = None
@@ -487,6 +479,7 @@ if __name__ == "__main__":
       state_filter=state_filter,
       xs_path=args.xs,
       trace_dir=simFrontendTraceDir if args.sim_frontend else "",
+      benchmarks=args.benchmarks
       #both time and coverage are taken into account, but to be evaluated
       # sorted_by=lambda x: -(x.eval_run_time * float(x.weight))
     )
