@@ -49,7 +49,7 @@ for ((i=0; i<runner_count; i++)); do
 
     # Send commands
     tmux send-keys -t "$pane_target" "cd '$runner_dir'" C-m
-    tmux send-keys -t "$pane_target" "proxychains ./run.sh" C-m
+    tmux send-keys -t "$pane_target" "proxychains -q ./run.sh" C-m
 
 done
 

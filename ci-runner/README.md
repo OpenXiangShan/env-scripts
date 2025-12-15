@@ -17,12 +17,12 @@ export RUNNER_FILE=~/actions-runner-linux-x64-2.329.0.tar.gz
 ```
 在 Open 服务器上：
 ```shell
-./xstop ./create_runners.sh -r xs -d /local/ci-runner -n 6
+~/xstop ~/env-scripts/ci-runner/create_runners.sh -r xs -d /local/ci-runner -n 6
 ```
 在 Node 服务器上：
 ```shell
-./xstop ./create_runners.sh -r xs -d /home/cirunner -n 10
-./xstop ./create_runners.sh -r xs-eda -d $HOME/ci-runner-xs-eda -n 4
+~/xstop ~/env-scripts/ci-runner/create_runners.sh -r xs -d /home/cirunner -n 10
+~/xstop ~/env-scripts/ci-runner/create_runners.sh -r xs-eda -d $HOME/ci-runner-xs-eda -n 4
 ```
 
 ## 批量启动 runners
@@ -31,12 +31,12 @@ export RUNNER_FILE=~/actions-runner-linux-x64-2.329.0.tar.gz
 ### 实例
 在 Open 服务器上：
 ```shell
-./xstop ./start_runners.sh -r xs -d /local/ci-runner -n 6
+~/xstop ~/env-scripts/ci-runner/start_runners.sh -r xs -d /local/ci-runner -n 6
 ```
 在 Node 服务器上：
 ```shell
-./xstop ./start_runners.sh -r xs -d /home/cirunner -n 10
-./xstop ./start_runners.sh -r xs-eda -d $HOME/ci-runner-xs-eda -n 4
+~/xstop ~/env-scripts/ci-runner/start_runners.sh -r xs -d /home/cirunner -n 10
+~/xstop ~/env-scripts/ci-runner/start_runners.sh -r xs-eda -d $HOME/ci-runner-xs-eda -n 4
 ```
 
 
@@ -46,11 +46,11 @@ export RUNNER_FILE=~/actions-runner-linux-x64-2.329.0.tar.gz
 ### 实例
 在 Open 服务器上：
 ```shell
-./xstop ./stop_runners.sh -r xs -d /local/ci-runner -n 6
+~/xstop ~/env-scripts/ci-runner/stop_runners.sh -r xs -d /local/ci-runner -n 6
 ```
 在 Node 服务器上：
 ```shell
-./xstop ./stop_runners.sh -r xs -d /home/cirunner -n 10
-./xstop ./stop_runners.sh -r xs-eda -d $HOME/ci-runner-xs-eda -n 4
+~/xstop ~/env-scripts/ci-runner/stop_runners.sh -r xs -d /home/cirunner -n 10
+~/xstop ~/env-scripts/ci-runner/stop_runners.sh -r xs-eda -d $HOME/ci-runner-xs-eda -n 4
 ```
 
