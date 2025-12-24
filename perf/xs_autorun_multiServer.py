@@ -128,7 +128,7 @@ def load_all_gcpt(gcpt_path, json_path, server_num, threads, state_filter=None, 
 
 def get_server(server_list):
   l = []
-  for s in server_list.strip().split(" "):
+  for s in server_list.replace(" ", "").split(","):
     l.append(Server(s))
   return l
 
@@ -435,7 +435,7 @@ if __name__ == "__main__":
     args.server_list = socket.gethostname()
     server_num = 1
   else:
-    server_num = len(args.server_list.strip().split(" "))
+    server_num = len(args.server_list.replace(" ", "").split(","))
 
   if args.show:
     gcpt = load_all_gcpt(args.gcpt_path, args.json_path, server_num, args.threads, xs_path=args.xs, benchmarks=args.benchmarks)
