@@ -475,9 +475,9 @@ def xs_report(gcpt_path, data_path, all_gcpt, xs_path, spec_version, isa, num_jo
             print(
                 "[WARNING] No DRAMSIM3 config found! Please check whether DRAMSIM3 is enabled correctly."
             )
+    print(f"Data Directory     : {os.path.realpath(data_path)}")
     print(f"Minimal Coverage   : {present_minimal_coverage:.2f}/{expected_minimal_coverage:.2f}")
     print(f"Checkpoints Number : {present_checkpoints_num}/{expected_checkpoints_num}")
-    print(f"Data Directory     : {os.path.realpath(data_path)}")
     print()
 
 def xs_show(all_gcpt):
