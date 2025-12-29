@@ -192,7 +192,7 @@ class Server(object):
         self.pending_proc.append((test_name, proc, (start, end)))
         if len(self.pending_proc) > (server_cores // threads):
             print(
-                f"Server {self.ipname} has more than {len(self.pending_proc)} proc. Is it OK?"
+                f"Server {self.host_name} has more than {len(self.pending_proc)} proc. Is it OK?"
             )
         return True
 
