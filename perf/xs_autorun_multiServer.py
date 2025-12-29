@@ -24,6 +24,7 @@ simFrontendTraceDir = "/nfs/home/wangzhizun/anzo/xs-env/NEMU/trace/2025-09-10_13
 emuArgR = "/nfs/home/share/liyanqin/old-gcpt-restorer/gcpt.bin"
 
 ref_run_time_path = "/nfs/home/share/liyanqin/env-scripts/perf/json/gcc12o3-incFpcOff-jeMalloc-time.json"
+# "expected" is facing the total in the JSON file regardless of filtering
 expected_checkpoints_num = 0
 expected_minimal_coverage = 1
 
@@ -403,7 +404,7 @@ def xs_report_ipc(xs_path, gcpt_queue, result_queue):
             print("IPC not found in", gcpt.benchspec, gcpt.point, gcpt.weight)
 
 
-def xs_report(gcpt_path, data_path, all_gcpt, xs_path, spec_version, isa, num_jobs, json_path=None):
+def xs_report(gcpt_path, all_gcpt, xs_path, spec_version, isa, num_jobs, json_path=None):
     global expected_checkpoints_num
     global expected_minimal_coverage
     present_checkpoints_num = 0
@@ -478,7 +479,7 @@ def xs_report(gcpt_path, data_path, all_gcpt, xs_path, spec_version, isa, num_jo
             print(
                 "[WARNING] No DRAMSIM3 config found! Please check whether DRAMSIM3 is enabled correctly."
             )
-    print(f"Data Directory     : {os.path.realpath(data_path)}")
+    print(f"Data Directory     : {os.path.realpath(tasks_dir)}")
     print(f"Minimal Coverage   : {present_minimal_coverage:.2f}/{expected_minimal_coverage:.2f}")
     print(f"Checkpoints Number : {present_checkpoints_num}/{expected_checkpoints_num}")
     print()
@@ -663,7 +664,7 @@ if __name__ == "__main__":
             report=True,
             benchmarks=args.benchmarks,
         )
-        xs_report(args.gcpt_path, args.dir, gcpt, args.ref, args.version, args.isa, args.jobs, args.json_path)
+        xs_report(args.gcpt_path, gcpt, args.ref, args.version, args.isa, args.jobs, args.json_path)
     else:
         state_filter = None
         print("RESUME:", args.resume)
