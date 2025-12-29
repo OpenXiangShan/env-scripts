@@ -45,6 +45,8 @@ class Server(object):
         # Handle multi-process by using an atomic lock directory and tmp rename.
         if not emu_path:
             return
+        if not os.path.isfile(emu_path):
+            raise FileNotFoundError(f"emu_path is not a file: {emu_path}")
 
         remote_test_cmd = self.remote_cmd + [
             "bash",
@@ -93,21 +95,11 @@ class Server(object):
                 ]
                 subprocess.run(remote_mkdir, check=True)
 
-                # Copy to tmp path on remote via rsync, then atomically move into place
-                is_dir = os.path.isdir(emu_path)
-                if is_dir:
-                    # Ensure tmp directory exists on remote for directory sync
-                    remote_tmp_mkdir = self.remote_cmd + [
-                        "bash",
-                        "-lc",
-                        f"mkdir -p {shlex.quote(tmp_path)}",
-                    ]
-                    subprocess.run(remote_tmp_mkdir, check=True)
-
+                # emu_path is a file: copy via rsync, then atomically move into place
                 rsync_cmd = [
                     "rsync",
                     "-a",
-                    emu_path if not is_dir else os.path.join(emu_path, ""),
+                    emu_path,
                     f"{self.host_name}:{tmp_path}",
                 ]
                 subprocess.run(rsync_cmd, check=True)
