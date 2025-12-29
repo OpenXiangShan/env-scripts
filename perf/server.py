@@ -165,7 +165,13 @@ class Server(object):
         dry_run=False,
         verbose=True,
     ):
-        self.initialize(emu_path=cmd[0])
+        try:
+            self.initialize(emu_path=cmd[0])
+        except RuntimeError as e:
+            # Record initialization failure for this test instead of crashing the whole program.
+            print(f"[ERROR] Failed to initialize emu for test '{test_name}': {e}")
+            self.failed_tests.append(test_name)
+            return False
         self.check_running()
         try:
             (free, mem, start, end, server_cores) = self.remote_get_free_cores(threads)
