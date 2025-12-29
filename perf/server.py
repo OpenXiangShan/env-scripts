@@ -1,40 +1,16 @@
 import os
 import subprocess
 import time
-import getpass
 import ast
-import requests
-from sshconf import read_ssh_config
-import os.path as osp
-import numpy as np
+import shlex
 
 
 class Server(object):
     glance_port = 61208
 
-    def __init__(self, node_name, verbose=False):
-        ssh_conf_file = osp.expanduser("~/.ssh/config")
-        openssh_config_exist = osp.exists(ssh_conf_file)
-        if openssh_config_exist:
-            ssh_conf = read_ssh_config(ssh_conf_file)
-            host_conf = ssh_conf.host(node_name)
-            found_node_name_in_ssh = "hostname" in host_conf
-        else:
-            found_node_name_in_ssh = False
-
-        if openssh_config_exist and found_node_name_in_ssh:
-            if verbose:
-                print(host_conf)
-            self.ip = host_conf["hostname"]
-            self.ipname = node_name
-            self.username = getpass.getuser()
-            self.remote_cmd = ["ssh", node_name]
-        else:
-            self.ip = node_name
-            self.ipname = node_name
-            self.username = getpass.getuser()
-            self.remote_cmd = ["ssh", f"{self.username}@{self.ip}"]
-
+    def __init__(self, host_name, verbose=False):
+        self.host_name = host_name
+        self.remote_cmd = ["ssh", host_name]
         self.failed_tests = []
         self.success_tests = []
         self.pending_proc = []
@@ -51,7 +27,7 @@ class Server(object):
             return cmd
         return ["numactl", "-m", f"{str(mem)}", "-C", f"{start}-{end}"] + cmd
 
-    def remote_get_free_cores_ssh(self, threads):
+    def remote_get_free_cores(self, threads):
         pwd = os.path.dirname(os.path.abspath(__file__))
         cmd = ["python3", f"{pwd}/get_free_core.py", f"{threads}"]
         ssh_cmd_str = " ".join(self.remote_cmd + cmd)
@@ -64,58 +40,119 @@ class Server(object):
         # (free, mem, start, end, server_cores)
         return result
 
-    def remote_get_free_cores_glance(self, threads, verbose=False):
-        # curl http://localhost:61208/api/4/core
-        # return: {"log": 4, "phys": 2}
-        if verbose:
-            print("url:", f"http://{self.ip}:{Server.glance_port}/api/4/core")
-        core_info = requests.get(
-            f"http://{self.ip}:{Server.glance_port}/api/4/core"
-        ).json()
-        num_phys_cores = core_info["phys"]
-        num_log_cores = core_info["log"]
-        has_smt = num_phys_cores * 2 == num_log_cores
+    def initialize(self, emu_path):
+        # Ensure remote host has the required emu_path; if missing, copy it.
+        # Handle multi-process by using an atomic lock directory and tmp rename.
+        if not emu_path:
+            return
 
-        num_windows = num_phys_cores // threads
-        rand_windows = np.random.permutation(
-            num_windows
-        )  # use random windows to avoid unexpected waiting on a free window
-        window_usage_thres = 20 * threads
+        remote_test_cmd = self.remote_cmd + [
+            "bash",
+            "-lc",
+            f"test -e {shlex.quote(emu_path)} && echo EXISTS || echo MISSING",
+        ]
+        try:
+            res = subprocess.run(
+                remote_test_cmd, capture_output=True, text=True, check=False
+            )
+            exists = res.stdout.strip() == "EXISTS"
+        except Exception:
+            exists = False
 
-        per_core_info = requests.get(
-            f"http://{self.ip}:{Server.glance_port}/api/4/percpu"
-        ).json()
-        # curl http://localhost:61208/api/4/percpu
-        # return:
-        # [{"cpu_number": 0,
-        #   ....
-        #   "idle": 26.2,
-        #   ....
-        #   "system": 4.4,
-        #   "total": 73.8,
-        #   "user": 68.0},
-        # {"cpu_number": 1,
-        #   ....}
-        # ]
+        if exists:
+            return
 
-        for w in rand_windows:
-            window_usage = 0
-            for i in range(threads):
-                core_id = w * threads + i
-                window_usage += per_core_info[core_id]["total"]
-                if has_smt:
-                    smt_sibling = core_id + num_phys_cores
-                    window_usage += per_core_info[smt_sibling]["total"]
-            start = w * threads
-            end = w * threads + threads - 1
-            if window_usage < window_usage_thres:
-                # always assume numa with 2 cpus
-                numa_node = int(start >= (num_phys_cores // 2))
-                return (True, numa_node, start, end, num_phys_cores)
-        return (False, 0, 0, 0, num_phys_cores)
+        lock_path = f"{emu_path}.copy.lock"
+        tmp_path = f"{emu_path}.tmp.{os.getpid()}"
 
-    def remote_get_free_cores(self, threads):
-        return self.remote_get_free_cores_ssh(threads)
+        acquire_lock_cmd = self.remote_cmd + [
+            "bash",
+            "-lc",
+            (
+                "umask 077; LOCK="
+                + shlex.quote(lock_path)
+                + '; if mkdir "$LOCK" 2>/dev/null; then echo ACQUIRED; else echo BLOCKED; fi'
+            ),
+        ]
+        lock_state = "BLOCKED"
+        try:
+            lr = subprocess.run(
+                acquire_lock_cmd, capture_output=True, text=True, check=False
+            )
+            lock_state = lr.stdout.strip() or "BLOCKED"
+        except Exception:
+            lock_state = "BLOCKED"
+
+        if lock_state == "ACQUIRED":
+            try:
+                # Ensure remote parent directory exists
+                remote_mkdir = self.remote_cmd + [
+                    "bash",
+                    "-lc",
+                    f"mkdir -p {shlex.quote(os.path.dirname(emu_path) or '.')}",
+                ]
+                subprocess.run(remote_mkdir, check=True)
+
+                # Copy to tmp path on remote via rsync, then atomically move into place
+                is_dir = os.path.isdir(emu_path)
+                if is_dir:
+                    # Ensure tmp directory exists on remote for directory sync
+                    remote_tmp_mkdir = self.remote_cmd + [
+                        "bash",
+                        "-lc",
+                        f"mkdir -p {shlex.quote(tmp_path)}",
+                    ]
+                    subprocess.run(remote_tmp_mkdir, check=True)
+
+                rsync_cmd = [
+                    "rsync",
+                    "-a",
+                    emu_path if not is_dir else os.path.join(emu_path, ""),
+                    f"{self.host_name}:{tmp_path}",
+                ]
+                subprocess.run(rsync_cmd, check=True)
+
+                remote_mv = self.remote_cmd + [
+                    "bash",
+                    "-lc",
+                    f"mv -f {shlex.quote(tmp_path)} {shlex.quote(emu_path)}",
+                ]
+                subprocess.run(remote_mv, check=True)
+            finally:
+                # Always release lock
+                remote_unlock = self.remote_cmd + [
+                    "bash",
+                    "-lc",
+                    f"rmdir {shlex.quote(lock_path)} 2>/dev/null || true",
+                ]
+                subprocess.run(remote_unlock, check=False)
+        else:
+            # Another process is copying; wait until path exists or lock disappears
+            deadline = time.time() + 300  # 5 minutes timeout
+            while time.time() < deadline:
+                check_cmd = self.remote_cmd + [
+                    "bash",
+                    "-lc",
+                    f"test -e {shlex.quote(emu_path)} && echo EXISTS || echo WAIT",
+                ]
+                cr = subprocess.run(
+                    check_cmd, capture_output=True, text=True, check=False
+                )
+                if (cr.stdout.strip() or "").startswith("EXISTS"):
+                    break
+                time.sleep(1)
+
+        # Final verify
+        final_check = self.remote_cmd + [
+            "bash",
+            "-lc",
+            f"test -e {shlex.quote(emu_path)} && echo OK || echo FAIL",
+        ]
+        fr = subprocess.run(final_check, capture_output=True, text=True, check=False)
+        if fr.stdout.strip() != "OK":
+            raise RuntimeError(
+                f"Failed to ensure emu_path on {self.host_name}: {emu_path}"
+            )
 
     def assign(
         self,
@@ -128,12 +165,12 @@ class Server(object):
         dry_run=False,
         verbose=True,
     ):
+        self.initialize(emu_path=cmd[0])
         self.check_running()
         try:
             (free, mem, start, end, server_cores) = self.remote_get_free_cores(threads)
         except:
             (free, mem, start, end, server_cores) = (False, 0, 0, 0, 0)
-        # print(free, mem, start, end, server_cores)
         if not free:
             return False
         for running in self.pending_proc:
