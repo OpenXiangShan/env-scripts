@@ -49,6 +49,9 @@ def load_all_gcpt(
     global expected_checkpoints_num
     global expected_minimal_coverage
 
+    # Reset expected values at the start of each call to avoid accumulation
+    expected_checkpoints_num = 0
+    expected_minimal_coverage = 1
     perf_filter = [
         ("l3cache_mpki_load", lambda x: float(x) < 3),
         ("branch_prediction_mpki", lambda x: float(x) > 5),
