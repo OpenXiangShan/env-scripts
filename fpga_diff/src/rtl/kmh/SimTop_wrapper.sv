@@ -158,6 +158,7 @@ output io_riscv_halt_0,
 output io_riscv_halt_1,
 
 input          difftest_ref_clock,
+               difftest_pcie_clock,
                difftest_to_host_axis_ready,
 output         difftest_to_host_axis_valid,
 output [511:0] difftest_to_host_axis_bits_data,
@@ -342,6 +343,7 @@ SimTop  u_XSTop(
 
   //difftest
   .difftest_ref_clock              (difftest_ref_clock),
+  .difftest_pcie_clock             (difftest_pcie_clock),
   .difftest_to_host_axis_ready     (difftest_to_host_axis_ready),
   .difftest_to_host_axis_valid     (difftest_to_host_axis_valid),
   .difftest_to_host_axis_bits_data (difftest_to_host_axis_bits_data),

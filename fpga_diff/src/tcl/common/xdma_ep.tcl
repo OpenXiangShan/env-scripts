@@ -128,6 +128,7 @@ if { $bCheckIPs == 1 } {
     set list_check_ips "\ 
     xilinx.com:ip:axis_clock_converter:1.1\
     xilinx.com:ip:axis_dwidth_converter:1.1\
+    xilinx.com:ip:proc_sys_reset:5.0\
     xilinx.com:ip:util_ds_buf:2.2\
     xilinx.com:ip:xdma:4.2\
     "
@@ -135,6 +136,7 @@ if { $bCheckIPs == 1 } {
     set list_check_ips "\ 
     xilinx.com:ip:axis_clock_converter:1.1\
     xilinx.com:ip:axis_dwidth_converter:1.1\
+    xilinx.com:ip:proc_sys_reset:5.0\
     xilinx.com:ip:util_ds_buf:2.1\
     xilinx.com:ip:xdma:4.1\
     "
@@ -203,7 +205,6 @@ proc create_root_design { parentCell } {
   # Create interface ports
   set S00_AXIS_0 [ create_bd_intf_port -mode Slave -vlnv xilinx.com:interface:axis_rtl:1.0 S00_AXIS_0 ]
   set_property -dict [ list \
-   CONFIG.FREQ_HZ {50000000} \
    CONFIG.HAS_TKEEP {1} \
    CONFIG.HAS_TLAST {1} \
    CONFIG.HAS_TREADY {1} \
@@ -219,7 +220,7 @@ proc create_root_design { parentCell } {
   set_property -dict [ list \
    CONFIG.ADDR_WIDTH {32} \
    CONFIG.DATA_WIDTH {32} \
-   CONFIG.FREQ_HZ {50000000} \
+   CONFIG.FREQ_HZ {25000000} \
    CONFIG.HAS_BURST {0} \
    CONFIG.HAS_CACHE {0} \
    CONFIG.HAS_LOCK {0} \
@@ -232,11 +233,6 @@ proc create_root_design { parentCell } {
 
 
   # Create ports
-  set cpu_clk [ create_bd_port -dir I -type clk -freq_hz 50000000 cpu_clk ]
-  set_property -dict [ list \
-   CONFIG.ASSOCIATED_BUSIF {S00_AXIS_0:XDMA_AXI_LITE} \
-   CONFIG.ASSOCIATED_RESET {cpu_rstn} \
- ] $cpu_clk
   set cpu_rstn [ create_bd_port -dir I -type rst cpu_rstn ]
   set pci_exp_rxn [ create_bd_port -dir I -from 7 -to 0 pci_exp_rxn ]
   set pci_exp_rxp [ create_bd_port -dir I -from 7 -to 0 pci_exp_rxp ]
@@ -244,15 +240,18 @@ proc create_root_design { parentCell } {
   set pci_exp_txp [ create_bd_port -dir O -from 7 -to 0 pci_exp_txp ]
   set pcie_ep_lnk_up [ create_bd_port -dir O pcie_ep_lnk_up ]
   set pcie_ep_perstn [ create_bd_port -dir I -type rst pcie_ep_perstn ]
+  set TO_DIFFTEST_PCIE_CLK [ create_bd_port -dir O -type clk TO_DIFFTEST_PCIE_CLK ]
+  set_property -dict [ list \
+   CONFIG.ASSOCIATED_BUSIF {S00_AXIS_0} \
+ ] $TO_DIFFTEST_PCIE_CLK
+  set cpu_clk [ create_bd_port -dir I -type clk -freq_hz 25000000 cpu_clk ]
+  set_property -dict [ list \
+   CONFIG.ASSOCIATED_BUSIF {XDMA_AXI_LITE} \
+ ] $cpu_clk
 
   # Create instance: axi_interconnect_0, and set properties
   set axi_interconnect_0 [ create_bd_cell -type ip -vlnv xilinx.com:ip:axi_interconnect:2.1 axi_interconnect_0 ]
-  set_property -dict [ list \
-   CONFIG.NUM_MI {1} \
- ] $axi_interconnect_0
-
-  # Create instance: axis_clock_converter_0, and set properties
-  set axis_clock_converter_0 [ create_bd_cell -type ip -vlnv xilinx.com:ip:axis_clock_converter:1.1 axis_clock_converter_0 ]
+  set_property CONFIG.NUM_MI {1} $axi_interconnect_0
 
   # Create instance: util_ds_buf_0, and set properties
   if {[string match "*2025.1*" $::vivado_version]} {
@@ -260,9 +259,7 @@ proc create_root_design { parentCell } {
   } else {
      set util_ds_buf_0 [ create_bd_cell -type ip -vlnv xilinx.com:ip:util_ds_buf:2.1 util_ds_buf_0 ]
   }
-  set_property -dict [ list \
-   CONFIG.C_BUF_TYPE {IBUFDSGTE} \
- ] $util_ds_buf_0
+  set_property CONFIG.C_BUF_TYPE {IBUFDSGTE} $util_ds_buf_0
 
   # Create instance: xdma_0, and set properties
   if {[string match "*2025.1*" $::vivado_version]} {
@@ -276,12 +273,16 @@ proc create_root_design { parentCell } {
         CONFIG.axilite_master_en {true} \
         CONFIG.axisten_freq {250} \
         CONFIG.cfg_mgmt_if {false} \
+        CONFIG.copy_pf0 {true} \
         CONFIG.en_gt_selection {true} \
+        CONFIG.enable_gtwizard {false} \
         CONFIG.mode_selection {Advanced} \
         CONFIG.pcie_blk_locn {PCIE4C_X0Y4} \
         CONFIG.pf0_device_id {9048} \
         CONFIG.pl_link_cap_max_link_speed {8.0_GT/s} \
         CONFIG.pl_link_cap_max_link_width {X8} \
+        CONFIG.plltype {QPLL1} \
+        CONFIG.runbit_fix {false} \
         CONFIG.select_quad {GTY_Quad_231} \
         CONFIG.xdma_axi_intf_mm {AXI_Stream} \
       ] $xdma_0
@@ -304,44 +305,55 @@ proc create_root_design { parentCell } {
         CONFIG.pf0_msix_cap_table_bir {BAR_1} \
         CONFIG.pl_link_cap_max_link_speed {8.0_GT/s} \
         CONFIG.pl_link_cap_max_link_width {X8} \
-        CONFIG.plltype {QPLL0} \
+        CONFIG.plltype {QPLL1} \
         CONFIG.select_quad {GTY_Quad_231} \
         CONFIG.xdma_axi_intf_mm {AXI_Stream} \
       ] $xdma_0
   }
 
+  # Create instance: proc_sys_reset_0, and set properties
+  set proc_sys_reset_0 [ create_bd_cell -type ip -vlnv xilinx.com:ip:proc_sys_reset:5.0 proc_sys_reset_0 ]
+
   # Create instance: axis_dwidth_converter_0, and set properties
   set axis_dwidth_converter_0 [ create_bd_cell -type ip -vlnv xilinx.com:ip:axis_dwidth_converter:1.1 axis_dwidth_converter_0 ]
+  set_property CONFIG.M_TDATA_NUM_BYTES {32} $axis_dwidth_converter_0
+
+  # Create instance: axis_clock_converter_0, and set properties
+  set axis_clock_converter_0 [ create_bd_cell -type ip -vlnv xilinx.com:ip:axis_clock_converter:1.1 axis_clock_converter_0 ]
 
   # Create interface connections
   connect_bd_intf_net -intf_net CLK_IN_D_0_1 [get_bd_intf_ports pcie_ep_gt_ref] [get_bd_intf_pins util_ds_buf_0/CLK_IN_D]
-  connect_bd_intf_net -intf_net S00_AXIS_0_1 [get_bd_intf_ports S00_AXIS_0] [get_bd_intf_pins axis_dwidth_converter_0/S_AXIS]
+  connect_bd_intf_net -intf_net S00_AXIS_0_1 [get_bd_intf_ports S00_AXIS_0] [get_bd_intf_pins axis_clock_converter_0/S_AXIS]
   connect_bd_intf_net -intf_net axi_interconnect_0_M00_AXI [get_bd_intf_ports XDMA_AXI_LITE] [get_bd_intf_pins axi_interconnect_0/M00_AXI]
-  connect_bd_intf_net -intf_net axis_clock_converter_0_M_AXIS [get_bd_intf_pins axis_clock_converter_0/M_AXIS] [get_bd_intf_pins xdma_0/S_AXIS_C2H_0]
-  connect_bd_intf_net -intf_net axis_dwidth_converter_0_M_AXIS [get_bd_intf_pins axis_dwidth_converter_0/M_AXIS] [get_bd_intf_pins axis_clock_converter_0/S_AXIS]
+  connect_bd_intf_net -intf_net axis_clock_converter_0_M_AXIS [get_bd_intf_pins axis_dwidth_converter_0/S_AXIS] [get_bd_intf_pins axis_clock_converter_0/M_AXIS]
+  connect_bd_intf_net -intf_net axis_dwidth_converter_0_M_AXIS [get_bd_intf_pins axis_dwidth_converter_0/M_AXIS] [get_bd_intf_pins xdma_0/S_AXIS_C2H_0]
   connect_bd_intf_net -intf_net xdma_0_M_AXI_LITE [get_bd_intf_pins xdma_0/M_AXI_LITE] [get_bd_intf_pins axi_interconnect_0/S00_AXI]
 
   # Create port connections
   connect_bd_net -net ARESETN_1  [get_bd_pins xdma_0/axi_aresetn] \
   [get_bd_pins axi_interconnect_0/ARESETN] \
   [get_bd_pins axi_interconnect_0/S00_ARESETN] \
-  [get_bd_pins axis_clock_converter_0/m_axis_aresetn]
+  [get_bd_pins axis_clock_converter_0/m_axis_aresetn] \
+  [get_bd_pins axis_dwidth_converter_0/aresetn]
   connect_bd_net -net M00_AXIS_ACLK_1  [get_bd_pins xdma_0/axi_aclk] \
+  [get_bd_ports TO_DIFFTEST_PCIE_CLK] \
   [get_bd_pins axi_interconnect_0/ACLK] \
   [get_bd_pins axi_interconnect_0/S00_ACLK] \
-  [get_bd_pins axis_clock_converter_0/m_axis_aclk]
-  connect_bd_net -net core_clk_0_1  [get_bd_ports cpu_clk] \
-  [get_bd_pins axi_interconnect_0/M00_ACLK] \
   [get_bd_pins axis_clock_converter_0/s_axis_aclk] \
+  [get_bd_pins axis_clock_converter_0/m_axis_aclk] \
   [get_bd_pins axis_dwidth_converter_0/aclk]
+  connect_bd_net -net cpu_clk_1  [get_bd_ports cpu_clk] \
+  [get_bd_pins axi_interconnect_0/M00_ACLK] \
+  [get_bd_pins proc_sys_reset_0/slowest_sync_clk]
   connect_bd_net -net m_axis_c2h_aresetn_0_1  [get_bd_ports cpu_rstn] \
   [get_bd_pins axi_interconnect_0/M00_ARESETN] \
-  [get_bd_pins axis_clock_converter_0/s_axis_aresetn] \
-  [get_bd_pins axis_dwidth_converter_0/aresetn]
+  [get_bd_pins proc_sys_reset_0/ext_reset_in]
   connect_bd_net -net pci_exp_rxn_0_1  [get_bd_ports pci_exp_rxn] \
   [get_bd_pins xdma_0/pci_exp_rxn]
   connect_bd_net -net pci_exp_rxp_0_1  [get_bd_ports pci_exp_rxp] \
   [get_bd_pins xdma_0/pci_exp_rxp]
+  connect_bd_net -net proc_sys_reset_0_interconnect_aresetn  [get_bd_pins proc_sys_reset_0/interconnect_aresetn] \
+  [get_bd_pins axis_clock_converter_0/s_axis_aresetn]
   connect_bd_net -net sys_rst_n_0_1  [get_bd_ports pcie_ep_perstn] \
   [get_bd_pins xdma_0/sys_rst_n]
   connect_bd_net -net util_ds_buf_0_IBUF_DS_ODIV2  [get_bd_pins util_ds_buf_0/IBUF_DS_ODIV2] \
