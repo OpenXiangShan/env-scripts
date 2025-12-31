@@ -20,12 +20,10 @@ import numpy as np
 
 percpu_use_thres = 30
 
-
 def numa_count():
     node_dir = "/sys/devices/system/node/"
     nodes = [node for node in os.listdir(node_dir) if node.startswith("node")]
     return len(nodes)
-
 
 def get_unset_cores(cpu_count=None, core_usage=None) -> list[int]:
     # FIXME: SMT is not considered temporaryly
@@ -49,13 +47,11 @@ def get_unset_cores(cpu_count=None, core_usage=None) -> list[int]:
     unset_cores = [cpu for cpu, count in cpu_affinity_count.items() if count == 0]
     return unset_cores
 
-
 def get_free_cores(n):
     # SMT is not allowed
     num_core = psutil.cpu_count(logical=False)
     core_usage = psutil.cpu_percent(interval=5, percpu=True)
     unset_cores = get_unset_cores(num_core, core_usage)
-    # print(f"Core Count: {num_core}\nCore Usage: {core_usage}\nUnset Cores: {unset_cores}")
     num_window = num_core // n
     numa_node = numa_count()  # default 2
     # use random windows to avoid unexpected waiting on a free window
@@ -63,8 +59,6 @@ def get_free_cores(n):
     for i in rand_windows:
         window_cores = range(i * n, i * n + n)
         window_usage = core_usage[i * n : i * n + n]
-        # print(f"Window{i} Usage: ", window_usage)
-        # 5950x only allow 1 emu
 
         # average unsage of window_cores less than percpu_use_thres
         cond1 = sum(window_usage) < percpu_use_thres * n
@@ -84,8 +78,6 @@ def get_free_cores(n):
                 num_core,
             )
     return (False, 0, 0, 0, num_core)
-    # print(f"No free {n} cores found. CPU usage: {core_usage}\n")
-
 
 def is_epyc():
     num_core = psutil.cpu_count(logical=False)
@@ -112,18 +104,19 @@ class Server:
                     "python3",
                     "-c",
                     shlex.quote(
-                        GET_FREE_CORE_SCRIPT + f"\nprint(get_free_cores(${threads}))"
+                        GET_FREE_CORE_SCRIPT + f"\nprint(get_free_cores({threads}))"
                     ),
                 ],
                 check=True,
             )
-        except Exception:
+        except Exception as e:
+            print(e)
             return FreeCoreInfo(False, 0, 0, 0, 0)
 
         if p.stdout is None:
             return FreeCoreInfo(False, 0, 0, 0, 0)
 
-        result = p.stdout.read().strip()
+        result = p.stdout.read().decode().strip()
         if len(result) == 0:
             return FreeCoreInfo(False, 0, 0, 0, 0)
 
@@ -163,18 +156,29 @@ class Server:
         stderr: int | IO[Any] = subprocess.PIPE,
         block: bool = True,
         check: bool = False,
-        **kwargs: Any,
     ):
         p = subprocess.Popen(
             ["ssh", self.hostname] + cmd,
             stdout=stdout,
             stderr=stderr,
-            **kwargs,
         )
         if block or check:
             p.wait()
         if check and p.returncode != 0:
-            raise RuntimeError(f"Remote command failed: {' '.join(cmd)}")
+            raise RuntimeError(
+                f"Remote command failed({p.returncode})\n"
+                + f"=== Command ===\n{' '.join(cmd)}\n"
+                + (
+                    f"=== stdout ===\n{p.stdout.read().decode()}\n"
+                    if p.stdout is not None
+                    else ""
+                )
+                + (
+                    f"=== stderr ===\n{p.stderr.read().decode()}\n"
+                    if p.stderr is not None
+                    else ""
+                )
+            )
         return p
 
     def run_gcpt(
@@ -183,6 +187,7 @@ class Server:
         emu_config: EmuConfig,
         free_cores: FreeCoreInfo,
     ):
+        os.makedirs(gcpt.get_res_dir(), exist_ok=True)
         with (
             open(gcpt.get_out_path(), "w", encoding="utf-8") as fout,
             open(gcpt.get_err_path(), "w", encoding="utf-8") as ferr,
@@ -240,7 +245,7 @@ class Server:
             ],
         )
 
-        if p.stdout is not None and p.stdout.read().strip() == "EXISTS":
+        if p.stdout is not None and p.stdout.read().decode().strip() == "EXISTS":
             return
 
         lock_path = f"{emu_path}.copy.lock"
@@ -261,7 +266,7 @@ class Server:
                 check=True,
             )
             if lr.stdout is not None:
-                lock_state = lr.stdout.read().strip() or "BLOCKED"
+                lock_state = lr.stdout.read().decode().strip() or "BLOCKED"
         except Exception:
             lock_state = "BLOCKED"
 
@@ -316,7 +321,9 @@ class Server:
                         f"test -e {shlex.quote(emu_path)} && echo EXISTS || echo WAIT",
                     ]
                 )
-                if cr.stdout is None or cr.stdout.read().strip().startswith("EXISTS"):
+                if cr.stdout is None or cr.stdout.read().decode().strip().startswith(
+                    "EXISTS"
+                ):
                     break
                 time.sleep(1)
 
@@ -328,7 +335,7 @@ class Server:
                 f"test -e {shlex.quote(emu_path)} && echo OK || echo FAIL",
             ],
         )
-        if fr.stdout is None or fr.stdout.read().strip() != "OK":
+        if fr.stdout is None or fr.stdout.read().decode().strip() != "OK":
             raise RuntimeError(
                 f"Failed to ensure emu_path on {self.hostname}: {emu_path}"
             )
