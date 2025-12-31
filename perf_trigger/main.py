@@ -208,7 +208,7 @@ def main():
     args = parser.parse_args()
 
     # pre-checks
-    if not os.path.isfile(args.gcpt_path):
+    if not os.path.isdir(args.gcpt_path):
         raise FileNotFoundError(f"gcpt_path is not a file: {args.gcpt_path}")
     if not os.path.isfile(args.json_path):
         raise FileNotFoundError(f"json_path is not a file: {args.json_path}")
