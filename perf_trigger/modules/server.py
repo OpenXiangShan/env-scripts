@@ -191,7 +191,33 @@ class Server:
         emu_config: EmuConfig,
         free_cores: FreeCoreInfo,
     ):
-        os.makedirs(gcpt.get_result_dir(), exist_ok=True)
+        os.makedirs(gcpt.get_result_path(), exist_ok=True)
+
+        # find binary
+        gcpt_path = gcpt.get_bin_path()
+        p = self.run(
+            [
+                "ls",
+                shlex.quote(gcpt_path),
+            ]
+        )
+        if p.returncode != 0 or p.stdout is None:
+            print("[ERROR] Failed to find gcpt binary:", gcpt_path)
+            return
+
+        gcpt_file = [f.strip() for f in p.stdout.read().decode().split()]
+        gcpt_file = [
+            f
+            for f in gcpt_file
+            if f.endswith(".gz") or f.endswith(".zstd") or f.endswith(".bin")
+        ]
+        if len(gcpt_file) == 0:
+            print("[ERROR] Failed to find gcpt binary:", gcpt_path)
+            return
+        elif len(gcpt_file) > 1:
+            print("[WARNING] Multiple gcpt binaries found, using the first one.")
+        gcpt_file = gcpt_file[0]
+
         with (
             open(gcpt.get_stdout_path(), "w", encoding="utf-8") as fout,
             open(gcpt.get_stderr_path(), "w", encoding="utf-8") as ferr,
@@ -217,7 +243,7 @@ class Server:
                     "-r",
                     GCPT_RESTORER,
                     "-i",
-                    shlex.quote(gcpt.get_bin_path()),
+                    shlex.quote(os.path.join(gcpt_path, gcpt_file)),
                     "-s",
                     str(random.randint(0, 9999)),
                 ]
@@ -230,7 +256,7 @@ class Server:
                 stderr=ferr,
                 block=False,
             )
-        self.pending_task.append(PendingTask(proc=p, name=gcpt.get_bin_path()))
+        self.pending_task.append(PendingTask(proc=p, name=str(gcpt)))
         time.sleep(10)  # wait for a while to let emu process start properly
 
     def stop(self):

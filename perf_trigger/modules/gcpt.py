@@ -28,17 +28,9 @@ class GCPT:
         return "_".join([self.benchmark, self.checkpoint, str(self.weight)])
 
     def get_bin_path(self) -> str:
-        bin_dir = os.path.join(self.gcpt_path, self.benchmark, str(self.checkpoint))
-        bin_file = list(os.listdir(bin_dir))
-        if len(bin_file) != 1:
-            print(bin_file)
-        bin_file = list(filter(lambda x: x != "_0_0.000000_.gz", bin_file))
-        assert len(bin_file) == 1
-        bin_path = os.path.join(bin_dir, bin_file[0])
-        assert os.path.isfile(bin_path)
-        return bin_path
+        return os.path.join(self.gcpt_path, self.benchmark, self.checkpoint)
 
-    def get_result_dir(self):
+    def get_result_path(self):
         return self.result_path
 
     def get_stdout_path(self):
