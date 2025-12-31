@@ -6,7 +6,6 @@ import subprocess
 class EmuConfig:
     """Configuration for emu runs"""
 
-    nemu_so_path: str | None  # if None, difftest will be disabled
     warmup: int
     max_instr: int
     threads: int
