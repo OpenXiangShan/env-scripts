@@ -154,7 +154,7 @@ class XiangShan:
                 print(f"- {gcpt}")
 
     def report(self):
-        pass
+        raise NotImplementedError("use xs_autorun_multiServer.py instead")
 
 
 def main():
