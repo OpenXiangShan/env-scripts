@@ -1,9 +1,13 @@
 import argparse
-import random
-from tqdm import tqdm
 import json
-from gcpt import GCPT
 import os
+import random
+import time
+from tqdm import tqdm
+
+from gcpt import GCPT
+from server import Server
+from perf.perf_trigger.types import EmuConfig
 
 SERVER_POOL = [
     "node003",
@@ -55,33 +59,19 @@ SERVER_POOL = [
     "open26",
     "open27",
 ]
-NEMU_DIFF_SO = None
 REF_RUN_TIME = "/nfs/home/share/liyanqin/env-scripts/perf/json/gcc12o3-incFpcOff-jeMalloc-time.json"
-GCPT_RESTORER = "/nfs/home/share/liyanqin/old-gcpt-restorer/gcpt.bin"
 
 
 class XiangShan:
     def __init__(
         self,
-        gcpt_path: str,
-        json_path: str,
-        emu_path: str,
-        result_path: str,
-        server_list: str,
+        emu_config: EmuConfig,
         benchmarks: str,
-        nemu_so_path: str | None,
-        warmup: int,
-        max_instr: int,
+        server_list: str,
     ):
-        self.gcpt_path = gcpt_path
-        self.json_path = json_path
-        self.emu_path = emu_path
-        self.result_path = result_path
-        self.nemu_so_path = nemu_so_path
-        self.warmup = warmup
-        self.max_instr = max_instr
+        self.emu_config = emu_config
 
-        with open(self.json_path, "r") as f:
+        with open(self.emu_config.json_path, "r", encoding="utf-8") as f:
             self.benchmarks = json.load(f)
         if benchmarks != "":
             benchmark_filter = benchmarks.replace(" ", "").split(",")
@@ -92,22 +82,24 @@ class XiangShan:
             }
 
         if server_list == "all":
-            self.servers = SERVER_POOL
+            server_pool = SERVER_POOL
         elif server_list == "":
-            self.servers = random.sample(SERVER_POOL, k=len(self.benchmarks) // 10 + 1)
+            server_pool = random.sample(SERVER_POOL, k=len(self.benchmarks) // 10 + 1)
         else:
-            self.servers = server_list.replace(" ", "").split(",")
-            for server in self.servers:
+            server_pool = server_list.replace(" ", "").split(",")
+            for server in server_pool:
                 if server not in SERVER_POOL:
                     raise ValueError(f"Server {server} is not in the server pool")
+
+        self.servers = [Server(hostname) for hostname in server_pool]
 
         self.checkpoints = []
         for benchmark_name, benchmark_config in self.benchmarks.items():
             for point, weight in benchmark_config["points"].items():
                 self.checkpoints.append(
                     GCPT(
-                        gcpt_bin_dir=self.gcpt_path,
-                        perf_base_dir=self.result_path,
+                        gcpt_bin_dir=self.emu_config.gcpt_path,
+                        perf_base_dir=self.emu_config.result_path,
                         benchspec=benchmark_name,
                         point=point,
                         weight=weight,
@@ -115,38 +107,59 @@ class XiangShan:
                     )
                 )
 
-        if not os.path.exists(self.result_path):
-            os.makedirs(self.result_path, exist_ok=True)
-
-    def __get_run_command(self, gcpt: GCPT):
-        return [
-            self.emu_path,
-            "--enable-fork",
-            "-W",
-            str(self.warmup),
-            "-I",
-            str(self.max_instr),
-            "-r",
-            GCPT_RESTORER,
-            "-i",
-            gcpt.get_bin_path(),
-            "-s",
-            str(random.randint(0, 9999)),
-        ] + (["--diff", self.nemu_so_path] if self.nemu_so_path else ["--no-diff"])
+        if not os.path.exists(self.emu_config.result_path):
+            os.makedirs(self.emu_config.result_path, exist_ok=True)
 
     def run(self):
-        for gcpt in tqdm(self.checkpoints):
-            command = self.__get_run_command(gcpt)
+        failed_checkpoints = []
 
-    def run_checkpoints(self):
-        pass
+        with (
+            tqdm(total=len(self.checkpoints)) as assigned_bar,
+            tqdm(total=len(self.checkpoints)) as completed_bar,
+        ):
+            for gcpt in self.checkpoints:
+                # check completion
+                for server in self.servers:
+                    success, fail, _ = server.poll()
+                    failed_checkpoints.extend(fail)
+                    completed_bar.update(len(success) + len(fail))
+                # assign task to the first available server
+                for server in self.servers:
+                    free_cores = server.get_free_cores(self.emu_config.threads)
+                    if free_cores.free:
+                        server.run_gcpt(gcpt, self.emu_config, free_cores)
+                        assigned_bar.update(1)
+                        break
+                else:
+                    # no available server, wait and retry
+                    time.sleep(60)
+
+            # wait for all servers to complete
+            pending = True
+            while pending:
+                pending = False
+                for server in self.servers:
+                    success, fail, pending_list = server.poll()
+                    failed_checkpoints.extend(fail)
+                    completed_bar.update(len(success) + len(fail))
+                    if len(pending_list) > 0:
+                        pending = True
+                if pending:
+                    time.sleep(60)
+
+            # report all failed jobs
+        if len(failed_checkpoints) > 0:
+            print("Failed checkpoints:")
+            for gcpt in failed_checkpoints:
+                print(f"- {gcpt}")
 
     def report(self):
         pass
 
 
-if __name__ == "__main__":
+def main():
     parser = argparse.ArgumentParser(description="Performance regression script")
+    # emu
     parser.add_argument(
         "--gcpt-path", type=str, required=True, help="Path to the GCPT checkpoints"
     )
@@ -158,6 +171,17 @@ if __name__ == "__main__":
     parser.add_argument(
         "--result-path", type=str, required=True, help="Path to store the results"
     )
+    parser.add_argument(
+        "--warmup", "-W", default=20000000, type=int, help="warmup instr count"
+    )
+    parser.add_argument(
+        "--max-instr", "-I", default=40000000, type=int, help="max instr count"
+    )
+    parser.add_argument(
+        "--threads", "-T", default=8, type=int, help="number of emu threads"
+    )
+
+    # autorun
     parser.add_argument(
         "--server-list",
         type=str,
@@ -172,10 +196,48 @@ if __name__ == "__main__":
     )
 
     parser.add_argument(
-        "--warmup", "-W", default=20000000, type=int, help="warmup instr count"
+        "--run",
+        action="store_true",
     )
+
     parser.add_argument(
-        "--max-instr", "-I", default=40000000, type=int, help="max instr count"
+        "--report",
+        action="store_true",
     )
 
     args = parser.parse_args()
+
+    # pre-checks
+    if not os.path.isfile(args.gcpt_path):
+        raise FileNotFoundError(f"gcpt_path is not a file: {args.gcpt_path}")
+    if not os.path.isfile(args.json_path):
+        raise FileNotFoundError(f"json_path is not a file: {args.json_path}")
+    if not os.path.isfile(args.emu_path):
+        raise FileNotFoundError(f"emu_path is not a file: {args.emu_path}")
+    if args.nemu_so_path and not os.path.isfile(args.nemu_so_path):
+        raise FileNotFoundError(f"nemu_so_path is not a file: {args.nemu_so_path}")
+
+    os.makedirs(args.result_path, exist_ok=True)
+
+    config = EmuConfig(
+        gcpt_path=args.gcpt_path,
+        json_path=args.json_path,
+        emu_path=args.emu_path,
+        result_path=args.result_path,
+        nemu_so_path=args.nemu_so_path,
+        warmup=args.warmup,
+        max_instr=args.max_instr,
+        threads=args.threads,
+    )
+
+    xiangshan = XiangShan(config, args.benchmarks, args.server_list)
+
+    if args.run:
+        xiangshan.run()
+
+    if args.report:
+        xiangshan.report()
+
+
+if __name__ == "__main__":
+    main()
