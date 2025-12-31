@@ -363,4 +363,6 @@ class Server:
             ],
             check=True,
         )
-        print(f"Copied emu to open server ({target_path}) successfully.")
+        print(
+            f"Copied ({os.path.basename(source_path)}) to open server ({target_path}) successfully."
+        )
