@@ -114,8 +114,8 @@ class XiangShan:
         failed_checkpoints = []
 
         with (
-            tqdm(total=len(self.checkpoints)) as assigned_bar,
-            tqdm(total=len(self.checkpoints)) as completed_bar,
+            tqdm(total=len(self.checkpoints), desc="  Assign") as assigned_bar,
+            tqdm(total=len(self.checkpoints), desc="Complete") as completed_bar,
         ):
             for gcpt in self.checkpoints:
                 # check completion
