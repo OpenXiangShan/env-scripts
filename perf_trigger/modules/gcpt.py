@@ -1,6 +1,5 @@
 from enum import Enum
 import os
-import shutil
 
 
 class GCPT:

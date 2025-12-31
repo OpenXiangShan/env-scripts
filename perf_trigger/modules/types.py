@@ -6,10 +6,6 @@ import subprocess
 class EmuConfig:
     """Configuration for emu runs"""
 
-    gcpt_path: str
-    json_path: str
-    emu_path: str
-    result_path: str
     nemu_so_path: str | None  # if None, difftest will be disabled
     warmup: int
     max_instr: int

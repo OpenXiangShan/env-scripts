@@ -65,13 +65,21 @@ REF_RUN_TIME = "/nfs/home/share/liyanqin/env-scripts/perf/json/gcc12o3-incFpcOff
 class XiangShan:
     def __init__(
         self,
+        gcpt_path: str,
+        json_path: str,
+        result_path: str,
+        emu_path: str,
         emu_config: EmuConfig,
         benchmarks: str,
         server_list: str,
     ):
+        self.gcpt_path = gcpt_path
+        self.json_path = json_path
+        self.result_path = result_path
+        self.emu_path = emu_path
         self.emu_config = emu_config
 
-        with open(self.emu_config.json_path, "r", encoding="utf-8") as f:
+        with open(self.json_path, "r", encoding="utf-8") as f:
             self.benchmarks = json.load(f)
         if benchmarks != "":
             benchmark_filter = benchmarks.replace(" ", "").split(",")
@@ -91,25 +99,38 @@ class XiangShan:
                 if server not in SERVER_POOL:
                     raise ValueError(f"Server {server} is not in the server pool")
 
-        self.servers = [Server(hostname) for hostname in server_pool]
+        self.servers = [Server(hostname, self.emu_path) for hostname in server_pool]
+
+        open_server = [s for s in self.servers if s.hostname.startswith("open")]
+        if open_server:
+            print("Using open servers, initializing emu_path...")
+            open_server[0].initialize_open(
+                self.emu_path,
+                os.path.join(
+                    self.result_path.replace(
+                        "/nfs/home/cirunner", "/nfs/home/ci-runner"
+                    ),
+                    "emu",
+                ),
+            )
 
         self.checkpoints = []
         for benchmark_name, benchmark_config in self.benchmarks.items():
             for point, weight in benchmark_config["points"].items():
                 self.checkpoints.append(
                     GCPT(
-                        gcpt_path=self.emu_config.gcpt_path,
-                        result_path=self.emu_config.result_path,
+                        gcpt_path=self.gcpt_path,
+                        result_path=self.result_path,
                         benchmark=benchmark_name,
                         checkpoint=point,
                         weight=weight,
                     )
                 )
 
-        if not os.path.exists(self.emu_config.result_path):
-            os.makedirs(self.emu_config.result_path, exist_ok=True)
-
     def run(self):
+        print(
+            f"Start Running {len(self.checkpoints)} checkpoints on {len(self.servers)} servers"
+        )
         failed_checkpoints = []
 
         with (
@@ -224,18 +245,20 @@ def main():
 
     os.makedirs(args.result_path, exist_ok=True)
 
-    config = EmuConfig(
+    xiangshan = XiangShan(
         gcpt_path=args.gcpt_path,
         json_path=args.json_path,
-        emu_path=args.emu_path,
         result_path=args.result_path,
-        nemu_so_path=args.nemu_so_path,
-        warmup=args.warmup,
-        max_instr=args.max_instr,
-        threads=args.threads,
+        emu_path=args.emu_path,
+        emu_config=EmuConfig(
+            nemu_so_path=args.nemu_so_path,
+            warmup=args.warmup,
+            max_instr=args.max_instr,
+            threads=args.threads,
+        ),
+        benchmarks=args.benchmarks,
+        server_list=args.server_list,
     )
-
-    xiangshan = XiangShan(config, args.benchmarks, args.server_list)
 
     if args.run:
         xiangshan.run()
