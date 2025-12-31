@@ -86,10 +86,23 @@ class XiangShan:
                 if any(k.startswith(prefix) for prefix in benchmark_filter)
             }
 
+        self.checkpoints = []
+        for benchmark_name, benchmark_config in self.benchmarks.items():
+            for point, weight in benchmark_config["points"].items():
+                self.checkpoints.append(
+                    GCPT(
+                        gcpt_path=gcpt_path,
+                        result_path=result_path,
+                        benchmark=benchmark_name,
+                        checkpoint=point,
+                        weight=weight,
+                    )
+                )
+
         if server_list == "all":
             server_pool = SERVER_POOL
         elif server_list == "":
-            server_pool = random.sample(SERVER_POOL, k=len(self.benchmarks) // 10 + 1)
+            server_pool = random.sample(SERVER_POOL, k=len(self.checkpoints) // 10 + 1)
         else:
             server_pool = server_list.replace(" ", "").split(",")
             for server in server_pool:
@@ -118,19 +131,6 @@ class XiangShan:
             for server in open_server:
                 server.emu_path = target_emu_path
                 server.nemu_so_path = target_nemu_so_path
-
-        self.checkpoints = []
-        for benchmark_name, benchmark_config in self.benchmarks.items():
-            for point, weight in benchmark_config["points"].items():
-                self.checkpoints.append(
-                    GCPT(
-                        gcpt_path=gcpt_path,
-                        result_path=result_path,
-                        benchmark=benchmark_name,
-                        checkpoint=point,
-                        weight=weight,
-                    )
-                )
 
     def run(self):
         print(
