@@ -9,7 +9,7 @@ from typing import IO, Any
 from .gcpt import GCPT
 from .types import EmuConfig, FreeCoreInfo, PendingTask
 
-GCPT_RESTORER = "/nfs/home/share/liyanqin/old-gcpt-restorer/gcpt.bin"
+GCPT_RESTORER = "/nfs/home/share/ci-workloads/old-gcpt-restorer/gcpt.bin"
 
 # NOTE: This script is directly copied from env-scripts/perf/cpuutil.py,
 #       and will be sent to remote servers through stdin.
@@ -280,7 +280,7 @@ class Server:
             ],
         )
         if p.returncode == 0:
-            print(f"Emu already exists on open server ({target_path}), skip copying.")
+            print(f"File already exists on open server ({target_path}), skip copying.")
             return
 
         # Ensure remote parent directory exists
