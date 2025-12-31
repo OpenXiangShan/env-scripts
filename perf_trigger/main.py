@@ -5,9 +5,9 @@ import random
 import time
 from tqdm import tqdm
 
-from gcpt import GCPT
-from server import Server
-from perf.perf_trigger.types import EmuConfig
+from modules.gcpt import GCPT
+from modules.server import Server
+from modules.types import EmuConfig
 
 SERVER_POOL = [
     "node003",
