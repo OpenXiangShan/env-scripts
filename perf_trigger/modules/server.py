@@ -6,8 +6,8 @@ import subprocess
 import time
 from typing import IO, Any
 
-from gcpt import GCPT
-from perf.perf_trigger.types import EmuConfig, FreeCoreInfo, PendingTask
+from .gcpt import GCPT
+from .types import EmuConfig, FreeCoreInfo, PendingTask
 
 GCPT_RESTORER = "/nfs/home/share/liyanqin/old-gcpt-restorer/gcpt.bin"
 
