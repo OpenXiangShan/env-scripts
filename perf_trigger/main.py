@@ -98,12 +98,11 @@ class XiangShan:
             for point, weight in benchmark_config["points"].items():
                 self.checkpoints.append(
                     GCPT(
-                        gcpt_bin_dir=self.emu_config.gcpt_path,
-                        perf_base_dir=self.emu_config.result_path,
-                        benchspec=benchmark_name,
-                        point=point,
+                        gcpt_path=self.emu_config.gcpt_path,
+                        result_path=self.emu_config.result_path,
+                        benchmark=benchmark_name,
+                        checkpoint=point,
                         weight=weight,
-                        gcc12Enable=True,
                     )
                 )
 
@@ -118,6 +117,12 @@ class XiangShan:
             tqdm(total=len(self.checkpoints), desc="Complete") as completed_bar,
         ):
             for gcpt in self.checkpoints:
+                state = gcpt.refresh_state()
+                if state != GCPT.State.NONE:
+                    assigned_bar.update(1)
+                    completed_bar.update(state != GCPT.State.RUNNING)
+                    continue
+
                 # check completion
                 for server in self.servers:
                     success, fail, _ = server.poll()

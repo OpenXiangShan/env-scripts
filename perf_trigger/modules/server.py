@@ -187,10 +187,10 @@ class Server:
         emu_config: EmuConfig,
         free_cores: FreeCoreInfo,
     ):
-        os.makedirs(gcpt.get_res_dir(), exist_ok=True)
+        os.makedirs(gcpt.get_result_dir(), exist_ok=True)
         with (
-            open(gcpt.get_out_path(), "w", encoding="utf-8") as fout,
-            open(gcpt.get_err_path(), "w", encoding="utf-8") as ferr,
+            open(gcpt.get_stdout_path(), "w", encoding="utf-8") as fout,
+            open(gcpt.get_stderr_path(), "w", encoding="utf-8") as ferr,
         ):
             p = self.run(
                 (
