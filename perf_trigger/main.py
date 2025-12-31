@@ -102,7 +102,8 @@ class XiangShan:
         if server_list == "all":
             server_pool = SERVER_POOL
         elif server_list == "":
-            server_pool = random.sample(SERVER_POOL, k=len(self.checkpoints) // 10 + 1)
+            desired_sever_num = min(len(self.checkpoints) // 64 + 1, len(SERVER_POOL))
+            server_pool = random.sample(SERVER_POOL, k=desired_sever_num)
         else:
             server_pool = server_list.replace(" ", "").split(",")
             for server in server_pool:
