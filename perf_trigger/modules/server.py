@@ -89,8 +89,10 @@ class Server:
     def __init__(
         self,
         hostname: str,
+        emu_path: str,
     ):
         self.hostname = hostname
+        self.emu_path = emu_path
         self.pending_task: list[PendingTask] = []
 
     def self_test(self) -> bool:
@@ -142,7 +144,7 @@ class Server:
                 still_pending.append(task)
                 continue
             if result != 0:
-                print(f"[ERROR] {task.name} exist with code {task.proc.returncode}")
+                print(f"[ERROR] {task.name} exits with code {task.proc.returncode}")
                 failed.append(task.name)
             else:
                 success.append(task.name)
@@ -205,7 +207,7 @@ class Server:
                     else []
                 )
                 + [
-                    emu_config.emu_path,
+                    self.emu_path,
                     "-W",
                     str(emu_config.warmup),
                     "-I",
@@ -234,22 +236,33 @@ class Server:
             task.proc.terminate()
         self.pending_task = []
 
-    def initialize(self, emu_path: str):
-        # Ensure remote host has the required emu_path; if missing, copy it.
-        # Handle multi-process by using an atomic lock directory and tmp rename.
+    def initialize_open(self, emu_path: str, target_path: str):
+        """Open servers does not share the same nfs with node, rsync emu to server target_path"""
+        assert self.hostname.startswith("open")
+
+        if os.path.islink(emu_path):
+            emu_path = os.path.realpath(emu_path)
+
+        # Skip if already exists
         p = self.run(
             [
-                "bash",
-                "-lc",
-                f"test -e {shlex.quote(emu_path)} && echo EXISTS || echo MISSING",
+                "test",
+                "-e",
+                shlex.quote(target_path),
             ],
         )
-
-        if p.stdout is not None and p.stdout.read().decode().strip() == "EXISTS":
+        if p.returncode == 0:
+            print(f"Emu already exists on open server ({target_path}), skip copying.")
             return
 
-        lock_path = f"{emu_path}.copy.lock"
-        tmp_path = f"{emu_path}.tmp.{os.getpid()}"
+        # Ensure remote parent directory exists
+        self.run(
+            ["mkdir", "-p", shlex.quote(os.path.dirname(target_path))],
+            check=True,
+        )
+
+        lock_path = f"{target_path}.copy.lock"
+        tmp_path = f"{target_path}.tmp"
 
         lock_state = "BLOCKED"
         try:
@@ -258,30 +271,21 @@ class Server:
                     "bash",
                     "-lc",
                     (
-                        "umask 077; LOCK="
+                        "umask 077 >/dev/null; LOCK="
                         + shlex.quote(lock_path)
-                        + '; if mkdir "$LOCK" 2>/dev/null; then echo ACQUIRED; else echo BLOCKED; fi'
+                        + '; if mkdir "$LOCK"; then echo ACQUIRED; else echo BLOCKED; fi'
                     ),
                 ],
                 check=True,
             )
             if lr.stdout is not None:
                 lock_state = lr.stdout.read().decode().strip() or "BLOCKED"
-        except Exception:
+        except Exception as e:
+            print(e)
             lock_state = "BLOCKED"
 
         if lock_state == "ACQUIRED":
             try:
-                # Ensure remote parent directory exists
-                self.run(
-                    [
-                        "bash",
-                        "-lc",
-                        f"mkdir -p {shlex.quote(os.path.dirname(emu_path) or '.')}",
-                    ],
-                    check=True,
-                )
-
                 # emu_path is a file: copy via rsync, then atomically move into place
                 subprocess.run(  # do not use self.run, we need this locally
                     [
@@ -295,47 +299,42 @@ class Server:
 
                 self.run(
                     [
-                        "bash",
-                        "-lc",
-                        f"mv -f {shlex.quote(tmp_path)} {shlex.quote(emu_path)}",
+                        "mv",
+                        "-f",
+                        shlex.quote(tmp_path),
+                        shlex.quote(target_path),
                     ],
                     check=True,
                 )
+            except Exception as e:
+                print(e)
             finally:
                 # Always release lock
-                self.run(
-                    [
-                        "bash",
-                        "-lc",
-                        f"rmdir {shlex.quote(lock_path)} 2>/dev/null || true",
-                    ]
-                )
+                self.run(["rmdir", shlex.quote(lock_path)])
         else:
             # Another process is copying; wait until path exists or lock disappears
             deadline = time.time() + 300  # 5 minutes timeout
             while time.time() < deadline:
                 cr = self.run(
                     [
-                        "bash",
-                        "-lc",
-                        f"test -e {shlex.quote(emu_path)} && echo EXISTS || echo WAIT",
+                        "test",
+                        "-e",
+                        shlex.quote(target_path),
                     ]
                 )
-                if cr.stdout is None or cr.stdout.read().decode().strip().startswith(
-                    "EXISTS"
-                ):
+                if cr.returncode == 0:
                     break
                 time.sleep(1)
 
         # Final verify
-        fr = self.run(
+        self.run(
             [
-                "bash",
-                "-lc",
-                f"test -e {shlex.quote(emu_path)} && echo OK || echo FAIL",
+                "test",
+                "-e",
+                shlex.quote(target_path),
             ],
+            check=True,
         )
-        if fr.stdout is None or fr.stdout.read().decode().strip() != "OK":
-            raise RuntimeError(
-                f"Failed to ensure emu_path on {self.hostname}: {emu_path}"
-            )
+        print(f"Copied emu to open server ({target_path}) successfully.")
+        # override self.emu_path
+        self.emu_path = target_path
