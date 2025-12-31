@@ -70,16 +70,13 @@ class XiangShan:
         result_path: str,
         emu_path: str,
         emu_config: EmuConfig,
+        nemu_so_path: str | None,
         benchmarks: str,
         server_list: str,
     ):
-        self.gcpt_path = gcpt_path
-        self.json_path = json_path
-        self.result_path = result_path
-        self.emu_path = emu_path
         self.emu_config = emu_config
 
-        with open(self.json_path, "r", encoding="utf-8") as f:
+        with open(json_path, "r", encoding="utf-8") as f:
             self.benchmarks = json.load(f)
         if benchmarks != "":
             benchmark_filter = benchmarks.replace(" ", "").split(",")
@@ -99,28 +96,36 @@ class XiangShan:
                 if server not in SERVER_POOL:
                     raise ValueError(f"Server {server} is not in the server pool")
 
-        self.servers = [Server(hostname, self.emu_path) for hostname in server_pool]
+        self.servers = [
+            Server(hostname, emu_path, nemu_so_path) for hostname in server_pool
+        ]
 
         open_server = [s for s in self.servers if s.hostname.startswith("open")]
         if open_server:
-            print("Using open servers, initializing emu_path...")
-            open_server[0].initialize_open(
-                self.emu_path,
-                os.path.join(
-                    self.result_path.replace(
-                        "/nfs/home/cirunner", "/nfs/home/ci-runner"
-                    ),
-                    "emu",
-                ),
+            print("Using open servers, initializing binaries and libs...")
+            target_result_path = result_path.replace(
+                "/nfs/home/cirunner", "/nfs/home/ci-runner"
             )
+            target_emu_path = os.path.join(target_result_path, "emu")
+            target_nemu_so_path = None
+
+            open_server[0].initialize_open(emu_path, target_emu_path)
+
+            if nemu_so_path is not None:
+                target_nemu_so_path = os.path.join(target_result_path, "nemu.so")
+                open_server[0].initialize_open(nemu_so_path, target_nemu_so_path)
+
+            for server in open_server:
+                server.emu_path = target_emu_path
+                server.nemu_so_path = target_nemu_so_path
 
         self.checkpoints = []
         for benchmark_name, benchmark_config in self.benchmarks.items():
             for point, weight in benchmark_config["points"].items():
                 self.checkpoints.append(
                     GCPT(
-                        gcpt_path=self.gcpt_path,
-                        result_path=self.result_path,
+                        gcpt_path=gcpt_path,
+                        result_path=result_path,
                         benchmark=benchmark_name,
                         checkpoint=point,
                         weight=weight,
@@ -251,11 +256,11 @@ def main():
         result_path=args.result_path,
         emu_path=args.emu_path,
         emu_config=EmuConfig(
-            nemu_so_path=args.nemu_so_path,
             warmup=args.warmup,
             max_instr=args.max_instr,
             threads=args.threads,
         ),
+        nemu_so_path=args.nemu_so_path,
         benchmarks=args.benchmarks,
         server_list=args.server_list,
     )

@@ -90,9 +90,11 @@ class Server:
         self,
         hostname: str,
         emu_path: str,
+        nemu_so_path: str | None = None,
     ):
         self.hostname = hostname
         self.emu_path = emu_path
+        self.nemu_so_path = nemu_so_path
         self.pending_task: list[PendingTask] = []
 
     def self_test(self) -> bool:
@@ -220,8 +222,8 @@ class Server:
                     str(random.randint(0, 9999)),
                 ]
                 + (
-                    ["--diff", emu_config.nemu_so_path]
-                    if emu_config.nemu_so_path
+                    ["--diff", self.nemu_so_path]
+                    if self.nemu_so_path
                     else ["--no-diff"]
                 ),
                 stdout=fout,
@@ -236,12 +238,12 @@ class Server:
             task.proc.terminate()
         self.pending_task = []
 
-    def initialize_open(self, emu_path: str, target_path: str):
+    def initialize_open(self, source_path: str, target_path: str):
         """Open servers does not share the same nfs with node, rsync emu to server target_path"""
         assert self.hostname.startswith("open")
 
-        if os.path.islink(emu_path):
-            emu_path = os.path.realpath(emu_path)
+        if os.path.islink(source_path):
+            source_path = os.path.realpath(source_path)
 
         # Skip if already exists
         p = self.run(
@@ -291,7 +293,7 @@ class Server:
                     [
                         "rsync",
                         "-a",
-                        emu_path,
+                        source_path,
                         f"{self.hostname}:{tmp_path}",
                     ],
                     check=True,
@@ -336,5 +338,3 @@ class Server:
             check=True,
         )
         print(f"Copied emu to open server ({target_path}) successfully.")
-        # override self.emu_path
-        self.emu_path = target_path
