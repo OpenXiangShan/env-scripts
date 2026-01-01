@@ -144,6 +144,7 @@ class XiangShan:
             tqdm(total=len(self.checkpoints), desc="Complete") as completed_bar,
         ):
             for gcpt in self.checkpoints:
+                # check state from disk
                 state = gcpt.refresh_state()
                 if state != GCPT.State.NONE:
                     assigned_bar.update(1)
@@ -155,16 +156,21 @@ class XiangShan:
                     success, fail, _ = server.poll()
                     failed_checkpoints.extend(fail)
                     completed_bar.update(len(success) + len(fail))
-                # assign task to the first available server
-                for server in self.servers:
-                    free_cores = server.get_free_cores(self.emu_config.threads)
-                    if free_cores.free:
-                        server.run_gcpt(gcpt, self.emu_config, free_cores)
-                        assigned_bar.update(1)
-                        break
-                else:
-                    # no available server, wait and retry
-                    time.sleep(60)
+
+                # loop until task is assigned
+                assigned = False
+                while not assigned:
+                    # assign task to the first available server
+                    for server in self.servers:
+                        free_cores = server.get_free_cores(self.emu_config.threads)
+                        if free_cores.free:
+                            server.run_gcpt(gcpt, self.emu_config, free_cores)
+                            assigned = True
+                            assigned_bar.update(1)
+                            break
+                    else:
+                        # no available server, wait and retry
+                        time.sleep(60)
 
             # wait for all servers to complete
             pending = True
