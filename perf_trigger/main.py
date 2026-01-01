@@ -143,6 +143,16 @@ class XiangShan:
             tqdm(total=len(self.checkpoints), desc="  Assign") as assigned_bar,
             tqdm(total=len(self.checkpoints), desc="Complete") as completed_bar,
         ):
+            def poll_servers() -> bool:
+                pending = False
+                for server in self.servers:
+                    success, fail, pending_list = server.poll()
+                    failed_checkpoints.extend(fail)
+                    completed_bar.update(len(success) + len(fail))
+                    if len(pending_list) > 0:
+                        pending = True
+                return pending
+
             for gcpt in self.checkpoints:
                 # check state from disk
                 state = gcpt.refresh_state()
@@ -152,10 +162,7 @@ class XiangShan:
                     continue
 
                 # check completion
-                for server in self.servers:
-                    success, fail, _ = server.poll()
-                    failed_checkpoints.extend(fail)
-                    completed_bar.update(len(success) + len(fail))
+                poll_servers()
 
                 # loop until task is assigned
                 assigned = False
@@ -173,17 +180,10 @@ class XiangShan:
                         time.sleep(60)
 
             # wait for all servers to complete
-            pending = True
+            pending = poll_servers()
             while pending:
-                pending = False
-                for server in self.servers:
-                    success, fail, pending_list = server.poll()
-                    failed_checkpoints.extend(fail)
-                    completed_bar.update(len(success) + len(fail))
-                    if len(pending_list) > 0:
-                        pending = True
-                if pending:
-                    time.sleep(60)
+                time.sleep(60)
+                pending = poll_servers()
 
             # report all failed jobs
         if len(failed_checkpoints) > 0:
