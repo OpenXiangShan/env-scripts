@@ -1,5 +1,5 @@
 `include "sys_define.vh"
-`include "DifftestMacros.v"
+`include "DifftestMacros.svh"
 
 module core_def (
       input                                      ddr_clk_p,
