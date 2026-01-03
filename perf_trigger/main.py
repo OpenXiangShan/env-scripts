@@ -1,5 +1,6 @@
 import argparse
 import json
+import logging
 import os
 import random
 import time
@@ -116,7 +117,7 @@ class XiangShan:
 
         open_server = [s for s in self.servers if s.hostname.startswith("open")]
         if open_server:
-            print("Using open servers, initializing binaries and libs...")
+            logging.info("Using open servers, initializing binaries and libs...")
             target_result_path = result_path.replace(
                 "/nfs/home/cirunner", "/nfs/home/ci-runner"
             )
@@ -134,15 +135,21 @@ class XiangShan:
                 server.nemu_so_path = target_nemu_so_path
 
     def run(self):
-        print(
-            f"Start Running {len(self.checkpoints)} checkpoints on {len(self.servers)} servers"
+        logging.info(
+            "Start Running %d checkpoints on %d servers",
+            len(self.checkpoints),
+            len(self.servers),
         )
-        failed_checkpoints = []
+        logging.debug(
+            "Server list: %s", ", ".join(map(lambda s: s.hostname, self.servers))
+        )
+        failed_checkpoints: list[str] = []
 
         with (
             tqdm(total=len(self.checkpoints), desc="  Assign") as assigned_bar,
             tqdm(total=len(self.checkpoints), desc="Complete") as completed_bar,
         ):
+
             def poll_servers() -> bool:
                 pending = False
                 for server in self.servers:
@@ -185,11 +192,11 @@ class XiangShan:
                 time.sleep(60)
                 pending = poll_servers()
 
-            # report all failed jobs
+        # report all failed jobs
         if len(failed_checkpoints) > 0:
-            print("Failed checkpoints:")
+            logging.error("Failed checkpoints:")
             for gcpt in failed_checkpoints:
-                print(f"- {gcpt}")
+                logging.error("- %s", gcpt)
 
     def report(self):
         raise NotImplementedError("use xs_autorun_multiServer.py instead")
