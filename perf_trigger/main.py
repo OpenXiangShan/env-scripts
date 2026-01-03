@@ -5,6 +5,7 @@ import os
 import random
 import time
 from tqdm import tqdm
+from tqdm.contrib.logging import logging_redirect_tqdm
 
 from modules.gcpt import GCPT
 from modules.server import Server
@@ -149,6 +150,7 @@ class XiangShan:
         with (
             tqdm(total=len(self.checkpoints), desc="  Assign") as assigned_bar,
             tqdm(total=len(self.checkpoints), desc="Complete") as completed_bar,
+            logging_redirect_tqdm(),
         ):
 
             def poll_servers() -> bool:
@@ -261,7 +263,18 @@ def main():
         action="store_true",
     )
 
+    parser.add_argument(
+        "--log-level",
+        type=str,
+        default="INFO",
+        help="Logging level (DEBUG, INFO, WARNING, ERROR, CRITICAL)",
+    )
+
     args = parser.parse_args()
+    logging.basicConfig(
+        level=args.log_level.upper(),
+        format="%(asctime)s - %(levelname)s - %(message)s",
+    )
 
     # pre-checks
     if not os.path.isdir(args.gcpt_path):
