@@ -1,3 +1,4 @@
+import logging
 import os
 import random
 import re
@@ -114,7 +115,7 @@ class Server:
                 check=True,
             )
         except Exception as e:
-            print(e)
+            logging.error(e)
             return FreeCoreInfo(False, 0, 0, 0, 0)
 
         if p.stdout is None:
@@ -146,7 +147,7 @@ class Server:
                 still_pending.append(task)
                 continue
             if result != 0:
-                print(f"[ERROR] {task.name} exits with code {task.proc.returncode}")
+                logging.error("%s exits with code %d", task.name, task.proc.returncode)
                 failed.append(task.name)
             else:
                 success.append(task.name)
@@ -202,7 +203,7 @@ class Server:
             ]
         )
         if p.returncode != 0 or p.stdout is None:
-            print("[ERROR] Failed to find gcpt binary:", gcpt_path)
+            logging.error("Failed to find gcpt binary: %s", gcpt_path)
             return
 
         gcpt_file = [f.strip() for f in p.stdout.read().decode().split()]
@@ -212,10 +213,10 @@ class Server:
             if f.endswith(".gz") or f.endswith(".zstd") or f.endswith(".bin")
         ]
         if len(gcpt_file) == 0:
-            print("[ERROR] Failed to find gcpt binary:", gcpt_path)
+            logging.error("Failed to find gcpt binary: %s", gcpt_path)
             return
-        elif len(gcpt_file) > 1:
-            print("[WARNING] Multiple gcpt binaries found, using the first one.")
+        if len(gcpt_file) > 1:
+            logging.warning("Multiple gcpt binaries found, using the first one.")
         gcpt_file = gcpt_file[0]
 
         with (
@@ -280,7 +281,9 @@ class Server:
             ],
         )
         if p.returncode == 0:
-            print(f"File already exists on open server ({target_path}), skip copying.")
+            logging.info(
+                "File already exists on open server (%s), skip copying.", target_path
+            )
             return
 
         # Ensure remote parent directory exists
@@ -309,7 +312,7 @@ class Server:
             if lr.stdout is not None:
                 lock_state = lr.stdout.read().decode().strip() or "BLOCKED"
         except Exception as e:
-            print(e)
+            logging.error(e)
             lock_state = "BLOCKED"
 
         if lock_state == "ACQUIRED":
@@ -335,7 +338,7 @@ class Server:
                     check=True,
                 )
             except Exception as e:
-                print(e)
+                logging.error(e)
             finally:
                 # Always release lock
                 self.run(["rmdir", shlex.quote(lock_path)])
@@ -363,6 +366,8 @@ class Server:
             ],
             check=True,
         )
-        print(
-            f"Copied ({os.path.basename(source_path)}) to open server ({target_path}) successfully."
+        logging.info(
+            "Copied %s to open server (%s) successfully.",
+            os.path.basename(source_path),
+            target_path,
         )
