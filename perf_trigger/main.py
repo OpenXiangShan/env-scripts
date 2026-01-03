@@ -61,6 +61,7 @@ SERVER_POOL = [
     "open27",
 ]
 REF_RUN_TIME = "/nfs/home/share/liyanqin/env-scripts/perf/json/gcc12o3-incFpcOff-jeMalloc-time.json"
+STUCK_THRESHOLD = 10 * 3600  # 10 hours
 
 
 class XiangShan:
@@ -87,7 +88,7 @@ class XiangShan:
                 if any(k.startswith(prefix) for prefix in benchmark_filter)
             }
 
-        self.checkpoints = []
+        self.checkpoints: list[GCPT] = []
         for benchmark_name, benchmark_config in self.benchmarks.items():
             for point, weight in benchmark_config["points"].items():
                 self.checkpoints.append(
@@ -163,6 +164,16 @@ class XiangShan:
             for gcpt in self.checkpoints:
                 # check state from disk
                 state = gcpt.refresh_state()
+                if state == GCPT.State.RUNNING:
+                    mtime = os.path.getmtime(gcpt.get_stdout_path())
+                    if time.time() - mtime > STUCK_THRESHOLD:
+                        logging.warning(
+                            "Checkpoint %s seems stalled after %d seconds, resetting state to NONE",
+                            gcpt,
+                            STUCK_THRESHOLD,
+                        )
+                        state = GCPT.State.NONE
+
                 if state != GCPT.State.NONE:
                     assigned_bar.update(1)
                     completed_bar.update(state != GCPT.State.RUNNING)
