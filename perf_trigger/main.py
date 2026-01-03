@@ -64,6 +64,41 @@ SERVER_POOL = [
 REF_RUN_TIME = "/nfs/home/share/liyanqin/env-scripts/perf/json/gcc12o3-incFpcOff-jeMalloc-time.json"
 STUCK_THRESHOLD = 10 * 3600  # 10 hours
 
+SPEC06_INT_BENCHMARKS = [
+    "perlbench",
+    "bzip2",
+    "gcc",
+    "mcf",
+    "gobmk",
+    "hmmer",
+    "sjeng",
+    "libquantum",
+    "h264ref",
+    "omnetpp",
+    "astar",
+    "xalancbmk",
+]
+
+SPEC06_FP_BENCHMARKS = [
+    "bwaves",
+    "gamess",
+    "milc",
+    "zeusmp",
+    "gromacs",
+    "cactusADM",
+    "leslie3d",
+    "namd",
+    "dealII",
+    "soplex",
+    "povray",
+    "Calculix",
+    "GemsFDTD",
+    "tonto",
+    "lbm",
+    "wrf",
+    "sphinx3",
+]
+
 
 class XiangShan:
     def __init__(
@@ -81,8 +116,16 @@ class XiangShan:
 
         with open(json_path, "r", encoding="utf-8") as f:
             self.benchmarks = json.load(f)
+
         if benchmarks != "":
             benchmark_filter = benchmarks.replace(" ", "").split(",")
+
+            # expand alias
+            if "int06" in benchmark_filter:
+                benchmark_filter.extend(SPEC06_INT_BENCHMARKS)
+            if "fp06" in benchmark_filter:
+                benchmark_filter.extend(SPEC06_FP_BENCHMARKS)
+
             self.benchmarks = {
                 k: v
                 for k, v in self.benchmarks.items()
