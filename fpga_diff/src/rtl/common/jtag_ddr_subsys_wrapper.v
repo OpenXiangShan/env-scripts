@@ -8,7 +8,7 @@
 //Purpose     : IP block netlist
 //--------------------------------------------------------------------------------
 `timescale 1 ps / 1 ps
-`include "DifftestMacros.v"
+`include "DifftestMacros.svh"
 
 module jtag_ddr_subsys_wrapper
    (DDR4_act_n,
