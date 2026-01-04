@@ -1070,15 +1070,22 @@ assign i2c2_prdata = 0;
   wire inter_soc_clk;
   wire inter_rtc_clk;
 
-  wire host_io_reset;
+  wire io_host_reset;
   wire clock_enable;
   wire sys_rstn_io;
   wire cpu_rstn_io;
-  assign sys_rstn_io = sys_rstn & ~host_io_reset;
-  assign cpu_rstn_io = cpu_rstn & ~host_io_reset;
+  assign sys_rstn_io = sys_rstn & ~io_host_reset;
+  assign cpu_rstn_io = cpu_rstn & ~io_host_reset;
 
-  assign difftest_to_host_axis_ready =  difftest_to_host_axis_ready_io & pcie_ep_lnk_up;
-  assign difftest_to_host_axis_valid_io = difftest_to_host_axis_valid & pcie_ep_lnk_up;
+  reg [1:0] pcie_lnk_sync;
+  always @(posedge sys_clk_i) begin
+      if (!sys_rstn) pcie_lnk_sync <= 2'b00;
+      else           pcie_lnk_sync <= {pcie_lnk_sync[0], pcie_ep_lnk_up};
+  end
+  wire xdma_link_up = pcie_lnk_sync[1];
+
+  assign difftest_to_host_axis_ready = difftest_to_host_axis_ready_io & xdma_link_up;
+  assign difftest_to_host_axis_valid_io = difftest_to_host_axis_valid & xdma_link_up;
 
   xdma_ep xdma_ep_i(
     .cpu_clk(sys_clk_i),
@@ -1147,13 +1154,13 @@ assign i2c2_prdata = 0;
 
   fpga_clock_gate SOC_CLK_CTRL(
       .CK  (sys_clk_i),
-      .E   (difftest_clock_enable || ~sys_rstn_io || ~cpu_rstn_io ),
+      .E   ((difftest_clock_enable & xdma_link_up )|| ~sys_rstn_io || ~cpu_rstn_io),
       .Q   (inter_soc_clk)
   );
 
    fpga_clock_gate RTC_CLK_CTRL(
       .CK  (tmclk),
-      .E   (difftest_clock_enable || ~sys_rstn_io || ~cpu_rstn_io ),
+      .E   ((difftest_clock_enable & xdma_link_up) || ~sys_rstn_io || ~cpu_rstn_io ),
       .Q   (inter_rtc_clk)
   );
 
