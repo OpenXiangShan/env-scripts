@@ -1074,6 +1074,7 @@ assign i2c2_prdata = 0;
   wire clock_enable;
   wire sys_rstn_io;
   wire cpu_rstn_io;
+  wire difftest_pcie_clock;
   assign sys_rstn_io = sys_rstn & ~host_io_reset;
   assign cpu_rstn_io = cpu_rstn & ~host_io_reset;
 
@@ -1109,6 +1110,7 @@ assign i2c2_prdata = 0;
     .XDMA_AXI_LITE_rvalid (XDMA_AXI_LITE_rvalid),
     .XDMA_AXI_LITE_rready (XDMA_AXI_LITE_rready),
     
+    .TO_DIFFTEST_PCIE_CLK (difftest_pcie_clock),
     .pci_exp_rxn(pci_ep_rxn),
     .pci_exp_rxp(pci_ep_rxp),
     .pci_exp_txn(pci_ep_txn),
@@ -1269,6 +1271,7 @@ jtag_ddr_subsys_wrapper U_JTAG_DDR_SUBSYS(
 );
 
 SimTop_wrapper U_CPU_TOP(
+    .difftest_pcie_clock             (difftest_pcie_clock),
     .difftest_to_host_axis_ready     (difftest_to_host_axis_ready),
     .difftest_to_host_axis_valid     (difftest_to_host_axis_valid),
     .difftest_to_host_axis_bits_data (difftest_to_host_axis_bits_data),
