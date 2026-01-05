@@ -211,7 +211,7 @@ proc create_root_design { parentCell } {
    CONFIG.AWUSER_WIDTH {0} \
    CONFIG.BUSER_WIDTH {0} \
    CONFIG.DATA_WIDTH $SOC_M_AXI_DATA_WIDTH \
-   CONFIG.FREQ_HZ {50000000} \
+   CONFIG.FREQ_HZ {25000000} \
    CONFIG.HAS_BRESP {1} \
    CONFIG.HAS_BURST {1} \
    CONFIG.HAS_CACHE {1} \
@@ -242,7 +242,7 @@ proc create_root_design { parentCell } {
   set_property -dict [ list \
    CONFIG.FREQ_HZ {25000000} \
  ] $MAC_CLK
-  set SOC_CLK [ create_bd_port -dir I -type clk -freq_hz 50000000 SOC_CLK ]
+  set SOC_CLK [ create_bd_port -dir I -type clk -freq_hz 25000000 SOC_CLK ]
   set_property -dict [ list \
    CONFIG.ASSOCIATED_BUSIF {SOC_M_AXI} \
  ] $SOC_CLK

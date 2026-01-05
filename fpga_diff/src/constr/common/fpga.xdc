@@ -442,7 +442,7 @@ set_property IOSTANDARD LVCMOS18 [get_ports PHY_RESET_B]
 create_clock -period 400.000 -name mdc_clk [get_ports MDC]
 create_clock -period 5.000 -name CPU_CLK_IN [get_ports clk6_p]
 create_clock -period 1000.000 -name TMCLK [get_ports clk8_p]
-create_clock -period 20.000 -name DEBUG_CLK_IN [get_ports clk5_p]
+create_clock -period 40.000 -name DEBUG_CLK_IN [get_ports clk5_p]
 create_clock -period 10.000 -name PCIE_CLK_IN [get_ports refclk_p]
 create_clock -period 10.000 -name PCIE2_CLK_IN [get_ports refclk2_p]
 create_clock -period 83.333 -name jtag_vclk [get_ports JTAG_TCK]
@@ -475,6 +475,11 @@ set_property PULLUP true [get_ports SD_DATA2]
 set_property PULLUP true [get_ports SD_DATA3]
 set_property PULLUP true [get_ports MDC]
 set_property PULLUP true [get_ports MDIO]
+
+####################################################################################
+# Constraints for difftest_pcie_clock from CLK_WIZ
+####################################################################################
+set_clock_groups -asynchronous -group [get_clocks difftest_pcie_clock] -group [get_clocks DEBUG_CLK_IN]
 
 ####################################################################################
 # Constraints from file : 'jtag_ddr_subsys_s01_data_fifo_0_clocks.xdc'
