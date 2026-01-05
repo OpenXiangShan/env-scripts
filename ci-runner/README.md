@@ -8,21 +8,32 @@
 > 这里使用环境变量而不是参数，是为了让 `config.sh` 脚本统一处理所有脚本的参数。
 
 ### 示例
-设置环境变量。
-```shell
-export RUNNER_URL="https://github.com/OpenXiangShan/XiangShan"
-export RUNNER_TOKEN="<token_from_github_new_self-hosted_runner_page>"
-export RUNNER_LABELS="bosc,open"
-export RUNNER_FILE=~/actions-runner-linux-x64-2.329.0.tar.gz
-```
 在 Open 服务器上：
 ```shell
-~/xstop ~/env-scripts/ci-runner/create_runners.sh -r xs -d /local/ci-runner -n 6
+~/xstop \
+RUNNER_URL="https://github.com/OpenXiangShan/XiangShan" \
+RUNNER_TOKEN="<token_from_github_new_self-hosted_runner_page>" \
+RUNNER_LABELS="bosc,open" \
+RUNNER_FILE=~/actions-runner-linux-x64-2.330.0.tar.gz \
+~/env-scripts/ci-runner/create_runners.sh -r xs -d /local/ci-runner -n 6
 ```
+
 在 Node 服务器上：
 ```shell
-~/xstop ~/env-scripts/ci-runner/create_runners.sh -r xs -d /home/cirunner -n 10
-~/xstop ~/env-scripts/ci-runner/create_runners.sh -r xs-eda -d $HOME/ci-runner-xs-eda -n 4
+~/xstop \
+RUNNER_URL="https://github.com/OpenXiangShan/XiangShan" \
+RUNNER_TOKEN="<token_from_github_new_self-hosted_runner_page>" \
+RUNNER_LABELS="bosc,node" \
+RUNNER_FILE=~/actions-runner-linux-x64-2.330.0.tar.gz \
+~/env-scripts/ci-runner/create_runners.sh -r xs -d /home/cirunner -n 10
+```
+```shell
+~/xstop \
+RUNNER_URL="https://github.com/OpenXiangShan/XiangShan" \
+RUNNER_TOKEN="<token_from_github_new_self-hosted_runner_page>" \
+RUNNER_LABELS="eda,perf,node" \
+RUNNER_FILE=~/actions-runner-linux-x64-2.330.0.tar.gz \
+~/env-scripts/ci-runner/create_runners.sh -r xs-eda -d $HOME/ci-runner-xs-eda -n 4
 ```
 
 ## 批量启动 runners
