@@ -38,12 +38,10 @@ mkdir -p "$base_dir"
 for ((i=0; i<runner_count; i++)); do
     echo "Setting runner $i (0 .. $((runner_count - 1)))"
 
-    continue
-
     INDEX=$(printf "%0${digits}d" "$i")
 
-    # runner_name format: $(runner_base_name)-$(host_name)-$(i)
-    runner_name="${runner_base_name}-${host_name}-${INDEX}"
+    # runner_name format: $(runner_base_name)-$(hostname)-$(i)
+    runner_name="${runner_base_name}-${hostname}-${INDEX}"
 
     echo "runner_name: ${runner_name}"
 
