@@ -174,7 +174,21 @@ class Server:
         check: bool = False,
     ):
         p = subprocess.Popen(
-            ["ssh", self.hostname] + cmd,
+            [
+                "ssh",
+                self.hostname,
+                "-o",
+                "BatchMode=yes",
+                "-o",
+                "ConnectionAttempts=3",
+                "-o",
+                "TCPKeepAlive=yes",
+                "-o",
+                "ServerAliveInterval=300",
+                "-o",
+                "ServerAliveCountMax=576",  # 2 days
+            ]
+            + cmd,
             stdout=stdout,
             stderr=stderr,
         )
