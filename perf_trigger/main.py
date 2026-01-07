@@ -224,9 +224,6 @@ class XiangShan:
                     completed_bar.update(state != GCPT.State.RUNNING)
                     continue
 
-                # check completion
-                poll_servers()
-
                 # loop until task is assigned
                 assigned = False
                 while not assigned:
@@ -241,6 +238,9 @@ class XiangShan:
                     else:
                         # no available server, wait and retry
                         time.sleep(60)
+
+                    # check completion
+                    poll_servers()
 
             # wait for all servers to complete
             pending = poll_servers()

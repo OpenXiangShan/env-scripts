@@ -159,6 +159,7 @@ class Server:
                 logging.error("%s exits with code %d", task.name, task.proc.returncode)
                 failed.append(task.name)
             else:
+                logging.info("%s finished successfully", task.name)
                 success.append(task.name)
             task.proc.wait()
         self.pending_task = still_pending
