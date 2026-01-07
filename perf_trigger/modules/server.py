@@ -153,11 +153,14 @@ class Server:
             if result is None:
                 still_pending.append(task)
                 continue
+
+            # process finished, check result and call .wait() to cleanup
             if result != 0:
                 logging.error("%s exits with code %d", task.name, task.proc.returncode)
                 failed.append(task.name)
             else:
                 success.append(task.name)
+            task.proc.wait()
         self.pending_task = still_pending
         return success, failed, [t.name for t in self.pending_task]
 
