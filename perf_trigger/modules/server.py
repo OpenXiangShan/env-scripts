@@ -259,6 +259,7 @@ class Server:
             )
         self.pending_task.append(PendingTask(proc=p, name=str(gcpt)))
         time.sleep(10)  # wait for a while to let emu process start properly
+        logging.info("Started gcpt %s on server %s", gcpt, self.hostname)
 
     def stop(self):
         for task in self.pending_task:
