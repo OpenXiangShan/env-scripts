@@ -53,7 +53,7 @@ def get_free_cores(n):
     num_core = psutil.cpu_count(logical=False)
     core_usage = psutil.cpu_percent(interval=5, percpu=True)
     unset_cores = get_unset_cores(num_core, core_usage)
-    num_window = num_core // n
+    num_window = max(num_core // n - 1, 0)
     numa_node = numa_count()  # default 2
     # use random windows to avoid unexpected waiting on a free window
     rand_windows = np.random.permutation(num_window)
