@@ -25,3 +25,4 @@ class FreeCoreInfo:
 class PendingTask:
     proc: subprocess.Popen
     name: str
+    free: FreeCoreInfo

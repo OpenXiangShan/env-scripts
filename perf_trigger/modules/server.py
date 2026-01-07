@@ -129,13 +129,20 @@ class Server:
         if result is None:
             return FreeCoreInfo(False, 0, 0, 0, 0)
 
-        return FreeCoreInfo(
+        info = FreeCoreInfo(
             free=result.group(1) == "True",
             mem_node=int(result.group(2)),
             start=int(result.group(3)),
             end=int(result.group(4)),
             total=int(result.group(5)),
         )
+
+        # there is already a pending task using the same free cores, it may not started properly yet
+        # return not free in this case, let higher level wait and retry
+        if any(info == pending.free for pending in self.pending_task):
+            info.free = False
+
+        return info
 
     def poll(self) -> tuple[list[str], list[str], list[str]]:
         still_pending: list[PendingTask] = []
@@ -257,8 +264,7 @@ class Server:
                 stderr=ferr,
                 block=False,
             )
-        self.pending_task.append(PendingTask(proc=p, name=str(gcpt)))
-        time.sleep(10)  # wait for a while to let emu process start properly
+        self.pending_task.append(PendingTask(proc=p, name=str(gcpt), free=free_cores))
         logging.info("Started gcpt %s on server %s", gcpt, self.hostname)
 
     def stop(self):
