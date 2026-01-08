@@ -156,10 +156,15 @@ class Server:
 
             # process finished, check result and call .wait() to cleanup
             if result != 0:
-                logging.error("%s exits with code %d", task.name, task.proc.returncode)
+                logging.error(
+                    "%s exits with code %d on %s",
+                    task.name,
+                    task.proc.returncode,
+                    self.hostname,
+                )
                 failed.append(task.name)
             else:
-                logging.info("%s finished successfully", task.name)
+                logging.info("%s finished successfully on %s", task.name, self.hostname)
                 success.append(task.name)
             task.proc.wait()
         self.pending_task = still_pending
@@ -283,7 +288,14 @@ class Server:
                 block=False,
             )
         self.pending_task.append(PendingTask(proc=p, name=str(gcpt), free=free_cores))
-        logging.info("Started gcpt %s on server %s", gcpt, self.hostname)
+        logging.info("Started gcpt %s on %s", gcpt, self.hostname)
+        logging.debug(
+            "Assigned cores %d-%d (total %d) on mem node %d",
+            free_cores.start,
+            free_cores.end,
+            free_cores.total,
+            free_cores.mem_node,
+        )
 
     def stop(self):
         for task in self.pending_task:

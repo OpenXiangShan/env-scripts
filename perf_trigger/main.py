@@ -191,8 +191,12 @@ class XiangShan:
         failed_checkpoints: list[str] = []
 
         with (
-            tqdm(total=len(self.checkpoints), desc="  Assign") as assigned_bar,
-            tqdm(total=len(self.checkpoints), desc="Complete") as completed_bar,
+            tqdm(
+                total=len(self.checkpoints), desc="  Assign", miniters=1, leave=True
+            ) as assigned_bar,
+            tqdm(
+                total=len(self.checkpoints), desc="Complete", miniters=1, leave=True
+            ) as completed_bar,
             logging_redirect_tqdm(),
         ):
 
@@ -220,6 +224,11 @@ class XiangShan:
                         state = GCPT.State.NONE
 
                 if state != GCPT.State.NONE:
+                    logging.info(
+                        "Checkpoint %s is already in state %s, skipping assignment",
+                        gcpt,
+                        state,
+                    )
                     assigned_bar.update(1)
                     completed_bar.update(state != GCPT.State.RUNNING)
                     continue
@@ -238,14 +247,19 @@ class XiangShan:
                             break
                     else:
                         # no available server, wait and retry
+                        logging.debug("No available server, waiting for 60 seconds...")
                         time.sleep(60)
 
                     # check completion
                     poll_servers()
 
             # wait for all servers to complete
+            logging.info("All checkpoints assigned, waiting for completion...")
             pending = poll_servers()
             while pending:
+                logging.debug(
+                    "Waiting for all servers to complete, checking again in 60 seconds..."
+                )
                 time.sleep(60)
                 pending = poll_servers()
 
@@ -315,6 +329,8 @@ def main():
     )
 
     args = parser.parse_args()
+
+    # setup logging
     logging.basicConfig(
         level=args.log_level.upper(),
         format="%(asctime)s - %(levelname)s - %(message)s",
