@@ -28,6 +28,42 @@ ref_run_time_path = "/nfs/home/share/liyanqin/env-scripts/perf/json/gcc12o3-incF
 expected_checkpoints_num = 0
 expected_minimal_coverage = 1
 
+SPEC06_INT_BENCHMARKS = [
+    "perlbench",
+    "bzip2",
+    "gcc",
+    "mcf",
+    "gobmk",
+    "hmmer",
+    "sjeng",
+    "libquantum",
+    "h264ref",
+    "omnetpp",
+    "astar",
+    "xalancbmk",
+]
+
+SPEC06_FP_BENCHMARKS = [
+    "bwaves",
+    "gamess",
+    "milc",
+    "zeusmp",
+    "gromacs",
+    "cactusADM",
+    "leslie3d",
+    "namd",
+    "dealII",
+    "soplex",
+    "povray",
+    "Calculix",
+    "GemsFDTD",
+    "tonto",
+    "lbm",
+    "wrf",
+    "sphinx3",
+]
+
+
 def get_perf_base_path(xs_path):
     if os.path.isabs(tasks_dir):
         return tasks_dir
@@ -64,6 +100,12 @@ def load_all_gcpt(
         data = json.load(f)
     if benchmarks != "":
         benchmark_filter = set(benchmarks.replace(" ", "").split(","))
+
+        if "int06" in benchmark_filter:
+            benchmark_filter.update(SPEC06_INT_BENCHMARKS)
+        if "fp06" in benchmark_filter:
+            benchmark_filter.update(SPEC06_FP_BENCHMARKS)
+
         data = {
             k: v
             for k, v in data.items()
@@ -404,7 +446,9 @@ def xs_report_ipc(xs_path, gcpt_queue, result_queue):
             print("IPC not found in", gcpt.benchspec, gcpt.point, gcpt.weight)
 
 
-def xs_report(gcpt_path, all_gcpt, xs_path, spec_version, isa, num_jobs, json_path=None):
+def xs_report(
+    gcpt_path, all_gcpt, xs_path, spec_version, isa, num_jobs, json_path=None
+):
     global expected_checkpoints_num
     global expected_minimal_coverage
     present_checkpoints_num = 0
@@ -467,7 +511,7 @@ def xs_report(gcpt_path, all_gcpt, xs_path, spec_version, isa, num_jobs, json_pa
     # print(f"SPEC CPU Version: SPEC CPU{spec_version}, {isa}")
     print("=================== Other Information ==================")
     print(f"Checkpoint Version : {os.path.basename(os.path.dirname(gcpt_path))}")
-    print(f"DRAMSIM3 Config    : ", end="") # check dramsim3
+    print(f"DRAMSIM3 Config    : ", end="")  # check dramsim3
     with open(all_gcpt[0].get_out_path()) as f:
         flag = True
         for line in f:
@@ -480,9 +524,12 @@ def xs_report(gcpt_path, all_gcpt, xs_path, spec_version, isa, num_jobs, json_pa
                 "[WARNING] No DRAMSIM3 config found! Please check whether DRAMSIM3 is enabled correctly."
             )
     print(f"Data Directory     : {os.path.realpath(tasks_dir)}")
-    print(f"Minimal Coverage   : {present_minimal_coverage:.2f}/{expected_minimal_coverage:.2f}")
+    print(
+        f"Minimal Coverage   : {present_minimal_coverage:.2f}/{expected_minimal_coverage:.2f}"
+    )
     print(f"Checkpoints Number : {present_checkpoints_num}/{expected_checkpoints_num}")
     print()
+
 
 def xs_show(all_gcpt):
     for gcpt in all_gcpt:
@@ -664,7 +711,15 @@ if __name__ == "__main__":
             report=True,
             benchmarks=args.benchmarks,
         )
-        xs_report(args.gcpt_path, gcpt, args.ref, args.version, args.isa, args.jobs, args.json_path)
+        xs_report(
+            args.gcpt_path,
+            gcpt,
+            args.ref,
+            args.version,
+            args.isa,
+            args.jobs,
+            args.json_path,
+        )
     else:
         state_filter = None
         print("RESUME:", args.resume)
