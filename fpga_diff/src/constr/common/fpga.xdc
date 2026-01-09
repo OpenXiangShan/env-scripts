@@ -480,6 +480,7 @@ set_property PULLUP true [get_ports MDIO]
 # Constraints for difftest_pcie_clock from CLK_WIZ
 ####################################################################################
 set_clock_groups -asynchronous -group [get_clocks difftest_pcie_clock] -group [get_clocks DEBUG_CLK_IN]
+set_clock_groups -asynchronous -group [get_clocks clk_out1_xdma_ep_clk_wiz_0_0] -group [get_clocks DEBUG_CLK_IN]
 
 ####################################################################################
 # Constraints from file : 'jtag_ddr_subsys_s01_data_fifo_0_clocks.xdc'
