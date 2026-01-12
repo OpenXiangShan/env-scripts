@@ -47,6 +47,7 @@ SERVER_POOL = [
     "open04",
     "open05",
     "open06",
+    "open07",
     "open08",
     "open09",
     "open10",
