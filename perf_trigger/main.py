@@ -180,7 +180,7 @@ class XiangShan:
                 server.emu_path = target_emu_path
                 server.nemu_so_path = target_nemu_so_path
 
-    def run(self):
+    def __run(self):
         logging.info(
             "Start Running %d checkpoints on %d servers",
             len(self.checkpoints),
@@ -265,6 +265,24 @@ class XiangShan:
             logging.error("Failed checkpoints:")
             for gcpt in failed_checkpoints:
                 logging.error("- %s", gcpt)
+
+    def __stop(self):
+        logging.info("Stopping all servers...")
+        for server in self.servers:
+            server.stop()
+
+    def run(self):
+        try:
+            self.__run()
+        except KeyboardInterrupt as e:
+            logging.info("SIGINT received")
+            self.__stop()
+            raise KeyboardInterrupt("Run interrupted by user") from e
+        except Exception as e:
+            logging.critical("Critical failure")
+            self.__stop()
+            raise e
+
 
     def report(self):
         raise NotImplementedError("use xs_autorun_multiServer.py instead")

@@ -300,6 +300,16 @@ class Server:
     def stop(self):
         for task in self.pending_task:
             task.proc.terminate()
+
+        if self.pending_task:
+            # send kill signal to all remaining emu processes
+            p = self.run(["pkill", "-e", "-f", shlex.quote(self.emu_path)], check=False)
+
+            if p.stderr is not None:
+                logging.info(
+                    "Sent pkill to %s:\n%s", self.hostname, p.stderr.read().decode()
+                )
+
         self.pending_task = []
 
     def initialize_open(self, source_path: str, target_path: str):
