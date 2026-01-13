@@ -305,9 +305,9 @@ class Server:
             # send kill signal to all remaining emu processes
             p = self.run(["pkill", "-e", "-f", shlex.quote(self.emu_path)], check=False)
 
-            if p.stderr is not None:
+            if p.stdout is not None:
                 logging.info(
-                    "Sent pkill to %s:\n%s", self.hostname, p.stderr.read().decode()
+                    "Sent pkill to %s:\n%s", self.hostname, p.stdout.read().decode()
                 )
 
         self.pending_task = []
