@@ -114,7 +114,7 @@ class Server:
                 ],
                 check=True,
             )
-        except Exception as e:
+        except RuntimeError as e:
             logging.error(e)
             return FreeCoreInfo(False, 0, 0, 0, 0)
 
@@ -358,7 +358,7 @@ class Server:
             )
             if lr.stdout is not None:
                 lock_state = lr.stdout.read().decode().strip() or "BLOCKED"
-        except Exception as e:
+        except RuntimeError as e:
             logging.error(e)
             lock_state = "BLOCKED"
 
@@ -384,7 +384,7 @@ class Server:
                     ],
                     check=True,
                 )
-            except Exception as e:
+            except (RuntimeError, subprocess.CalledProcessError) as e:
                 logging.error(e)
             finally:
                 # Always release lock
