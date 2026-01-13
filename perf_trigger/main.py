@@ -214,25 +214,21 @@ class XiangShan:
             for gcpt in self.checkpoints:
                 # check state from disk
                 state = gcpt.refresh_state()
-                if state == GCPT.State.RUNNING:
-                    mtime = os.path.getmtime(gcpt.get_stdout_path())
-                    if time.time() - mtime > STUCK_THRESHOLD:
+                match state:
+                    case GCPT.State.RUNNING:
                         logging.warning(
-                            "Checkpoint %s seems stalled after %d seconds, resetting state to NONE",
+                            "Checkpoint %s is in RUNNING state, there can be another process running it, restart anyway",
                             gcpt,
-                            STUCK_THRESHOLD,
                         )
-                        state = GCPT.State.NONE
-
-                if state != GCPT.State.NONE:
-                    logging.info(
-                        "Checkpoint %s is already in state %s, skipping assignment",
-                        gcpt,
-                        state,
-                    )
-                    assigned_bar.update(1)
-                    completed_bar.update(state != GCPT.State.RUNNING)
-                    continue
+                    case GCPT.State.FINISHED | GCPT.State.ABORTED:
+                        logging.info(
+                            "Checkpoint %s is already in state %s, skipping assignment",
+                            gcpt,
+                            state,
+                        )
+                        assigned_bar.update(1)
+                        completed_bar.update(1)
+                        continue
 
                 # loop until task is assigned
                 assigned = False
