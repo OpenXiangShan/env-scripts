@@ -85,6 +85,8 @@ def is_epyc():
     return num_core > 16
 """
 
+MIN_ALLOC_CORES = 8
+
 
 class Server:
     def __init__(
@@ -97,19 +99,26 @@ class Server:
         self.emu_path = emu_path
         self.nemu_so_path = nemu_so_path
         self.pending_task: list[PendingTask] = []
+        self.free_info: FreeCoreInfo = FreeCoreInfo(
+            free=False, mem_node=0, start=0, end=0, total=0
+        )
 
     def self_test(self) -> bool:
         return self.run(["hostname"]).wait() == 0
 
     def get_free_cores(self, threads: int) -> FreeCoreInfo:
-        # (free, mem, start, end, server_cores)
+        # if we have enough cached free cores, split and return
+        if self.free_info.free and self.free_info.num() >= threads:
+            return self.free_info.split(threads)
+
         try:
             p = self.run(
                 [
                     "python3",
                     "-c",
                     shlex.quote(
-                        GET_FREE_CORE_SCRIPT + f"\nprint(get_free_cores({threads}))"
+                        GET_FREE_CORE_SCRIPT
+                        + f"\nprint(get_free_cores({max(threads, MIN_ALLOC_CORES)}))"
                     ),
                 ],
                 check=True,
@@ -136,6 +145,11 @@ class Server:
             end=int(result.group(4)),
             total=int(result.group(5)),
         )
+
+        # if we got more than needed, cache the remaining cores
+        if info.free and MIN_ALLOC_CORES > threads:
+            self.free_info = info
+            info = self.free_info.split(threads)
 
         # there is already a pending task using the same free cores, it may not started properly yet
         # return not free in this case, let higher level wait and retry

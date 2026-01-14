@@ -238,7 +238,9 @@ class XiangShan:
                         free_cores = server.get_free_cores(self.emu_config.threads)
                         if free_cores.free:
                             server.run_gcpt(gcpt, self.emu_config, free_cores)
-                            random.shuffle(self.servers)  # shuffle for load balancing
+                            # shuffle for load balancing, unless current has some cached free cores
+                            if not server.free_info.free:
+                                random.shuffle(self.servers)
                             assigned = True
                             assigned_bar.update(1)
                             break
