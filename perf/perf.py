@@ -37,7 +37,7 @@ class PerfManip(object):
 
 
 class PerfCounters(object):
-    perf_re = re.compile(r'.*\[PERF \]\[time=\s+\d+\] (([a-zA-Z0-9_]+\.)+[a-zA-Z0-9_@]+): ((\w| |\')+),\s+(\d+)$')
+    perf_re = re.compile(r'.*\[PERF \]\[time=\s+\d*\] (([a-zA-Z0-9_]+\.)+[a-zA-Z0-9_@]+): ((\w| |\')+),\s+(\d+)$')
     path_re = re.compile(r'(?P<spec_name>\w+((_\w+)|(_\w+\.\w+)|-\d+|))_(?P<time_point>\d+)_(?P<weight>0\.\d+)')
 
     def __init__(self, args):
