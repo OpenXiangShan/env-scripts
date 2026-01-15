@@ -217,9 +217,25 @@ class XiangShan:
                 match state:
                     case GCPT.State.RUNNING:
                         logging.warning(
-                            "Checkpoint %s is in RUNNING state, there can be another process running it, restart anyway",
+                            "Checkpoint %s is in RUNNING state, there can be another process running it",
                             gcpt,
                         )
+                        if (
+                            time.time() - os.path.getmtime(gcpt.get_stdout_path())
+                            > STUCK_THRESHOLD
+                            and time.time() - os.path.getmtime(gcpt.get_stderr_path())
+                            > STUCK_THRESHOLD
+                        ):
+                            logging.warning(
+                                "Checkpoint %s no output for more than %d seconds, try restarting it",
+                                gcpt,
+                                STUCK_THRESHOLD,
+                            )
+                            state = GCPT.State.NONE
+                        else:
+                            assigned_bar.update(1)
+                            continue
+
                     case GCPT.State.FINISHED | GCPT.State.ABORTED:
                         logging.info(
                             "Checkpoint %s is already in state %s, skipping assignment",
@@ -284,7 +300,6 @@ class XiangShan:
             logging.critical("Critical failure")
             self.__stop()
             raise e
-
 
     def report(self):
         raise NotImplementedError("use xs_autorun_multiServer.py instead")
