@@ -17,7 +17,8 @@ GCPT_RESTORER = "/nfs/home/share/ci-workloads/old-gcpt-restorer/gcpt.bin"
 GET_FREE_CORE_SCRIPT = """
 import psutil
 import os
-import numpy as np
+import time
+import random
 
 percpu_use_thres = 30
 
@@ -31,7 +32,7 @@ def get_unset_cores(cpu_count=None, core_usage=None) -> list[int]:
     if cpu_count is None:
         cpu_count = psutil.cpu_count(logical=False)
     if core_usage is None:
-        core_usage = psutil.cpu_percent(interval=5, percpu=True)
+        core_usage = psutil.cpu_percent(interval=0.5, percpu=True)
 
     cpu_affinity_count = {i: 0 for i in range(cpu_count)}
     valid_list = ["running", "disk-sleep", "waking", "waiting"]
@@ -51,13 +52,13 @@ def get_unset_cores(cpu_count=None, core_usage=None) -> list[int]:
 def get_free_cores(n):
     # SMT is not allowed
     num_core = psutil.cpu_count(logical=False)
-    core_usage = psutil.cpu_percent(interval=5, percpu=True)
-    unset_cores = get_unset_cores(num_core, core_usage)
     num_window = max(num_core // n - 1, 0)
     numa_node = numa_count()  # default 2
-    # use random windows to avoid unexpected waiting on a free window
-    rand_windows = np.random.permutation(num_window)
-    for i in rand_windows:
+
+    def check(i):
+        core_usage = psutil.cpu_percent(interval=0.5, percpu=True)
+        unset_cores = get_unset_cores(num_core, core_usage)
+
         window_cores = range(i * n, i * n + n)
         window_usage = core_usage[i * n : i * n + n]
 
@@ -69,15 +70,26 @@ def get_free_cores(n):
         )
         # window_cores is unset
         cond3 = set(window_cores).issubset(unset_cores)
-        if cond1 and cond2 and cond3:
-            # return (Success?, memory node, start_core, end_core)
-            return (
-                True,
-                (int)(((i * n) % num_core) // (num_core // numa_node)),
-                (int)(i * n),
-                (int)(i * n + n - 1),
-                num_core,
-            )
+        return cond1 and cond2 and cond3
+
+    for i in random.sample(range(num_window), num_window):
+        if not check(i):
+            continue
+
+        # sleep random time to avoid contention, then re-check
+        time.sleep(random.uniform(1, 30))
+        if not check(i):
+            continue
+
+        # return (Success?, memory node, start_core, end_core)
+        return (
+            True,
+            (int)(((i * n) % num_core) // (num_core // numa_node)),
+            (int)(i * n),
+            (int)(i * n + n - 1),
+            num_core,
+        )
+
     return (False, 0, 0, 0, num_core)
 
 def is_epyc():
