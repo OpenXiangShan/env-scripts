@@ -238,15 +238,10 @@ proc create_root_design { parentCell } {
 
 
   # Create ports
-  set MAC_CLK [ create_bd_port -dir O -type clk MAC_CLK ]
-  set_property -dict [ list \
-   CONFIG.FREQ_HZ {25000000} \
- ] $MAC_CLK
   set SOC_CLK [ create_bd_port -dir I -type clk -freq_hz 25000000 SOC_CLK ]
   set_property -dict [ list \
    CONFIG.ASSOCIATED_BUSIF {SOC_M_AXI} \
  ] $SOC_CLK
-  set SOC_RESETN [ create_bd_port -dir O -from 0 -to 0 -type rst SOC_RESETN ]
   set calib_complete [ create_bd_port -dir O calib_complete ]
   set ddr_rstn [ create_bd_port -dir I -type rst ddr_rstn ]
   set_property -dict [ list \
@@ -273,8 +268,8 @@ proc create_root_design { parentCell } {
   # Create instance: ddr4_0, and set properties
   set ddr4_0 [ create_bd_cell -type ip -vlnv xilinx.com:ip:ddr4:2.2 ddr4_0 ]
   set_property -dict [ list \
-   CONFIG.ADDN_UI_CLKOUT1_FREQ_HZ {50} \
-   CONFIG.ADDN_UI_CLKOUT2_FREQ_HZ {25} \
+   CONFIG.ADDN_UI_CLKOUT1_FREQ_HZ {None} \
+   CONFIG.ADDN_UI_CLKOUT2_FREQ_HZ {None} \
    CONFIG.ADDN_UI_CLKOUT3_FREQ_HZ {None} \
    CONFIG.ADDN_UI_CLKOUT4_FREQ_HZ {None} \
    CONFIG.C0.DDR4_AxiAddressWidth {33} \
@@ -360,22 +355,8 @@ proc create_root_design { parentCell } {
    CONFIG.LOGO_FILE {data/sym_notgate.png} \
  ] $logic_not
 
-  # Create instance: logic_not1, and set properties
-  set logic_not1 [ create_bd_cell -type ip -vlnv xilinx.com:ip:util_vector_logic:2.0 logic_not1 ]
-  set_property -dict [ list \
-   CONFIG.C_OPERATION {not} \
-   CONFIG.C_SIZE {1} \
-   CONFIG.LOGO_FILE {data/sym_notgate.png} \
- ] $logic_not1
-
   # Create instance: rst_ddr4_200M, and set properties
   set rst_ddr4_200M [ create_bd_cell -type ip -vlnv xilinx.com:ip:proc_sys_reset:5.0 rst_ddr4_200M ]
-
-  # Create instance: rst_sys_50M, and set properties
-  set rst_sys_50M [ create_bd_cell -type ip -vlnv xilinx.com:ip:proc_sys_reset:5.0 rst_sys_50M ]
-  set_property -dict [ list \
-   CONFIG.C_EXT_RST_WIDTH {16} \
- ] $rst_sys_50M
 
   # Create interface connections
   connect_bd_intf_net -intf_net C0_SYS_CLK_0_1 [get_bd_intf_ports OSC_SYS_CLK] [get_bd_intf_pins ddr4_0/C0_SYS_CLK]
@@ -388,17 +369,12 @@ connect_bd_intf_net -intf_net [get_bd_intf_nets S00_AXI_1] [get_bd_intf_pins jta
   # Create port connections
   connect_bd_net -net M00_ACLK_1 [get_bd_pins axi_interconnect_0/ACLK] [get_bd_pins axi_interconnect_0/M00_ACLK] [get_bd_pins axi_interconnect_0/S00_ACLK] [get_bd_pins ddr4_0/c0_ddr4_ui_clk] [get_bd_pins jtag_axi_0/aclk] [get_bd_pins jtag_maxi_ila/clk] [get_bd_pins rst_ddr4_200M/slowest_sync_clk]
   connect_bd_net -net SOC_CLK_1 [get_bd_ports SOC_CLK] [get_bd_pins axi_interconnect_0/S01_ACLK]
-  connect_bd_net -net ddr4_0_addn_ui_clkout1 [get_bd_pins ddr4_0/addn_ui_clkout1] [get_bd_pins rst_sys_50M/slowest_sync_clk]
-  connect_bd_net -net ddr4_0_addn_ui_clkout2 [get_bd_ports MAC_CLK] [get_bd_pins ddr4_0/addn_ui_clkout2]
   connect_bd_net -net ddr4_0_c0_ddr4_ui_clk_sync_rst [get_bd_pins ddr4_0/c0_ddr4_ui_clk_sync_rst] [get_bd_pins rst_ddr4_200M/ext_reset_in]
-  connect_bd_net -net ddr4_0_c0_init_calib_complete1 [get_bd_ports calib_complete] [get_bd_pins ddr4_0/c0_init_calib_complete] [get_bd_pins rst_ddr4_200M/dcm_locked] [get_bd_pins rst_sys_50M/dcm_locked]
+  connect_bd_net -net ddr4_0_c0_init_calib_complete1 [get_bd_ports calib_complete] [get_bd_pins ddr4_0/c0_init_calib_complete] [get_bd_pins rst_ddr4_200M/dcm_locked]
   connect_bd_net -net ddr_rst_1 [get_bd_ports ddr_rstn] [get_bd_pins logic_not/Op1]
-  connect_bd_net -net logic_not1_Res [get_bd_pins logic_not1/Res] [get_bd_pins rst_sys_50M/ext_reset_in]
   connect_bd_net -net rst_ddr4_0_200M_interconnect_aresetn [get_bd_pins axi_interconnect_0/ARESETN] [get_bd_pins axi_interconnect_0/M00_ARESETN] [get_bd_pins axi_interconnect_0/S00_ARESETN] [get_bd_pins rst_ddr4_200M/interconnect_aresetn]
   connect_bd_net -net rst_ddr4_0_200M_peripheral_aresetn [get_bd_pins ddr4_0/c0_ddr4_aresetn] [get_bd_pins jtag_axi_0/aresetn] [get_bd_pins rst_ddr4_200M/peripheral_aresetn]
-  connect_bd_net -net rst_sys_50M_interconnect_aresetn [get_bd_pins axi_interconnect_0/S01_ARESETN] [get_bd_pins rst_sys_50M/interconnect_aresetn]
-  connect_bd_net -net rst_sys_50M_peripheral_aresetn [get_bd_ports SOC_RESETN] [get_bd_pins rst_sys_50M/peripheral_aresetn]
-  connect_bd_net -net soc_rstn_1 [get_bd_ports soc_rstn] [get_bd_pins logic_not1/Op1]
+  connect_bd_net -net soc_rstn_1 [get_bd_ports soc_rstn] [get_bd_pins axi_interconnect_0/S01_ARESETN]
   connect_bd_net -net util_vector_logic_0_Res [get_bd_pins ddr4_0/sys_rst] [get_bd_pins logic_not/Res]
 
   # Create address segments

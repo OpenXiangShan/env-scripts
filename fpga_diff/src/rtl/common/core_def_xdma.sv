@@ -1235,8 +1235,6 @@ jtag_ddr_subsys_wrapper U_JTAG_DDR_SUBSYS(
     .OSC_SYS_CLK_clk_p      (ddr_clk_p),
     // AXI INTERFACE CLK
     .SOC_CLK                (inter_soc_clk),
-    .MAC_CLK                (mac_clk),
-    .SOC_RESETN             (),
     .SOC_M_AXI_awid         (cpu2ddr_m2s_awid_mix          ),  
     .SOC_M_AXI_awaddr       (cpu2ddr_m2s_awaddr_mix        ),   
     .SOC_M_AXI_awlen        (cpu2ddr_m2s_awlen             ),    
