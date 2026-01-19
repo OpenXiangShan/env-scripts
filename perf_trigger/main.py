@@ -107,13 +107,11 @@ class XiangShan:
         gcpt_path: str,
         json_path: str,
         result_path: str,
-        emu_path: str,
-        emu_config: EmuConfig,
-        nemu_so_path: str | None,
         benchmarks: str,
-        server_list: str,
     ):
-        self.emu_config = emu_config
+        self.gcpt_path = gcpt_path
+        self.json_path = json_path
+        self.result_path = result_path
 
         with open(json_path, "r", encoding="utf-8") as f:
             self.benchmarks = json.load(f)
@@ -146,6 +144,14 @@ class XiangShan:
                     )
                 )
 
+        self.servers: list[Server] = []
+
+    def __init_servers(
+        self,
+        emu_path: str,
+        nemu_so_path: str | None,
+        server_list: str,
+    ) -> None:
         if server_list == "all":
             server_pool = SERVER_POOL
         elif server_list == "":
@@ -164,7 +170,7 @@ class XiangShan:
         open_server = [s for s in self.servers if s.hostname.startswith("open")]
         if open_server:
             logging.info("Using open servers, initializing binaries and libs...")
-            target_result_path = result_path.replace(
+            target_result_path = self.result_path.replace(
                 "/nfs/home/cirunner", "/nfs/home/ci-runner"
             )
             target_emu_path = os.path.join(target_result_path, "emu")
@@ -180,7 +186,10 @@ class XiangShan:
                 server.emu_path = target_emu_path
                 server.nemu_so_path = target_nemu_so_path
 
-    def __run(self):
+    def __run(
+        self,
+        emu_config: EmuConfig,
+    ) -> None:
         logging.info(
             "Start Running %d checkpoints on %d servers",
             len(self.checkpoints),
@@ -251,9 +260,9 @@ class XiangShan:
                 while not assigned:
                     # assign task to the first available server
                     for server in self.servers:
-                        free_cores = server.get_free_cores(self.emu_config.threads)
+                        free_cores = server.get_free_cores(emu_config.threads)
                         if free_cores.free:
-                            server.run_gcpt(gcpt, self.emu_config, free_cores)
+                            server.run_gcpt(gcpt, emu_config, free_cores)
                             # shuffle for load balancing, unless current has some cached free cores
                             if not server.free_info.free:
                                 random.shuffle(self.servers)
@@ -289,9 +298,20 @@ class XiangShan:
         for server in self.servers:
             server.stop()
 
-    def run(self):
+    def run(
+        self,
+        emu_path: str,
+        nemu_so_path: str | None,
+        server_list: str,
+        emu_config: EmuConfig,
+    ) -> None:
         try:
-            self.__run()
+            self.__init_servers(
+                emu_path,
+                nemu_so_path,
+                server_list,
+            )
+            self.__run(emu_config)
         except KeyboardInterrupt as e:
             logging.info("SIGINT received")
             self.__stop()
@@ -319,18 +339,21 @@ class XiangShan:
 
 def main():
     parser = argparse.ArgumentParser(description="Performance regression script")
-    # emu
+
+    # general task configs
     parser.add_argument(
         "--gcpt-path", type=str, required=True, help="Path to the GCPT checkpoints"
     )
     parser.add_argument(
         "--json-path", type=str, required=True, help="Path to the GCPT json"
     )
-    parser.add_argument("--emu-path", type=str, required=True, help="Path to the emu")
-    parser.add_argument("--nemu-so-path", type=str, help="Path to NEMU diff so")
     parser.add_argument(
         "--result-path", type=str, required=True, help="Path to store the results"
     )
+
+    # run emu configs
+    parser.add_argument("--emu-path", type=str, help="Path to the emu")
+    parser.add_argument("--nemu-so-path", type=str, help="Path to NEMU diff so")
     parser.add_argument(
         "--warmup", "-W", default=20000000, type=int, help="warmup instr count"
     )
@@ -355,6 +378,7 @@ def main():
         help="Comma-separated list of benchmarks to run, leave empty to run all",
     )
 
+    # function options
     parser.add_argument(
         "--run",
         action="store_true",
@@ -371,6 +395,7 @@ def main():
         help="Reset checkpoints in RUNNING state by removing their output files",
     )
 
+    # debug options
     parser.add_argument(
         "--log-level",
         type=str,
@@ -391,10 +416,6 @@ def main():
         raise FileNotFoundError(f"gcpt_path is not a file: {args.gcpt_path}")
     if not os.path.isfile(args.json_path):
         raise FileNotFoundError(f"json_path is not a file: {args.json_path}")
-    if not os.path.isfile(args.emu_path):
-        raise FileNotFoundError(f"emu_path is not a file: {args.emu_path}")
-    if args.nemu_so_path and not os.path.isfile(args.nemu_so_path):
-        raise FileNotFoundError(f"nemu_so_path is not a file: {args.nemu_so_path}")
 
     os.makedirs(args.result_path, exist_ok=True)
 
@@ -402,19 +423,26 @@ def main():
         gcpt_path=args.gcpt_path,
         json_path=args.json_path,
         result_path=args.result_path,
-        emu_path=args.emu_path,
-        emu_config=EmuConfig(
-            warmup=args.warmup,
-            max_instr=args.max_instr,
-            threads=args.threads,
-        ),
-        nemu_so_path=args.nemu_so_path,
         benchmarks=args.benchmarks,
-        server_list=args.server_list,
     )
 
     if args.run:
-        xiangshan.run()
+        if not args.emu_path:
+            raise ValueError("emu_path is required for --run")
+        if not os.path.isfile(args.emu_path):
+            raise FileNotFoundError(f"emu_path is not a file: {args.emu_path}")
+        if args.nemu_so_path and not os.path.isfile(args.nemu_so_path):
+            raise FileNotFoundError(f"nemu_so_path is not a file: {args.nemu_so_path}")
+        xiangshan.run(
+            emu_path=args.emu_path,
+            nemu_so_path=args.nemu_so_path,
+            server_list=args.server_list,
+            emu_config=EmuConfig(
+                warmup=args.warmup,
+                max_instr=args.max_instr,
+                threads=args.threads,
+            ),
+        )
 
     if args.report:
         xiangshan.report()
