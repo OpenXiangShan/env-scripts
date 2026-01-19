@@ -426,6 +426,9 @@ def main():
         benchmarks=args.benchmarks,
     )
 
+    if args.reset_running:
+        xiangshan.reset_running_gcpt()
+
     if args.run:
         if not args.emu_path:
             raise ValueError("emu_path is required for --run")
@@ -446,9 +449,6 @@ def main():
 
     if args.report:
         xiangshan.report()
-
-    if args.reset_running:
-        xiangshan.reset_running_gcpt()
 
 
 if __name__ == "__main__":
