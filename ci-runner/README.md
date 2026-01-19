@@ -65,3 +65,30 @@ RUNNER_FILE=~/actions-runner-linux-x64-2.330.0.tar.gz \
 ~/xstop ~/env-scripts/ci-runner/stop_runners.sh -r xs-eda -d $HOME/ci-runner-xs-eda -n 4
 ```
 
+## 批量更新 runners
+`update_runners.sh` 脚本用于手动更新 self-hosted runner。需要下载 Runner Package 并将地址设为 `RUNNER_FILE` 环境变量。
+
+### 实例
+在 Open 服务器上：
+```shell
+~/xstop \
+RUNNER_FILE=$HOME/actions-runner-linux-x64-2.331.0.tar.gz \
+RUNNER_VERSION=2.331.0 \
+RUNNER_EXTRACT_DIR=$HOME/actions-runner-linux-x64-2.331.0 \
+~/env-scripts/ci-runner/update_runners.sh -r xs -d /local/ci-runner -n 6
+```
+在 Node 服务器上：
+```shell
+~/xstop \
+RUNNER_FILE=$HOME/actions-runner-linux-x64-2.331.0.tar.gz \
+RUNNER_VERSION=2.331.0 \
+RUNNER_EXTRACT_DIR=$HOME/actions-runner-linux-x64-2.331.0 \
+~/env-scripts/ci-runner/update_runners.sh -r xs -d /home/cirunner -n 10
+```
+```shell
+~/xstop \
+RUNNER_FILE=$HOME/actions-runner-linux-x64-2.331.0.tar.gz \
+RUNNER_VERSION=2.331.0 \
+RUNNER_EXTRACT_DIR=$HOME/actions-runner-linux-x64-2.331.0 \
+~/env-scripts/ci-runner/update_runners.sh -r xs-eda -d $HOME/ci-runner-xs-eda -n 4
+```
