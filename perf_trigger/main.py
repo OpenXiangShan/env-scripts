@@ -304,6 +304,18 @@ class XiangShan:
     def report(self):
         raise NotImplementedError("use xs_autorun_multiServer.py instead")
 
+    def reset_running_gcpt(self):
+        num = 0
+        for gcpt in self.checkpoints:
+            state = gcpt.refresh_state()
+            if state == GCPT.State.RUNNING:
+                logging.info("Resetting GCPT %s", gcpt)
+                num += 1
+                os.remove(gcpt.get_stdout_path())
+                os.remove(gcpt.get_stderr_path())
+                os.rmdir(gcpt.get_result_path())
+        logging.info("Reset %d RUNNING GCPTs", num)
+
 
 def main():
     parser = argparse.ArgumentParser(description="Performance regression script")
@@ -354,6 +366,12 @@ def main():
     )
 
     parser.add_argument(
+        "--reset-running",
+        action="store_true",
+        help="Reset checkpoints in RUNNING state by removing their output files",
+    )
+
+    parser.add_argument(
         "--log-level",
         type=str,
         default="INFO",
@@ -400,6 +418,9 @@ def main():
 
     if args.report:
         xiangshan.report()
+
+    if args.reset_running:
+        xiangshan.reset_running_gcpt()
 
 
 if __name__ == "__main__":
