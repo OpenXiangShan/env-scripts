@@ -28,7 +28,6 @@ module jtag_ddr_subsys_wrapper
     OSC_SYS_CLK_clk_n,
     OSC_SYS_CLK_clk_p,
     SOC_CLK,
-    MAC_CLK,
     SOC_M_AXI_araddr,
     SOC_M_AXI_arburst,
     SOC_M_AXI_arcache,
@@ -68,7 +67,6 @@ module jtag_ddr_subsys_wrapper
     SOC_M_AXI_wready,
     SOC_M_AXI_wstrb,
     SOC_M_AXI_wvalid,
-    SOC_RESETN,
     calib_complete,
     ddr_rstn,
     soc_rstn);
@@ -89,7 +87,6 @@ module jtag_ddr_subsys_wrapper
   input OSC_SYS_CLK_clk_n;
   input OSC_SYS_CLK_clk_p;
   input SOC_CLK;
-  output MAC_CLK;
   input [32:0]SOC_M_AXI_araddr;
   input [1:0]SOC_M_AXI_arburst;
   input [3:0]SOC_M_AXI_arcache;
@@ -141,7 +138,6 @@ module jtag_ddr_subsys_wrapper
   output SOC_M_AXI_wready;
   input [31:0]SOC_M_AXI_wstrb;
   input SOC_M_AXI_wvalid;
-  output [0:0]SOC_RESETN;
   output calib_complete;
   input ddr_rstn;
   input soc_rstn;
@@ -202,7 +198,6 @@ module jtag_ddr_subsys_wrapper
   wire SOC_M_AXI_wready;
   wire [31:0]SOC_M_AXI_wstrb;
   wire SOC_M_AXI_wvalid;
-  wire [0:0]SOC_RESETN;
   wire calib_complete;
   wire ddr_rstn;
   wire soc_rstn;
@@ -225,7 +220,6 @@ module jtag_ddr_subsys_wrapper
         .OSC_SYS_CLK_clk_n(OSC_SYS_CLK_clk_n),
         .OSC_SYS_CLK_clk_p(OSC_SYS_CLK_clk_p),
         .SOC_CLK(SOC_CLK),
-        .MAC_CLK(MAC_CLK),
         .SOC_M_AXI_araddr(SOC_M_AXI_araddr),
         .SOC_M_AXI_arburst(SOC_M_AXI_arburst),
         .SOC_M_AXI_arcache(SOC_M_AXI_arcache),
@@ -265,7 +259,6 @@ module jtag_ddr_subsys_wrapper
         .SOC_M_AXI_wready(SOC_M_AXI_wready),
         .SOC_M_AXI_wstrb(SOC_M_AXI_wstrb),
         .SOC_M_AXI_wvalid(SOC_M_AXI_wvalid),
-        .SOC_RESETN(SOC_RESETN),
         .calib_complete(calib_complete),
         .ddr_rstn(ddr_rstn),
         .soc_rstn(soc_rstn));
