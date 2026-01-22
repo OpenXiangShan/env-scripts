@@ -405,9 +405,18 @@ def main():
 
     args = parser.parse_args()
 
+    os.makedirs(args.result_path, exist_ok=True)
+
     # setup logging
+    file_handler = logging.FileHandler(os.path.join(args.result_path, "runner_log.txt"))
+    file_handler.setLevel(logging.NOTSET)
+
+    stdout_handler = logging.StreamHandler()
+    stdout_handler.setLevel(args.log_level.upper())
+
     logging.basicConfig(
-        level=args.log_level.upper(),
+        handlers=[file_handler, stdout_handler],
+        force=True,
         format="%(asctime)s - %(levelname)s - %(message)s",
     )
 
@@ -417,7 +426,6 @@ def main():
     if not os.path.isfile(args.json_path):
         raise FileNotFoundError(f"json_path is not a file: {args.json_path}")
 
-    os.makedirs(args.result_path, exist_ok=True)
 
     xiangshan = XiangShan(
         gcpt_path=args.gcpt_path,
