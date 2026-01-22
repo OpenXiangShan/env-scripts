@@ -5,7 +5,6 @@ import os
 import random
 import time
 from tqdm import tqdm
-from tqdm.contrib.logging import logging_redirect_tqdm
 
 from modules.gcpt import GCPT
 from modules.server import Server
@@ -207,7 +206,6 @@ class XiangShan:
             tqdm(
                 total=len(self.checkpoints), desc="Complete", miniters=1, leave=True
             ) as completed_bar,
-            logging_redirect_tqdm(),
         ):
 
             def poll_servers() -> bool:
@@ -268,12 +266,14 @@ class XiangShan:
                         free_cores = server.get_cached_free_cores(emu_config.threads)
                         if free_cores.free:
                             free_server = server
+                            logging.debug("Get cached free cores")
                             break
                     # no, check if a server can alloc enough free core
                     else:
                         for server in self.servers:
                             free_cores = server.get_free_cores(emu_config.threads)
                             if free_cores.free:
+                                logging.debug("Allocated free cores")
                                 free_server = server
                                 break
                     # still no, wait and retry
@@ -420,17 +420,19 @@ def main():
     os.makedirs(args.result_path, exist_ok=True)
 
     # setup logging
-    file_handler = logging.FileHandler(os.path.join(args.result_path, "runner_log.txt"))
-    file_handler.setLevel(logging.NOTSET)
-
-    stdout_handler = logging.StreamHandler()
-    stdout_handler.setLevel(args.log_level.upper())
-
     logging.basicConfig(
-        handlers=[file_handler, stdout_handler],
-        force=True,
+        level=logging.DEBUG,
         format="%(asctime)s - %(levelname)s - %(message)s",
+        handlers=[
+            logging.FileHandler(os.path.join(args.result_path, 'runner.log'), encoding='utf-8'),
+            logging.StreamHandler()
+        ]
     )
+    for handler in logging.root.handlers:
+        if isinstance(handler, logging.StreamHandler):
+            handler.setLevel(logging.INFO)
+        if isinstance(handler, logging.FileHandler):
+            handler.setLevel(logging.DEBUG)
 
     # pre-checks
     if not os.path.isdir(args.gcpt_path):
