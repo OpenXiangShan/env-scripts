@@ -4,11 +4,11 @@ import logging
 import os
 import random
 import time
-from tqdm import tqdm
 
 from modules.gcpt import GCPT
 from modules.server import Server
 from modules.types import EmuConfig, FreeCoreInfo
+from modules.tracker import Tracker
 
 SERVER_POOL = [
     "node003",
@@ -145,6 +145,10 @@ class XiangShan:
 
         self.servers: list[Server] = []
 
+        self.tracker = Tracker(
+            total=len(self.checkpoints), keys=["assigned", "completed"], with_keys=False
+        )
+
     def __init_servers(
         self,
         emu_path: str,
@@ -163,7 +167,8 @@ class XiangShan:
                     raise ValueError(f"Server {server} is not in the server pool")
 
         self.servers = [
-            Server(hostname, emu_path, nemu_so_path) for hostname in server_pool
+            Server(hostname, emu_path, self.tracker, nemu_so_path)
+            for hostname in server_pool
         ]
 
         open_server = [s for s in self.servers if s.hostname.startswith("open")]
@@ -190,7 +195,7 @@ class XiangShan:
         emu_config: EmuConfig,
     ) -> None:
         logging.info(
-            "Start Running %d checkpoints on %d servers",
+            "Start running %d checkpoints on %d servers",
             len(self.checkpoints),
             len(self.servers),
         )
@@ -199,105 +204,94 @@ class XiangShan:
         )
         failed_checkpoints: list[str] = []
 
-        with (
-            tqdm(
-                total=len(self.checkpoints), desc="  Assign", miniters=1, leave=True
-            ) as assigned_bar,
-            tqdm(
-                total=len(self.checkpoints), desc="Complete", miniters=1, leave=True
-            ) as completed_bar,
-        ):
+        def poll_servers() -> bool:
+            pending = False
+            for server in self.servers:
+                success, fail, pending_list = server.poll()
+                failed_checkpoints.extend(fail)
+                self.tracker.step("completed", len(success) + len(fail))
+                if len(pending_list) > 0:
+                    pending = True
+            return pending
 
-            def poll_servers() -> bool:
-                pending = False
-                for server in self.servers:
-                    success, fail, pending_list = server.poll()
-                    failed_checkpoints.extend(fail)
-                    completed_bar.update(len(success) + len(fail))
-                    if len(pending_list) > 0:
-                        pending = True
-                return pending
-
-            for gcpt in self.checkpoints:
-                # check state from disk
-                state = gcpt.refresh_state()
-                match state:
-                    case GCPT.State.RUNNING:
-                        logging.warning(
-                            "Checkpoint %s is in RUNNING state, there can be another process running it",
-                            gcpt,
+        for gcpt in self.checkpoints:
+            # check state from disk
+            state = gcpt.refresh_state()
+            match state:
+                case GCPT.State.RUNNING:
+                    self.tracker.warning(
+                        "%s is RUNNING, there can be another process running it",
+                        gcpt,
+                    )
+                    if (
+                        time.time() - os.path.getmtime(gcpt.get_stdout_path())
+                        > STUCK_THRESHOLD
+                        and time.time() - os.path.getmtime(gcpt.get_stderr_path())
+                        > STUCK_THRESHOLD
+                    ):
+                        self.tracker.warning(
+                            "... no output for more than %d seconds, try restarting",
+                            STUCK_THRESHOLD,
                         )
-                        if (
-                            time.time() - os.path.getmtime(gcpt.get_stdout_path())
-                            > STUCK_THRESHOLD
-                            and time.time() - os.path.getmtime(gcpt.get_stderr_path())
-                            > STUCK_THRESHOLD
-                        ):
-                            logging.warning(
-                                "Checkpoint %s no output for more than %d seconds, try restarting it",
-                                gcpt,
-                                STUCK_THRESHOLD,
-                            )
-                            state = GCPT.State.NONE
-                        else:
-                            assigned_bar.update(1)
-                            continue
-
-                    case GCPT.State.FINISHED | GCPT.State.ABORTED:
-                        logging.info(
-                            "Checkpoint %s is already in state %s, skipping assignment",
-                            gcpt,
-                            state,
-                        )
-                        assigned_bar.update(1)
-                        completed_bar.update(1)
-                        continue
-
-                # loop until task is assigned
-                assigned = False
-                while not assigned:
-                    # check completion
-                    poll_servers()
-                    # assign task to the first available server
-                    free_server = None
-                    free_cores = FreeCoreInfo.none()
-                    # check if a server has enough cached free core
-                    for server in self.servers:
-                        free_cores = server.get_cached_free_cores(emu_config.threads)
-                        if free_cores.free:
-                            free_server = server
-                            logging.debug("Get cached free cores")
-                            break
-                    # no, check if a server can alloc enough free core
+                        state = GCPT.State.NONE
                     else:
-                        for server in self.servers:
-                            free_cores = server.get_free_cores(emu_config.threads)
-                            if free_cores.free:
-                                logging.debug("Allocated free cores")
-                                free_server = server
-                                break
-                    # still no, wait and retry
-                    if free_server is None:
-                        logging.debug("No available server, waiting for 60 seconds...")
-                        time.sleep(60)
+                        self.tracker.warning("... skipping")
+                        self.tracker.step("assigned", 1)
                         continue
 
-                    # start job
-                    free_server.run_gcpt(gcpt, emu_config, free_cores)
-                    # shuffle for load balancing
-                    random.shuffle(self.servers)
-                    assigned = True
-                    assigned_bar.update(1)
+                case GCPT.State.FINISHED | GCPT.State.ABORTED:
+                    self.tracker.info(
+                        "%s is %s, skipping",
+                        gcpt,
+                        state,
+                    )
+                    self.tracker.step("assigned", 1)
+                    self.tracker.step("completed", 1)
+                    continue
 
-            # wait for all servers to complete
-            logging.info("All checkpoints assigned, waiting for completion...")
+            # loop until task is assigned
+            assigned = False
+            while not assigned:
+                # check completion
+                poll_servers()
+                # assign task to the first available server
+                free_server = None
+                free_cores = FreeCoreInfo.none()
+                # check if a server has enough cached free core
+                for server in self.servers:
+                    free_cores = server.get_cached_free_cores(emu_config.threads)
+                    if free_cores.free:
+                        free_server = server
+                        self.tracker.debug("Get cached free cores")
+                        break
+                # no, check if a server can alloc enough free core
+                else:
+                    for server in self.servers:
+                        free_cores = server.get_free_cores(emu_config.threads)
+                        if free_cores.free:
+                            self.tracker.debug("Allocated free cores")
+                            free_server = server
+                            break
+                # still no, wait and retry
+                if free_server is None:
+                    self.tracker.debug("No available server, waiting for 60 seconds...")
+                    time.sleep(60)
+                    continue
+
+                # start job
+                free_server.run_gcpt(gcpt, emu_config, free_cores)
+                # shuffle for load balancing
+                random.shuffle(self.servers)
+                assigned = True
+                self.tracker.step("assigned", 1)
+
+        # wait for all servers to complete
+        self.tracker.info("All checkpoints assigned, waiting for completion...")
+        pending = poll_servers()
+        while pending:
+            self.tracker.debug("Still running, checking again in 60 seconds...")
+            time.sleep(60)
             pending = poll_servers()
-            while pending:
-                logging.debug(
-                    "Waiting for all servers to complete, checking again in 60 seconds..."
-                )
-                time.sleep(60)
-                pending = poll_servers()
 
         # report all failed jobs
         if len(failed_checkpoints) > 0:
@@ -422,11 +416,13 @@ def main():
     # setup logging
     logging.basicConfig(
         level=logging.DEBUG,
-        format="%(asctime)s - %(levelname)s - %(message)s",
+        format="%(asctime)s - %(levelname)5s - %(message)s",
         handlers=[
-            logging.FileHandler(os.path.join(args.result_path, 'runner.log'), encoding='utf-8'),
-            logging.StreamHandler()
-        ]
+            logging.FileHandler(
+                os.path.join(args.result_path, "runner.log"), encoding="utf-8"
+            ),
+            logging.StreamHandler(),
+        ],
     )
     for handler in logging.root.handlers:
         if isinstance(handler, logging.StreamHandler):
@@ -439,7 +435,6 @@ def main():
         raise FileNotFoundError(f"gcpt_path is not a file: {args.gcpt_path}")
     if not os.path.isfile(args.json_path):
         raise FileNotFoundError(f"json_path is not a file: {args.json_path}")
-
 
     xiangshan = XiangShan(
         gcpt_path=args.gcpt_path,
