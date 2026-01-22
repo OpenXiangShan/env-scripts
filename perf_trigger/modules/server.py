@@ -118,11 +118,16 @@ class Server:
     def self_test(self) -> bool:
         return self.run(["hostname"]).wait() == 0
 
-    def get_free_cores(self, threads: int) -> FreeCoreInfo:
+    def has_cached_free_core(self, threads: int) -> bool:
+        return self.free_info.free and self.free_info.num() >= threads
+    
+    def get_cached_free_cores(self, threads: int) -> FreeCoreInfo:
         # if we have enough cached free cores, split and return
-        if self.free_info.free and self.free_info.num() >= threads:
+        if self.has_cached_free_core(threads):
             return self.free_info.split(threads)
+        return FreeCoreInfo.none()
 
+    def get_free_cores(self, threads: int) -> FreeCoreInfo:
         try:
             p = self.run(
                 [
@@ -137,18 +142,18 @@ class Server:
             )
         except RuntimeError as e:
             logging.error(e)
-            return FreeCoreInfo(False, 0, 0, 0, 0)
+            return FreeCoreInfo.none()
 
         if p.stdout is None:
-            return FreeCoreInfo(False, 0, 0, 0, 0)
+            return FreeCoreInfo.none()
 
         result = p.stdout.read().decode().strip()
         if len(result) == 0:
-            return FreeCoreInfo(False, 0, 0, 0, 0)
+            return FreeCoreInfo.none()
 
         result = re.match(r"\((True|False), (\d+), (\d+), (\d+), (\d+)\)", result)
         if result is None:
-            return FreeCoreInfo(False, 0, 0, 0, 0)
+            return FreeCoreInfo.none()
 
         info = FreeCoreInfo(
             free=result.group(1) == "True",

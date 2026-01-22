@@ -20,6 +20,10 @@ class FreeCoreInfo:
     end: int
     total: int
 
+    @classmethod
+    def none(cls) -> "FreeCoreInfo":
+        return FreeCoreInfo(False, 0, 0, 0, 0)
+
     def num(self) -> int:
         return self.end - self.start + 1
 

@@ -9,7 +9,7 @@ from tqdm.contrib.logging import logging_redirect_tqdm
 
 from modules.gcpt import GCPT
 from modules.server import Server
-from modules.types import EmuConfig
+from modules.types import EmuConfig, FreeCoreInfo
 
 SERVER_POOL = [
     "node003",
@@ -258,24 +258,36 @@ class XiangShan:
                 # loop until task is assigned
                 assigned = False
                 while not assigned:
-                    # assign task to the first available server
-                    for server in self.servers:
-                        free_cores = server.get_free_cores(emu_config.threads)
-                        if free_cores.free:
-                            server.run_gcpt(gcpt, emu_config, free_cores)
-                            # shuffle for load balancing, unless current has some cached free cores
-                            if not server.free_info.free:
-                                random.shuffle(self.servers)
-                            assigned = True
-                            assigned_bar.update(1)
-                            break
-                    else:
-                        # no available server, wait and retry
-                        logging.debug("No available server, waiting for 60 seconds...")
-                        time.sleep(60)
-
                     # check completion
                     poll_servers()
+                    # assign task to the first available server
+                    free_server = None
+                    free_cores = FreeCoreInfo.none()
+                    # check if a server has enough cached free core
+                    for server in self.servers:
+                        free_cores = server.get_cached_free_cores(emu_config.threads)
+                        if free_cores.free:
+                            free_server = server
+                            break
+                    # no, check if a server can alloc enough free core
+                    else:
+                        for server in self.servers:
+                            free_cores = server.get_free_cores(emu_config.threads)
+                            if free_cores.free:
+                                free_server = server
+                                break
+                    # still no, wait and retry
+                    if free_server is None:
+                        logging.debug("No available server, waiting for 60 seconds...")
+                        time.sleep(60)
+                        continue
+
+                    # start job
+                    free_server.run_gcpt(gcpt, emu_config, free_cores)
+                    # shuffle for load balancing
+                    random.shuffle(self.servers)
+                    assigned = True
+                    assigned_bar.update(1)
 
             # wait for all servers to complete
             logging.info("All checkpoints assigned, waiting for completion...")
