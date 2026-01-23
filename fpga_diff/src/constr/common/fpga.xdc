@@ -482,6 +482,8 @@ set_property PULLUP true [get_ports MDIO]
 set_clock_groups -asynchronous -group [get_clocks difftest_pcie_clock] -group [get_clocks DEBUG_CLK_IN]
 set_clock_groups -asynchronous -group [get_clocks clk_out1_xdma_ep_clk_wiz_0_0] -group [get_clocks DEBUG_CLK_IN]
 
+set_clock_groups -asynchronous -group [get_clocks -of_objects [get_pins core_def/xdma_ep_i/xdma_0/inst/pcie4c_ip_i/inst/xdma_ep_xdma_0_0_pcie4c_ip_gt_top_i/diablo_gt.diablo_gt_phy_wrapper/phy_clk_i/bufg_gt_userclk/O]] -group [get_clocks DEBUG_CLK_IN]
+
 ####################################################################################
 # Constraints from file : 'jtag_ddr_subsys_s01_data_fifo_0_clocks.xdc'
 ####################################################################################
