@@ -9,6 +9,7 @@ from typing import IO, Any
 
 from .gcpt import GCPT
 from .types import EmuConfig, FreeCoreInfo, PendingTask
+from .tracker import Tracker
 
 GCPT_RESTORER = "/nfs/home/share/ci-workloads/old-gcpt-restorer/gcpt.bin"
 
@@ -105,6 +106,7 @@ class Server:
         self,
         hostname: str,
         emu_path: str,
+        tracker: Tracker,
         nemu_so_path: str | None = None,
     ):
         self.hostname = hostname
@@ -114,15 +116,24 @@ class Server:
         self.free_info: FreeCoreInfo = FreeCoreInfo(
             free=False, mem_node=0, start=0, end=0, total=0
         )
+        self.tracker = tracker
+
+    def __str__(self) -> str:
+        return self.hostname
 
     def self_test(self) -> bool:
         return self.run(["hostname"]).wait() == 0
 
-    def get_free_cores(self, threads: int) -> FreeCoreInfo:
-        # if we have enough cached free cores, split and return
-        if self.free_info.free and self.free_info.num() >= threads:
-            return self.free_info.split(threads)
+    def has_cached_free_core(self, threads: int) -> bool:
+        return self.free_info.free and self.free_info.num() >= threads
 
+    def get_cached_free_cores(self, threads: int) -> FreeCoreInfo:
+        # if we have enough cached free cores, split and return
+        if self.has_cached_free_core(threads):
+            return self.free_info.split(threads)
+        return FreeCoreInfo.none()
+
+    def get_free_cores(self, threads: int) -> FreeCoreInfo:
         try:
             p = self.run(
                 [
@@ -137,18 +148,18 @@ class Server:
             )
         except RuntimeError as e:
             logging.error(e)
-            return FreeCoreInfo(False, 0, 0, 0, 0)
+            return FreeCoreInfo.none()
 
         if p.stdout is None:
-            return FreeCoreInfo(False, 0, 0, 0, 0)
+            return FreeCoreInfo.none()
 
         result = p.stdout.read().decode().strip()
         if len(result) == 0:
-            return FreeCoreInfo(False, 0, 0, 0, 0)
+            return FreeCoreInfo.none()
 
         result = re.match(r"\((True|False), (\d+), (\d+), (\d+), (\d+)\)", result)
         if result is None:
-            return FreeCoreInfo(False, 0, 0, 0, 0)
+            return FreeCoreInfo.none()
 
         info = FreeCoreInfo(
             free=result.group(1) == "True",
@@ -182,15 +193,15 @@ class Server:
 
             # process finished, check result and call .wait() to cleanup
             if result != 0:
-                logging.error(
-                    "%s exits with code %d on %s",
+                self.tracker.error(
+                    "%s failed with code %d on %s",
                     task.name,
                     task.proc.returncode,
                     self.hostname,
                 )
                 failed.append(task.name)
             else:
-                logging.info("%s finished successfully on %s", task.name, self.hostname)
+                self.tracker.info("%s succeeded on %s", task.name, self.hostname)
                 success.append(task.name)
             task.proc.wait()
         self.pending_task = still_pending
@@ -259,7 +270,7 @@ class Server:
             ]
         )
         if p.returncode != 0 or p.stdout is None:
-            logging.error("Failed to find gcpt binary: %s", gcpt_path)
+            self.tracker.error("Failed to find gcpt binary: %s", gcpt_path)
             return
 
         gcpt_file = [f.strip() for f in p.stdout.read().decode().split()]
@@ -269,10 +280,10 @@ class Server:
             if f.endswith(".gz") or f.endswith(".zstd") or f.endswith(".bin")
         ]
         if len(gcpt_file) == 0:
-            logging.error("Failed to find gcpt binary: %s", gcpt_path)
+            self.tracker.error("Failed to find gcpt binary: %s", gcpt_path)
             return
         if len(gcpt_file) > 1:
-            logging.warning("Multiple gcpt binaries found, using the first one.")
+            self.tracker.warning("Multiple gcpt binaries found, using the first one.")
         gcpt_file = gcpt_file[0]
 
         with (
@@ -314,8 +325,8 @@ class Server:
                 block=False,
             )
         self.pending_task.append(PendingTask(proc=p, name=str(gcpt), free=free_cores))
-        logging.info("Started gcpt %s on %s", gcpt, self.hostname)
-        logging.debug(
+        self.tracker.info("Started %s on %s", gcpt, self.hostname)
+        self.tracker.debug(
             "Assigned cores %d-%d (total %d) on mem node %d",
             free_cores.start,
             free_cores.end,
