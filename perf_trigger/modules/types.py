@@ -1,5 +1,6 @@
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 import subprocess
+import time
 
 
 @dataclass
@@ -51,3 +52,7 @@ class PendingTask:
     proc: subprocess.Popen
     name: str
     free: FreeCoreInfo
+    started: float = field(default_factory=lambda: time.time())
+
+    def elapsed(self) -> float:
+        return time.time() - self.started

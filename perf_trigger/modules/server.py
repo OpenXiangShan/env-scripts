@@ -203,6 +203,7 @@ class Server:
             else:
                 self.tracker.info("%s succeeded on %s", task.name, self.hostname)
                 success.append(task.name)
+            self.tracker.debug("... elapsed: %.3f", task.elapsed())
             task.proc.wait()
         self.pending_task = still_pending
         return success, failed, [t.name for t in self.pending_task]
