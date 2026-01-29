@@ -464,12 +464,12 @@ def xs_report(
     for k in keys:
         gcpt_ipc[k] = []
     # multi-threading for processing the performance counters
-    gcpt_queue = Queue()
-    for gcpt in all_gcpt:
-        gcpt_queue.put(gcpt)
     result_queue = Queue()
     process_list = []
-    for _ in range(num_jobs):
+    for i in range(num_jobs):
+        gcpt_queue = Queue()
+        for gcpt in all_gcpt[i::num_jobs]:
+            gcpt_queue.put(gcpt)
         p = Process(target=xs_report_ipc, args=(xs_path, gcpt_queue, result_queue))
         process_list.append(p)
         p.start()
