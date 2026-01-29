@@ -430,10 +430,8 @@ def get_total_inst(benchspec, spec_version, isa):
     return None
 
 
-def xs_report_ipc(xs_path, gcpt_queue, result_queue):
-    while not gcpt_queue.empty():
-        gcpt = gcpt_queue.get()
-        # print(f"Processing {str(gcpt)}...")
+def xs_report_ipc(xs_path, gcpt_list, result_queue):
+    for gcpt in gcpt_list:
         perf_path = gcpt.get_err_path()
         counters = perf.PerfCounters(perf_path)
         counters.add_manip(get_all_manip())
@@ -454,6 +452,8 @@ def xs_report(
     present_checkpoints_num = 0
     present_minimal_coverage = 1
 
+    num_jobs = min(num_jobs, len(all_gcpt))
+
     # frequency/GHz
     frequency = 3
     if gcc12Enable:
@@ -467,10 +467,7 @@ def xs_report(
     result_queue = Queue()
     process_list = []
     for i in range(num_jobs):
-        gcpt_queue = Queue()
-        for gcpt in all_gcpt[i::num_jobs]:
-            gcpt_queue.put(gcpt)
-        p = Process(target=xs_report_ipc, args=(xs_path, gcpt_queue, result_queue))
+        p = Process(target=xs_report_ipc, args=(xs_path, all_gcpt[i::num_jobs], result_queue))
         process_list.append(p)
         p.start()
     for p in process_list:
