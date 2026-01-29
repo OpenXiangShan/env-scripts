@@ -146,7 +146,15 @@ if {[string equal $cpu_hit "no"]} {
   source "$tcl_dir/cpu_files.tcl"
 }
 
-set xs_files [list {*}$cpu_files {*}$ip_files {*}$rtl_files]
+# Initialize chi_files to empty list
+set chi_files [list]
+
+# Try to load CHI file list (if it exists)
+if { [file exists "$tcl_dir/chi_files.tcl"] } {
+  source "$tcl_dir/chi_files.tcl"
+}
+
+set xs_files [list {*}$cpu_files {*}$ip_files {*}$rtl_files {*}$chi_files]
 
 # Check for paths and files needed for project creation
 set validate_required 1
@@ -192,7 +200,31 @@ if {[string equal [get_filesets -quiet sources_1] ""]} {
 
 # Set 'sources_1' fileset object
 set obj [get_filesets sources_1]
+# Add files by reference, not by copy
+set_property SOURCE_SET sources_1 [get_filesets sim_1]
 add_files -norecurse -fileset $obj $xs_files
+
+# Set file type to "SystemVerilog" for all .v files as base type
+# This should be done before setting specific files to "Verilog Header"
+foreach file $xs_files {
+  set file_extension [file extension $file]
+  if { [string equal -nocase $file_extension ".v"] } {
+    set_property -name file_type -value {SystemVerilog} -objects [get_files $file]
+  }
+}
+
+# Set file type to "Verilog Header" for files matching specific patterns in CHI files
+foreach chi_file $chi_files {
+  set filename [file tail $chi_file]
+  if { [string match "*_define*" $filename] || [string match "*_structs*" $filename] ||
+       [string match "*_params*" $filename] || [string match "*rnid_inc*" $filename] ||
+       [string match "*hns_inc*" $filename] || [string match "*hni_inc*" $filename] ||
+       [string match "*_pkg*" $filename] || [string match "*_function*" $filename] ||
+       [string match "*_localparam*" $filename] || [string match "*axi_lite_slave*" $filename]} {
+      puts "INFO: Setting $filename file_type to 'Verilog Header'"
+      set_property -name file_type -value {Verilog Header} -objects [get_files $chi_file]
+    }
+}
 
 # If DifftestMacros.v exists, set its file_type to 'Verilog Header' to avoid being treated as a top/regular synthesizable source
 set difftest_hdr [get_files -quiet *DifftestMacros.v]
@@ -208,6 +240,17 @@ set obj [get_filesets sources_1]
 set_property -name "include_dirs" -value "$include_dirs" -objects $obj
 set_property -name "top" -value "fpga_top_debug" -objects $obj
 set_property -name "top_auto_set" -value "0" -objects $obj
+
+# Define MSI_MODE macro only if CHI files exist
+if { [llength $chi_files] > 0 } {
+    lappend defines "MSI_MODE"
+    lappend defines "CONFIG_USE_XSCORE_CHI"
+    puts "INFO: Defined MSI_MODE macro as CHI files are present"
+} else {
+    puts "INFO: MSI_MODE macro not defined as CHI files are not present"
+    lappend defines "CONFIG_USE_XSCORE_AXI"
+}
+
 set_property -name "verilog_define" -value "$defines" -objects $obj
 source "$tcl_dir/common/global_includes.tcl"
 
@@ -226,9 +269,6 @@ foreach constr $constr_files {
 
 # Set 'constrs_1' fileset properties
 set obj [get_filesets constrs_1]
-#set_property -name "target_constrs_file" -value "[get_files *new/pblock.xdc]" -objects $obj
-#set_property -name "target_part" -value "xcvu19p-fsva3824-2-e" -objects $obj
-#set_property -name "target_ucf" -value "[get_files *new/pblock.xdc]" -objects $obj
 
 # Create 'sim_1' fileset (if not found)
 if {[string equal [get_filesets -quiet sim_1] ""]} {
@@ -273,7 +313,6 @@ if {[string equal [get_runs -quiet synth_1] ""]} {
 }
 set obj [get_runs synth_1]
 set_property -name "part" -value "xcvu19p-fsva3824-2-e" -objects $obj
-#set_property -name "auto_incremental_checkpoint.directory" -value "/home/zyy/whz/ns_sdmmc_default_xs/ns_uart/ns_uart.srcs/utils_1/imports/sdmmc_xs" -objects $obj
 set_property -name "strategy" -value "Flow_PerfOptimized_high" -objects $obj
 
 # set the current synth run
@@ -288,11 +327,7 @@ if {[string equal [get_runs -quiet impl_1] ""]} {
 }
 set obj [get_runs impl_1]
 set_property -name "part" -value "xcvu19p-fsva3824-2-e" -objects $obj
-#set_property -name "auto_incremental_checkpoint.directory" -value "/home/zyy/whz/ns_sdmmc_default_xs/ns_uart/ns_uart.srcs/utils_1/imports/sdmmc_xs_impl" -objects $obj
 set_property -name "strategy" -value "Congestion_SSI_SpreadLogic_high" -objects $obj
-#set_property -name "steps.place_design.args.directive" -value "AltSpreadLogic_high" -objects $obj
-#set_property -name "steps.phys_opt_design.args.directive" -value "AggressiveExplore" -objects $obj
-#set_property -name "steps.route_design.args.directive" -value "AlternateCLBRouting" -objects $obj
 set_property -name "steps.write_bitstream.args.readback_file" -value "0" -objects $obj
 set_property -name "steps.write_bitstream.args.verbose" -value "0" -objects $obj
 
