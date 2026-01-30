@@ -11,8 +11,6 @@ from .gcpt import GCPT
 from .types import EmuConfig, FreeCoreInfo, PendingTask
 from .tracker import Tracker
 
-GCPT_RESTORER = "/nfs/home/share/ci-workloads/old-gcpt-restorer/gcpt.bin"
-
 # NOTE: This script is directly copied from env-scripts/perf/cpuutil.py,
 #       and will be sent to remote servers through stdin.
 GET_FREE_CORE_SCRIPT = """
@@ -309,8 +307,6 @@ class Server:
                     str(emu_config.warmup),
                     "-I",
                     str(emu_config.max_instr),
-                    "-r",
-                    GCPT_RESTORER,
                     "-i",
                     shlex.quote(os.path.join(gcpt_path, gcpt_file)),
                     "-s",
