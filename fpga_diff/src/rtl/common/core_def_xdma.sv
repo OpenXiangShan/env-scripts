@@ -1,6 +1,14 @@
 `include "sys_define.vh"
 `include "DifftestMacros.svh"
 
+`ifdef CONFIG_USE_XSCORE_CHI
+`include "kconfig.svh"
+`include "chi_icn_defines.svh"
+`elsif CONFIG_USE_XSCORE_AXI
+`define CONFIG_RANK_WIDTH 1
+`endif
+
+
 module core_def (
       input                                      ddr_clk_p,
       input                                      ddr_clk_n, 
@@ -46,11 +54,11 @@ module core_def (
       output      [1:0]                          uhs1_drv_sth                   ,
       output                                     uhs1_swvolt_en                 ,
       output                                     sd_led_control                 ,
-      output      [0:0]                          DDR_CK_T                       ,
-      output      [0:0]                          DDR_CK_C                       ,
-      output      [0:0]                          DDR_CKE                        ,
-      output      [0:0]                          DDR_CS_N                       ,
-      output      [0:0]                          DDR_ODT                        ,
+      output      [`CONFIG_RANK_WIDTH-1:0]       DDR_CK_T                       ,
+      output      [`CONFIG_RANK_WIDTH-1:0]       DDR_CK_C                       ,
+      output      [`CONFIG_RANK_WIDTH-1:0]       DDR_CKE                        ,
+      output      [`CONFIG_RANK_WIDTH-1:0]       DDR_CS_N                       ,
+      output      [`CONFIG_RANK_WIDTH-1:0]       DDR_ODT                        ,
       output                                     DDR_ACT_N                      ,
       output      [1:0]                          DDR_BG                         ,
       output      [1:0]                          DDR_BA                         ,
@@ -109,6 +117,51 @@ assign uhs1_drv_sth = 0;
 assign uhs1_swvolt_en = 0;
 assign sd_led_control = 0;
 // }}} Unbind useless output port
+
+wire [47:0]  cmn2ddr_araddr;
+wire [1:0]   cmn2ddr_arburst;
+wire [3:0]   cmn2ddr_arcache;
+wire [13:0]  cmn2ddr_arid;
+wire [7:0]   cmn2ddr_arlen;
+wire [0:0]   cmn2ddr_arlock;
+wire [2:0]   cmn2ddr_arprot;
+wire [3:0]   cmn2ddr_arqos;
+wire         cmn2ddr_arready;
+wire [3:0]   cmn2ddr_arregion;
+wire [2:0]   cmn2ddr_arsize;
+wire         cmn2ddr_arvalid;
+wire [47:0]  cmn2ddr_awaddr;
+wire [1:0]   cmn2ddr_awburst;
+wire [3:0]   cmn2ddr_awcache;
+wire [13:0]  cmn2ddr_awid;
+wire [7:0]   cmn2ddr_awlen;
+wire [0:0]   cmn2ddr_awlock;
+wire [2:0]   cmn2ddr_awprot;
+wire [3:0]   cmn2ddr_awqos;
+wire         cmn2ddr_awready;
+wire [3:0]   cmn2ddr_awregion;
+wire [2:0]   cmn2ddr_awsize;
+wire         cmn2ddr_awvalid;
+wire [13:0]  cmn2ddr_bid;
+wire         cmn2ddr_bready;
+wire [1:0]   cmn2ddr_bresp;
+wire         cmn2ddr_bvalid;
+wire [255:0] cmn2ddr_rdata;
+wire [13:0]  cmn2ddr_rid;
+wire         cmn2ddr_rlast;
+wire         cmn2ddr_rready;
+wire [1:0]   cmn2ddr_rresp;
+wire         cmn2ddr_rvalid;
+wire [255:0] cmn2ddr_wdata;
+wire         cmn2ddr_wlast;
+wire         cmn2ddr_wready;
+wire [31:0]  cmn2ddr_wstrb;
+wire         cmn2ddr_wvalid;
+
+wire [47:0] cmn2ddr_awaddr_mix;
+wire [47:0] cmn2ddr_araddr_mix;
+assign cmn2ddr_awaddr_mix = cmn2ddr_awaddr - 48'h8000_0000;
+assign cmn2ddr_araddr_mix = cmn2ddr_araddr - 48'h8000_0000;
 
 wire                       axi_bclk_sync_rstn        ; 
 wire                       ddr_bus_clk               ; 
@@ -1023,6 +1076,75 @@ assign cfg_pcie1_s2m_rdata = 0;
 assign cfg_pcie1_s2m_rvalid = 1;
 `endif
 
+`ifdef CONFIG_USE_IMSIC
+    wire                          xstile_imsic_awready        [`CONFIG_XSCORE_NR-1:0];
+    wire                          xstile_imsic_awvalid        [`CONFIG_XSCORE_NR-1:0];
+    wire [4:0]                    xstile_imsic_awid           [`CONFIG_XSCORE_NR-1:0];
+    wire [31:0]                   xstile_imsic_awaddr         [`CONFIG_XSCORE_NR-1:0];
+    wire                          xstile_imsic_wready         [`CONFIG_XSCORE_NR-1:0];
+    wire                          xstile_imsic_wvalid         [`CONFIG_XSCORE_NR-1:0];
+    wire [31:0]                   xstile_imsic_wdata          [`CONFIG_XSCORE_NR-1:0];
+    wire                          xstile_imsic_bready         [`CONFIG_XSCORE_NR-1:0];
+    wire                          xstile_imsic_bvalid         [`CONFIG_XSCORE_NR-1:0];
+    wire [4:0]                    xstile_imsic_bid            [`CONFIG_XSCORE_NR-1:0];
+    wire [1:0]                    xstile_imsic_bresp          [`CONFIG_XSCORE_NR-1:0];
+    wire                          xstile_imsic_arready        [`CONFIG_XSCORE_NR-1:0];
+    wire                          xstile_imsic_arvalid        [`CONFIG_XSCORE_NR-1:0];
+    wire [4:0]                    xstile_imsic_arid           [`CONFIG_XSCORE_NR-1:0];
+    wire [31:0]                   xstile_imsic_araddr         [`CONFIG_XSCORE_NR-1:0];
+    wire                          xstile_imsic_rready         [`CONFIG_XSCORE_NR-1:0];
+    wire                          xstile_imsic_rvalid         [`CONFIG_XSCORE_NR-1:0];
+    wire [4:0]                    xstile_imsic_rid            [`CONFIG_XSCORE_NR-1:0];
+    wire [31:0]                   xstile_imsic_rdata          [`CONFIG_XSCORE_NR-1:0];
+    wire [1:0]                    xstile_imsic_rresp          [`CONFIG_XSCORE_NR-1:0];
+`endif /* CONFIG_USE_IMSIC */
+`ifdef CONFIG_USE_XSCORE_CHI
+    /* XSTile RN-F */
+    wire                          xstile_chi_syscoreq         [`CONFIG_XSCORE_NR-1:0];
+    wire                          xstile_chi_syscoack         [`CONFIG_XSCORE_NR-1:0];
+    wire                          xstile_chi_txsactive        [`CONFIG_XSCORE_NR-1:0];
+    wire                          xstile_chi_rxsactive        [`CONFIG_XSCORE_NR-1:0];
+    wire                          xstile_chi_tx_linkactiveack [`CONFIG_XSCORE_NR-1:0];
+    wire                          xstile_chi_rx_linkactivereq [`CONFIG_XSCORE_NR-1:0];
+    wire                          xstile_chi_tx_linkactivereq [`CONFIG_XSCORE_NR-1:0];
+    wire                          xstile_chi_rx_linkactiveack [`CONFIG_XSCORE_NR-1:0];
+    wire                          xstile_chi_tx_req_flitpend  [`CONFIG_XSCORE_NR-1:0];
+    wire                          xstile_chi_tx_req_lcrdv     [`CONFIG_XSCORE_NR-1:0];
+    wire                          xstile_chi_tx_rsp_lcrdv     [`CONFIG_XSCORE_NR-1:0];
+    wire                          xstile_chi_tx_dat_lcrdv     [`CONFIG_XSCORE_NR-1:0];
+    wire                          xstile_chi_rx_rsp_flitpend  [`CONFIG_XSCORE_NR-1:0];
+    wire                          xstile_chi_rx_rsp_flitv     [`CONFIG_XSCORE_NR-1:0];
+    wire [`CHI_RSPFLIT_WIDTH-1:0] xstile_chi_rx_rsp_flit      [`CONFIG_XSCORE_NR-1:0];
+    wire                          xstile_chi_rx_dat_flitpend  [`CONFIG_XSCORE_NR-1:0];
+    wire                          xstile_chi_rx_dat_flitv     [`CONFIG_XSCORE_NR-1:0];
+    wire [`CHI_DATFLIT_WIDTH-1:0] xstile_chi_rx_dat_flit      [`CONFIG_XSCORE_NR-1:0];
+    wire                          xstile_chi_rx_snp_flitpend  [`CONFIG_XSCORE_NR-1:0];
+    wire                          xstile_chi_rx_snp_flitv     [`CONFIG_XSCORE_NR-1:0];
+    wire [`CHI_SNPFLIT_WIDTH-1:0] xstile_chi_rx_snp_flit      [`CONFIG_XSCORE_NR-1:0];
+    wire                          xstile_chi_tx_req_flitv     [`CONFIG_XSCORE_NR-1:0];
+    wire [`CHI_REQFLIT_WIDTH-1:0] xstile_chi_tx_req_flit      [`CONFIG_XSCORE_NR-1:0];
+    wire                          xstile_chi_tx_rsp_flitpend  [`CONFIG_XSCORE_NR-1:0];
+    wire                          xstile_chi_tx_rsp_flitv     [`CONFIG_XSCORE_NR-1:0];
+    wire [`CHI_RSPFLIT_WIDTH-1:0] xstile_chi_tx_rsp_flit      [`CONFIG_XSCORE_NR-1:0];
+    wire                          xstile_chi_tx_dat_flitpend  [`CONFIG_XSCORE_NR-1:0];
+    wire                          xstile_chi_tx_dat_flitv     [`CONFIG_XSCORE_NR-1:0];
+    wire [`CHI_DATFLIT_WIDTH-1:0] xstile_chi_tx_dat_flit      [`CONFIG_XSCORE_NR-1:0];
+    wire                          xstile_chi_rx_rsp_lcrdv     [`CONFIG_XSCORE_NR-1:0];
+    wire                          xstile_chi_rx_dat_lcrdv     [`CONFIG_XSCORE_NR-1:0];
+    wire                          xstile_chi_rx_snp_lcrdv     [`CONFIG_XSCORE_NR-1:0];
+    /* CLINT interface */
+    wire          clint_int_0                 [`CONFIG_XSCORE_MAX_NRTILE-1:0];
+    wire          clint_int_1                 [`CONFIG_XSCORE_MAX_NRTILE-1:0];
+    wire          io_clintTime_valid;
+    wire [63:0]   io_clintTime_bits;
+    wire [1:0]    plic_int                    [`CONFIG_XSCORE_MAX_NRTILE-1:0];
+    wire          debug_module_hart           [`CONFIG_XSCORE_MAX_NRTILE-1:0];
+    wire          io_hartIsInReset            [`CONFIG_XSCORE_MAX_NRTILE-1:0];
+
+    wire          noc_clk;
+`endif
+
+
 assign pcie1_int = 0;
 assign gpu_m_arvalid = 0;
 assign gpu_m_awvalid = 0;
@@ -1036,6 +1158,44 @@ assign i2c1_int = 0;
 assign i2c1_prdata = 0;
 assign i2c2_int = 0;
 assign i2c2_prdata = 0;
+
+wire [30:0]   br2cfg_araddr;
+wire [1:0]    br2cfg_arburst;
+wire [3:0]    br2cfg_arcache;
+wire [1:0]    br2cfg_arid;
+wire [7:0]    br2cfg_arlen;
+wire [0:0]    br2cfg_arlock;
+wire [2:0]    br2cfg_arprot;
+wire [3:0]    br2cfg_arqos;
+wire [0:0]    br2cfg_arready;
+wire [2:0]    br2cfg_arsize;
+wire [0:0]    br2cfg_arvalid;
+wire [30:0]   br2cfg_awaddr;
+wire [1:0]    br2cfg_awburst;
+wire [3:0]    br2cfg_awcache;
+wire [1:0]    br2cfg_awid;
+wire [7:0]    br2cfg_awlen;
+wire [0:0]    br2cfg_awlock;
+wire [2:0]    br2cfg_awprot;
+wire [3:0]    br2cfg_awqos;
+wire [0:0]    br2cfg_awready;
+wire [2:0]    br2cfg_awsize;
+wire [0:0]    br2cfg_awvalid;
+wire [1:0]    br2cfg_bid;
+wire [0:0]    br2cfg_bready;
+wire [1:0]    br2cfg_bresp;
+wire [0:0]    br2cfg_bvalid;
+wire [64:0]   br2cfg_rdata;
+wire [1:0]    br2cfg_rid;
+wire [0:0]    br2cfg_rlast;
+wire [0:0]    br2cfg_rready;
+wire [1:0]    br2cfg_rresp;
+wire [0:0]    br2cfg_rvalid;
+wire [64:0]   br2cfg_wdata;
+wire [0:0]    br2cfg_wlast;
+wire [0:0]    br2cfg_wready;
+wire [7:0]    br2cfg_wstrb;
+wire [0:0]    br2cfg_wvalid;
 
   wire [511:0] PCIE_S00_AXIS_0_tdata;
   wire PCIE_S00_AXIS_0_tlast;
@@ -1078,7 +1238,7 @@ assign i2c2_prdata = 0;
   wire difftest_pcie_clock;
   assign sys_rstn_io = sys_rstn & ~io_host_reset;
   assign cpu_rstn_io = cpu_rstn & ~io_host_reset;
-
+  assign noc_clk = inter_soc_clk;
 
   reg [1:0] pcie_lnk_sync;
   always @(posedge sys_clk_i) begin
@@ -1153,21 +1313,21 @@ assign i2c2_prdata = 0;
       .io_axi_read_rvalid    (XDMA_AXI_LITE_rvalid),
       .io_axi_read_rready    (XDMA_AXI_LITE_rready),
 
-      .io_host_reset         (io_host_reset)
+      .io_host_reset         (host_io_reset)
   );
 
-  DifftestClockGate SOC_CLK_CTRL(
+  fpga_clock_gate SOC_CLK_CTRL(
       .CK  (sys_clk_i),
       .E   ((difftest_clock_enable & xdma_link_up )|| ~sys_rstn_io || ~cpu_rstn_io),
       .Q   (inter_soc_clk)
   );
 
-  DifftestClockGate RTC_CLK_CTRL(
+  fpga_clock_gate RTC_CLK_CTRL(
       .CK  (tmclk),
       .E   ((difftest_clock_enable & xdma_link_up) || ~sys_rstn_io || ~cpu_rstn_io ),
       .Q   (inter_rtc_clk)
   );
-
+ 
 xilnx_crg xilnx_crg(
    .sys_clk                         (sys_clk_i                     ),
    .dev_clk                         (dev_clk_i                     ),
@@ -1216,6 +1376,7 @@ mode_ctrl U_MODE_CTRL(
     .mbist_mode                     (mbist_mode                    ),
     .scan_mode                      (                              )
 );
+
 jtag_ddr_subsys_wrapper U_JTAG_DDR_SUBSYS(
     .DDR4_act_n             (DDR_ACT_N),
     .DDR4_adr               (DDR_A),
@@ -1235,6 +1396,8 @@ jtag_ddr_subsys_wrapper U_JTAG_DDR_SUBSYS(
     .OSC_SYS_CLK_clk_p      (ddr_clk_p),
     // AXI INTERFACE CLK
     .SOC_CLK                (inter_soc_clk),
+
+`ifdef CONFIG_USE_XSCORE_AXI
     .SOC_M_AXI_awid         (cpu2ddr_m2s_awid_mix          ),  
     .SOC_M_AXI_awaddr       (cpu2ddr_m2s_awaddr_mix        ),   
     .SOC_M_AXI_awlen        (cpu2ddr_m2s_awlen             ),    
@@ -1271,11 +1434,497 @@ jtag_ddr_subsys_wrapper U_JTAG_DDR_SUBSYS(
     .SOC_M_AXI_rresp        (cpu2ddr_s2m_rresp             ),       
     .SOC_M_AXI_rlast        (cpu2ddr_s2m_rlast             ),       
     .SOC_M_AXI_rvalid       (cpu2ddr_s2m_rvalid            ),       
-    .SOC_M_AXI_rready       (cpu2ddr_m2s_rready            ),        
+    .SOC_M_AXI_rready       (cpu2ddr_m2s_rready            ),    
+`elsif CONFIG_USE_XSCORE_CHI
+    .SOC_M_AXI_awid         (cmn2ddr_awid   ),
+    .SOC_M_AXI_awaddr       (cmn2ddr_awaddr_mix),
+    .SOC_M_AXI_awlen        (cmn2ddr_awlen  ),
+    .SOC_M_AXI_awsize       (cmn2ddr_awsize ),
+    .SOC_M_AXI_awburst      (cmn2ddr_awburst),
+    .SOC_M_AXI_awlock       (cmn2ddr_awlock ),
+    .SOC_M_AXI_awcache      (cmn2ddr_awcache),
+    .SOC_M_AXI_awprot       (cmn2ddr_awprot ),
+    .SOC_M_AXI_awqos        (cmn2ddr_awqos  ),
+    .SOC_M_AXI_awvalid      (cmn2ddr_awvalid),
+    .SOC_M_AXI_awready      (cmn2ddr_awready),
+    .SOC_M_AXI_awregion     (cmn2ddr_awregion),
+    .SOC_M_AXI_wdata        (cmn2ddr_wdata  ),
+    .SOC_M_AXI_wstrb        (cmn2ddr_wstrb  ),
+    .SOC_M_AXI_wlast        (cmn2ddr_wlast  ),
+    .SOC_M_AXI_wvalid       (cmn2ddr_wvalid ),
+    .SOC_M_AXI_wready       (cmn2ddr_wready ),
+    .SOC_M_AXI_bid          (cmn2ddr_bid    ),
+    .SOC_M_AXI_bresp        (cmn2ddr_bresp  ),
+    .SOC_M_AXI_bvalid       (cmn2ddr_bvalid ),
+    .SOC_M_AXI_bready       (cmn2ddr_bready ),
+    .SOC_M_AXI_arid         (cmn2ddr_arid   ),
+    .SOC_M_AXI_araddr       (cmn2ddr_araddr_mix),
+    .SOC_M_AXI_arlen        (cmn2ddr_arlen  ),
+    .SOC_M_AXI_arsize       (cmn2ddr_arsize ),
+    .SOC_M_AXI_arburst      (cmn2ddr_arburst),
+    .SOC_M_AXI_arlock       (cmn2ddr_arlock ),
+    .SOC_M_AXI_arcache      (cmn2ddr_arcache),
+    .SOC_M_AXI_arprot       (cmn2ddr_arprot ),
+    .SOC_M_AXI_arqos        (cmn2ddr_arqos  ),
+    .SOC_M_AXI_arvalid      (cmn2ddr_arvalid),
+    .SOC_M_AXI_arready      (cmn2ddr_arready),
+    .SOC_M_AXI_arregion     (cmn2ddr_arregion),
+    .SOC_M_AXI_rid          (cmn2ddr_rid    ),
+    .SOC_M_AXI_rdata        (cmn2ddr_rdata  ),
+    .SOC_M_AXI_rresp        (cmn2ddr_rresp  ),
+    .SOC_M_AXI_rlast        (cmn2ddr_rlast  ),
+    .SOC_M_AXI_rvalid       (cmn2ddr_rvalid ),
+    .SOC_M_AXI_rready       (cmn2ddr_rready ),
+`endif // CONFIG_USE_XSCORE_AXI
+`ifdef CONFIG_HAVE_DDRC_MCU_PERI_AXI
+    /* ext peri AXI */
+    .M_AXI_DP_araddr        (mcu_axi_dp_araddr  ),
+    .M_AXI_DP_arburst       (mcu_axi_dp_arburst ),
+    .M_AXI_DP_arcache       (mcu_axi_dp_arcache ),
+    .M_AXI_DP_arlen         (mcu_axi_dp_arlen   ),
+    .M_AXI_DP_arlock        (mcu_axi_dp_arlock  ),
+    .M_AXI_DP_arprot        (mcu_axi_dp_arprot  ),
+    .M_AXI_DP_arqos         (mcu_axi_dp_arqos   ),
+    .M_AXI_DP_arready       (mcu_axi_dp_arready ),
+    .M_AXI_DP_arregion      (mcu_axi_dp_arregion),
+    .M_AXI_DP_arsize        (mcu_axi_dp_arsize  ),
+    .M_AXI_DP_arvalid       (mcu_axi_dp_arvalid ),
+    .M_AXI_DP_awaddr        (mcu_axi_dp_awaddr  ),
+    .M_AXI_DP_awburst       (mcu_axi_dp_awburst ),
+    .M_AXI_DP_awcache       (mcu_axi_dp_awcache ),
+    .M_AXI_DP_awlen         (mcu_axi_dp_awlen   ),
+    .M_AXI_DP_awlock        (mcu_axi_dp_awlock  ),
+    .M_AXI_DP_awprot        (mcu_axi_dp_awprot  ),
+    .M_AXI_DP_awqos         (mcu_axi_dp_awqos   ),
+    .M_AXI_DP_awready       (mcu_axi_dp_awready ),
+    .M_AXI_DP_awregion      (mcu_axi_dp_awregion),
+    .M_AXI_DP_awsize        (mcu_axi_dp_awsize  ),
+    .M_AXI_DP_awvalid       (mcu_axi_dp_awvalid ),
+    .M_AXI_DP_bready        (mcu_axi_dp_bready  ),
+    .M_AXI_DP_bresp         (mcu_axi_dp_bresp   ),
+    .M_AXI_DP_bvalid        (mcu_axi_dp_bvalid  ),
+    .M_AXI_DP_rdata         (mcu_axi_dp_rdata   ),
+    .M_AXI_DP_rlast         (mcu_axi_dp_rlast   ),
+    .M_AXI_DP_rready        (mcu_axi_dp_rready  ),
+    .M_AXI_DP_rresp         (mcu_axi_dp_rresp   ),
+    .M_AXI_DP_rvalid        (mcu_axi_dp_rvalid  ),
+    .M_AXI_DP_wdata         (mcu_axi_dp_wdata   ),
+    .M_AXI_DP_wlast         (mcu_axi_dp_wlast   ),
+    .M_AXI_DP_wready        (mcu_axi_dp_wready  ),
+    .M_AXI_DP_wstrb         (mcu_axi_dp_wstrb   ),
+    .M_AXI_DP_wvalid        (mcu_axi_dp_wvalid  ),
+`endif /* CONFIG_HAVE_DDRC_MCU_PERI_AXI */
     .ddr_rstn               (rstn_sw4),
     .soc_rstn               (rstn_sw4),
     .calib_complete         (init_calib_complete)
 );
+
+`ifdef CONFIG_USE_XSCORE_CHI
+xs_sys_icn u_icn(
+    .clock(noc_clk),
+    .rstn(sys_rstn),
+    .sys_rstn(sys_rstn),
+
+`ifdef CONFIG_HAVE_ONCHIP_PERI
+    /* On-chip peripherial */
+    .rtc_clock          (inter_rtc_clk),
+    .clint_int_0        (clint_int_0),
+    .clint_int_1        (clint_int_1),
+    .io_clintTime_valid (io_clintTime_valid),
+    .io_clintTime_bits  (io_clintTime_bits),
+    .io_irq_sources     ({cpu_int_mix[63:15],pcie_int,cpu_int_mix[12:0]}),
+    .plic_int           (plic_int),
+`ifdef CONFIG_USE_XSCORE_CHI
+    .debug_module_hart              (debug_module_hart),
+    .io_hartIsInReset               (io_hartIsInReset),
+    .debug_module_ndreset           (debug_module_ndreset),
+    .io_systemjtag_jtag_TCK         (io_systemjtag_jtag_TCK),
+    .io_systemjtag_jtag_TMS         (io_systemjtag_jtag_TMS),
+    .io_systemjtag_jtag_TDI         (io_systemjtag_jtag_TDI),
+    .io_systemjtag_jtag_TDO_data    (io_systemjtag_jtag_TDO_data),
+    .io_systemjtag_jtag_TDO_driven  (io_systemjtag_jtag_TDO_driven),
+`endif /* CONFIG_USE_XSCORE_CHI */ 
+`endif /* CONFIG_HAVE_ONCHIP_PERI */
+
+`ifdef CONFIG_ICN_CFG_PORT
+    /* icn config */
+    .icn_cfg_araddr  (mcu_axi_dp_araddr ),
+    .icn_cfg_arburst (mcu_axi_dp_arburst),
+    .icn_cfg_arcache (mcu_axi_dp_arcache),
+    .icn_cfg_arlen   (mcu_axi_dp_arlen  ),
+    .icn_cfg_arlock  (mcu_axi_dp_arlock ),
+    .icn_cfg_arprot  (mcu_axi_dp_arprot ),
+    .icn_cfg_arqos   (mcu_axi_dp_arqos  ),
+    .icn_cfg_arready (mcu_axi_dp_arready),
+    .icn_cfg_arsize  (mcu_axi_dp_arsize ),
+    .icn_cfg_arvalid (mcu_axi_dp_arvalid),
+    .icn_cfg_arregion(mcu_axi_dp_arregion),
+    .icn_cfg_awaddr  (mcu_axi_dp_awaddr ),
+    .icn_cfg_awburst (mcu_axi_dp_awburst),
+    .icn_cfg_awcache (mcu_axi_dp_awcache),
+    .icn_cfg_awlen   (mcu_axi_dp_awlen  ),
+    .icn_cfg_awlock  (mcu_axi_dp_awlock ),
+    .icn_cfg_awprot  (mcu_axi_dp_awprot ),
+    .icn_cfg_awqos   (mcu_axi_dp_awqos  ),
+    .icn_cfg_awready (mcu_axi_dp_awready),
+    .icn_cfg_awregion(mcu_axi_dp_awregion),
+    .icn_cfg_awsize  (mcu_axi_dp_awsize ),
+    .icn_cfg_awvalid (mcu_axi_dp_awvalid),
+    .icn_cfg_bready  (mcu_axi_dp_bready ),
+    .icn_cfg_bresp   (mcu_axi_dp_bresp  ),
+    .icn_cfg_bvalid  (mcu_axi_dp_bvalid ),
+    .icn_cfg_rdata   (mcu_axi_dp_rdata  ),
+    .icn_cfg_rlast   (mcu_axi_dp_rlast  ),
+    .icn_cfg_rready  (mcu_axi_dp_rready ),
+    .icn_cfg_rresp   (mcu_axi_dp_rresp  ),
+    .icn_cfg_rvalid  (mcu_axi_dp_rvalid ),
+    .icn_cfg_wdata   (mcu_axi_dp_wdata  ),
+    .icn_cfg_wlast   (mcu_axi_dp_wlast  ),
+    .icn_cfg_wready  (mcu_axi_dp_wready ),
+    .icn_cfg_wstrb   (mcu_axi_dp_wstrb  ),
+    .icn_cfg_wvalid  (mcu_axi_dp_wvalid ),
+`endif /* CONFIG_ICN_CFG_PORT */
+
+`ifdef CONFIG_USE_XSCORE_AXI
+    /* AXI: with mem/mmio ports */
+    .core_axi_awready         (cpu2ddr_s2m_awready),
+    .core_axi_awvalid         (cpu2ddr_m2s_awvalid),
+    .core_axi_awid            (cpu2ddr_m2s_awid),
+    .core_axi_awaddr          (cpu2ddr_m2s_awaddr),
+    .core_axi_awlen           (cpu2ddr_m2s_awlen),
+    .core_axi_awsize          (cpu2ddr_m2s_awsize),
+    .core_axi_awburst         (cpu2ddr_m2s_awburst),
+    .core_axi_awlock          (cpu2ddr_m2s_awlock),
+    .core_axi_awcache         (cpu2ddr_m2s_awcache),
+    .core_axi_awprot          (cpu2ddr_m2s_awprot),
+    .core_axi_awqos           (cpu2ddr_m2s_awqos),
+    .core_axi_wready          (cpu2ddr_s2m_wready),
+    .core_axi_wvalid          (cpu2ddr_m2s_wvalid),
+    .core_axi_wdata           (cpu2ddr_m2s_wdata),
+    .core_axi_wstrb           (cpu2ddr_m2s_wstrb),
+    .core_axi_wlast           (cpu2ddr_m2s_wlast),
+    .core_axi_bready          (cpu2ddr_m2s_bready),
+    .core_axi_bvalid          (cpu2ddr_s2m_bvalid),
+    .core_axi_bid             (cpu2ddr_s2m_bid),
+    .core_axi_bresp           (cpu2ddr_s2m_bresp),
+    .core_axi_arready         (cpu2ddr_s2m_arready),
+    .core_axi_arvalid         (cpu2ddr_m2s_arvalid),
+    .core_axi_arid            (cpu2ddr_m2s_arid),
+    .core_axi_araddr          (cpu2ddr_m2s_araddr),
+    .core_axi_arlen           (cpu2ddr_m2s_arlen),
+    .core_axi_arsize          (cpu2ddr_m2s_arsize),
+    .core_axi_arburst         (cpu2ddr_m2s_arburst),
+    .core_axi_arlock          (cpu2ddr_m2s_arlock),
+    .core_axi_arcache         (cpu2ddr_m2s_arcache),
+    .core_axi_arprot          (cpu2ddr_m2s_arprot),
+    .core_axi_arqos           (cpu2ddr_m2s_arqos),
+    .core_axi_rready          (cpu2ddr_m2s_rready),
+    .core_axi_rvalid          (cpu2ddr_s2m_rvalid),
+    .core_axi_rid             (cpu2ddr_s2m_rid),
+    .core_axi_rdata           (cpu2ddr_s2m_rdata),
+    .core_axi_rresp           (cpu2ddr_s2m_rresp),
+    .core_axi_rlast           (cpu2ddr_s2m_rlast),
+
+    /* XSCore peri side */
+    .core_mmio_araddr  (cpu2cfg_m2s_araddr ),
+    .core_mmio_arburst (cpu2cfg_m2s_arburst),
+    .core_mmio_arcache (cpu2cfg_m2s_arcache),
+    .core_mmio_arid    (cpu2cfg_m2s_arid   ),
+    .core_mmio_arlen   (cpu2cfg_m2s_arlen  ),
+    .core_mmio_arlock  (cpu2cfg_m2s_arlock ),
+    .core_mmio_arprot  (cpu2cfg_m2s_arprot ),
+    .core_mmio_arqos   (cpu2cfg_m2s_arqos  ),
+    .core_mmio_arready (cpu2cfg_s2m_arready),
+    .core_mmio_arsize  (cpu2cfg_m2s_arsize ),
+    .core_mmio_arvalid (cpu2cfg_m2s_arvalid),
+    .core_mmio_awaddr  (cpu2cfg_m2s_awaddr ),
+    .core_mmio_awburst (cpu2cfg_m2s_awburst),
+    .core_mmio_awcache (cpu2cfg_m2s_awcache),
+    .core_mmio_awid    (cpu2cfg_m2s_awid   ),
+    .core_mmio_awlen   (cpu2cfg_m2s_awlen  ),
+    .core_mmio_awlock  (cpu2cfg_m2s_awlock ),
+    .core_mmio_awprot  (cpu2cfg_m2s_awprot ),
+    .core_mmio_awqos   (cpu2cfg_m2s_awqos  ),
+    .core_mmio_awready (cpu2cfg_s2m_awready),
+    .core_mmio_awsize  (cpu2cfg_m2s_awsize ),
+    .core_mmio_awvalid (cpu2cfg_m2s_awvalid),
+    .core_mmio_bid     (cpu2cfg_s2m_bid    ),
+    .core_mmio_bready  (cpu2cfg_m2s_bready ),
+    .core_mmio_bresp   (cpu2cfg_s2m_bresp  ),
+    .core_mmio_bvalid  (cpu2cfg_s2m_bvalid ),
+    .core_mmio_rdata   (cpu2cfg_s2m_rdata  ),
+    .core_mmio_rid     (cpu2cfg_s2m_rid    ),
+    .core_mmio_rlast   (cpu2cfg_s2m_rlast  ),
+    .core_mmio_rready  (cpu2cfg_m2s_rready ),
+    .core_mmio_rresp   (cpu2cfg_s2m_rresp  ),
+    .core_mmio_rvalid  (cpu2cfg_s2m_rvalid ),
+    .core_mmio_wdata   (cpu2cfg_m2s_wdata  ),
+    .core_mmio_wlast   (cpu2cfg_m2s_wlast  ),
+    .core_mmio_wready  (cpu2cfg_s2m_wready ),
+    .core_mmio_wstrb   (cpu2cfg_m2s_wstrb  ),
+    .core_mmio_wvalid  (cpu2cfg_m2s_wvalid ),
+
+`elsif CONFIG_USE_XSCORE_CHI
+    /* CHI */
+    .core_chi_syscoreq        (xstile_chi_syscoreq ),
+    .core_chi_syscoack        (xstile_chi_syscoack ),
+    .core_chi_txsactive       (xstile_chi_txsactive),
+    .core_chi_rxsactive       (xstile_chi_rxsactive),
+    .core_chi_tx_linkactivereq(xstile_chi_tx_linkactivereq),
+    .core_chi_tx_linkactiveack(xstile_chi_tx_linkactiveack),
+    .core_chi_rx_linkactivereq(xstile_chi_rx_linkactivereq),
+    .core_chi_rx_linkactiveack(xstile_chi_rx_linkactiveack),
+    .core_chi_tx_req_lcrdv    (xstile_chi_tx_req_lcrdv   ),
+    .core_chi_tx_rsp_lcrdv    (xstile_chi_tx_rsp_lcrdv   ),
+    .core_chi_tx_dat_lcrdv    (xstile_chi_tx_dat_lcrdv   ),
+    .core_chi_rx_rsp_flitpend (xstile_chi_rx_rsp_flitpend),
+    .core_chi_rx_rsp_flitv    (xstile_chi_rx_rsp_flitv   ),
+    .core_chi_rx_rsp_flit     (xstile_chi_rx_rsp_flit    ),
+    .core_chi_rx_dat_flitpend (xstile_chi_rx_dat_flitpend),
+    .core_chi_rx_dat_flitv    (xstile_chi_rx_dat_flitv   ),
+    .core_chi_rx_dat_flit     (xstile_chi_rx_dat_flit    ),
+    .core_chi_rx_snp_flitpend (xstile_chi_rx_snp_flitpend),
+    .core_chi_rx_snp_flitv    (xstile_chi_rx_snp_flitv   ),
+    .core_chi_rx_snp_flit     (xstile_chi_rx_snp_flit    ),
+    .core_chi_tx_req_flitpend (xstile_chi_tx_req_flitpend),
+    .core_chi_tx_req_flitv    (xstile_chi_tx_req_flitv   ),
+    .core_chi_tx_req_flit     (xstile_chi_tx_req_flit    ),
+    .core_chi_tx_rsp_flitpend (xstile_chi_tx_rsp_flitpend),
+    .core_chi_tx_rsp_flitv    (xstile_chi_tx_rsp_flitv   ),
+    .core_chi_tx_rsp_flit     (xstile_chi_tx_rsp_flit    ),
+    .core_chi_tx_dat_flitpend (xstile_chi_tx_dat_flitpend),
+    .core_chi_tx_dat_flitv    (xstile_chi_tx_dat_flitv   ),
+    .core_chi_tx_dat_flit     (xstile_chi_tx_dat_flit    ),
+    .core_chi_rx_rsp_lcrdv    (xstile_chi_rx_rsp_lcrdv   ),
+    .core_chi_rx_dat_lcrdv    (xstile_chi_rx_dat_lcrdv   ),
+    .core_chi_rx_snp_lcrdv    (xstile_chi_rx_snp_lcrdv   ),
+`else
+    /* other XSCore variants */
+`endif
+
+`ifdef CONFIG_USE_IMSIC
+    .core_imsic_awready (xstile_imsic_awready),
+    .core_imsic_awvalid (xstile_imsic_awvalid),
+    .core_imsic_awid    (xstile_imsic_awid),
+    .core_imsic_awaddr  (xstile_imsic_awaddr),
+    .core_imsic_wready  (xstile_imsic_wready),
+    .core_imsic_wvalid  (xstile_imsic_wvalid),
+    .core_imsic_wdata   (xstile_imsic_wdata),
+    .core_imsic_bready  (xstile_imsic_bready),
+    .core_imsic_bvalid  (xstile_imsic_bvalid),
+    .core_imsic_bid     (xstile_imsic_bid),
+    .core_imsic_bresp   (xstile_imsic_bresp),
+    .core_imsic_arready (xstile_imsic_arready),
+    .core_imsic_arvalid (xstile_imsic_arvalid),
+    .core_imsic_arid    (xstile_imsic_arid),
+    .core_imsic_araddr  (xstile_imsic_araddr),
+    .core_imsic_rready  (xstile_imsic_rready),
+    .core_imsic_rvalid  (xstile_imsic_rvalid),
+    .core_imsic_rid     (xstile_imsic_rid),
+    .core_imsic_rdata   (xstile_imsic_rdata),
+    .core_imsic_rresp   (xstile_imsic_rresp),
+`endif /* CONFIG_USE_IMSIC */
+
+    /* DDRC */
+    .ddrc_araddr     (cmn2ddr_araddr   ),
+    .ddrc_arburst    (cmn2ddr_arburst  ),
+    .ddrc_arcache    (cmn2ddr_arcache  ),
+    .ddrc_arid       (cmn2ddr_arid     ),
+    .ddrc_arlen      (cmn2ddr_arlen    ),
+    .ddrc_arlock     (cmn2ddr_arlock   ),
+    .ddrc_arprot     (cmn2ddr_arprot   ),
+    .ddrc_arqos      (cmn2ddr_arqos    ),
+    .ddrc_arready    (cmn2ddr_arready  ),
+    .ddrc_arregion   (cmn2ddr_arregion ),
+    .ddrc_arsize     (cmn2ddr_arsize   ),
+    .ddrc_arvalid    (cmn2ddr_arvalid  ),
+    .ddrc_awaddr     (cmn2ddr_awaddr   ),
+    .ddrc_awburst    (cmn2ddr_awburst  ),
+    .ddrc_awcache    (cmn2ddr_awcache  ),
+    .ddrc_awid       (cmn2ddr_awid     ),
+    .ddrc_awlen      (cmn2ddr_awlen    ),
+    .ddrc_awlock     (cmn2ddr_awlock   ),
+    .ddrc_awprot     (cmn2ddr_awprot   ),
+    .ddrc_awqos      (cmn2ddr_awqos    ),
+    .ddrc_awready    (cmn2ddr_awready  ),
+    .ddrc_awregion   (cmn2ddr_awregion ),
+    .ddrc_awsize     (cmn2ddr_awsize   ),
+    .ddrc_awvalid    (cmn2ddr_awvalid  ),
+    .ddrc_bid        (cmn2ddr_bid      ),
+    .ddrc_bready     (cmn2ddr_bready   ),
+    .ddrc_bresp      (cmn2ddr_bresp    ),
+    .ddrc_bvalid     (cmn2ddr_bvalid   ),
+    .ddrc_rdata      (cmn2ddr_rdata    ),
+    .ddrc_rid        (cmn2ddr_rid      ),
+    .ddrc_rlast      (cmn2ddr_rlast    ),
+    .ddrc_rready     (cmn2ddr_rready   ),
+    .ddrc_rresp      (cmn2ddr_rresp    ),
+    .ddrc_rvalid     (cmn2ddr_rvalid   ),
+    .ddrc_wdata      (cmn2ddr_wdata    ),
+    .ddrc_wlast      (cmn2ddr_wlast    ),
+    .ddrc_wready     (cmn2ddr_wready   ),
+    .ddrc_wstrb      (cmn2ddr_wstrb    ),
+    .ddrc_wvalid     (cmn2ddr_wvalid   ),
+
+`ifdef CONFIG_ICN_DATA_PORT
+    /* DATA_BRIDGE AXI */
+    .icn_data_awid     (data_cpu_bridge_m2s_awid   ),
+    .icn_data_awaddr   (data_cpu_bridge_m2s_awaddr ),
+    .icn_data_awlen    (data_cpu_bridge_m2s_awlen  ),
+    .icn_data_awsize   (data_cpu_bridge_m2s_awsize ),
+    .icn_data_awburst  (data_cpu_bridge_m2s_awburst),
+    .icn_data_awlock   (data_cpu_bridge_m2s_awlock ),
+    .icn_data_awcache  (data_cpu_bridge_m2s_awcache),
+    .icn_data_awprot   (data_cpu_bridge_m2s_awprot ),
+    .icn_data_awvalid  (data_cpu_bridge_m2s_awvalid),
+    .icn_data_wdata    (data_cpu_bridge_m2s_wdata  ),
+    .icn_data_wstrb    (data_cpu_bridge_m2s_wstrb  ),
+    .icn_data_wlast    (data_cpu_bridge_m2s_wlast  ),
+    .icn_data_wvalid   (data_cpu_bridge_m2s_wvalid ),
+    .icn_data_bready   (data_cpu_bridge_m2s_bready ),
+    .icn_data_arid     (data_cpu_bridge_m2s_arid   ),
+    .icn_data_araddr   (data_cpu_bridge_m2s_araddr ),
+    .icn_data_arlen    (data_cpu_bridge_m2s_arlen  ),
+    .icn_data_arsize   (data_cpu_bridge_m2s_arsize ),
+    .icn_data_arburst  (data_cpu_bridge_m2s_arburst),
+    .icn_data_arlock   (data_cpu_bridge_m2s_arlock ),
+    .icn_data_arcache  (data_cpu_bridge_m2s_arcache),
+    .icn_data_arprot   (data_cpu_bridge_m2s_arprot ),
+    .icn_data_arvalid  (data_cpu_bridge_m2s_arvalid),
+    .icn_data_rready   (data_cpu_bridge_m2s_rready ),
+    .icn_data_awready  (data_cpu_bridge_s2m_awready),
+    .icn_data_wready   (data_cpu_bridge_s2m_wready ),
+    .icn_data_bid      (data_cpu_bridge_s2m_bid    ),
+    .icn_data_bresp    (data_cpu_bridge_s2m_bresp  ),
+    .icn_data_bvalid   (data_cpu_bridge_s2m_bvalid ),
+    .icn_data_arready  (data_cpu_bridge_s2m_arready),
+    .icn_data_rid      (data_cpu_bridge_s2m_rid    ),
+    .icn_data_rdata    (data_cpu_bridge_s2m_rdata  ),
+    .icn_data_rresp    (data_cpu_bridge_s2m_rresp  ),
+    .icn_data_rlast    (data_cpu_bridge_s2m_rlast  ),
+    .icn_data_rvalid   (data_cpu_bridge_s2m_rvalid ),
+    .icn_data_awqos    (data_cpu_bridge_m2s_awqos  ),
+    .icn_data_arqos    (data_cpu_bridge_m2s_arqos  ),
+`endif/* CONFIG_ICN_DATA_PORT */
+`ifdef CONFIG_USE_PCIE
+    .pcie_s_awid     (pcie2cmn_awid   ),
+    .pcie_s_awaddr   (pcie2cmn_awaddr ),
+    .pcie_s_awlen    (pcie2cmn_awlen  ),
+    .pcie_s_awsize   (pcie2cmn_awsize ),
+    .pcie_s_awburst  (pcie2cmn_awburst),
+    .pcie_s_awlock   (pcie2cmn_awlock ),
+    .pcie_s_awcache  (pcie2cmn_awcache),
+    .pcie_s_awprot   (pcie2cmn_awprot ),
+    .pcie_s_awvalid  (pcie2cmn_awvalid),
+    .pcie_s_wdata    (pcie2cmn_wdata  ),
+    .pcie_s_wstrb    (pcie2cmn_wstrb  ),
+    .pcie_s_wlast    (pcie2cmn_wlast  ),
+    .pcie_s_wvalid   (pcie2cmn_wvalid ),
+    .pcie_s_bready   (pcie2cmn_bready ),
+    .pcie_s_arid     (pcie2cmn_arid   ),
+    .pcie_s_araddr   (pcie2cmn_araddr ),
+    .pcie_s_arlen    (pcie2cmn_arlen  ),
+    .pcie_s_arsize   (pcie2cmn_arsize ),
+    .pcie_s_arburst  (pcie2cmn_arburst),
+    .pcie_s_arlock   (pcie2cmn_arlock ),
+    .pcie_s_arcache  (pcie2cmn_arcache),
+    .pcie_s_arprot   (pcie2cmn_arprot ),
+    .pcie_s_arvalid  (pcie2cmn_arvalid),
+    .pcie_s_rready   (pcie2cmn_rready ),
+    .pcie_s_awready  (pcie2cmn_awready),
+    .pcie_s_wready   (pcie2cmn_wready ),
+    .pcie_s_bid      (pcie2cmn_bid    ),
+    .pcie_s_bresp    (pcie2cmn_bresp  ),
+    .pcie_s_bvalid   (pcie2cmn_bvalid ),
+    .pcie_s_arready  (pcie2cmn_arready),
+    .pcie_s_rid      (pcie2cmn_rid    ),
+    .pcie_s_rdata    (pcie2cmn_rdata  ),
+    .pcie_s_rresp    (pcie2cmn_rresp  ),
+    .pcie_s_rlast    (pcie2cmn_rlast  ),
+    .pcie_s_rvalid   (pcie2cmn_rvalid ),
+    .pcie_s_awqos    (pcie2cmn_awqos  ),
+    .pcie_s_arqos    (pcie2cmn_arqos  ),
+
+    .pcie_m_araddr     (cmn2pcie_araddr ),
+    .pcie_m_arburst    (cmn2pcie_arburst),
+    .pcie_m_arcache    (cmn2pcie_arcache),
+    .pcie_m_arid       (cmn2pcie_arid   ),
+    .pcie_m_arlen      (cmn2pcie_arlen  ),
+    .pcie_m_arlock     (cmn2pcie_arlock ),
+    .pcie_m_arprot     (cmn2pcie_arprot ),
+    .pcie_m_arqos      (cmn2pcie_arqos  ),
+    .pcie_m_arready    (cmn2pcie_arready),
+    .pcie_m_arsize     (cmn2pcie_arsize ),
+    .pcie_m_arvalid    (cmn2pcie_arvalid),
+    .pcie_m_awaddr     (cmn2pcie_awaddr ),
+    .pcie_m_awburst    (cmn2pcie_awburst),
+    .pcie_m_awcache    (cmn2pcie_awcache),
+    .pcie_m_awid       (cmn2pcie_awid   ),
+    .pcie_m_awlen      (cmn2pcie_awlen  ),
+    .pcie_m_awlock     (cmn2pcie_awlock ),
+    .pcie_m_awprot     (cmn2pcie_awprot ),
+    .pcie_m_awqos      (cmn2pcie_awqos  ),
+    .pcie_m_awready    (cmn2pcie_awready),
+    .pcie_m_awsize     (cmn2pcie_awsize ),
+    .pcie_m_awvalid    (cmn2pcie_awvalid),
+    .pcie_m_bid        (cmn2pcie_bid    ),
+    .pcie_m_bready     (cmn2pcie_bready ),
+    .pcie_m_bresp      (cmn2pcie_bresp  ),
+    .pcie_m_bvalid     (cmn2pcie_bvalid ),
+    .pcie_m_rdata      (cmn2pcie_rdata  ),
+    .pcie_m_rid        (cmn2pcie_rid    ),
+    .pcie_m_rlast      (cmn2pcie_rlast  ),
+    .pcie_m_rready     (cmn2pcie_rready ),
+    .pcie_m_rresp      (cmn2pcie_rresp  ),
+    .pcie_m_rvalid     (cmn2pcie_rvalid ),
+    .pcie_m_wdata      (cmn2pcie_wdata  ),
+    .pcie_m_wlast      (cmn2pcie_wlast  ),
+    .pcie_m_wready     (cmn2pcie_wready ),
+    .pcie_m_wstrb      (cmn2pcie_wstrb  ),
+    .pcie_m_wvalid     (cmn2pcie_wvalid ),
+`endif /* CONFIG_USE_PCIE */
+    /* Peri AXI */
+    .peri_araddr  (br2cfg_araddr ),
+    .peri_arburst (br2cfg_arburst),
+    .peri_arcache (br2cfg_arcache),
+    .peri_arlen   (br2cfg_arlen  ),
+    .peri_arlock  (br2cfg_arlock ),
+    .peri_arprot  (br2cfg_arprot ),
+    .peri_arqos   (br2cfg_arqos  ),
+    .peri_arready (br2cfg_arready),
+    .peri_arsize  (br2cfg_arsize ),
+    .peri_arvalid (br2cfg_arvalid),
+    .peri_awaddr  (br2cfg_awaddr ),
+    .peri_awburst (br2cfg_awburst),
+    .peri_awcache (br2cfg_awcache),
+    .peri_awlen   (br2cfg_awlen  ),
+    .peri_awlock  (br2cfg_awlock ),
+    .peri_awprot  (br2cfg_awprot ),
+    .peri_awqos   (br2cfg_awqos  ),
+    .peri_awready (br2cfg_awready),
+    .peri_awsize  (br2cfg_awsize ),
+    .peri_awvalid (br2cfg_awvalid),
+    .peri_bready  (br2cfg_bready ),
+    .peri_bresp   (br2cfg_bresp  ),
+    .peri_bvalid  (br2cfg_bvalid ),
+    .peri_rdata   (br2cfg_rdata  ),
+    .peri_rlast   (br2cfg_rlast  ),
+    .peri_rready  (br2cfg_rready ),
+    .peri_rresp   (br2cfg_rresp  ),
+    .peri_rvalid  (br2cfg_rvalid ),
+    .peri_wdata   (br2cfg_wdata  ),
+    .peri_wlast   (br2cfg_wlast  ),
+    .peri_wready  (br2cfg_wready ),
+    .peri_wstrb   (br2cfg_wstrb  ),
+    .peri_wvalid  (br2cfg_wvalid ),
+    .peri_arid    (br2cfg_arid),
+    .peri_awid    (br2cfg_awid),
+    .peri_bid     (br2cfg_bid),
+    .peri_rid     (br2cfg_rid)
+);
+
+`endif
+
 
 SimTop_wrapper U_CPU_TOP(
     .difftest_pcie_clock             (difftest_pcie_clock),
@@ -1296,6 +1945,29 @@ SimTop_wrapper U_CPU_TOP(
     .pll0_test_calout               (),
     .soc_to_cpu                     (16'b0                         ),
     .cpu_to_soc                     (                              ),
+`ifdef CONFIG_USE_IMSIC
+    .io_imsic_awready               (xstile_imsic_awready),
+    .io_imsic_awvalid               (xstile_imsic_awvalid),
+    .io_imsic_awid                  (xstile_imsic_awid),
+    .io_imsic_awaddr                (xstile_imsic_awaddr),
+    .io_imsic_wready                (xstile_imsic_wready),
+    .io_imsic_wvalid                (xstile_imsic_wvalid),
+    .io_imsic_wdata                 (xstile_imsic_wdata),
+    .io_imsic_bready                (xstile_imsic_bready),
+    .io_imsic_bvalid                (xstile_imsic_bvalid),
+    .io_imsic_bid                   (xstile_imsic_bid),
+    .io_imsic_bresp                 (xstile_imsic_bresp),
+    .io_imsic_arready               (xstile_imsic_arready),
+    .io_imsic_arvalid               (xstile_imsic_arvalid),
+    .io_imsic_arid                  (xstile_imsic_arid),
+    .io_imsic_araddr                (xstile_imsic_araddr),
+    .io_imsic_rready                (xstile_imsic_rready),
+    .io_imsic_rvalid                (xstile_imsic_rvalid),
+    .io_imsic_rid                   (xstile_imsic_rid),
+    .io_imsic_rdata                 (xstile_imsic_rdata),
+    .io_imsic_rresp                 (xstile_imsic_rresp),
+`endif /* CONFIG_USE_IMSIC */
+`ifdef CONFIG_USE_XSCORE_AXI
     .io_systemjtag_jtag_TCK         (io_systemjtag_jtag_TCK),
     .io_systemjtag_jtag_TMS         (io_systemjtag_jtag_TMS),
     .io_systemjtag_jtag_TDI         (io_systemjtag_jtag_TDI),
@@ -1420,7 +2092,50 @@ SimTop_wrapper U_CPU_TOP(
     .mem_core_rlast                 (cpu2ddr_s2m_rlast),
     
     .io_extIntrs                    (cpu_int_mix)
-    
+`elsif CONFIG_USE_XSCORE_CHI
+    .noc_clk                        (noc_clk ),
+    .noc_rstn                       (cpu_rstn_io),  
+    .clint_int_0                    (clint_int_0[`CONFIG_XSCORE_NR-1:0]),
+    .clint_int_1                    (clint_int_1[`CONFIG_XSCORE_NR-1:0]),
+    .plic_int                       (plic_int[`CONFIG_XSCORE_NR-1:0]),
+    .io_clintTime_valid             (io_clintTime_valid),
+    .io_clintTime_bits              (io_clintTime_bits),
+    .io_debug_module_hart           (debug_module_hart[`CONFIG_XSCORE_NR-1:0]),
+    .io_hartIsInReset               (io_hartIsInReset[`CONFIG_XSCORE_NR-1:0]),
+    .io_riscv_halt                  (),
+    .io_chi_syscoreq                (xstile_chi_syscoreq ),
+    .io_chi_syscoack                (xstile_chi_syscoack ),
+    .io_chi_txsactive               (xstile_chi_txsactive),
+    .io_chi_rxsactive               (xstile_chi_rxsactive),
+    .io_chi_tx_linkactivereq        (xstile_chi_tx_linkactivereq),
+    .io_chi_tx_linkactiveack        (xstile_chi_tx_linkactiveack),
+    .io_chi_tx_req_flitpend         (xstile_chi_tx_req_flitpend),
+    .io_chi_tx_req_flitv            (xstile_chi_tx_req_flitv),
+    .io_chi_tx_req_flit             (xstile_chi_tx_req_flit),
+    .io_chi_tx_req_lcrdv            (xstile_chi_tx_req_lcrdv),
+    .io_chi_tx_rsp_flitpend         (xstile_chi_tx_rsp_flitpend),
+    .io_chi_tx_rsp_flitv            (xstile_chi_tx_rsp_flitv),
+    .io_chi_tx_rsp_flit             (xstile_chi_tx_rsp_flit),
+    .io_chi_tx_rsp_lcrdv            (xstile_chi_tx_rsp_lcrdv),
+    .io_chi_tx_dat_flitpend         (xstile_chi_tx_dat_flitpend),
+    .io_chi_tx_dat_flitv            (xstile_chi_tx_dat_flitv),
+    .io_chi_tx_dat_flit             (xstile_chi_tx_dat_flit),
+    .io_chi_tx_dat_lcrdv            (xstile_chi_tx_dat_lcrdv),
+    .io_chi_rx_linkactivereq        (xstile_chi_rx_linkactivereq),
+    .io_chi_rx_linkactiveack        (xstile_chi_rx_linkactiveack),
+    .io_chi_rx_rsp_flitpend         (xstile_chi_rx_rsp_flitpend),
+    .io_chi_rx_rsp_flitv            (xstile_chi_rx_rsp_flitv),
+    .io_chi_rx_rsp_flit             (xstile_chi_rx_rsp_flit),
+    .io_chi_rx_rsp_lcrdv            (xstile_chi_rx_rsp_lcrdv),
+    .io_chi_rx_dat_flitpend         (xstile_chi_rx_dat_flitpend),
+    .io_chi_rx_dat_flitv            (xstile_chi_rx_dat_flitv),
+    .io_chi_rx_dat_flit             (xstile_chi_rx_dat_flit),
+    .io_chi_rx_dat_lcrdv            (xstile_chi_rx_dat_lcrdv),
+    .io_chi_rx_snp_flitpend         (xstile_chi_rx_snp_flitpend),
+    .io_chi_rx_snp_flitv            (xstile_chi_rx_snp_flitv),
+    .io_chi_rx_snp_flit             (xstile_chi_rx_snp_flit),
+    .io_chi_rx_snp_lcrdv            (xstile_chi_rx_snp_lcrdv)
+`endif
 );
 
 assign hpm_data_ulvt = 0;
