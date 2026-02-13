@@ -121,28 +121,26 @@ set bCheckIPsPassed 1
 # CHECK IPs
 ##################################################################
 set bCheckIPs 1
+proc pick_ip_vlnv {base} {
+    set defs [get_ipdefs -all xilinx.com:ip:${base}:*]
+    if { $defs eq "" } {
+      return xilinx.com:ip:${base}
+    }
+    return [lindex $defs end]
+}
 if { $bCheckIPs == 1 } {
   common::send_gid_msg -ssname BD::TCL -id 2058 -severity "INFO" "Current scripts_vivado_version value: '$::vivado_version'"
   
-  if {[string match "*2025.1*" $::vivado_version]} {
-    set list_check_ips "\ 
+  set xdma_vlnv [pick_ip_vlnv xdma]
+  set util_vlnv [pick_ip_vlnv util_ds_buf]
+  set list_check_ips [list \
     xilinx.com:ip:axis_clock_converter:1.1\
     xilinx.com:ip:axis_dwidth_converter:1.1\
     xilinx.com:ip:xpm_cdc_gen:1.0\
-    xilinx.com:ip:util_ds_buf:2.2\
-    xilinx.com:ip:xdma:4.2\
     xilinx.com:ip:clk_wiz:6.0\
-    "
-  } else {
-    set list_check_ips "\ 
-    xilinx.com:ip:axis_clock_converter:1.1\
-    xilinx.com:ip:axis_dwidth_converter:1.1\
-    xilinx.com:ip:xpm_cdc_gen:1.0\
-    xilinx.com:ip:util_ds_buf:2.1\
-    xilinx.com:ip:xdma:4.1\
-    xilinx.com:ip:clk_wiz:6.0\
-    "
-  }
+    $util_vlnv\
+    $xdma_vlnv\
+   ]
 
    set list_ips_missing ""
    common::send_gid_msg -ssname BD::TCL -id 2011 -severity "INFO" "Checking if the following IPs exist in the project's IP catalog: $list_check_ips ."
@@ -178,6 +176,8 @@ proc create_root_design { parentCell } {
 
   variable script_folder
   variable design_name
+  variable xdma_vlnv
+  variable util_vlnv
 
   if { $parentCell eq "" } {
      set parentCell [get_bd_cells /]
@@ -268,61 +268,59 @@ proc create_root_design { parentCell } {
  ] $clk_wiz_0
 
   # Create instance: util_ds_buf_0, and set properties
-  if {[string match "*2025.1*" $::vivado_version]} {
-     set util_ds_buf_0 [ create_bd_cell -type ip -vlnv xilinx.com:ip:util_ds_buf:2.2 util_ds_buf_0 ]
-  } else {
-     set util_ds_buf_0 [ create_bd_cell -type ip -vlnv xilinx.com:ip:util_ds_buf:2.1 util_ds_buf_0 ]
-  }
+  set util_ds_buf_0 [ create_bd_cell -type ip -vlnv $util_vlnv util_ds_buf_0 ]
   set_property CONFIG.C_BUF_TYPE {IBUFDSGTE} $util_ds_buf_0
 
   # Create instance: xdma_0, and set properties
-  if {[string match "*2025.1*" $::vivado_version]} {
-     set xdma_0 [ create_bd_cell -type ip -vlnv xilinx.com:ip:xdma:4.2 xdma_0 ]
-      set_property -dict [list \
-        CONFIG.PF0_DEVICE_ID_mqdma {9048} \
-        CONFIG.PF0_SRIOV_VF_DEVICE_ID {A048} \
-        CONFIG.PF2_DEVICE_ID_mqdma {9248} \
-        CONFIG.PF3_DEVICE_ID_mqdma {9348} \
-        CONFIG.axi_data_width {256_bit} \
-        CONFIG.axilite_master_en {true} \
-        CONFIG.axisten_freq {250} \
-        CONFIG.cfg_mgmt_if {false} \
-        CONFIG.copy_pf0 {true} \
-        CONFIG.en_gt_selection {true} \
-        CONFIG.enable_gtwizard {false} \
-        CONFIG.mode_selection {Advanced} \
-        CONFIG.pcie_blk_locn {PCIE4C_X0Y4} \
-        CONFIG.pf0_device_id {9048} \
-        CONFIG.pl_link_cap_max_link_speed {8.0_GT/s} \
-        CONFIG.pl_link_cap_max_link_width {X8} \
-        CONFIG.plltype {QPLL1} \
-        CONFIG.runbit_fix {false} \
-        CONFIG.select_quad {GTY_Quad_231} \
-        CONFIG.xdma_axi_intf_mm {AXI_Stream} \
-      ] $xdma_0
+  set xdma_0 [ create_bd_cell -type ip -vlnv $xdma_vlnv xdma_0 ]
+  # Configure based on XDMA IP version
+  if { [string match "*4.2" $xdma_vlnv] } {
+    set_property -dict [list \
+      CONFIG.PF0_DEVICE_ID_mqdma {9048} \
+      CONFIG.PF0_SRIOV_VF_DEVICE_ID {A048} \
+      CONFIG.PF2_DEVICE_ID_mqdma {9248} \
+      CONFIG.PF3_DEVICE_ID_mqdma {9348} \
+      CONFIG.axi_data_width {256_bit} \
+      CONFIG.axilite_master_en {true} \
+      CONFIG.axisten_freq {250} \
+      CONFIG.cfg_mgmt_if {false} \
+      CONFIG.copy_pf0 {true} \
+      CONFIG.en_gt_selection {true} \
+      CONFIG.enable_gtwizard {false} \
+      CONFIG.mode_selection {Advanced} \
+      CONFIG.pcie_blk_locn {PCIE4C_X0Y4} \
+      CONFIG.pf0_device_id {9048} \
+      CONFIG.pl_link_cap_max_link_speed {8.0_GT/s} \
+      CONFIG.pl_link_cap_max_link_width {X8} \
+      CONFIG.plltype {QPLL1} \
+      CONFIG.runbit_fix {false} \
+      CONFIG.select_quad {GTY_Quad_231} \
+      CONFIG.xdma_axi_intf_mm {AXI_Stream} \
+    ] $xdma_0
+  } elseif { [string match "*4.1" $xdma_vlnv] } {
+    set_property -dict [list \
+      CONFIG.PF0_DEVICE_ID_mqdma {9048} \
+      CONFIG.PF2_DEVICE_ID_mqdma {9048} \
+      CONFIG.PF3_DEVICE_ID_mqdma {9048} \
+      CONFIG.axi_data_width {256_bit} \
+      CONFIG.axilite_master_en {true} \
+      CONFIG.axisten_freq {250} \
+      CONFIG.cfg_mgmt_if {false} \
+      CONFIG.coreclk_freq {500} \
+      CONFIG.en_gt_selection {true} \
+      CONFIG.mode_selection {Advanced} \
+      CONFIG.pcie_blk_locn {PCIE4C_X0Y4} \
+      CONFIG.pf0_device_id {9048} \
+      CONFIG.pf0_msix_cap_pba_bir {BAR_1} \
+      CONFIG.pf0_msix_cap_table_bir {BAR_1} \
+      CONFIG.pl_link_cap_max_link_speed {8.0_GT/s} \
+      CONFIG.pl_link_cap_max_link_width {X8} \
+      CONFIG.plltype {QPLL1} \
+      CONFIG.select_quad {GTY_Quad_231} \
+      CONFIG.xdma_axi_intf_mm {AXI_Stream} \
+    ] $xdma_0
   } else {
-     set xdma_0 [ create_bd_cell -type ip -vlnv xilinx.com:ip:xdma:4.1 xdma_0 ]
-      set_property -dict [ list \
-        CONFIG.PF0_DEVICE_ID_mqdma {9048} \
-        CONFIG.PF2_DEVICE_ID_mqdma {9048} \
-        CONFIG.PF3_DEVICE_ID_mqdma {9048} \
-        CONFIG.axi_data_width {256_bit} \
-        CONFIG.axilite_master_en {true} \
-        CONFIG.axisten_freq {250} \
-        CONFIG.cfg_mgmt_if {false} \
-        CONFIG.coreclk_freq {500} \
-        CONFIG.en_gt_selection {true} \
-        CONFIG.mode_selection {Advanced} \
-        CONFIG.pcie_blk_locn {PCIE4C_X0Y4} \
-        CONFIG.pf0_device_id {9048} \
-        CONFIG.pf0_msix_cap_pba_bir {BAR_1} \
-        CONFIG.pf0_msix_cap_table_bir {BAR_1} \
-        CONFIG.pl_link_cap_max_link_speed {8.0_GT/s} \
-        CONFIG.pl_link_cap_max_link_width {X8} \
-        CONFIG.plltype {QPLL1} \
-        CONFIG.select_quad {GTY_Quad_231} \
-        CONFIG.xdma_axi_intf_mm {AXI_Stream} \
-      ] $xdma_0
+    error "Unsupported XDMA IP version: $xdma_vlnv (only 4.1 or 4.2 supported)"
   }
 
   # Create instance: xpm_cdc_gen_0, and set properties
