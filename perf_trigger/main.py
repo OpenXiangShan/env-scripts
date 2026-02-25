@@ -155,11 +155,13 @@ class XiangShan:
         nemu_so_path: str | None,
         server_list: str,
     ) -> None:
+        # Do not use open servers unless explicitly specified, as they are too slow
         if server_list == "all":
-            server_pool = SERVER_POOL
+            server_pool = list(filter(lambda s: s.startswith("node"), SERVER_POOL))
         elif server_list == "":
-            desired_sever_num = min(len(self.checkpoints) // 64 + 1, len(SERVER_POOL))
-            server_pool = random.sample(SERVER_POOL, k=desired_sever_num)
+            server_pool = list(filter(lambda s: s.startswith("node"), SERVER_POOL))
+            desired_server_num = min(len(self.checkpoints) // 64 + 1, len(server_pool))
+            server_pool = random.sample(server_pool, k=desired_server_num)
         else:
             server_pool = server_list.replace(" ", "").split(",")
             for server in server_pool:
