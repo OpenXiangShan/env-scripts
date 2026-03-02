@@ -126,6 +126,8 @@ def load_all_gcpt(gcpt_path, json_path, server_num, threads, state_filter=None, 
 
 def get_server(server_list):
   l = []
+  if ", " in server_list:
+    server_list = server_list.replace(", ", " ")
   for s in server_list.strip().split(" "):
     l.append(Server(s))
   return l
