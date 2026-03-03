@@ -319,6 +319,12 @@ class Server:
                 )
             )
 
+            if emu_config.custom_constantin:
+                run_cmd = [
+                    "env",
+                    f"CONSTANT_FILE={shlex.quote(emu_config.custom_constantin)}",
+                ] + run_cmd
+
             if emu_config.sim_frontend:
                 run_cmd += ["--instr-trace", shlex.quote(gcpt.get_trace_path())]
 

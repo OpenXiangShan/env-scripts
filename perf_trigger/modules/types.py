@@ -13,6 +13,7 @@ class EmuConfig:
     with_numactl: bool = True
     sim_frontend: bool = False
     dry_run: bool = False
+    custom_constantin: str = ""
 
 
 @dataclass

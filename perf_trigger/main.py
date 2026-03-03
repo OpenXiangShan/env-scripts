@@ -394,6 +394,12 @@ def main():
         action="store_true",
         help="Do not run emu, only print command and sleep 10 seconds",
     )
+    parser.add_argument(
+        "--custom-constantin",
+        type=str,
+        default="",
+        help="Path to custom constant file; if set, exported as CONSTANT_FILE",
+    )
 
     # autorun
     parser.add_argument(
@@ -481,6 +487,10 @@ def main():
             raise FileNotFoundError(f"nemu_so_path is not a file: {args.nemu_so_path}")
         if args.sim_frontend and not os.path.isdir(args.trace_dir):
             raise FileNotFoundError(f"trace_dir is not a directory: {args.trace_dir}")
+        if args.custom_constantin and not os.path.isfile(args.custom_constantin):
+            raise FileNotFoundError(
+                f"custom_constantin file does not exist: {args.custom_constantin}"
+            )
         xiangshan.run(
             emu_path=args.emu_path,
             nemu_so_path=args.nemu_so_path,
@@ -491,6 +501,7 @@ def main():
                 threads=args.threads,
                 sim_frontend=args.sim_frontend,
                 dry_run=args.dry_run,
+                custom_constantin=args.custom_constantin,
             ),
         )
 
