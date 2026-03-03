@@ -289,7 +289,7 @@ class Server:
             open(gcpt.get_stdout_path(), "w", encoding="utf-8") as fout,
             open(gcpt.get_stderr_path(), "w", encoding="utf-8") as ferr,
         ):
-            p = self.run(
+            run_cmd = (
                 (
                     [
                         "numactl",
@@ -316,7 +316,22 @@ class Server:
                     ["--diff", self.nemu_so_path]
                     if self.nemu_so_path
                     else ["--no-diff"]
-                ),
+                )
+            )
+
+            if emu_config.sim_frontend:
+                run_cmd += ["--instr-trace", shlex.quote(gcpt.get_trace_path())]
+
+            if emu_config.dry_run:
+                cmd_str = " ".join(run_cmd)
+                self.tracker.info("[DRY-RUN] %s on %s", gcpt, self.hostname)
+                self.tracker.info("[DRY-RUN CMD] %s", cmd_str)
+                time.sleep(10)
+                self.tracker.info("[DRY-RUN] finished %s on %s", gcpt, self.hostname)
+                return
+
+            p = self.run(
+                run_cmd,
                 stdout=fout,
                 stderr=ferr,
                 block=False,

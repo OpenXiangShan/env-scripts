@@ -11,6 +11,8 @@ class EmuConfig:
     max_instr: int
     threads: int
     with_numactl: bool = True
+    sim_frontend: bool = False
+    dry_run: bool = False
 
 
 @dataclass

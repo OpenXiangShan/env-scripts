@@ -63,6 +63,7 @@ SERVER_POOL = [
 ]
 REF_RUN_TIME = "/nfs/home/share/liyanqin/env-scripts/perf/json/gcc12o3-incFpcOff-jeMalloc-time.json"
 STUCK_THRESHOLD = 10 * 3600  # 10 hours
+SIM_FRONTEND_TRACE_DIR = "/nfs/home/wangzhizun/anzo/xs-env/NEMU/trace/2025-09-10_13-04-38"
 
 SPEC06_INT_BENCHMARKS = [
     "perlbench",
@@ -107,10 +108,12 @@ class XiangShan:
         json_path: str,
         result_path: str,
         benchmarks: str,
+        trace_dir: str = "",
     ):
         self.gcpt_path = gcpt_path
         self.json_path = json_path
         self.result_path = result_path
+        self.trace_dir = trace_dir
 
         with open(json_path, "r", encoding="utf-8") as f:
             self.benchmarks = json.load(f)
@@ -140,6 +143,7 @@ class XiangShan:
                         benchmark=benchmark_name,
                         checkpoint=point,
                         weight=weight,
+                        trace_dir=trace_dir,
                     )
                 )
 
@@ -219,6 +223,8 @@ class XiangShan:
         for gcpt in self.checkpoints:
             # check state from disk
             state = gcpt.refresh_state()
+            if emu_config.dry_run:
+                state = GCPT.State.NONE  # ignore existing state in dry-run mode
             match state:
                 case GCPT.State.RUNNING:
                     self.tracker.warning(
@@ -371,6 +377,23 @@ def main():
     parser.add_argument(
         "--threads", "-T", default=8, type=int, help="number of emu threads"
     )
+    parser.add_argument(
+        "--sim-frontend",
+        "-F",
+        action="store_true",
+        help="Enable simFrontend mode and pass --instr-trace for each checkpoint",
+    )
+    parser.add_argument(
+        "--trace-dir",
+        type=str,
+        default=SIM_FRONTEND_TRACE_DIR,
+        help="Base directory of simFrontend traces",
+    )
+    parser.add_argument(
+        "--dry-run",
+        action="store_true",
+        help="Do not run emu, only print command and sleep 10 seconds",
+    )
 
     # autorun
     parser.add_argument(
@@ -443,18 +466,21 @@ def main():
         json_path=args.json_path,
         result_path=args.result_path,
         benchmarks=args.benchmarks,
+        trace_dir=args.trace_dir if args.sim_frontend else "",
     )
 
     if args.reset_running:
         xiangshan.reset_running_gcpt()
 
-    if args.run:
+    if args.run or args.dry_run:
         if not args.emu_path:
             raise ValueError("emu_path is required for --run")
         if not os.path.isfile(args.emu_path):
             raise FileNotFoundError(f"emu_path is not a file: {args.emu_path}")
         if args.nemu_so_path and not os.path.isfile(args.nemu_so_path):
             raise FileNotFoundError(f"nemu_so_path is not a file: {args.nemu_so_path}")
+        if args.sim_frontend and not os.path.isdir(args.trace_dir):
+            raise FileNotFoundError(f"trace_dir is not a directory: {args.trace_dir}")
         xiangshan.run(
             emu_path=args.emu_path,
             nemu_so_path=args.nemu_so_path,
@@ -463,6 +489,8 @@ def main():
                 warmup=args.warmup,
                 max_instr=args.max_instr,
                 threads=args.threads,
+                sim_frontend=args.sim_frontend,
+                dry_run=args.dry_run,
             ),
         )
 

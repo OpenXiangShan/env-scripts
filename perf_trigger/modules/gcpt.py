@@ -16,11 +16,13 @@ class GCPT:
         benchmark: str,
         checkpoint: str,
         weight: str,
+        trace_dir: str = "",
     ):
         self.gcpt_path = gcpt_path
         self.benchmark = benchmark
         self.checkpoint = checkpoint
         self.weight = weight
+        self.trace_dir = trace_dir
         self.state = GCPT.State.NONE
         self.result_path = os.path.join(result_path, self.__str__())
 
@@ -38,6 +40,18 @@ class GCPT:
 
     def get_stderr_path(self):
         return os.path.join(self.result_path, "simulator_err.txt")
+
+    def get_trace_path(self) -> str:
+        if self.trace_dir == "":
+            raise ValueError("trace_dir is not set")
+        trace_path = os.path.join(
+            self.trace_dir,
+            self.benchmark,
+            f"{self.benchmark}_{self.checkpoint}.trace",
+        )
+        if not os.path.isfile(trace_path):
+            raise FileNotFoundError(f"Trace file not found: {trace_path}")
+        return trace_path
 
     def refresh_state(self) -> "GCPT.State":
         if (
