@@ -427,9 +427,10 @@ def main():
     )
 
     parser.add_argument(
-        "--reset-running",
+        "--keep-running", # "--reset-running",
         action="store_true",
-        help="Reset checkpoints in RUNNING state by removing their output files",
+        # help="Reset checkpoints in RUNNING state by removing their output files",
+        help="Do not remove the output files of checkpoints in RUNNING state",
     )
 
     # debug options
@@ -475,7 +476,7 @@ def main():
         trace_dir=args.trace_dir if args.sim_frontend else "",
     )
 
-    if args.reset_running:
+    if not args.keep_running:
         xiangshan.reset_running_gcpt()
 
     if args.run or args.dry_run:
