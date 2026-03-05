@@ -17,12 +17,14 @@ class GCPT:
         checkpoint: str,
         weight: str,
         trace_dir: str = "",
+        ref_time: int = 0,
     ):
         self.gcpt_path = gcpt_path
         self.benchmark = benchmark
         self.checkpoint = checkpoint
         self.weight = weight
         self.trace_dir = trace_dir
+        self.ref_time = ref_time
         self.state = GCPT.State.NONE
         self.result_path = os.path.join(result_path, self.__str__())
 

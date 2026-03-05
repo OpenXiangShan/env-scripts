@@ -61,7 +61,8 @@ SERVER_POOL = [
     "open26",
     "open27",
 ]
-REF_RUN_TIME = "/nfs/home/share/liyanqin/env-scripts/perf/json/gcc12o3-incFpcOff-jeMalloc-time.json"
+REF_RUN_TIME1 = "/nfs/home/share/liyanqin/env-scripts/perf/json/gcc12o3-incFpcOff-jeMalloc-time.json"
+REF_RUN_TIME2 = "/nfs/home/share/liyanqin/json/host_time_map.json"
 STUCK_THRESHOLD = 10 * 3600  # 10 hours
 SIM_FRONTEND_TRACE_DIR = "/nfs/home/wangzhizun/anzo/xs-env/NEMU/trace/2025-09-10_13-04-38"
 
@@ -133,6 +134,9 @@ class XiangShan:
                 if any(k.startswith(prefix) for prefix in benchmark_filter)
             }
 
+        with open(REF_RUN_TIME2, "r", encoding="utf-8") as f:
+            time_json = json.load(f)
+
         self.checkpoints: list[GCPT] = []
         for benchmark_name, benchmark_config in self.benchmarks.items():
             for point, weight in benchmark_config["points"].items():
@@ -144,8 +148,10 @@ class XiangShan:
                         checkpoint=point,
                         weight=weight,
                         trace_dir=trace_dir,
+                        ref_time=int(time_json[f"{benchmark_name}_{point}_{weight}"]),
                     )
                 )
+        self.checkpoints = sorted(self.checkpoints, key=lambda x: -x.ref_time)
 
         self.servers: list[Server] = []
 
