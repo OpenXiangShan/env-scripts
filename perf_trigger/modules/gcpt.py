@@ -74,3 +74,6 @@ class GCPT:
                     self.state = GCPT.State.NONE
 
         return self.state
+
+    def clear_state(self) -> None:
+        self.state = GCPT.State.NONE

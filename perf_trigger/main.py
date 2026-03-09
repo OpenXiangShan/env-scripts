@@ -354,6 +354,7 @@ class XiangShan:
                 os.remove(gcpt.get_stdout_path())
                 os.remove(gcpt.get_stderr_path())
                 os.rmdir(gcpt.get_result_path())
+                gcpt.clear_state()
         logging.info("Reset %d RUNNING GCPTs", num)
 
 
