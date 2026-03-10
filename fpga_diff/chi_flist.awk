@@ -1,4 +1,4 @@
-BEGIN{printf "set cpu_files [list \\\n"}
+BEGIN{printf "set chi_files [list \\\n"}
 {
     printf " [file normalize \""
     printf $0
