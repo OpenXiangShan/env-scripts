@@ -158,7 +158,11 @@ class XiangShan:
         # Do not use open servers unless explicitly specified, as they are too slow
         if server_list == "all":
             server_pool = list(filter(lambda s: s.startswith("node"), SERVER_POOL))
-        elif server_list == "":
+        elif server_list == "open":
+            server_pool = list(filter(lambda s: s.startswith("open"), SERVER_POOL))
+            desired_server_num = min(len(self.checkpoints) // 64 + 1, len(server_pool))
+            server_pool = random.sample(server_pool, k=desired_server_num)
+        elif server_list == "node" or server_list == "":
             server_pool = list(filter(lambda s: s.startswith("node"), SERVER_POOL))
             desired_server_num = min(len(self.checkpoints) // 64 + 1, len(server_pool))
             server_pool = random.sample(server_pool, k=desired_server_num)
