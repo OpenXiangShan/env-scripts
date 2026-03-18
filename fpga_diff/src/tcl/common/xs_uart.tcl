@@ -318,13 +318,19 @@ set_property -name "strategy" -value "Flow_PerfOptimized_high" -objects $obj
 # set the current synth run
 current_run -synthesis [get_runs synth_1]
 
-# Create 'synth_2' run
-create_run -name synth_2 -part xcvu19p-fsva3824-2-e -strategy "Vivado Synthesis Defaults" -report_strategy {No Reports} -constrset constrs_1
+# Create 'synth_2' run (if not found)
+if {[string equal [get_runs -quiet synth_2] ""]} {
+    create_run -name synth_2 -part xcvu19p-fsva3824-2-e -flow {Vivado Synthesis 2020} -strategy "Vivado Synthesis Defaults" -report_strategy {No Reports} -constrset constrs_1
+} else {
+  set_property strategy "Vivado Synthesis Defaults" [get_runs synth_2]
+  set_property flow "Vivado Synthesis 2020" [get_runs synth_2]
+}
 set obj [get_runs synth_2]
-set_property -name "steps.synth_design.directive" -value "AlternateRoutability" -objects $obj
-set_property -name "steps.synth_design.gated_clock_conversion" -value "2" -objects $obj
-set_property -name "steps.synth_design.max_clock_buffer_count" -value "52" -objects $obj
-set_property -name "auto_incremental_checkpoint" -value "1" -objects $obj
+set_property -name "part" -value "xcvu19p-fsva3824-2-e" -objects $obj
+set_property -name "strategy" -value "Vivado Synthesis Defaults" -objects $obj
+set_property -name "steps.synth_design.args.directive" -value "AlternateRoutability" -objects $obj
+set_property -name "steps.synth_design.args.gated_clock_conversion" -value "auto" -objects $obj
+set_property -name "steps.synth_design.args.bufg" -value "52" -objects $obj
 
 # Create 'impl_1' run (if not found)
 if {[string equal [get_runs -quiet impl_1] ""]} {
@@ -339,15 +345,21 @@ set_property -name "strategy" -value "Congestion_SSI_SpreadLogic_high" -objects 
 set_property -name "steps.write_bitstream.args.readback_file" -value "0" -objects $obj
 set_property -name "steps.write_bitstream.args.verbose" -value "0" -objects $obj
 
-# Create 'impl_2' run
-create_run -name impl_2 -part xcvu19p-fsva3824-2-e -strategy "Performance_WLBlockPlacementFanoutOpt" -report_strategy {No Reports} -constrset constrs_1 -parent_run synth_2
+# Create 'impl_2' run (if not found)
+if {[string equal [get_runs -quiet impl_2] ""]} {
+    create_run -name impl_2 -part xcvu19p-fsva3824-2-e -flow {Vivado Implementation 2020} -strategy "Performance_WLBlockPlacementFanoutOpt" -report_strategy {No Reports} -constrset constrs_1 -parent_run synth_2
+} else {
+  set_property strategy "Performance_WLBlockPlacementFanoutOpt" [get_runs impl_2]
+  set_property flow "Vivado Implementation 2020" [get_runs impl_2]
+}
 set obj [get_runs impl_2]
-set_property -name "steps.place_design.directive" -value "WLDrivenBlockPlacement" -objects $obj
-set_property -name "steps.phys_opt_design.directive" -value "AggressiveFanoutOpt" -objects $obj
-set_property -name "steps.route_design.directive" -value "Explore" -objects $obj
+set_property -name "part" -value "xcvu19p-fsva3824-2-e" -objects $obj
+set_property -name "strategy" -value "Performance_WLBlockPlacementFanoutOpt" -objects $obj
+set_property -name "steps.place_design.args.directive" -value "WLDrivenBlockPlacement" -objects $obj
+set_property -name "steps.phys_opt_design.args.directive" -value "AggressiveFanoutOpt" -objects $obj
+set_property -name "steps.route_design.args.directive" -value "Explore" -objects $obj
 set_property -name "steps.write_bitstream.args.readback_file" -value "0" -objects $obj
 set_property -name "steps.write_bitstream.args.verbose" -value "0" -objects $obj
-set_property -name "launch_options" -value "-jobs 80" -objects $obj
 
 # set the current impl run
 current_run -implementation [get_runs impl_1]

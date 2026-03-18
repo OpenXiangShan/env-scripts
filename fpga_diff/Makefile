@@ -1,15 +1,15 @@
 PRJ ?=
 ENV_SCRIPTS_HOME ?= $(CURDIR)
 
-CORE_DIR ?= ""
-CHI_DIR ?= ""
+CORE_DIR ?=
+CHI_DIR ?=
 FPGA_BIT_HOME ?=
 WORKLOAD ?=
 # Supported CPU parameters:
 #   kmh
 #   nutshell
 #   nanhu
-CPU ?= ""
+CPU ?=
 
 .PHONY: bitstream vivado
 
@@ -75,6 +75,8 @@ get_synth_log:
 
 # Build complete FPGA project
 all:
+ifneq ($(strip $(CHI_DIR)),)
 	$(MAKE) update_chi_flist CHI_DIR="$(CHI_DIR)"
+endif
 	$(MAKE) update_core_flist CORE_DIR=$(CORE_DIR)
 	$(MAKE) vivado CPU=$(CPU)
