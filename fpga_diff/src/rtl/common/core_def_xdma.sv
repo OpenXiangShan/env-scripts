@@ -1318,13 +1318,13 @@ wire [0:0]    br2cfg_wvalid;
       .io_host_reset         (io_host_reset)
   );
 
-  fpga_clock_gate SOC_CLK_CTRL(
+  DifftestClockGate SOC_CLK_CTRL(
       .CK  (sys_clk_i),
       .E   ((difftest_clock_enable & xdma_link_up ) || ~io_host_diff_enable || ~sys_rstn_io || ~cpu_rstn_io),
       .Q   (inter_soc_clk)
   );
 
-  fpga_clock_gate RTC_CLK_CTRL(
+  DifftestClockGate RTC_CLK_CTRL(
       .CK  (tmclk),
       .E   ((difftest_clock_enable & xdma_link_up) || ~io_host_diff_enable || ~sys_rstn_io || ~cpu_rstn_io ),
       .Q   (inter_rtc_clk)
