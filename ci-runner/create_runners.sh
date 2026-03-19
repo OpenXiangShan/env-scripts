@@ -32,7 +32,7 @@ if [ ! -f "$runner_file" ]; then
 fi
 
 # Create base directory if needed
-mkdir -p "$base_dir"
+run_cmd mkdir -p "$base_dir"
 
 # Iterate runner_count times
 for ((i=0; i<runner_count; i++)); do
@@ -49,7 +49,7 @@ for ((i=0; i<runner_count; i++)); do
     runner_dir="${base_dir}/${runner_name}"
     
     echo "Creating runner directory: $runner_dir"
-    mkdir -p "$runner_dir"
+    run_cmd mkdir -p "$runner_dir"
 
     # Skip extraction if config.sh already exists (avoid redundant unpack)
     if [ -f "${runner_dir}/config.sh" ]; then
@@ -57,22 +57,22 @@ for ((i=0; i<runner_count; i++)); do
     else
         # Extract actions-runner into the directory
         echo "Extracting actions-runner to $runner_dir"
-        tar -xzf "$runner_file" -C "$runner_dir"
+        run_cmd tar -xzf "$runner_file" -C "$runner_dir"
     fi
 
     # Enter directory and configure runner
     echo "Configuring runner: $runner_name"
-    cd "$runner_dir" || exit 1
+    run_cmd cd "$runner_dir" || exit 1
     
     # Run configuration command
     echo "Executing configuration command"
     echo "    proxychains ./config.sh --unattended --url $url --token $token --replace --name $runner_name --labels $label"
-    proxychains ./config.sh --unattended --url $url --token $token --replace --name $runner_name --labels $label
+    run_cmd proxychains ./config.sh --unattended --url $url --token $token --replace --name $runner_name --labels $label
     # proxychains ./config.sh remove --token $token
 
     
     # Return to original directory
-    cd - > /dev/null
+    run_cmd cd - > /dev/null
     
     echo "Runner $i configuration complete: $runner_name"
     echo "----------------------------------------"
