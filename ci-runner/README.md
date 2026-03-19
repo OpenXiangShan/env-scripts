@@ -14,7 +14,7 @@
 RUNNER_URL="https://github.com/OpenXiangShan/XiangShan" \
 RUNNER_TOKEN="<token_from_github_new_self-hosted_runner_page>" \
 RUNNER_LABELS="bosc,open" \
-RUNNER_FILE=~/actions-runner-linux-x64-2.330.0.tar.gz \
+RUNNER_FILE=~/actions-runner-linux-x64-2.333.0.tar.gz \
 ~/env-scripts/ci-runner/create_runners.sh -r xs -d /local/ci-runner -n 6
 ```
 
@@ -24,15 +24,16 @@ RUNNER_FILE=~/actions-runner-linux-x64-2.330.0.tar.gz \
 RUNNER_URL="https://github.com/OpenXiangShan/XiangShan" \
 RUNNER_TOKEN="<token_from_github_new_self-hosted_runner_page>" \
 RUNNER_LABELS="bosc,node" \
-RUNNER_FILE=~/actions-runner-linux-x64-2.330.0.tar.gz \
+RUNNER_FILE=~/actions-runner-linux-x64-2.333.0.tar.gz \
 ~/env-scripts/ci-runner/create_runners.sh -r xs -d /home/cirunner -n 10
 ```
+
 ```shell
 ~/xstop \
 RUNNER_URL="https://github.com/OpenXiangShan/XiangShan" \
 RUNNER_TOKEN="<token_from_github_new_self-hosted_runner_page>" \
 RUNNER_LABELS="eda,perf,node" \
-RUNNER_FILE=~/actions-runner-linux-x64-2.330.0.tar.gz \
+RUNNER_FILE=~/actions-runner-linux-x64-2.333.0.tar.gz \
 ~/env-scripts/ci-runner/create_runners.sh -r xs-eda -d $HOME/ci-runner-xs-eda -n 4
 ```
 
@@ -72,23 +73,17 @@ RUNNER_FILE=~/actions-runner-linux-x64-2.330.0.tar.gz \
 在 Open 服务器上：
 ```shell
 ~/xstop \
-RUNNER_FILE=$HOME/actions-runner-linux-x64-2.331.0.tar.gz \
-RUNNER_VERSION=2.331.0 \
-RUNNER_EXTRACT_DIR=$HOME/actions-runner-linux-x64-2.331.0 \
+RUNNER_FILE=$HOME/actions-runner-linux-x64-2.333.0.tar.gz \
 ~/env-scripts/ci-runner/update_runners.sh -r xs -d /local/ci-runner -n 6
 ```
 在 Node 服务器上：
 ```shell
 ~/xstop \
-RUNNER_FILE=$HOME/actions-runner-linux-x64-2.331.0.tar.gz \
-RUNNER_VERSION=2.331.0 \
-RUNNER_EXTRACT_DIR=$HOME/actions-runner-linux-x64-2.331.0 \
+RUNNER_FILE=$HOME/actions-runner-linux-x64-2.333.0.tar.gz \
 ~/env-scripts/ci-runner/update_runners.sh -r xs -d /home/cirunner -n 10
 ```
 ```shell
 ~/xstop \
-RUNNER_FILE=$HOME/actions-runner-linux-x64-2.331.0.tar.gz \
-RUNNER_VERSION=2.331.0 \
-RUNNER_EXTRACT_DIR=$HOME/actions-runner-linux-x64-2.331.0 \
+RUNNER_FILE=$HOME/actions-runner-linux-x64-2.333.0.tar.gz \
 ~/env-scripts/ci-runner/update_runners.sh -r xs-eda -d $HOME/ci-runner-xs-eda -n 4
 ```

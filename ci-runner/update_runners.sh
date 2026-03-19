@@ -13,34 +13,37 @@ require_env() {
 }
 
 require_env "RUNNER_FILE"
-require_env "RUNNER_VERSION"
-require_env "RUNNER_EXTRACT_DIR"
 
 runner_file="$RUNNER_FILE"
-runner_version="$RUNNER_VERSION"
-extract_dir="$RUNNER_EXTRACT_DIR"
+runner_version=$(basename "$runner_file" .tar.gz | cut -d- -f5)
+
+# Verify runner archive exists
+if [ ! -f "$runner_file" ]; then
+    echo "Error: runner archive $runner_file not found!"
+    exit 1
+fi
+
+# Verify filename format
+if [[ -z "$runner_version" ]]; then
+    echo "Error: Unable to extract runner version from filename '$runner_file'"
+    exit 1
+fi
 
 # Load user configuration
 . "$SCRIPT_DIR/config.sh"
 
-# 1. Prepare Extracted Assets (Once)
-# If the extract directory does not have the 'bin' folder, we assume it needs extraction.
-if [ ! -d "$extract_dir/bin" ]; then
-    echo "Extracting $runner_file to $extract_dir ..."
-    
-    if [ ! -f "$runner_file" ]; then
-        echo "Error: runner archive $runner_file not found!"
-        exit 1
-    fi
-    
-    run_cmd mkdir -p "$extract_dir"
-    run_cmd tar -xzf "$runner_file" -C "$extract_dir"
-else
-    echo "Using existing extracted files at $extract_dir"
-fi
-
 # Create base directory if needed
 run_cmd mkdir -p "$base_dir"
+
+# 1. Extract runner archive to shared location (if not already extracted)
+shared_runner_dir="$base_dir/runner-${runner_version}"
+if [ ! -d "$shared_runner_dir" ]; then
+    echo "Extracting $runner_file to $shared_runner_dir ..."
+    run_cmd mkdir -p "$shared_runner_dir"
+    run_cmd tar -xzf "$runner_file" -C "$shared_runner_dir"
+else
+    echo "Using existing extracted files at $shared_runner_dir"
+fi
 
 # Iterate runner_count times
 for ((i=0; i<runner_count; i++)); do
@@ -59,58 +62,37 @@ for ((i=0; i<runner_count; i++)); do
     echo "Ensuring runner directory exists: $runner_dir"
     run_cmd mkdir -p "$runner_dir"
 
-    # 2. Files Distribution (Manual Update Logic)
-    target_bin_dir="${runner_dir}/bin.${runner_version}"
-    target_ext_dir="${runner_dir}/externals.${runner_version}"
-
-    # a) Copy bin directory
-    if [ ! -d "$target_bin_dir" ]; then
-        echo "Creating $target_bin_dir..."
-        run_cmd mkdir -p "$target_bin_dir"
-        run_cmd cp -rP "$extract_dir/bin/." "$target_bin_dir/"
-    else
-        echo "$target_bin_dir already exists, skipping copy."
-    fi
-
-    # b) Copy externals directory
-    if [ ! -d "$target_ext_dir" ]; then
-        echo "Creating $target_ext_dir..."
-        run_cmd mkdir -p "$target_ext_dir"
-        run_cmd cp -rP "$extract_dir/externals/." "$target_ext_dir/"
-    else
-        echo "$target_ext_dir already exists, skipping copy."
-    fi
-
-    # c) Copy other root files (excluding bin and externals)
+    # 2. Copy other root files (excluding bin and externals)
     echo "Copying root runner files..."
-    # Copy all files from extract_dir to runner_dir except bin and externals
+    # Copy all files from shared_runner_dir to runner_dir except bin and externals
     # Using find to handle the exclusion and copy
-    run_cmd find "$extract_dir" -maxdepth 1 -mindepth 1 -not -name 'bin' -not -name 'externals' -exec cp -rP {} "$runner_dir/" \;
+    # run_cmd find "$shared_runner_dir" -maxdepth 1 -mindepth 1 -not -name 'bin' -not -name 'externals' -exec cp -rP {} "$runner_dir/" \;
+    run_cmd find "$shared_runner_dir" -maxdepth 1 -mindepth 1 -not -name 'externals' -exec cp -rP {} "$runner_dir/" \;
 
     # 3. Symlink Switching
     echo "Updating symlinks..."
     
     # Handle 'bin' symlink
-    if [ -L "$runner_dir/bin" ]; then
-        run_cmd rm "$runner_dir/bin"
-    elif [ -d "$runner_dir/bin" ]; then
-        echo "Warning: moving existing processing directory 'bin' to 'bin.old.$(date "+%Y%m%d")'"
-        run_cmd mv "$runner_dir/bin" "$runner_dir/bin.old.$(date "+%Y%m%d")"
-    fi
-    run_cmd ln -s "bin.${runner_version}" "$runner_dir/bin"
+    # if [ -L "$runner_dir/bin" ]; then
+    #     run_cmd rm "$runner_dir/bin"
+    # elif [ -d "$runner_dir/bin" ]; then
+    #     echo "Warning: removing legacy 'bin' dir"
+    #     run_cmd rm -rf "$runner_dir/bin"
+    # fi
+    # run_cmd ln -s "$shared_runner_dir/bin" "$runner_dir/bin"
 
     # Handle 'externals' symlink
     if [ -L "$runner_dir/externals" ]; then
         run_cmd rm "$runner_dir/externals"
     elif [ -d "$runner_dir/externals" ]; then
-        echo "Warning: moving existing directory 'externals' to 'externals.old.$(date "+%Y%m%d")'"
-        run_cmd mv "$runner_dir/externals" "$runner_dir/externals.old.$(date "+%Y%m%d")"
+        echo "Warning: removing legacy 'externals' dir"
+        run_cmd rm -rf "$runner_dir/externals"
     fi
-    run_cmd ln -s "externals.${runner_version}" "$runner_dir/externals"
+    run_cmd ln -s "$shared_runner_dir/externals" "$runner_dir/externals"
     
     echo "Runner $i update complete: $runner_name"
     echo "----------------------------------------"
 done
 
 echo "All $runner_count runners updated and configured!"
-
+echo "Consider removing old shared runner directory if no longer needed: $(find "$base_dir" -maxdepth 1 -type d -name 'runner-*' ! -name "runner-${runner_version}")"
