@@ -62,6 +62,11 @@ for ((i=0; i<runner_count; i++)); do
     echo "Ensuring runner directory exists: $runner_dir"
     run_cmd mkdir -p "$runner_dir"
 
+    if [ -L "$runner_dir/bin" ]; then
+        echo "Removing legacy 'bin' symlink"
+        run_cmd rm "$runner_dir/bin"
+    fi
+
     # 2. Copy other root files (excluding bin and externals)
     echo "Copying root runner files..."
     # Copy all files from shared_runner_dir to runner_dir except bin and externals
