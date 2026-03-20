@@ -37,7 +37,19 @@ is_runner_active_in_pane() {
 # Capture the last non-empty line from a pane for idle-state detection.
 get_last_nonempty_line() {
     local pane_target="$1"
-    tmux capture-pane -p -t "$pane_target" 2>/dev/null | awk 'NF { line=$0 } END { print line }'
+    # -S -200: include recent scrollback; -J: join wrapped physical lines into logical lines.
+    # This avoids missing keywords when pane width is too small and long lines wrap.
+    tmux capture-pane -pJ -S -200 -t "$pane_target" 2>/dev/null | awk '
+        {
+            gsub(/\r/, "", $0)
+            if (NF) {
+                line=$0
+            }
+        }
+        END {
+            print line
+        }
+    '
 }
 
 # A pane is considered idle if the last non-empty line contains one of idle markers.
