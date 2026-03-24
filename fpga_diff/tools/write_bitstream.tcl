@@ -26,6 +26,8 @@ open_hw_manager
 connect_hw_server
 open_hw_target
 
+set_property PARAM.FREQUENCY 12000000 [current_hw_target]
+
 current_hw_device [get_hw_devices *]
 refresh_hw_device [current_hw_device]
 
