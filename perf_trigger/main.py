@@ -2,10 +2,12 @@ import argparse
 import json
 import logging
 import os
+from pathlib import Path
 import random
 import time
 
 from modules.gcpt import GCPT
+from modules.heartbeat import Heartbeat, HEARTBEAT_INTERVAL
 from modules.server import Server
 from modules.types import EmuConfig, FreeCoreInfo
 from modules.tracker import Tracker
@@ -442,36 +444,53 @@ def main():
     if not os.path.isfile(args.json_path):
         raise FileNotFoundError(f"json_path is not a file: {args.json_path}")
 
-    xiangshan = XiangShan(
-        gcpt_path=args.gcpt_path,
-        json_path=args.json_path,
-        result_path=args.result_path,
-        benchmarks=args.benchmarks,
-    )
+    heartbeat = Heartbeat(Path(args.result_path) / "heartbeat")
+    while heartbeat.is_alive():
+        logging.info(
+            "Another instance is running in the same directory (%s), waiting for %d seconds...",
+            args.result_path,
+            HEARTBEAT_INTERVAL,
+        )
+        time.sleep(HEARTBEAT_INTERVAL)
 
-    if args.reset_running:
-        xiangshan.reset_running_gcpt()
+    try:
+        heartbeat.start()
 
-    if args.run:
-        if not args.emu_path:
-            raise ValueError("emu_path is required for --run")
-        if not os.path.isfile(args.emu_path):
-            raise FileNotFoundError(f"emu_path is not a file: {args.emu_path}")
-        if args.nemu_so_path and not os.path.isfile(args.nemu_so_path):
-            raise FileNotFoundError(f"nemu_so_path is not a file: {args.nemu_so_path}")
-        xiangshan.run(
-            emu_path=args.emu_path,
-            nemu_so_path=args.nemu_so_path,
-            server_list=args.server_list,
-            emu_config=EmuConfig(
-                warmup=args.warmup,
-                max_instr=args.max_instr,
-                threads=args.threads,
-            ),
+        xiangshan = XiangShan(
+            gcpt_path=args.gcpt_path,
+            json_path=args.json_path,
+            result_path=args.result_path,
+            benchmarks=args.benchmarks,
         )
 
-    if args.report:
-        xiangshan.report()
+        if args.reset_running:
+            xiangshan.reset_running_gcpt()
+
+        if args.run:
+            if not args.emu_path:
+                raise ValueError("emu_path is required for --run")
+            if not os.path.isfile(args.emu_path):
+                raise FileNotFoundError(f"emu_path is not a file: {args.emu_path}")
+            if args.nemu_so_path and not os.path.isfile(args.nemu_so_path):
+                raise FileNotFoundError(
+                    f"nemu_so_path is not a file: {args.nemu_so_path}"
+                )
+            xiangshan.run(
+                emu_path=args.emu_path,
+                nemu_so_path=args.nemu_so_path,
+                server_list=args.server_list,
+                emu_config=EmuConfig(
+                    warmup=args.warmup,
+                    max_instr=args.max_instr,
+                    threads=args.threads,
+                ),
+            )
+
+        if args.report:
+            xiangshan.report()
+
+    finally:
+        heartbeat.stop()
 
 
 if __name__ == "__main__":
