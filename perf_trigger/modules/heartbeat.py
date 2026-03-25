@@ -5,9 +5,15 @@ from pathlib import Path
 
 
 class Heartbeat:
-    def __init__(self, name: str, parent_path: Path, interval: int):
+    def __init__(self, name: str, parent_path: Path, interval: float):
+        if not name.isidentifier():
+            raise ValueError(f"Name {name} is not a valid identifier")
         if not parent_path.is_dir():
             raise ValueError(f"Parent directory of {parent_path} does not exist")
+        if not type(interval) in (int, float):
+            raise ValueError(f"Interval {interval} is not a number")
+        if interval <= 0:
+            raise ValueError(f"Interval {interval} must be positive")
 
         self.name = name
         self.lock_path = parent_path / f".{name}.lock"
