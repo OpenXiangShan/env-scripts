@@ -16,22 +16,35 @@ class Heartbeat:
         self.thread = None
         self.stop_event = threading.Event()
         self.lock_owned = False
+        # If lock dir exists but heartbeat file is not yet written, treat as alive briefly.
+        self.acquire_grace = max(1.0, float(interval))
 
     def __is_alive(self) -> bool:
         # check the write timestamp of the heartbeat file
-        if not self.heartbeat_path.exists():
-            return False
-        last = self.heartbeat_path.stat().st_mtime
         curr = time.time()
-        return curr - last < 2 * self.interval
+        if self.heartbeat_path.exists():
+            last = self.heartbeat_path.stat().st_mtime
+            return curr - last < 2 * self.interval
+
+        # Grace window: lock dir may be freshly acquired before heartbeat is written.
+        if self.lock_path.exists():
+            lock_last = self.lock_path.stat().st_mtime
+            return curr - lock_last < self.acquire_grace
+
+        return False
+    
+    def __heartbeat(self) -> None:
+        self.heartbeat_path.touch(exist_ok=True)
 
     def __loop(self) -> None:
+        # Should be called only by threading.Thread
         while not self.stop_event.is_set():
-            self.heartbeat_path.touch(exist_ok=True)
+            self.__heartbeat()
             if self.stop_event.wait(self.interval):
                 break
 
     def __start(self) -> None:
+        # Should be called only after acquiring the lock
         self.stop_event.clear()
         self.thread = threading.Thread(
             target=self.__loop,
@@ -41,6 +54,7 @@ class Heartbeat:
         self.thread.start()
 
     def __stop(self) -> None:
+        # Should be called only after acquiring the lock
         if self.thread is not None:
             self.stop_event.set()
             self.thread.join()
@@ -52,23 +66,25 @@ class Heartbeat:
         if self.lock_owned:
             return True
 
-        try:
-            self.lock_path.mkdir()
-            self.lock_owned = True
-            self.__start()
-            return True
-        except FileExistsError:
-            if self.__is_alive():
-                return False
-
-            # The old owner appears stale; try to reclaim lock.
+        while True:
             try:
-                self.lock_path.rmdir()
-            except FileNotFoundError:
-                pass
-            except OSError:
-                return False
-            return self.try_acquire()
+                self.lock_path.mkdir()
+                # Publish liveness immediately after lock acquisition to avoid stale reclaim races.
+                self.__heartbeat()
+                self.__start()
+                self.lock_owned = True
+                return True
+            except FileExistsError:
+                if self.__is_alive():
+                    return False
+                # The old owner appears stale; try to reclaim lock and retry.
+                try:
+                    self.lock_path.rmdir()
+                except FileNotFoundError: # Someone else removed the lock; retry acquisition.
+                    pass
+                except OSError: # Cannot safely reclaim the lock.
+                    return False
+                # Loop will retry acquiring the lock.
 
     def release(self):
         if not self.lock_owned:
