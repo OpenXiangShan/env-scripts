@@ -38,9 +38,12 @@ class Heartbeat:
             return curr - lock_last < self.acquire_grace
 
         return False
-    
+
     def __heartbeat(self) -> None:
-        self.heartbeat_path.touch(exist_ok=True)
+        try:
+            self.heartbeat_path.touch(exist_ok=True)
+        except OSError:
+            logging.warning("Failed to update heartbeat file: %s", self.heartbeat_path)
 
     def __loop(self) -> None:
         # Should be called only by threading.Thread
@@ -86,9 +89,11 @@ class Heartbeat:
                 # The old owner appears stale; try to reclaim lock and retry.
                 try:
                     self.lock_path.rmdir()
-                except FileNotFoundError: # Someone else removed the lock; retry acquisition.
+                except (
+                    FileNotFoundError
+                ):  # Someone else removed the lock; retry acquisition.
                     pass
-                except OSError: # Cannot safely reclaim the lock.
+                except OSError:  # Cannot safely reclaim the lock.
                     return False
                 # Loop will retry acquiring the lock.
 
@@ -96,9 +101,8 @@ class Heartbeat:
         if not self.lock_owned:
             return
 
-        self.__stop()
-
         try:
+            self.__stop()
             self.lock_path.rmdir()
         except FileNotFoundError:
             pass
