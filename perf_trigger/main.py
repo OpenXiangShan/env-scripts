@@ -7,7 +7,7 @@ import random
 import time
 
 from modules.gcpt import GCPT
-from modules.heartbeat import Heartbeat, HEARTBEAT_INTERVAL
+from modules.heartbeat import Heartbeat
 from modules.server import Server
 from modules.types import EmuConfig, FreeCoreInfo
 from modules.tracker import Tracker
@@ -93,6 +93,8 @@ SPEC06_FP_BENCHMARKS = [
     "wrf",
     "sphinx3",
 ]
+
+HEARTBEAT_INTERVAL = 60
 
 
 class XiangShan:
@@ -423,7 +425,7 @@ def main():
     if not os.path.isfile(args.json_path):
         raise FileNotFoundError(f"json_path is not a file: {args.json_path}")
 
-    heartbeat = Heartbeat(Path(args.result_path) / "heartbeat")
+    heartbeat = Heartbeat(Path(args.result_path) / "heartbeat", HEARTBEAT_INTERVAL)
     while heartbeat.is_alive():
         logging.info(
             "Another instance is running in the same directory (%s), waiting for %d seconds...",
