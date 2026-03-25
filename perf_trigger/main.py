@@ -425,7 +425,7 @@ def main():
     if not os.path.isfile(args.json_path):
         raise FileNotFoundError(f"json_path is not a file: {args.json_path}")
 
-    lock = Heartbeat("perf-trigger", Path(args.result_path), HEARTBEAT_INTERVAL)
+    lock = Heartbeat("perf_trigger", Path(args.result_path), HEARTBEAT_INTERVAL)
     while not lock.try_acquire():
         logging.info(
             "Another instance is running in the same directory (%s), waiting for %d seconds...",
