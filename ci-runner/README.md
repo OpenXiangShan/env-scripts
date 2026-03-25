@@ -14,7 +14,7 @@
 RUNNER_URL="https://github.com/OpenXiangShan/XiangShan" \
 RUNNER_TOKEN="<token_from_github_new_self-hosted_runner_page>" \
 RUNNER_LABELS="bosc,open" \
-RUNNER_FILE=~/actions-runner-linux-x64-2.330.0.tar.gz \
+RUNNER_FILE=~/actions-runner-linux-x64-2.333.0.tar.gz \
 ~/env-scripts/ci-runner/create_runners.sh -r xs -d /local/ci-runner -n 6
 ```
 
@@ -24,15 +24,16 @@ RUNNER_FILE=~/actions-runner-linux-x64-2.330.0.tar.gz \
 RUNNER_URL="https://github.com/OpenXiangShan/XiangShan" \
 RUNNER_TOKEN="<token_from_github_new_self-hosted_runner_page>" \
 RUNNER_LABELS="bosc,node" \
-RUNNER_FILE=~/actions-runner-linux-x64-2.330.0.tar.gz \
+RUNNER_FILE=~/actions-runner-linux-x64-2.333.0.tar.gz \
 ~/env-scripts/ci-runner/create_runners.sh -r xs -d /home/cirunner -n 10
 ```
+
 ```shell
 ~/xstop \
 RUNNER_URL="https://github.com/OpenXiangShan/XiangShan" \
 RUNNER_TOKEN="<token_from_github_new_self-hosted_runner_page>" \
 RUNNER_LABELS="eda,perf,node" \
-RUNNER_FILE=~/actions-runner-linux-x64-2.330.0.tar.gz \
+RUNNER_FILE=~/actions-runner-linux-x64-2.333.0.tar.gz \
 ~/env-scripts/ci-runner/create_runners.sh -r xs-eda -d $HOME/ci-runner-xs-eda -n 4
 ```
 
@@ -66,29 +67,24 @@ RUNNER_FILE=~/actions-runner-linux-x64-2.330.0.tar.gz \
 ```
 
 ## 批量更新 runners
-`update_runners.sh` 脚本用于手动更新 self-hosted runner。需要下载 Runner Package 并将地址设为 `RUNNER_FILE` 环境变量。
+`update_runners_safe.sh` 脚本用于手动更新 self-hosted runner。需要下载 Runner Package 并将地址设为 `RUNNER_FILE` 环境变量。
+
+不建议直接使用 `update_runners.sh`，其会强制对 runner 做更新，可能会中断正在运行的 CI 任务。`_safe` 版本会首先对 tmux session 进行检查，逐渐将所有处于 idle 状态的 runner 停止，直至所有 runner 都停止后，调用 `update_runners.sh` 进行更新，并自动调用 `start_runners.sh` 重启 runner。
+
+建议配合 tmux 使用 `update_runners_safe.sh`，因为它可能会等待很久才能等到所有 runner 都 idle。
+
+建议不要同时对所有 CI 服务器进行更新，这会导致更新期间可用的 runner 数量过少。
 
 ### 实例
 在 Open 服务器上：
 ```shell
-~/xstop \
-RUNNER_FILE=$HOME/actions-runner-linux-x64-2.331.0.tar.gz \
-RUNNER_VERSION=2.331.0 \
-RUNNER_EXTRACT_DIR=$HOME/actions-runner-linux-x64-2.331.0 \
-~/env-scripts/ci-runner/update_runners.sh -r xs -d /local/ci-runner -n 6
+tmux create-session -s runner-update
+RUNNER_FILE=$HOME/actions-runner-linux-x64-2.333.0.tar.gz \
+~/env-scripts/ci-runner/update_runners_safe.sh -r xs -d /local/ci-runner -n 6
 ```
 在 Node 服务器上：
 ```shell
-~/xstop \
-RUNNER_FILE=$HOME/actions-runner-linux-x64-2.331.0.tar.gz \
-RUNNER_VERSION=2.331.0 \
-RUNNER_EXTRACT_DIR=$HOME/actions-runner-linux-x64-2.331.0 \
-~/env-scripts/ci-runner/update_runners.sh -r xs -d /home/cirunner -n 10
-```
-```shell
-~/xstop \
-RUNNER_FILE=$HOME/actions-runner-linux-x64-2.331.0.tar.gz \
-RUNNER_VERSION=2.331.0 \
-RUNNER_EXTRACT_DIR=$HOME/actions-runner-linux-x64-2.331.0 \
-~/env-scripts/ci-runner/update_runners.sh -r xs-eda -d $HOME/ci-runner-xs-eda -n 4
+tmux create-session -s runner-update
+RUNNER_FILE=$HOME/actions-runner-linux-x64-2.333.0.tar.gz \
+~/env-scripts/ci-runner/update_runners_safe.sh -r xs -d /home/cirunner -n 10
 ```

@@ -6,7 +6,9 @@ SCRIPT_DIR="$(dirname "$(realpath "${BASH_SOURCE[0]}")")"
 . "$SCRIPT_DIR/config.sh"
 
 # Check if session already exists
-if ! tmux has-session -t "$session_name" 2>/dev/null; then
+if [[ "$dry_run" == true ]]; then
+    echo "  (DRY RUN) Skipping session existence check for '$session_name'"
+elif ! tmux has-session -t "$session_name" 2>/dev/null; then
     echo "Note: Session '$session_name' does not exist, exiting"
     exit 1
 fi
@@ -22,15 +24,15 @@ for ((i=0; i<runner_count; i++)); do
     echo "Stopping runner ($runner_name) in pane $i"
 
     # Send commands
-    tmux send-keys -t "$pane_target" C-c
+    run_cmd tmux send-keys -t "$pane_target" C-c
 
 done
 
 # Brief pause to ensure all runners have stopped
-sleep 5
+run_cmd sleep 5
 
 # kill the tmux session
-tmux kill-session -t "$session_name"
+run_cmd tmux kill-session -t "$session_name"
 
 echo
 echo "Complete! Session '$session_name' has been stopped"

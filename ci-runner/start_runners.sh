@@ -6,7 +6,9 @@ SCRIPT_DIR="$(dirname "$(realpath "${BASH_SOURCE[0]}")")"
 . "$SCRIPT_DIR/config.sh"
 
 # Check if session already exists
-if tmux has-session -t "$session_name" 2>/dev/null; then
+if [[ "$dry_run" == true ]]; then
+    echo "  (DRY RUN) Skipping session existence check for '$session_name'"
+elif tmux has-session -t "$session_name" 2>/dev/null; then
     echo "Error: Session '$session_name' already exists, exiting"
     echo "You may use following command to kill it:"
     echo "    tmux kill-session -t $session_name"
@@ -21,17 +23,17 @@ fi
 
 # Create new tmux session
 echo "Creating session: $session_name"
-tmux new-session -d -s "$session_name" -c "$base_dir"
+run_cmd tmux new-session -d -s "$session_name" -c "$base_dir"
 
 # Create panes
 for ((i=1; i<runner_count; i++)); do
     echo "Creating pane $i"
-    tmux split-window -t "$session_name" -c "$base_dir"
-    tmux select-layout -t "$session_name" tiled
+    run_cmd tmux split-window -t "$session_name" -c "$base_dir"
+    run_cmd tmux select-layout -t "$session_name" tiled
 done
 
 # Brief pause
-sleep 0.5
+run_cmd sleep 0.5
 
 # Set up runners in each pane
 for ((i=0; i<runner_count; i++)); do
@@ -45,11 +47,11 @@ for ((i=0; i<runner_count; i++)); do
     echo "Setting up pane $i"
 
     # Setup pane title
-    tmux select-pane -t "$pane_target" -T "$runner_name"
+    run_cmd tmux select-pane -t "$pane_target" -T "$runner_name"
 
     # Send commands
-    tmux send-keys -t "$pane_target" "cd '$runner_dir'" C-m
-    tmux send-keys -t "$pane_target" "proxychains -q ./run.sh" C-m
+    run_cmd tmux send-keys -t "$pane_target" "cd '$runner_dir'" C-m
+    run_cmd tmux send-keys -t "$pane_target" "proxychains -q ./run.sh" C-m
 
 done
 

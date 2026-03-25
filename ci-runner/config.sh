@@ -4,6 +4,28 @@ runner_base_name="xiangshan"
 session_name="ci-${runner_base_name}-runners"
 base_dir="/nfs/home/xuzefan/test"
 runner_count=6
+dry_run=false
+
+function help() {
+    echo "Usage: $0 [-r runner_name] [-d base_directory] [-n runner_count] [--dry-run]"
+    echo "  -r, --runner       Base name for runners (default: $runner_base_name)"
+    echo "  -d, --directory    Base directory for runners (default: $base_dir)"
+    echo "  -n, --count        Maximum number of runners (default: $runner_count)"
+    echo "  -h, --help         Show this help message and exit"
+    echo "  --dry-run          Show what would be done without actually doing it"
+    exit 0
+}
+
+function run_cmd() {
+    # Avoid eval so arguments (especially trailing \;) are preserved exactly
+    if [[ "$dry_run" == true ]]; then
+        echo "  (DRY RUN) -> $*"
+    else
+        echo "  -> $*"
+        "$@"
+    fi
+    return $?
+}
 
 # Parse command line arguments
 while [[ $# -gt 0 ]]; do
@@ -22,9 +44,11 @@ while [[ $# -gt 0 ]]; do
             shift 2
             ;;
         -h|--help)
-            echo "Usage: $0 [-r runner_name] [-d base_directory] [-n runner_count]"
-            echo "Default: runner=$runner_base_name, directory=$base_dir, count=$runner_count"
-            exit 0
+            help
+            ;;
+        --dry-run)
+            dry_run=true
+            shift
             ;;
         *)
             echo "Unknown parameter: $1"
@@ -44,3 +68,8 @@ echo
 # Calculate digit width
 max_index=$(($runner_count - 1))
 digits=${#max_index}
+
+if [[ "$dry_run" == true ]]; then
+    echo "  (DRY RUN) Dry run mode activated, no actual commands will be executed."
+    echo "Runner names will be: ${runner_base_name}-$(printf "%0${digits}d" "0") to ${runner_base_name}-$(printf "%0${digits}d" "$max_index")"
+fi
