@@ -63,8 +63,6 @@ SERVER_POOL = [
     "open26",
     "open27",
 ]
-REF_RUN_TIME = "/nfs/home/share/liyanqin/env-scripts/perf/json/gcc12o3-incFpcOff-jeMalloc-time.json"
-STUCK_THRESHOLD = 10 * 3600  # 10 hours
 
 SPEC06_INT_BENCHMARKS = [
     "perlbench",
@@ -228,24 +226,10 @@ class XiangShan:
             match state:
                 case GCPT.State.RUNNING:
                     self.tracker.warning(
-                        "%s is RUNNING, there can be another process running it",
+                        "%s is RUNNING, resetting it",
                         gcpt,
                     )
-                    if (
-                        time.time() - os.path.getmtime(gcpt.get_stdout_path())
-                        > STUCK_THRESHOLD
-                        and time.time() - os.path.getmtime(gcpt.get_stderr_path())
-                        > STUCK_THRESHOLD
-                    ):
-                        self.tracker.warning(
-                            "... no output for more than %d seconds, try restarting",
-                            STUCK_THRESHOLD,
-                        )
-                        state = GCPT.State.NONE
-                    else:
-                        self.tracker.warning("... skipping")
-                        self.tracker.step("assigned", 1)
-                        continue
+                    state = GCPT.State.NONE
 
                 case GCPT.State.FINISHED | GCPT.State.ABORTED:
                     self.tracker.info(
