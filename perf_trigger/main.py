@@ -425,8 +425,8 @@ def main():
     if not os.path.isfile(args.json_path):
         raise FileNotFoundError(f"json_path is not a file: {args.json_path}")
 
-    heartbeat = Heartbeat(Path(args.result_path) / "heartbeat", HEARTBEAT_INTERVAL)
-    while heartbeat.is_alive():
+    lock = Heartbeat("perf-trigger", Path(args.result_path), HEARTBEAT_INTERVAL)
+    while not lock.try_acquire():
         logging.info(
             "Another instance is running in the same directory (%s), waiting for %d seconds...",
             args.result_path,
@@ -435,8 +435,6 @@ def main():
         time.sleep(HEARTBEAT_INTERVAL)
 
     try:
-        heartbeat.start()
-
         xiangshan = XiangShan(
             gcpt_path=args.gcpt_path,
             json_path=args.json_path,
@@ -471,7 +469,7 @@ def main():
             xiangshan.report()
 
     finally:
-        heartbeat.stop()
+        lock.release()
 
 
 if __name__ == "__main__":
