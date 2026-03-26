@@ -1220,23 +1220,22 @@ wire [0:0]    br2cfg_wvalid;
   wire        XDMA_AXI_LITE_rvalid;
   wire        XDMA_AXI_LITE_rready;
 
-  wire difftest_to_host_axis_ready_io;
-  wire difftest_to_host_axis_valid_io;
-  wire difftest_to_host_axis_ready;
-  wire difftest_to_host_axis_valid;
-  wire [511:0] difftest_to_host_axis_bits_data;
-  wire difftest_to_host_axis_bits_last;
-  wire difftest_clock_enable;
-  wire inter_soc_clk;
-  wire inter_rtc_clk;
+  (*dont_touch = "true"*) wire difftest_to_host_axis_ready_io;
+  (*dont_touch = "true"*) wire difftest_to_host_axis_valid_io;
+  (*dont_touch = "true"*) wire difftest_to_host_axis_ready;
+  (*dont_touch = "true"*) wire difftest_to_host_axis_valid;
+  (*dont_touch = "true"*) wire [511:0] difftest_to_host_axis_bits_data;
+  (*dont_touch = "true"*) wire difftest_to_host_axis_bits_last;
+  (*dont_touch = "true"*) wire difftest_clock_enable;
+  (*dont_touch = "true"*) wire inter_soc_clk;
+  (*dont_touch = "true"*) wire inter_rtc_clk;
 
-  wire io_host_reset;
-  wire io_host_diff_enable;
-  wire clock_enable;
-  wire sys_rstn_io;
-  wire cpu_rstn_io;
+  (*dont_touch = "true"*) wire io_host_reset;
+  (*dont_touch = "true"*) wire io_host_diff_enable;
+  (*dont_touch = "true"*) wire sys_rstn_io;
+  (*dont_touch = "true"*) wire cpu_rstn_io;
 
-  wire difftest_pcie_clock;
+  (*dont_touch = "true"*) wire difftest_pcie_clock;
   assign sys_rstn_io = sys_rstn & ~io_host_reset;
   assign cpu_rstn_io = cpu_rstn & ~io_host_reset;
   assign noc_clk = inter_soc_clk;
@@ -1246,12 +1245,12 @@ wire [0:0]    br2cfg_wvalid;
       if (!sys_rstn) pcie_lnk_sync <= 2'b00;
       else           pcie_lnk_sync <= {pcie_lnk_sync[0], pcie_ep_lnk_up};
   end
-  wire xdma_link_up = pcie_lnk_sync[1];
+  (*dont_touch = "true"*) wire xdma_link_up = pcie_lnk_sync[1];
 
   assign difftest_to_host_axis_ready = difftest_to_host_axis_ready_io & xdma_link_up;
   assign difftest_to_host_axis_valid_io = difftest_to_host_axis_valid & xdma_link_up & io_host_diff_enable;
 
-  xdma_ep xdma_ep_i(
+  (*dont_touch = "true"*) xdma_ep xdma_ep_i(
     .cpu_clk(sys_clk_i),
     .cpu_rstn(sys_rstn),
     .S00_AXIS_0_tdata(difftest_to_host_axis_bits_data),
@@ -1291,7 +1290,7 @@ wire [0:0]    br2cfg_wvalid;
     .pcie_ep_perstn(pcie_ep_perstn)
   );
 
-  XDMA_AXI4LiteBar u_xdma_axi4lite_bar (
+  (*dont_touch = "true"*) XDMA_AXI4LiteBar u_xdma_axi4lite_bar (
       .clock           (sys_clk_i),
       .reset           (~sys_rstn),
 
@@ -1318,13 +1317,13 @@ wire [0:0]    br2cfg_wvalid;
       .io_host_reset         (io_host_reset)
   );
 
-  DifftestClockGate SOC_CLK_CTRL(
+  (*dont_touch = "true"*) DifftestClockGate SOC_CLK_CTRL(
       .CK  (sys_clk_i),
       .E   ((difftest_clock_enable & xdma_link_up ) || ~io_host_diff_enable || ~sys_rstn_io || ~cpu_rstn_io),
       .Q   (inter_soc_clk)
   );
 
-  DifftestClockGate RTC_CLK_CTRL(
+  (*dont_touch = "true"*) DifftestClockGate RTC_CLK_CTRL(
       .CK  (tmclk),
       .E   ((difftest_clock_enable & xdma_link_up) || ~io_host_diff_enable || ~sys_rstn_io || ~cpu_rstn_io ),
       .Q   (inter_rtc_clk)
