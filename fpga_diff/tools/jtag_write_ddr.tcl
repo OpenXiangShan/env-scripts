@@ -25,6 +25,8 @@ if {[catch {open_hw_target} errmsg]} {
     puts "Opened hardware target"
 }
 
+set_property PARAM.FREQUENCY 12000000 [current_hw_target]
+
 # Get JTAG device handle
 set hw_device [lindex [get_hw_devices] 0]
 if {$hw_device eq ""} {
