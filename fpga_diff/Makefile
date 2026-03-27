@@ -57,6 +57,7 @@ write_bitstream:
 write_jtag_ddr:
 	vivado -mode tcl -source tools/reset_ddr.tcl -tclargs $(FPGA_BIT_HOME)/fpga_top_debug.ltx
 	vivado -mode tcl -source tools/jtag_write_ddr.tcl -tclargs $(WORKLOAD) $(AXI_WIDTH)
+	$(MAKE) reset_cpu
 
 # Reset CPU on FPGA
 reset_cpu:
