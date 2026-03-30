@@ -289,7 +289,8 @@ proc create_root_design { parentCell } {
   set jtag_axi_0 [ create_bd_cell -type ip -vlnv xilinx.com:ip:jtag_axi:1.2 jtag_axi_0 ]
   set_property -dict [ list \
    CONFIG.M_AXI_ID_WIDTH {1} \
-   CONFIG.M_HAS_BURST {0} \
+   CONFIG.M_AXI_DATA_WIDTH {64} \
+   CONFIG.M_HAS_BURST {1} \
    CONFIG.RD_TXN_QUEUE_LENGTH {8} \
    CONFIG.WR_TXN_QUEUE_LENGTH {8} \
  ] $jtag_axi_0

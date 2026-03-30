@@ -5,6 +5,7 @@ CORE_DIR ?=
 CHI_DIR ?=
 FPGA_BIT_HOME ?=
 WORKLOAD ?=
+AXI_WIDTH ?= 64
 # Supported CPU parameters:
 #   kmh
 #   nutshell
@@ -55,7 +56,7 @@ write_bitstream:
 # Write workload to FPGA DDR via JTAG
 write_jtag_ddr:
 	vivado -mode tcl -source tools/reset_ddr.tcl -tclargs $(FPGA_BIT_HOME)/fpga_top_debug.ltx
-	vivado -mode tcl -source tools/jtag_write_ddr.tcl -tclargs $(WORKLOAD)
+	vivado -mode tcl -source tools/jtag_write_ddr.tcl -tclargs $(WORKLOAD) $(AXI_WIDTH)
 
 # Reset CPU on FPGA
 reset_cpu:
