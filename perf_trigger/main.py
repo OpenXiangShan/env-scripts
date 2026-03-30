@@ -2,10 +2,12 @@ import argparse
 import json
 import logging
 import os
+from pathlib import Path
 import random
 import time
 
 from modules.gcpt import GCPT
+from modules.heartbeat import Heartbeat
 from modules.server import Server
 from modules.types import EmuConfig, FreeCoreInfo
 from modules.tracker import Tracker
@@ -40,11 +42,6 @@ SERVER_POOL = [
     "node040",
     "node041",
     "node042",
-    "open01",
-    "open02",
-    "open03",
-    "open04",
-    "open05",
     "open06",
     "open07",
     "open08",
@@ -61,8 +58,6 @@ SERVER_POOL = [
     "open26",
     "open27",
 ]
-REF_RUN_TIME = "/nfs/home/share/liyanqin/env-scripts/perf/json/gcc12o3-incFpcOff-jeMalloc-time.json"
-STUCK_THRESHOLD = 10 * 3600  # 10 hours
 
 SPEC06_INT_BENCHMARKS = [
     "perlbench",
@@ -98,6 +93,8 @@ SPEC06_FP_BENCHMARKS = [
     "wrf",
     "sphinx3",
 ]
+
+HEARTBEAT_INTERVAL = 60
 
 
 class XiangShan:
@@ -226,24 +223,10 @@ class XiangShan:
             match state:
                 case GCPT.State.RUNNING:
                     self.tracker.warning(
-                        "%s is RUNNING, there can be another process running it",
+                        "%s is RUNNING, resetting it",
                         gcpt,
                     )
-                    if (
-                        time.time() - os.path.getmtime(gcpt.get_stdout_path())
-                        > STUCK_THRESHOLD
-                        and time.time() - os.path.getmtime(gcpt.get_stderr_path())
-                        > STUCK_THRESHOLD
-                    ):
-                        self.tracker.warning(
-                            "... no output for more than %d seconds, try restarting",
-                            STUCK_THRESHOLD,
-                        )
-                        state = GCPT.State.NONE
-                    else:
-                        self.tracker.warning("... skipping")
-                        self.tracker.step("assigned", 1)
-                        continue
+                    state = GCPT.State.NONE
 
                 case GCPT.State.FINISHED | GCPT.State.ABORTED:
                     self.tracker.info(
@@ -442,36 +425,51 @@ def main():
     if not os.path.isfile(args.json_path):
         raise FileNotFoundError(f"json_path is not a file: {args.json_path}")
 
-    xiangshan = XiangShan(
-        gcpt_path=args.gcpt_path,
-        json_path=args.json_path,
-        result_path=args.result_path,
-        benchmarks=args.benchmarks,
-    )
+    lock = Heartbeat("perf_trigger", Path(args.result_path), HEARTBEAT_INTERVAL)
+    while not lock.try_acquire():
+        logging.info(
+            "Another instance is running in the same directory (%s), waiting for %d seconds...",
+            args.result_path,
+            HEARTBEAT_INTERVAL,
+        )
+        time.sleep(HEARTBEAT_INTERVAL)
 
-    if args.reset_running:
-        xiangshan.reset_running_gcpt()
-
-    if args.run:
-        if not args.emu_path:
-            raise ValueError("emu_path is required for --run")
-        if not os.path.isfile(args.emu_path):
-            raise FileNotFoundError(f"emu_path is not a file: {args.emu_path}")
-        if args.nemu_so_path and not os.path.isfile(args.nemu_so_path):
-            raise FileNotFoundError(f"nemu_so_path is not a file: {args.nemu_so_path}")
-        xiangshan.run(
-            emu_path=args.emu_path,
-            nemu_so_path=args.nemu_so_path,
-            server_list=args.server_list,
-            emu_config=EmuConfig(
-                warmup=args.warmup,
-                max_instr=args.max_instr,
-                threads=args.threads,
-            ),
+    try:
+        xiangshan = XiangShan(
+            gcpt_path=args.gcpt_path,
+            json_path=args.json_path,
+            result_path=args.result_path,
+            benchmarks=args.benchmarks,
         )
 
-    if args.report:
-        xiangshan.report()
+        if args.reset_running:
+            xiangshan.reset_running_gcpt()
+
+        if args.run:
+            if not args.emu_path:
+                raise ValueError("emu_path is required for --run")
+            if not os.path.isfile(args.emu_path):
+                raise FileNotFoundError(f"emu_path is not a file: {args.emu_path}")
+            if args.nemu_so_path and not os.path.isfile(args.nemu_so_path):
+                raise FileNotFoundError(
+                    f"nemu_so_path is not a file: {args.nemu_so_path}"
+                )
+            xiangshan.run(
+                emu_path=args.emu_path,
+                nemu_so_path=args.nemu_so_path,
+                server_list=args.server_list,
+                emu_config=EmuConfig(
+                    warmup=args.warmup,
+                    max_instr=args.max_instr,
+                    threads=args.threads,
+                ),
+            )
+
+        if args.report:
+            xiangshan.report()
+
+    finally:
+        lock.release()
 
 
 if __name__ == "__main__":
