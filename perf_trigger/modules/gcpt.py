@@ -48,13 +48,19 @@ class GCPT:
             return self.state
 
         self.state = GCPT.State.RUNNING
-        with open(self.get_stdout_path(), "r", encoding="utf-8") as f:
-            for line in f:
+        with (
+            open(self.get_stdout_path(), "r", encoding="utf-8") as stdout,
+            open(self.get_stderr_path(), "r", encoding="utf-8") as stderr,
+        ):
+            for line in stdout:
                 if "ABORT at pc" in line or "FATAL:" in line or "Error:" in line:
                     self.state = GCPT.State.ABORTED
                 elif "EXCEEDING CYCLE/INSTR LIMIT" in line or "GOOD TRAP" in line:
                     self.state = GCPT.State.FINISHED
                 elif "SOME SIGNAL STOPS THE PROGRAM" in line:
                     self.state = GCPT.State.NONE
+            for line in stderr:
+                if "Assertion failed" in line:
+                    self.state = GCPT.State.ABORTED
 
         return self.state
