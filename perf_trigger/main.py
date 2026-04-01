@@ -422,14 +422,14 @@ def main():
 
     # pre-checks
     if not os.path.isdir(args.gcpt_path):
-        raise FileNotFoundError(f"gcpt_path is not a file: {args.gcpt_path}")
+        raise FileNotFoundError(f"gcpt_path is not a directory: {args.gcpt_path}")
     if not os.path.isfile(args.json_path):
         raise FileNotFoundError(f"json_path is not a file: {args.json_path}")
 
     # add lock per (result_path, gcpt_path) pair
     # to prevent the same checkpoint from being run by multiple instances with same result_path simultaneously
-    gcpt_hash = hashlib.sha256(args.gcpt_path.encode()).hexdigest()[:8]
-    lock = Heartbeat(gcpt_hash, Path(args.result_path), HEARTBEAT_INTERVAL)
+    gcpt_hash = hashlib.sha256(str(Path(args.gcpt_path).resolve()).encode()).hexdigest()[:8]
+    lock = Heartbeat(f"trigger_{gcpt_hash}", Path(args.result_path), HEARTBEAT_INTERVAL)
     while not lock.try_acquire():
         logging.info(
             "Another instance is running in the same directory (%s), waiting for %d seconds...",
