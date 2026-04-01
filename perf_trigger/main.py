@@ -409,7 +409,7 @@ def main():
         format="%(asctime)s - %(levelname)5s - %(message)s",
         handlers=[
             logging.FileHandler(
-                os.path.join(args.result_path, "runner.log"), encoding="utf-8"
+                os.path.join(args.result_path, f"runner_{time.strftime('%Y-%m-%d_%H-%M-%S')}.log"), encoding="utf-8"
             ),
             logging.StreamHandler(),
         ],
