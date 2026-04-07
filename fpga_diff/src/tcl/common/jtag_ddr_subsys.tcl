@@ -125,7 +125,6 @@ if { $bCheckIPs == 1 } {
    set list_check_ips "\ 
 xilinx.com:ip:ddr4:2.2\
 xilinx.com:ip:jtag_axi:1.2\
-xilinx.com:ip:ila:6.2\
 xilinx.com:ip:util_vector_logic:2.0\
 xilinx.com:ip:proc_sys_reset:5.0\
 "
@@ -251,132 +250,89 @@ proc create_root_design { parentCell } {
 
   # Create instance: axi_interconnect_0, and set properties
   set axi_interconnect_0 [ create_bd_cell -type ip -vlnv xilinx.com:ip:axi_interconnect:2.1 axi_interconnect_0 ]
-  set_property -dict [ list \
-   CONFIG.ENABLE_ADVANCED_OPTIONS {1} \
-   CONFIG.M00_HAS_DATA_FIFO {2} \
-   CONFIG.M00_HAS_REGSLICE {3} \
-   CONFIG.NUM_MI {1} \
-   CONFIG.NUM_SI {2} \
-   CONFIG.S00_HAS_DATA_FIFO {2} \
-   CONFIG.S00_HAS_REGSLICE {4} \
-   CONFIG.S01_HAS_DATA_FIFO {2} \
-   CONFIG.S01_HAS_REGSLICE {4} \
-   CONFIG.S02_HAS_DATA_FIFO {2} \
-   CONFIG.STRATEGY {2} \
- ] $axi_interconnect_0
-
+  set_property -dict [list \
+    CONFIG.ENABLE_ADVANCED_OPTIONS {1} \
+    CONFIG.M00_HAS_DATA_FIFO {0} \
+    CONFIG.M00_HAS_REGSLICE {4} \
+    CONFIG.NUM_MI {1} \
+    CONFIG.NUM_SI {2} \
+    CONFIG.S00_HAS_DATA_FIFO {0} \
+    CONFIG.S00_HAS_REGSLICE {4} \
+    CONFIG.S01_HAS_DATA_FIFO {1} \
+    CONFIG.S01_HAS_REGSLICE {4} \
+    CONFIG.S02_HAS_DATA_FIFO {2} \
+    CONFIG.STRATEGY {0} \
+  ] $axi_interconnect_0
   # Create instance: ddr4_0, and set properties
   set ddr4_0 [ create_bd_cell -type ip -vlnv xilinx.com:ip:ddr4:2.2 ddr4_0 ]
-  set_property -dict [ list \
-   CONFIG.ADDN_UI_CLKOUT1_FREQ_HZ {None} \
-   CONFIG.ADDN_UI_CLKOUT2_FREQ_HZ {None} \
-   CONFIG.ADDN_UI_CLKOUT3_FREQ_HZ {None} \
-   CONFIG.ADDN_UI_CLKOUT4_FREQ_HZ {None} \
-   CONFIG.C0.DDR4_AxiAddressWidth {33} \
-   CONFIG.C0.DDR4_AxiDataWidth {64} \
-   CONFIG.C0.DDR4_CLKFBOUT_MULT {15} \
-   CONFIG.C0.DDR4_CLKOUT0_DIVIDE {6} \
-   CONFIG.C0.DDR4_CasLatency {11} \
-   CONFIG.C0.DDR4_CasWriteLatency {11} \
-   CONFIG.C0.DDR4_DataWidth {64} \
-   CONFIG.C0.DDR4_InputClockPeriod {12500} \
-   CONFIG.C0.DDR4_MemoryPart {MTA8ATF1G64HZ-2G3} \
-   CONFIG.C0.DDR4_MemoryType {SODIMMs} \
-   CONFIG.C0.DDR4_TimePeriod {1250} \
- ] $ddr4_0
-
+  set_property -dict [list \
+    CONFIG.ADDN_UI_CLKOUT1_FREQ_HZ {None} \
+    CONFIG.ADDN_UI_CLKOUT2_FREQ_HZ {None} \
+    CONFIG.ADDN_UI_CLKOUT3_FREQ_HZ {None} \
+    CONFIG.ADDN_UI_CLKOUT4_FREQ_HZ {None} \
+    CONFIG.C0.DDR4_AxiAddressWidth {33} \
+    CONFIG.C0.DDR4_AxiDataWidth {64} \
+    CONFIG.C0.DDR4_CasLatency {11} \
+    CONFIG.C0.DDR4_CasWriteLatency {11} \
+    CONFIG.C0.DDR4_DataWidth {64} \
+    CONFIG.C0.DDR4_InputClockPeriod {12500} \
+    CONFIG.C0.DDR4_MemoryPart {MTA8ATF1G64HZ-2G3} \
+    CONFIG.C0.DDR4_MemoryType {SODIMMs} \
+    CONFIG.C0.DDR4_TimePeriod {1250} \
+  ] $ddr4_0
   # Create instance: jtag_axi_0, and set properties
   set jtag_axi_0 [ create_bd_cell -type ip -vlnv xilinx.com:ip:jtag_axi:1.2 jtag_axi_0 ]
-  set_property -dict [ list \
-   CONFIG.M_AXI_ID_WIDTH {1} \
-   CONFIG.M_AXI_DATA_WIDTH {64} \
-   CONFIG.M_HAS_BURST {1} \
-   CONFIG.RD_TXN_QUEUE_LENGTH {8} \
-   CONFIG.WR_TXN_QUEUE_LENGTH {8} \
- ] $jtag_axi_0
-
-  # Create instance: jtag_maxi_ila, and set properties
-  set jtag_maxi_ila [ create_bd_cell -type ip -vlnv xilinx.com:ip:ila:6.2 jtag_maxi_ila ]
-  set_property -dict [ list \
-   CONFIG.ALL_PROBE_SAME_MU {false} \
-   CONFIG.ALL_PROBE_SAME_MU_CNT {2} \
-   CONFIG.C_DATA_DEPTH {2048} \
-   CONFIG.C_EN_STRG_QUAL {0} \
-   CONFIG.C_PROBE0_MU_CNT {2} \
-   CONFIG.C_PROBE10_MU_CNT {2} \
-   CONFIG.C_PROBE11_MU_CNT {2} \
-   CONFIG.C_PROBE12_MU_CNT {2} \
-   CONFIG.C_PROBE13_MU_CNT {2} \
-   CONFIG.C_PROBE14_MU_CNT {2} \
-   CONFIG.C_PROBE15_MU_CNT {2} \
-   CONFIG.C_PROBE16_MU_CNT {2} \
-   CONFIG.C_PROBE17_MU_CNT {2} \
-   CONFIG.C_PROBE18_MU_CNT {2} \
-   CONFIG.C_PROBE19_MU_CNT {2} \
-   CONFIG.C_PROBE1_MU_CNT {2} \
-   CONFIG.C_PROBE20_MU_CNT {2} \
-   CONFIG.C_PROBE21_MU_CNT {2} \
-   CONFIG.C_PROBE22_MU_CNT {2} \
-   CONFIG.C_PROBE23_MU_CNT {2} \
-   CONFIG.C_PROBE24_MU_CNT {2} \
-   CONFIG.C_PROBE25_MU_CNT {2} \
-   CONFIG.C_PROBE26_MU_CNT {2} \
-   CONFIG.C_PROBE27_MU_CNT {2} \
-   CONFIG.C_PROBE28_MU_CNT {2} \
-   CONFIG.C_PROBE29_MU_CNT {2} \
-   CONFIG.C_PROBE2_MU_CNT {2} \
-   CONFIG.C_PROBE30_MU_CNT {2} \
-   CONFIG.C_PROBE31_MU_CNT {2} \
-   CONFIG.C_PROBE32_MU_CNT {2} \
-   CONFIG.C_PROBE33_MU_CNT {2} \
-   CONFIG.C_PROBE34_MU_CNT {2} \
-   CONFIG.C_PROBE35_MU_CNT {2} \
-   CONFIG.C_PROBE36_MU_CNT {2} \
-   CONFIG.C_PROBE37_MU_CNT {2} \
-   CONFIG.C_PROBE38_MU_CNT {2} \
-   CONFIG.C_PROBE39_MU_CNT {2} \
-   CONFIG.C_PROBE3_MU_CNT {2} \
-   CONFIG.C_PROBE40_MU_CNT {2} \
-   CONFIG.C_PROBE41_MU_CNT {2} \
-   CONFIG.C_PROBE42_MU_CNT {2} \
-   CONFIG.C_PROBE43_MU_CNT {2} \
-   CONFIG.C_PROBE4_MU_CNT {2} \
-   CONFIG.C_PROBE5_MU_CNT {2} \
-   CONFIG.C_PROBE6_MU_CNT {2} \
-   CONFIG.C_PROBE7_MU_CNT {2} \
-   CONFIG.C_PROBE8_MU_CNT {2} \
-   CONFIG.C_PROBE9_MU_CNT {2} \
- ] $jtag_maxi_ila
-
+  set_property -dict [list \
+    CONFIG.M_AXI_ADDR_WIDTH {32} \
+    CONFIG.M_AXI_DATA_WIDTH {64} \
+    CONFIG.M_AXI_ID_WIDTH {1} \
+    CONFIG.M_HAS_BURST {1} \
+    CONFIG.RD_TXN_QUEUE_LENGTH {8} \
+    CONFIG.WR_TXN_QUEUE_LENGTH {8} \
+  ] $jtag_axi_0
   # Create instance: logic_not, and set properties
   set logic_not [ create_bd_cell -type ip -vlnv xilinx.com:ip:util_vector_logic:2.0 logic_not ]
-  set_property -dict [ list \
-   CONFIG.C_OPERATION {not} \
-   CONFIG.C_SIZE {1} \
-   CONFIG.LOGO_FILE {data/sym_notgate.png} \
- ] $logic_not
-
+  set_property -dict [list \
+    CONFIG.C_OPERATION {not} \
+    CONFIG.C_SIZE {1} \
+  ] $logic_not
   # Create instance: rst_ddr4_200M, and set properties
   set rst_ddr4_200M [ create_bd_cell -type ip -vlnv xilinx.com:ip:proc_sys_reset:5.0 rst_ddr4_200M ]
 
   # Create interface connections
   connect_bd_intf_net -intf_net C0_SYS_CLK_0_1 [get_bd_intf_ports OSC_SYS_CLK] [get_bd_intf_pins ddr4_0/C0_SYS_CLK]
   connect_bd_intf_net -intf_net S00_AXI_1 [get_bd_intf_pins axi_interconnect_0/S00_AXI] [get_bd_intf_pins jtag_axi_0/M_AXI]
-connect_bd_intf_net -intf_net [get_bd_intf_nets S00_AXI_1] [get_bd_intf_pins jtag_axi_0/M_AXI] [get_bd_intf_pins jtag_maxi_ila/SLOT_0_AXI]
   connect_bd_intf_net -intf_net SOC_M_AXI_1 [get_bd_intf_ports SOC_M_AXI] [get_bd_intf_pins axi_interconnect_0/S01_AXI]
   connect_bd_intf_net -intf_net axi_interconnect_0_M00_AXI [get_bd_intf_pins axi_interconnect_0/M00_AXI] [get_bd_intf_pins ddr4_0/C0_DDR4_S_AXI]
   connect_bd_intf_net -intf_net ddr4_0_C0_DDR4 [get_bd_intf_ports DDR4] [get_bd_intf_pins ddr4_0/C0_DDR4]
 
   # Create port connections
-  connect_bd_net -net M00_ACLK_1 [get_bd_pins axi_interconnect_0/ACLK] [get_bd_pins axi_interconnect_0/M00_ACLK] [get_bd_pins axi_interconnect_0/S00_ACLK] [get_bd_pins ddr4_0/c0_ddr4_ui_clk] [get_bd_pins jtag_axi_0/aclk] [get_bd_pins jtag_maxi_ila/clk] [get_bd_pins rst_ddr4_200M/slowest_sync_clk]
-  connect_bd_net -net SOC_CLK_1 [get_bd_ports SOC_CLK] [get_bd_pins axi_interconnect_0/S01_ACLK]
-  connect_bd_net -net ddr4_0_c0_ddr4_ui_clk_sync_rst [get_bd_pins ddr4_0/c0_ddr4_ui_clk_sync_rst] [get_bd_pins rst_ddr4_200M/ext_reset_in]
-  connect_bd_net -net ddr4_0_c0_init_calib_complete1 [get_bd_ports calib_complete] [get_bd_pins ddr4_0/c0_init_calib_complete] [get_bd_pins rst_ddr4_200M/dcm_locked]
-  connect_bd_net -net ddr_rst_1 [get_bd_ports ddr_rstn] [get_bd_pins logic_not/Op1]
-  connect_bd_net -net rst_ddr4_0_200M_interconnect_aresetn [get_bd_pins axi_interconnect_0/ARESETN] [get_bd_pins axi_interconnect_0/M00_ARESETN] [get_bd_pins axi_interconnect_0/S00_ARESETN] [get_bd_pins rst_ddr4_200M/interconnect_aresetn]
-  connect_bd_net -net rst_ddr4_0_200M_peripheral_aresetn [get_bd_pins ddr4_0/c0_ddr4_aresetn] [get_bd_pins jtag_axi_0/aresetn] [get_bd_pins rst_ddr4_200M/peripheral_aresetn]
-  connect_bd_net -net soc_rstn_1 [get_bd_ports soc_rstn] [get_bd_pins axi_interconnect_0/S01_ARESETN]
-  connect_bd_net -net util_vector_logic_0_Res [get_bd_pins ddr4_0/sys_rst] [get_bd_pins logic_not/Res]
+  connect_bd_net -net M00_ACLK_1  [get_bd_pins ddr4_0/c0_ddr4_ui_clk] \
+  [get_bd_pins axi_interconnect_0/ACLK] \
+  [get_bd_pins axi_interconnect_0/M00_ACLK] \
+  [get_bd_pins axi_interconnect_0/S00_ACLK] \
+  [get_bd_pins jtag_axi_0/aclk] \
+  [get_bd_pins rst_ddr4_200M/slowest_sync_clk]
+  connect_bd_net -net SOC_CLK_1  [get_bd_ports SOC_CLK] \
+  [get_bd_pins axi_interconnect_0/S01_ACLK]
+  connect_bd_net -net ddr4_0_c0_ddr4_ui_clk_sync_rst  [get_bd_pins ddr4_0/c0_ddr4_ui_clk_sync_rst] \
+  [get_bd_pins rst_ddr4_200M/ext_reset_in]
+  connect_bd_net -net ddr4_0_c0_init_calib_complete1  [get_bd_pins ddr4_0/c0_init_calib_complete] \
+  [get_bd_ports calib_complete] \
+  [get_bd_pins rst_ddr4_200M/dcm_locked]
+  connect_bd_net -net ddr_rst_1  [get_bd_ports ddr_rstn] \
+  [get_bd_pins logic_not/Op1]
+  connect_bd_net -net rst_ddr4_0_200M_interconnect_aresetn  [get_bd_pins rst_ddr4_200M/interconnect_aresetn] \
+  [get_bd_pins axi_interconnect_0/ARESETN] \
+  [get_bd_pins axi_interconnect_0/M00_ARESETN] \
+  [get_bd_pins axi_interconnect_0/S00_ARESETN]
+  connect_bd_net -net rst_ddr4_0_200M_peripheral_aresetn  [get_bd_pins rst_ddr4_200M/peripheral_aresetn] \
+  [get_bd_pins ddr4_0/c0_ddr4_aresetn] \
+  [get_bd_pins jtag_axi_0/aresetn]
+  connect_bd_net -net soc_rstn_1  [get_bd_ports soc_rstn] \
+  [get_bd_pins axi_interconnect_0/S01_ARESETN]
+  connect_bd_net -net util_vector_logic_0_Res  [get_bd_pins logic_not/Res] \
+  [get_bd_pins ddr4_0/sys_rst]
 
   # Create address segments
   assign_bd_address -offset 0x00000000 -range 0x000100000000 -target_address_space [get_bd_addr_spaces jtag_axi_0/Data] [get_bd_addr_segs ddr4_0/C0_DDR4_MEMORY_MAP/C0_DDR4_ADDRESS_BLOCK] -force
