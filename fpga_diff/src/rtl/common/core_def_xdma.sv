@@ -1235,10 +1235,17 @@ wire [0:0]    br2cfg_wvalid;
   wire clock_enable;
   wire sys_rstn_io;
   wire cpu_rstn_io;
+  wire difftest_c2h_rstn;
+  wire difftest_stream_enable;
+  wire difftest_startup_done;
+  reg [19:0] difftest_startup_wait;
 
   wire difftest_pcie_clock;
   assign sys_rstn_io = sys_rstn & ~io_host_reset;
   assign cpu_rstn_io = cpu_rstn & ~io_host_reset;
+  assign difftest_startup_done = &difftest_startup_wait;
+  assign difftest_stream_enable = xdma_link_up & io_host_diff_enable & difftest_startup_done;
+  assign difftest_c2h_rstn = cpu_rstn_io & difftest_stream_enable;
   assign noc_clk = inter_soc_clk;
 
   reg [1:0] pcie_lnk_sync;
@@ -1248,12 +1255,20 @@ wire [0:0]    br2cfg_wvalid;
   end
   wire xdma_link_up = pcie_lnk_sync[1];
 
-  assign difftest_to_host_axis_ready = difftest_to_host_axis_ready_io & xdma_link_up;
-  assign difftest_to_host_axis_valid_io = difftest_to_host_axis_valid & xdma_link_up & io_host_diff_enable;
+  always @(posedge sys_clk_i) begin
+      if (!cpu_rstn_io || !io_host_diff_enable || !xdma_link_up)
+          difftest_startup_wait <= 20'b0;
+      else if (!difftest_startup_done)
+          difftest_startup_wait <= difftest_startup_wait + 20'b1;
+  end
+
+  assign difftest_to_host_axis_ready = difftest_to_host_axis_ready_io & difftest_stream_enable;
+  assign difftest_to_host_axis_valid_io = difftest_to_host_axis_valid & difftest_stream_enable;
 
   xdma_ep xdma_ep_i(
     .cpu_clk(sys_clk_i),
     .cpu_rstn(sys_rstn),
+    .c2h_rstn(difftest_c2h_rstn),
     .S00_AXIS_0_tdata(difftest_to_host_axis_bits_data),
     .S00_AXIS_0_tkeep(64'hffffffff_ffffffff),
     .S00_AXIS_0_tlast(difftest_to_host_axis_bits_last),

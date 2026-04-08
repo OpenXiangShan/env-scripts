@@ -136,6 +136,7 @@ if { $bCheckIPs == 1 } {
   set list_check_ips [list \
     xilinx.com:ip:axis_clock_converter:1.1\
     xilinx.com:ip:axis_dwidth_converter:1.1\
+    xilinx.com:ip:util_vector_logic:2.0\
     xilinx.com:ip:xpm_cdc_gen:1.0\
     xilinx.com:ip:clk_wiz:6.0\
     $util_vlnv\
@@ -236,6 +237,7 @@ proc create_root_design { parentCell } {
 
   # Create ports
   set cpu_rstn [ create_bd_port -dir I -type rst cpu_rstn ]
+  set c2h_rstn [ create_bd_port -dir I -type rst c2h_rstn ]
   set pci_exp_rxn [ create_bd_port -dir I -from 7 -to 0 pci_exp_rxn ]
   set pci_exp_rxp [ create_bd_port -dir I -from 7 -to 0 pci_exp_rxp ]
   set pci_exp_txn [ create_bd_port -dir O -from 7 -to 0 pci_exp_txn ]
@@ -331,6 +333,14 @@ proc create_root_design { parentCell } {
    CONFIG.WIDTH {1} \
  ] $xpm_cdc_gen_0
 
+  # Create instance: logic_and_c2h_rst, and set properties
+  set logic_and_c2h_rst [ create_bd_cell -type ip -vlnv xilinx.com:ip:util_vector_logic:2.0 logic_and_c2h_rst ]
+  set_property -dict [ list \
+   CONFIG.C_OPERATION {and} \
+   CONFIG.C_SIZE {1} \
+   CONFIG.LOGO_FILE {data/sym_andgate.png} \
+ ] $logic_and_c2h_rst
+
   # Create instance: axis_dwidth_converter_0, and set properties
   set axis_dwidth_converter_0 [ create_bd_cell -type ip -vlnv xilinx.com:ip:axis_dwidth_converter:1.1 axis_dwidth_converter_0 ]
   set_property CONFIG.M_TDATA_NUM_BYTES {32} $axis_dwidth_converter_0
@@ -351,8 +361,7 @@ proc create_root_design { parentCell } {
   connect_bd_net -net ARESETN_1  [get_bd_pins xdma_0/axi_aresetn] \
   [get_bd_pins axi_interconnect_0/ARESETN] \
   [get_bd_pins axi_interconnect_0/S00_ARESETN] \
-  [get_bd_pins axis_clock_converter_0/m_axis_aresetn] \
-  [get_bd_pins axis_dwidth_converter_0/aresetn] \
+  [get_bd_pins logic_and_c2h_rst/Op1] \
   [get_bd_pins clk_wiz_0/resetn]
   connect_bd_net -net M00_AXIS_ACLK_1  [get_bd_pins xdma_0/axi_aclk] \
   [get_bd_pins axi_interconnect_0/ACLK] \
@@ -367,7 +376,8 @@ proc create_root_design { parentCell } {
   connect_bd_net -net cpu_clk_1  [get_bd_ports cpu_clk] \
   [get_bd_pins axi_interconnect_0/M00_ACLK]
   connect_bd_net -net m_axis_c2h_aresetn_0_1  [get_bd_ports cpu_rstn] \
-  [get_bd_pins axi_interconnect_0/M00_ARESETN] \
+  [get_bd_pins axi_interconnect_0/M00_ARESETN]
+  connect_bd_net -net c2h_rstn_0_1  [get_bd_ports c2h_rstn] \
   [get_bd_pins xpm_cdc_gen_0/src_arst]
   connect_bd_net -net pci_exp_rxn_0_1  [get_bd_ports pci_exp_rxn] \
   [get_bd_pins xdma_0/pci_exp_rxn]
@@ -386,7 +396,11 @@ proc create_root_design { parentCell } {
   connect_bd_net -net xdma_0_user_lnk_up  [get_bd_pins xdma_0/user_lnk_up] \
   [get_bd_ports pcie_ep_lnk_up]
   connect_bd_net -net xpm_cdc_gen_0_dest_arst  [get_bd_pins xpm_cdc_gen_0/dest_arst] \
-  [get_bd_pins axis_clock_converter_0/s_axis_aresetn]
+  [get_bd_pins axis_clock_converter_0/s_axis_aresetn] \
+  [get_bd_pins logic_and_c2h_rst/Op2]
+  connect_bd_net -net logic_and_c2h_rst_Res  [get_bd_pins logic_and_c2h_rst/Res] \
+  [get_bd_pins axis_clock_converter_0/m_axis_aresetn] \
+  [get_bd_pins axis_dwidth_converter_0/aresetn]
 
   # Create address segments
   assign_bd_address -offset 0x00000000 -range 0x00100000 -target_address_space [get_bd_addr_spaces xdma_0/M_AXI_LITE] [get_bd_addr_segs XDMA_AXI_LITE/Reg] -force
@@ -408,4 +422,3 @@ create_root_design ""
 
 
 common::send_gid_msg -ssname BD::TCL -id 2053 -severity "WARNING" "This Tcl script was generated from a block design that has not been validated. It is possible that design <$design_name> may result in errors during validation."
-
