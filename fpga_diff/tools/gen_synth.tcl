@@ -37,7 +37,7 @@ set status [get_property STATUS $synth_run]
 puts "INFO: synth_1 status: $status"
 
 # Launch synthesis if not complete, then block until finished
-if {$status ne "synth_design Complete"} {
+if {![string match "synth_design Complete*" $status]} {
     # Determine parallel jobs as half of system threads (min 1)
     set sys_threads 1
     if {![catch {exec nproc} _nproc_out]} {
