@@ -1,4 +1,3 @@
-PRJ ?=
 ENV_SCRIPTS_HOME ?= $(CURDIR)
 
 CORE_DIR ?=
@@ -11,6 +10,10 @@ AXI_WIDTH ?= 64
 #   nutshell
 #   nanhu
 CPU ?=
+SUFFIX ?=
+PRJ_NAME = fpga_$(CPU)$(if $(strip $(SUFFIX)),-$(strip $(SUFFIX)),)
+PRJ_DIR ?= $(ENV_SCRIPTS_HOME)/$(PRJ_NAME)
+PRJ ?= $(PRJ_DIR)/$(PRJ_NAME).xpr
 
 .PHONY: bitstream vivado
 
@@ -41,11 +44,11 @@ update_chi_flist:
 
 # Launch Vivado with FPGA project configuration
 vivado: check_vivado_version
-	vivado -mode batch -source src/tcl/common/xs_uart.tcl -tclargs --cpu $(CPU) --project_name fpga_$(CPU) --vivado_version $(VIVADO_VERSION)
+	vivado -mode batch -source src/tcl/common/xs_uart.tcl -tclargs --cpu $(CPU) --project_name $(PRJ_NAME) --vivado_version $(VIVADO_VERSION)
 
 # Check Vivado version compatibility
 check_version:
-	vivado -mode batch -source src/tcl/common/check_version.tcl -tclargs --vivado_version $(VIVADO_VERSION) --cpu $(CPU) --project_name fpga_$(CPU)
+	vivado -mode batch -source src/tcl/common/check_version.tcl -tclargs --vivado_version $(VIVADO_VERSION) --cpu $(CPU) --project_name $(PRJ_NAME)
 
 # Write bitstream to FPGA via PCIe
 write_bitstream:
@@ -69,11 +72,11 @@ add_sys_option:
 
 # Display implementation log
 get_impl_log:
-	cat fpga_$(CPU)/fpga_$(CPU).runs/impl_1/runme.log
+	cat $(PRJ_DIR)/$(PRJ_NAME).runs/impl_1/runme.log
 
 # Display synthesis log
 get_synth_log:
-	cat fpga_$(CPU)/fpga_$(CPU).runs/synth_1/runme.log
+	cat $(PRJ_DIR)/$(PRJ_NAME).runs/synth_1/runme.log
 
 # Build complete FPGA project
 all:
@@ -81,4 +84,4 @@ ifneq ($(strip $(CHI_DIR)),)
 	$(MAKE) update_chi_flist CHI_DIR="$(CHI_DIR)"
 endif
 	$(MAKE) update_core_flist CORE_DIR=$(CORE_DIR)
-	$(MAKE) vivado CPU=$(CPU)
+	$(MAKE) vivado CPU=$(CPU) SUFFIX="$(SUFFIX)"
