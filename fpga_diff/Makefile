@@ -1,5 +1,8 @@
 ENV_SCRIPTS_HOME ?= $(CURDIR)
 
+# Ensure Vivado can run on hosts with non-C locales (e.g. zh_CN.UTF-8)
+export LC_ALL := C
+
 CORE_DIR ?=
 CHI_DIR ?=
 FPGA_BIT_HOME ?=
@@ -51,18 +54,25 @@ check_version:
 	vivado -mode batch -source src/tcl/common/check_version.tcl -tclargs --vivado_version $(VIVADO_VERSION) --cpu $(CPU) --project_name $(PRJ_NAME)
 
 # Write bitstream to FPGA via PCIe
+# After programming, reset DDR controller (sw4 toggle) for initial calibration.
 write_bitstream:
 	sh tools/pcie-remove.sh
 	vivado -mode tcl -source tools/write_bitstream.tcl -tclargs $(FPGA_BIT_HOME)
 	sh tools/pcie-rescan.sh
+	vivado -mode tcl -source tools/reset_ddr.tcl -tclargs $(FPGA_BIT_HOME)/fpga_top_debug.ltx
 
 # Write workload to FPGA DDR via JTAG
+# The jtag_write_ddr.tcl script halts the system (sw6=0) before writing DDR,
+# then reset_cpu releases the CPU. No DDR controller reset (sw4 toggle) is
+# performed here — DDR4 MIG warm reset causes unreliable PHY recalibration.
 write_jtag_ddr:
-	vivado -mode tcl -source tools/reset_ddr.tcl -tclargs $(FPGA_BIT_HOME)/fpga_top_debug.ltx
-	vivado -mode tcl -source tools/jtag_write_ddr.tcl -tclargs $(WORKLOAD) $(AXI_WIDTH)
+	vivado -mode tcl -source tools/jtag_write_ddr.tcl -tclargs $(WORKLOAD) $(AXI_WIDTH) $(FPGA_BIT_HOME)/fpga_top_debug.ltx
 	$(MAKE) reset_cpu
 
 # Reset CPU on FPGA
+# Note: reset_cpu.tcl toggles vio_sw6 which also resets XDMA IP (sys_rstn = sys_rstn && vio_sw6).
+# This briefly drops the PCIe link, but the XDMA driver recovers on its own.
+# Do NOT add pcie-remove/rescan here — it causes a second link disruption and corrupts XDMA state.
 reset_cpu:
 	vivado -mode tcl -source tools/reset_cpu.tcl -tclargs $(FPGA_BIT_HOME)/fpga_top_debug.ltx
 

@@ -1,6 +1,15 @@
 puts "workload path:"
 puts [lindex $argv 0]
 set file_name [lindex $argv 0]
+
+# 3rd argument: .ltx probe file path for VIO halt (sw6=0)
+set ltx_file [lindex $argv 2]
+if {$ltx_file eq "" || ![file exists $ltx_file]} {
+    puts "ERROR: .ltx probe file required as 3rd argument"
+    puts "Usage: jtag_write_ddr.tcl <workload.txt> <axi_width> <probes.ltx>"
+    exit 1
+}
+
 # Initialize LabTools system
 if {[catch {open_hw_manager} errmsg]} {
     puts "Error initializing LabTools system: $errmsg"
@@ -37,6 +46,19 @@ if {$hw_device eq ""} {
 }
 puts "Refreshing hardware device..."
 refresh_hw_device $hw_device
+
+# Halt system (sw6=0) before DDR write to prevent CPU from modifying DDR.
+# This avoids the need for a separate reset_ddr.tcl call (and its destructive
+# DDR controller warm-reset via sw4 toggle).
+puts "Loading probes from $ltx_file for system halt..."
+set_property PROBES.FILE $ltx_file [current_hw_device]
+refresh_hw_device [current_hw_device]
+refresh_hw_vio hw_vio_1
+# vio_sw6 0 (halt system)
+set_property OUTPUT_VALUE 0 [get_hw_probes vio_sw6 -of_objects [get_hw_vios hw_vio_1]]
+commit_hw_vio [get_hw_probes {vio_sw6} -of_objects [get_hw_vios hw_vio_1]]
+puts "System halted (sw6=0)"
+after 500
 
 # List all AXI interfaces
 set hw_axi_list [get_hw_axis]
@@ -180,10 +202,11 @@ proc write_to_ddr {fn hw_axi hw_axi_data_width} {
     }
   }
   close $fdata
-  exit
 }
 
 if {[catch {[write_to_ddr $file_name $hw_axi $hw_axi_data_width]} errmsg]} {
   puts "ErrorMsg: $errmsg"
 }
 puts "After"
+
+exit
