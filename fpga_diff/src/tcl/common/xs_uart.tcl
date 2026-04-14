@@ -203,6 +203,7 @@ set obj [get_filesets sources_1]
 # Add files by reference, not by copy
 set_property SOURCE_SET sources_1 [get_filesets sim_1]
 add_files -norecurse -fileset $obj $xs_files
+update_compile_order -fileset $obj
 
 # Set file type to "SystemVerilog" for all .v files as base type
 # This should be done before setting specific files to "Verilog Header"

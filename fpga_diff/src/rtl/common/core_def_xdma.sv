@@ -1202,37 +1202,49 @@ wire [0:0]    br2cfg_wvalid;
   wire PCIE_S00_AXIS_0_tready;
   wire PCIE_S00_AXIS_0_tvalid;
 
-  wire [31:0] XDMA_AXI_LITE_awaddr;
-  wire        XDMA_AXI_LITE_awvalid;
-  wire        XDMA_AXI_LITE_awready;
-  wire [31:0] XDMA_AXI_LITE_wdata;
-  wire [3:0]  XDMA_AXI_LITE_wstrb;
-  wire        XDMA_AXI_LITE_wvalid;
-  wire        XDMA_AXI_LITE_wready;
-  wire [1:0]  XDMA_AXI_LITE_bresp;
-  wire        XDMA_AXI_LITE_bvalid;
-  wire        XDMA_AXI_LITE_bready;
-  wire [31:0] XDMA_AXI_LITE_araddr;
-  wire        XDMA_AXI_LITE_arvalid;
-  wire        XDMA_AXI_LITE_arready;
-  wire [31:0] XDMA_AXI_LITE_rdata;
-  wire [1:0]  XDMA_AXI_LITE_rresp;
-  wire        XDMA_AXI_LITE_rvalid;
-  wire        XDMA_AXI_LITE_rready;
+  // H2C AXI-Stream signals (Host -> DUT)
+  (* dont_touch = "true" *) wire        difftest_h2c_axis_valid;
+  (* dont_touch = "true" *) wire        difftest_h2c_axis_ready;
+  (* dont_touch = "true" *) wire [255:0]difftest_h2c_axis_bits_data;
+  (* dont_touch = "true" *) wire        difftest_h2c_axis_bits_last;
+  (* dont_touch = "true" *) wire [31:0] difftest_h2c_axis_bits_keep;
+  (* dont_touch = "true" *) wire        difftest_h2c_axis_clock;
+  (* dont_touch = "true" *) wire        simtop_h2c_axis_ready_unused;
 
-  wire difftest_to_host_axis_ready_io;
-  wire difftest_to_host_axis_valid_io;
-  wire difftest_to_host_axis_ready;
-  wire difftest_to_host_axis_valid;
-  wire [511:0] difftest_to_host_axis_bits_data;
-  wire difftest_to_host_axis_bits_last;
+  // Config AXI4-Lite signals (replaces XDMA_AXI4LiteBar)
+  wire        difftest_cfg_aw_valid;
+  wire        difftest_cfg_aw_ready;
+  wire [31:0] difftest_cfg_aw_bits_addr;
+  wire [2:0]  difftest_cfg_aw_bits_prot;
+  wire        difftest_cfg_w_valid;
+  wire        difftest_cfg_w_ready;
+  wire [31:0] difftest_cfg_w_bits_data;
+  wire [3:0]  difftest_cfg_w_bits_strb;
+  wire        difftest_cfg_b_valid;
+  wire        difftest_cfg_b_ready;
+  wire [1:0]  difftest_cfg_b_bits_resp;
+  wire        difftest_cfg_ar_valid;
+  wire        difftest_cfg_ar_ready;
+  wire [31:0] difftest_cfg_ar_bits_addr;
+  wire [2:0]  difftest_cfg_ar_bits_prot;
+  wire        difftest_cfg_r_valid;
+  wire        difftest_cfg_r_ready;
+  wire [31:0] difftest_cfg_r_bits_data;
+  wire [1:0]  difftest_cfg_r_bits_resp;
+
+  (* dont_touch = "true" *) wire difftest_to_host_axis_ready_io;
+  (* dont_touch = "true" *) wire difftest_to_host_axis_valid_io;
+  (* dont_touch = "true" *) wire difftest_to_host_axis_ready;
+  (* dont_touch = "true" *) wire difftest_to_host_axis_valid;
+  (* dont_touch = "true" *) wire [511:0] difftest_to_host_axis_bits_data;
+  (* dont_touch = "true" *) wire difftest_to_host_axis_bits_last;
   wire difftest_clock_enable;
   wire inter_soc_clk;
   wire inter_rtc_clk;
 
+  // Control signals from SimTop config registers
   wire io_host_reset;
   wire io_host_diff_enable;
-  wire clock_enable;
   wire sys_rstn_io;
   wire cpu_rstn_io;
   wire difftest_c2h_rstn;
@@ -1265,36 +1277,47 @@ wire [0:0]    br2cfg_wvalid;
   assign difftest_to_host_axis_ready = difftest_to_host_axis_ready_io & difftest_stream_enable;
   assign difftest_to_host_axis_valid_io = difftest_to_host_axis_valid & difftest_stream_enable;
 
-  xdma_ep xdma_ep_i(
+  (*dont_touch = "true"*) xdma_ep xdma_ep_i(
     .cpu_clk(sys_clk_i),
     .cpu_rstn(sys_rstn),
     .c2h_rstn(difftest_c2h_rstn),
+    .H2C_AXIS_CLK(difftest_h2c_axis_clock),
+
+    // C2H (DUT -> Host)
     .S00_AXIS_0_tdata(difftest_to_host_axis_bits_data),
     .S00_AXIS_0_tkeep(64'hffffffff_ffffffff),
     .S00_AXIS_0_tlast(difftest_to_host_axis_bits_last),
     .S00_AXIS_0_tready(difftest_to_host_axis_ready_io),
     .S00_AXIS_0_tvalid(difftest_to_host_axis_valid_io),
-    
-    .XDMA_AXI_LITE_awaddr (XDMA_AXI_LITE_awaddr),
-    .XDMA_AXI_LITE_awprot (3'b000),
-    .XDMA_AXI_LITE_awvalid(XDMA_AXI_LITE_awvalid),
-    .XDMA_AXI_LITE_awready(XDMA_AXI_LITE_awready),
-    .XDMA_AXI_LITE_wdata  (XDMA_AXI_LITE_wdata),
-    .XDMA_AXI_LITE_wstrb  (XDMA_AXI_LITE_wstrb),
-    .XDMA_AXI_LITE_wvalid (XDMA_AXI_LITE_wvalid),
-    .XDMA_AXI_LITE_wready (XDMA_AXI_LITE_wready),
-    .XDMA_AXI_LITE_bresp  (XDMA_AXI_LITE_bresp),
-    .XDMA_AXI_LITE_bvalid (XDMA_AXI_LITE_bvalid),
-    .XDMA_AXI_LITE_bready (XDMA_AXI_LITE_bready),
-    .XDMA_AXI_LITE_araddr (XDMA_AXI_LITE_araddr),
-    .XDMA_AXI_LITE_arprot (3'b000),
-    .XDMA_AXI_LITE_arvalid(XDMA_AXI_LITE_arvalid),
-    .XDMA_AXI_LITE_arready(XDMA_AXI_LITE_arready),
-    .XDMA_AXI_LITE_rdata  (XDMA_AXI_LITE_rdata),
-    .XDMA_AXI_LITE_rresp  (XDMA_AXI_LITE_rresp),
-    .XDMA_AXI_LITE_rvalid (XDMA_AXI_LITE_rvalid),
-    .XDMA_AXI_LITE_rready (XDMA_AXI_LITE_rready),
-    
+
+    // H2C (Host -> DUT)
+    .M00_AXIS_0_tdata(difftest_h2c_axis_bits_data),
+    .M00_AXIS_0_tkeep(difftest_h2c_axis_bits_keep),
+    .M00_AXIS_0_tlast(difftest_h2c_axis_bits_last),
+    .M00_AXIS_0_tready(difftest_h2c_axis_ready),
+    .M00_AXIS_0_tvalid(difftest_h2c_axis_valid),
+
+    // Config AXI4-Lite
+    .XDMA_AXI_LITE_awaddr (difftest_cfg_aw_bits_addr),
+    .XDMA_AXI_LITE_awprot (difftest_cfg_aw_bits_prot),
+    .XDMA_AXI_LITE_awvalid(difftest_cfg_aw_valid),
+    .XDMA_AXI_LITE_awready(difftest_cfg_aw_ready),
+    .XDMA_AXI_LITE_wdata  (difftest_cfg_w_bits_data),
+    .XDMA_AXI_LITE_wstrb  (difftest_cfg_w_bits_strb),
+    .XDMA_AXI_LITE_wvalid (difftest_cfg_w_valid),
+    .XDMA_AXI_LITE_wready (difftest_cfg_w_ready),
+    .XDMA_AXI_LITE_bresp  (difftest_cfg_b_bits_resp),
+    .XDMA_AXI_LITE_bvalid (difftest_cfg_b_valid),
+    .XDMA_AXI_LITE_bready (difftest_cfg_b_ready),
+    .XDMA_AXI_LITE_araddr (difftest_cfg_ar_bits_addr),
+    .XDMA_AXI_LITE_arprot (difftest_cfg_ar_bits_prot),
+    .XDMA_AXI_LITE_arvalid(difftest_cfg_ar_valid),
+    .XDMA_AXI_LITE_arready(difftest_cfg_ar_ready),
+    .XDMA_AXI_LITE_rdata  (difftest_cfg_r_bits_data),
+    .XDMA_AXI_LITE_rresp  (difftest_cfg_r_bits_resp),
+    .XDMA_AXI_LITE_rvalid (difftest_cfg_r_valid),
+    .XDMA_AXI_LITE_rready (difftest_cfg_r_ready),
+
     .TO_DIFFTEST_PCIE_CLK (difftest_pcie_clock),
     .pci_exp_rxn(pci_ep_rxn),
     .pci_exp_rxp(pci_ep_rxp),
@@ -1304,33 +1327,6 @@ wire [0:0]    br2cfg_wvalid;
     .pcie_ep_gt_ref_clk_p(pcie_ep_gt_ref_clk_p),
     .pcie_ep_lnk_up(pcie_ep_lnk_up),
     .pcie_ep_perstn(pcie_ep_perstn)
-  );
-
-  XDMA_AXI4LiteBar u_xdma_axi4lite_bar (
-      .clock           (sys_clk_i),
-      .reset           (~sys_rstn),
-
-      .io_axi_write_awaddr   (XDMA_AXI_LITE_awaddr),
-      .io_axi_write_awvalid  (XDMA_AXI_LITE_awvalid),
-      .io_axi_write_awready  (XDMA_AXI_LITE_awready),
-      .io_axi_write_wdata    (XDMA_AXI_LITE_wdata),
-      .io_axi_write_wstrb    (XDMA_AXI_LITE_wstrb),
-      .io_axi_write_wvalid   (XDMA_AXI_LITE_wvalid),
-      .io_axi_write_wready   (XDMA_AXI_LITE_wready),
-      .io_axi_write_bresp    (XDMA_AXI_LITE_bresp),
-      .io_axi_write_bvalid   (XDMA_AXI_LITE_bvalid),
-      .io_axi_write_bready   (XDMA_AXI_LITE_bready),
-
-      .io_axi_read_araddr    (XDMA_AXI_LITE_araddr),
-      .io_axi_read_arvalid   (XDMA_AXI_LITE_arvalid),
-      .io_axi_read_arready   (XDMA_AXI_LITE_arready),
-      .io_axi_read_rdata     (XDMA_AXI_LITE_rdata),
-      .io_axi_read_rresp     (XDMA_AXI_LITE_rresp),
-      .io_axi_read_rvalid    (XDMA_AXI_LITE_rvalid),
-      .io_axi_read_rready    (XDMA_AXI_LITE_rready),
-
-      .io_host_diff_enable   (io_host_diff_enable),
-      .io_host_reset         (io_host_reset)
   );
 
   DifftestClockGate SOC_CLK_CTRL(
@@ -1409,8 +1405,14 @@ jtag_ddr_subsys_wrapper U_JTAG_DDR_SUBSYS(
     .DDR4_dqs_t             (DDR_DQS_T),
     .DDR4_odt               (DDR_ODT),
     .DDR4_reset_n           (DDR_RESET_N),
+    .H2C_CLK                (difftest_h2c_axis_clock),
     .OSC_SYS_CLK_clk_n      (ddr_clk_n),
     .OSC_SYS_CLK_clk_p      (ddr_clk_p),
+    .S_AXIS_H2C_tdata       (difftest_h2c_axis_bits_data),
+    .S_AXIS_H2C_tkeep       (difftest_h2c_axis_bits_keep),
+    .S_AXIS_H2C_tlast       (difftest_h2c_axis_bits_last),
+    .S_AXIS_H2C_tready      (difftest_h2c_axis_ready),
+    .S_AXIS_H2C_tvalid      (difftest_h2c_axis_valid),
     // AXI INTERFACE CLK
     .SOC_CLK                (inter_soc_clk),
 
@@ -1532,6 +1534,7 @@ jtag_ddr_subsys_wrapper U_JTAG_DDR_SUBSYS(
     .M_AXI_DP_wvalid        (mcu_axi_dp_wvalid  ),
 `endif /* CONFIG_HAVE_DDRC_MCU_PERI_AXI */
     .ddr_rstn               (rstn_sw4),
+    .h2c_rstn               (sys_rstn),
     .soc_rstn               (rstn_sw4),
     .calib_complete         (init_calib_complete)
 );
@@ -1945,12 +1948,42 @@ xs_sys_icn u_icn(
 
 SimTop_wrapper U_CPU_TOP(
     .difftest_pcie_clock             (difftest_pcie_clock),
+    .difftest_ref_clock              (sys_clk_i),
     .difftest_to_host_axis_ready     (difftest_to_host_axis_ready),
     .difftest_to_host_axis_valid     (difftest_to_host_axis_valid),
     .difftest_to_host_axis_bits_data (difftest_to_host_axis_bits_data),
     .difftest_to_host_axis_bits_last (difftest_to_host_axis_bits_last),
+
+    .difftest_h2c_axis_valid         (1'b0),
+    .difftest_h2c_axis_ready         (simtop_h2c_axis_ready_unused),
+    .difftest_h2c_axis_bits_data     (64'd0),
+    .difftest_h2c_axis_bits_last     (1'b0),
+
+    .difftest_cfg_aw_valid           (difftest_cfg_aw_valid),
+    .difftest_cfg_aw_ready           (difftest_cfg_aw_ready),
+    .difftest_cfg_aw_bits_addr       (difftest_cfg_aw_bits_addr),
+    .difftest_cfg_aw_bits_prot       (difftest_cfg_aw_bits_prot),
+    .difftest_cfg_w_valid            (difftest_cfg_w_valid),
+    .difftest_cfg_w_ready            (difftest_cfg_w_ready),
+    .difftest_cfg_w_bits_data        (difftest_cfg_w_bits_data),
+    .difftest_cfg_w_bits_strb        (difftest_cfg_w_bits_strb),
+    .difftest_cfg_b_valid            (difftest_cfg_b_valid),
+    .difftest_cfg_b_ready            (difftest_cfg_b_ready),
+    .difftest_cfg_b_bits_resp        (difftest_cfg_b_bits_resp),
+    .difftest_cfg_ar_valid           (difftest_cfg_ar_valid),
+    .difftest_cfg_ar_ready           (difftest_cfg_ar_ready),
+    .difftest_cfg_ar_bits_addr       (difftest_cfg_ar_bits_addr),
+    .difftest_cfg_ar_bits_prot       (difftest_cfg_ar_bits_prot),
+    .difftest_cfg_r_valid            (difftest_cfg_r_valid),
+    .difftest_cfg_r_ready            (difftest_cfg_r_ready),
+    .difftest_cfg_r_bits_data        (difftest_cfg_r_bits_data),
+    .difftest_cfg_r_bits_resp        (difftest_cfg_r_bits_resp),
+
     .difftest_clock_enable           (difftest_clock_enable),
-    .difftest_ref_clock             (sys_clk_i    ),
+
+    .difftest_HOST_IO_RESET          (io_host_reset),
+    .difftest_HOST_IO_DIFFTEST_ENABLE(io_host_diff_enable),
+
     .inter_soc_clk                  (inter_soc_clk),
     .sys_rstn_i                     (cpu_rstn_io  ),
     .tmclk                          (inter_rtc_clk),

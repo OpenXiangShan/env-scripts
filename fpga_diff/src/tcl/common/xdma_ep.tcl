@@ -206,6 +206,20 @@ proc create_root_design { parentCell } {
 
 
   # Create interface ports
+  set M00_AXIS_0 [ create_bd_intf_port -mode Master -vlnv xilinx.com:interface:axis_rtl:1.0 M00_AXIS_0 ]
+  set_property -dict [ list \
+   CONFIG.FREQ_HZ {250000000} \
+   CONFIG.HAS_TKEEP {1} \
+   CONFIG.HAS_TLAST {1} \
+   CONFIG.HAS_TREADY {1} \
+   CONFIG.HAS_TSTRB {0} \
+   CONFIG.LAYERED_METADATA {undef} \
+   CONFIG.TDATA_NUM_BYTES {32} \
+   CONFIG.TDEST_WIDTH {0} \
+   CONFIG.TID_WIDTH {0} \
+   CONFIG.TUSER_WIDTH {0} \
+   ] $M00_AXIS_0
+
   set S00_AXIS_0 [ create_bd_intf_port -mode Slave -vlnv xilinx.com:interface:axis_rtl:1.0 S00_AXIS_0 ]
   set_property -dict [ list \
    CONFIG.HAS_TKEEP {1} \
@@ -248,6 +262,10 @@ proc create_root_design { parentCell } {
   set_property -dict [ list \
    CONFIG.ASSOCIATED_BUSIF {S00_AXIS_0} \
  ] $TO_DIFFTEST_PCIE_CLK
+  set H2C_AXIS_CLK [ create_bd_port -dir O -type clk H2C_AXIS_CLK ]
+  set_property -dict [ list \
+   CONFIG.ASSOCIATED_BUSIF {M00_AXIS_0} \
+ ] $H2C_AXIS_CLK
   set cpu_clk [ create_bd_port -dir I -type clk -freq_hz 25000000 cpu_clk ]
   set_property -dict [ list \
    CONFIG.ASSOCIATED_BUSIF {XDMA_AXI_LITE} \
@@ -355,6 +373,7 @@ proc create_root_design { parentCell } {
   # Create port connections
   connect_bd_intf_net -intf_net axis_clock_converter_0_M_AXIS [get_bd_intf_pins axis_clock_converter_0/M_AXIS] [get_bd_intf_pins axis_dwidth_converter_0/S_AXIS]
   connect_bd_intf_net -intf_net axis_dwidth_converter_0_M_AXIS [get_bd_intf_pins axis_dwidth_converter_0/M_AXIS] [get_bd_intf_pins xdma_0/S_AXIS_C2H_0]
+  connect_bd_intf_net -intf_net xdma_0_M_AXIS_H2C_0 [get_bd_intf_ports M00_AXIS_0] [get_bd_intf_pins xdma_0/M_AXIS_H2C_0]
   connect_bd_intf_net -intf_net xdma_0_M_AXI_LITE [get_bd_intf_pins axi_interconnect_0/S00_AXI] [get_bd_intf_pins xdma_0/M_AXI_LITE]
 
   # Create port connections
@@ -364,6 +383,7 @@ proc create_root_design { parentCell } {
   [get_bd_pins logic_and_c2h_rst/Op1] \
   [get_bd_pins clk_wiz_0/resetn]
   connect_bd_net -net M00_AXIS_ACLK_1  [get_bd_pins xdma_0/axi_aclk] \
+  [get_bd_ports H2C_AXIS_CLK] \
   [get_bd_pins axi_interconnect_0/ACLK] \
   [get_bd_pins axi_interconnect_0/S00_ACLK] \
   [get_bd_pins axis_clock_converter_0/m_axis_aclk] \

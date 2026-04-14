@@ -125,6 +125,8 @@ if { $bCheckIPs == 1 } {
    set list_check_ips "\ 
 xilinx.com:ip:ddr4:2.2\
 xilinx.com:ip:jtag_axi:1.2\
+xilinx.com:ip:axi_datamover:5.1\
+xilinx.com:ip:axis_clock_converter:1.1\
 xilinx.com:ip:util_vector_logic:2.0\
 xilinx.com:ip:proc_sys_reset:5.0\
 "
@@ -154,6 +156,37 @@ if { $bCheckIPsPassed != 1 } {
 ##################################################################
 # DESIGN PROCs
 ##################################################################
+
+proc ensure_h2c_s2mm_bridge_module {} {
+  variable script_folder
+
+  set rtl_file [file normalize [file join $script_folder ../../rtl/common/h2c_s2mm_bridge.v]]
+  if {![file exists $rtl_file]} {
+     error "Unable to find RTL file for module reference: $rtl_file"
+  }
+
+  set src_fileset [get_filesets -quiet sources_1]
+  if {$src_fileset eq ""} {
+     error "Unable to find sources_1 fileset while preparing h2c_s2mm_bridge module reference"
+  }
+
+  if {[get_projects -quiet] ne ""} {
+     set_property source_mgmt_mode All [current_project]
+  }
+
+  set rtl_file_obj [get_files -quiet $rtl_file]
+  if {[llength $rtl_file_obj] == 0} {
+     add_files -norecurse -fileset $src_fileset $rtl_file
+     set rtl_file_obj [get_files -quiet $rtl_file]
+  }
+
+  if {[llength $rtl_file_obj] == 0} {
+     error "Failed to add RTL file for module reference: $rtl_file"
+  }
+
+  set_property -name file_type -value {Verilog} -objects $rtl_file_obj
+  update_compile_order -fileset $src_fileset
+}
 
 
 
@@ -235,8 +268,27 @@ proc create_root_design { parentCell } {
    CONFIG.WUSER_WIDTH {0} \
    ] $SOC_M_AXI
 
+  set S_AXIS_H2C [ create_bd_intf_port -mode Slave -vlnv xilinx.com:interface:axis_rtl:1.0 S_AXIS_H2C ]
+  set_property -dict [ list \
+   CONFIG.FREQ_HZ {250000000} \
+   CONFIG.HAS_TKEEP {1} \
+   CONFIG.HAS_TLAST {1} \
+   CONFIG.HAS_TREADY {1} \
+   CONFIG.HAS_TSTRB {0} \
+   CONFIG.LAYERED_METADATA {undef} \
+   CONFIG.TDATA_NUM_BYTES {32} \
+   CONFIG.TDEST_WIDTH {0} \
+   CONFIG.TID_WIDTH {0} \
+   CONFIG.TUSER_WIDTH {0} \
+   ] $S_AXIS_H2C
+
 
   # Create ports
+  set H2C_CLK [ create_bd_port -dir I -type clk -freq_hz 250000000 H2C_CLK ]
+  set_property -dict [ list \
+   CONFIG.ASSOCIATED_BUSIF {S_AXIS_H2C} \
+   CONFIG.ASSOCIATED_RESET {h2c_rstn} \
+ ] $H2C_CLK
   set SOC_CLK [ create_bd_port -dir I -type clk -freq_hz 25000000 SOC_CLK ]
   set_property -dict [ list \
    CONFIG.ASSOCIATED_BUSIF {SOC_M_AXI} \
@@ -246,23 +298,43 @@ proc create_root_design { parentCell } {
   set_property -dict [ list \
    CONFIG.POLARITY {ACTIVE_LOW} \
  ] $ddr_rstn
+  set h2c_rstn [ create_bd_port -dir I -type rst h2c_rstn ]
+  set_property -dict [ list \
+   CONFIG.POLARITY {ACTIVE_LOW} \
+ ] $h2c_rstn
   set soc_rstn [ create_bd_port -dir I -type rst soc_rstn ]
 
   # Create instance: axi_interconnect_0, and set properties
   set axi_interconnect_0 [ create_bd_cell -type ip -vlnv xilinx.com:ip:axi_interconnect:2.1 axi_interconnect_0 ]
   set_property -dict [list \
     CONFIG.ENABLE_ADVANCED_OPTIONS {1} \
-    CONFIG.M00_HAS_DATA_FIFO {0} \
-    CONFIG.M00_HAS_REGSLICE {4} \
+    CONFIG.M00_HAS_DATA_FIFO {2} \
+    CONFIG.M00_HAS_REGSLICE {3} \
     CONFIG.NUM_MI {1} \
-    CONFIG.NUM_SI {2} \
-    CONFIG.S00_HAS_DATA_FIFO {0} \
+    CONFIG.NUM_SI {3} \
+    CONFIG.S00_HAS_DATA_FIFO {2} \
     CONFIG.S00_HAS_REGSLICE {4} \
-    CONFIG.S01_HAS_DATA_FIFO {1} \
+    CONFIG.S01_HAS_DATA_FIFO {2} \
     CONFIG.S01_HAS_REGSLICE {4} \
     CONFIG.S02_HAS_DATA_FIFO {2} \
-    CONFIG.STRATEGY {0} \
+    CONFIG.S02_HAS_REGSLICE {4} \
+    CONFIG.STRATEGY {2} \
   ] $axi_interconnect_0
+  # Create instance: axi_datamover_0, and set properties
+  set axi_datamover_0 [ create_bd_cell -type ip -vlnv xilinx.com:ip:axi_datamover:5.1 axi_datamover_0 ]
+  set_property -dict [ list \
+   CONFIG.c_addr_width {33} \
+   CONFIG.c_enable_mm2s {0} \
+   CONFIG.c_enable_s2mm {1} \
+   CONFIG.c_include_s2mm {Full} \
+   CONFIG.c_include_s2mm_dre {1} \
+   CONFIG.c_m_axi_s2mm_data_width {256} \
+   CONFIG.c_s2mm_burst_size {16} \
+   CONFIG.c_s2mm_support_indet_btt {1} \
+   CONFIG.c_s_axis_s2mm_tdata_width {256} \
+   ] $axi_datamover_0
+  # Create instance: axis_clock_converter_0
+  set axis_clock_converter_0 [ create_bd_cell -type ip -vlnv xilinx.com:ip:axis_clock_converter:1.1 axis_clock_converter_0 ]
   # Create instance: ddr4_0, and set properties
   set ddr4_0 [ create_bd_cell -type ip -vlnv xilinx.com:ip:ddr4:2.2 ddr4_0 ]
   set_property -dict [list \
@@ -272,6 +344,8 @@ proc create_root_design { parentCell } {
     CONFIG.ADDN_UI_CLKOUT4_FREQ_HZ {None} \
     CONFIG.C0.DDR4_AxiAddressWidth {33} \
     CONFIG.C0.DDR4_AxiDataWidth {64} \
+    CONFIG.C0.DDR4_CLKFBOUT_MULT {15} \
+    CONFIG.C0.DDR4_CLKOUT0_DIVIDE {6} \
     CONFIG.C0.DDR4_CasLatency {11} \
     CONFIG.C0.DDR4_CasWriteLatency {11} \
     CONFIG.C0.DDR4_DataWidth {64} \
@@ -283,13 +357,14 @@ proc create_root_design { parentCell } {
   # Create instance: jtag_axi_0, and set properties
   set jtag_axi_0 [ create_bd_cell -type ip -vlnv xilinx.com:ip:jtag_axi:1.2 jtag_axi_0 ]
   set_property -dict [list \
-    CONFIG.M_AXI_ADDR_WIDTH {32} \
-    CONFIG.M_AXI_DATA_WIDTH {64} \
     CONFIG.M_AXI_ID_WIDTH {1} \
-    CONFIG.M_HAS_BURST {1} \
+    CONFIG.M_HAS_BURST {0} \
     CONFIG.RD_TXN_QUEUE_LENGTH {8} \
     CONFIG.WR_TXN_QUEUE_LENGTH {8} \
   ] $jtag_axi_0
+  # Create instance: h2c_s2mm_bridge_0
+  ensure_h2c_s2mm_bridge_module
+  set h2c_s2mm_bridge_0 [ create_bd_cell -type module -reference h2c_s2mm_bridge h2c_s2mm_bridge_0 ]
   # Create instance: logic_not, and set properties
   set logic_not [ create_bd_cell -type ip -vlnv xilinx.com:ip:util_vector_logic:2.0 logic_not ]
   set_property -dict [list \
@@ -301,16 +376,28 @@ proc create_root_design { parentCell } {
 
   # Create interface connections
   connect_bd_intf_net -intf_net C0_SYS_CLK_0_1 [get_bd_intf_ports OSC_SYS_CLK] [get_bd_intf_pins ddr4_0/C0_SYS_CLK]
+  connect_bd_intf_net -intf_net S_AXIS_H2C_0_1 [get_bd_intf_ports S_AXIS_H2C] [get_bd_intf_pins axis_clock_converter_0/S_AXIS]
   connect_bd_intf_net -intf_net S00_AXI_1 [get_bd_intf_pins axi_interconnect_0/S00_AXI] [get_bd_intf_pins jtag_axi_0/M_AXI]
+  connect_bd_intf_net -intf_net axi_datamover_0_M_AXI_S2MM [get_bd_intf_pins axi_datamover_0/M_AXI_S2MM] [get_bd_intf_pins axi_interconnect_0/S02_AXI]
+  connect_bd_intf_net -intf_net axis_clock_converter_0_M_AXIS [get_bd_intf_pins axis_clock_converter_0/M_AXIS] [get_bd_intf_pins h2c_s2mm_bridge_0/S_AXIS]
+  connect_bd_intf_net -intf_net h2c_s2mm_bridge_0_M_AXIS [get_bd_intf_pins h2c_s2mm_bridge_0/M_AXIS] [get_bd_intf_pins axi_datamover_0/S_AXIS_S2MM]
+  connect_bd_intf_net -intf_net h2c_s2mm_bridge_0_M_AXIS_S2MM_CMD [get_bd_intf_pins h2c_s2mm_bridge_0/M_AXIS_S2MM_CMD] [get_bd_intf_pins axi_datamover_0/S_AXIS_S2MM_CMD]
+  connect_bd_intf_net -intf_net axi_datamover_0_M_AXIS_S2MM_STS [get_bd_intf_pins axi_datamover_0/M_AXIS_S2MM_STS] [get_bd_intf_pins h2c_s2mm_bridge_0/S_AXIS_S2MM_STS]
   connect_bd_intf_net -intf_net SOC_M_AXI_1 [get_bd_intf_ports SOC_M_AXI] [get_bd_intf_pins axi_interconnect_0/S01_AXI]
   connect_bd_intf_net -intf_net axi_interconnect_0_M00_AXI [get_bd_intf_pins axi_interconnect_0/M00_AXI] [get_bd_intf_pins ddr4_0/C0_DDR4_S_AXI]
   connect_bd_intf_net -intf_net ddr4_0_C0_DDR4 [get_bd_intf_ports DDR4] [get_bd_intf_pins ddr4_0/C0_DDR4]
 
   # Create port connections
+  connect_bd_net -net H2C_CLK_1 [get_bd_ports H2C_CLK] [get_bd_pins axis_clock_converter_0/s_axis_aclk]
   connect_bd_net -net M00_ACLK_1  [get_bd_pins ddr4_0/c0_ddr4_ui_clk] \
+  [get_bd_pins axi_datamover_0/m_axi_s2mm_aclk] \
+  [get_bd_pins axi_datamover_0/m_axis_s2mm_cmdsts_awclk] \
   [get_bd_pins axi_interconnect_0/ACLK] \
   [get_bd_pins axi_interconnect_0/M00_ACLK] \
   [get_bd_pins axi_interconnect_0/S00_ACLK] \
+  [get_bd_pins axi_interconnect_0/S02_ACLK] \
+  [get_bd_pins axis_clock_converter_0/m_axis_aclk] \
+  [get_bd_pins h2c_s2mm_bridge_0/clk] \
   [get_bd_pins jtag_axi_0/aclk] \
   [get_bd_pins rst_ddr4_200M/slowest_sync_clk]
   connect_bd_net -net SOC_CLK_1  [get_bd_ports SOC_CLK] \
@@ -322,19 +409,26 @@ proc create_root_design { parentCell } {
   [get_bd_pins rst_ddr4_200M/dcm_locked]
   connect_bd_net -net ddr_rst_1  [get_bd_ports ddr_rstn] \
   [get_bd_pins logic_not/Op1]
+  connect_bd_net -net h2c_rstn_1 [get_bd_ports h2c_rstn] [get_bd_pins axis_clock_converter_0/s_axis_aresetn]
   connect_bd_net -net rst_ddr4_0_200M_interconnect_aresetn  [get_bd_pins rst_ddr4_200M/interconnect_aresetn] \
   [get_bd_pins axi_interconnect_0/ARESETN] \
   [get_bd_pins axi_interconnect_0/M00_ARESETN] \
-  [get_bd_pins axi_interconnect_0/S00_ARESETN]
+  [get_bd_pins axi_interconnect_0/S00_ARESETN] \
+  [get_bd_pins axi_interconnect_0/S02_ARESETN]
   connect_bd_net -net rst_ddr4_0_200M_peripheral_aresetn  [get_bd_pins rst_ddr4_200M/peripheral_aresetn] \
   [get_bd_pins ddr4_0/c0_ddr4_aresetn] \
-  [get_bd_pins jtag_axi_0/aresetn]
+  [get_bd_pins jtag_axi_0/aresetn] \
+  [get_bd_pins axi_datamover_0/m_axi_s2mm_aresetn] \
+  [get_bd_pins axi_datamover_0/m_axis_s2mm_cmdsts_aresetn] \
+  [get_bd_pins axis_clock_converter_0/m_axis_aresetn] \
+  [get_bd_pins h2c_s2mm_bridge_0/rstn]
   connect_bd_net -net soc_rstn_1  [get_bd_ports soc_rstn] \
   [get_bd_pins axi_interconnect_0/S01_ARESETN]
   connect_bd_net -net util_vector_logic_0_Res  [get_bd_pins logic_not/Res] \
   [get_bd_pins ddr4_0/sys_rst]
 
   # Create address segments
+  assign_bd_address -offset 0x00000000 -range 0x000200000000 -target_address_space [get_bd_addr_spaces axi_datamover_0/Data_S2MM] [get_bd_addr_segs ddr4_0/C0_DDR4_MEMORY_MAP/C0_DDR4_ADDRESS_BLOCK] -force
   assign_bd_address -offset 0x00000000 -range 0x000100000000 -target_address_space [get_bd_addr_spaces jtag_axi_0/Data] [get_bd_addr_segs ddr4_0/C0_DDR4_MEMORY_MAP/C0_DDR4_ADDRESS_BLOCK] -force
   assign_bd_address -offset 0x00000000 -range 0x000200000000 -target_address_space [get_bd_addr_spaces SOC_M_AXI] [get_bd_addr_segs ddr4_0/C0_DDR4_MEMORY_MAP/C0_DDR4_ADDRESS_BLOCK] -force
 
@@ -353,5 +447,3 @@ proc create_root_design { parentCell } {
 ##################################################################
 
 create_root_design ""
-
-

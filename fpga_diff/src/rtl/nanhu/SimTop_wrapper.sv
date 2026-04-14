@@ -177,11 +177,45 @@ output io_riscv_halt_1,
 
 input          difftest_ref_clock,
                difftest_pcie_clock,
-               difftest_to_host_axis_ready,
+
+// C2H (DUT -> Host)
+input          difftest_to_host_axis_ready,
 output         difftest_to_host_axis_valid,
 output [511:0] difftest_to_host_axis_bits_data,
 output         difftest_to_host_axis_bits_last,
-               difftest_clock_enable
+
+// H2C (Host -> DUT)
+input          difftest_h2c_axis_valid,
+output         difftest_h2c_axis_ready,
+input  [63:0]  difftest_h2c_axis_bits_data,
+input          difftest_h2c_axis_bits_last,
+
+// Config AXI4-Lite
+input          difftest_cfg_aw_valid,
+output         difftest_cfg_aw_ready,
+input  [31:0]  difftest_cfg_aw_bits_addr,
+input  [2:0]   difftest_cfg_aw_bits_prot,
+input          difftest_cfg_w_valid,
+output         difftest_cfg_w_ready,
+input  [31:0]  difftest_cfg_w_bits_data,
+input  [3:0]   difftest_cfg_w_bits_strb,
+output         difftest_cfg_b_valid,
+input          difftest_cfg_b_ready,
+output [1:0]   difftest_cfg_b_bits_resp,
+input          difftest_cfg_ar_valid,
+output         difftest_cfg_ar_ready,
+input  [31:0]  difftest_cfg_ar_bits_addr,
+input  [2:0]   difftest_cfg_ar_bits_prot,
+output         difftest_cfg_r_valid,
+input          difftest_cfg_r_ready,
+output [31:0]  difftest_cfg_r_bits_data,
+output [1:0]   difftest_cfg_r_bits_resp,
+
+output         difftest_clock_enable,
+
+// Control outputs from config registers
+output         difftest_HOST_IO_RESET,
+output         difftest_HOST_IO_DIFFTEST_ENABLE
 );
 
   wire          cpu_clock       ;
@@ -390,13 +424,47 @@ XlnFpgaTop  XlnFpgaTop_inst(
   .s_axi_hs_rlast                  (dma_core_rlast),
 
   //difftest
-  .difftest_pcie_clock             (difftest_pcie_clock),
   .difftest_ref_clock              (difftest_ref_clock),
+  .difftest_pcie_clock             (difftest_pcie_clock),
+
+  // C2H (DUT -> Host)
   .difftest_to_host_axis_ready     (difftest_to_host_axis_ready),
   .difftest_to_host_axis_valid     (difftest_to_host_axis_valid),
   .difftest_to_host_axis_bits_data (difftest_to_host_axis_bits_data),
   .difftest_to_host_axis_bits_last (difftest_to_host_axis_bits_last),
-  .difftest_clock_enable           (difftest_clock_enable)
+
+  // H2C (Host -> DUT)
+  .difftest_h2c_axis_valid         (difftest_h2c_axis_valid),
+  .difftest_h2c_axis_ready         (difftest_h2c_axis_ready),
+  .difftest_h2c_axis_bits_data     (difftest_h2c_axis_bits_data),
+  .difftest_h2c_axis_bits_last     (difftest_h2c_axis_bits_last),
+
+  // Config AXI4-Lite (note: SimTop uses flat naming without _bits)
+  .difftest_cfg_awvalid            (difftest_cfg_aw_valid),
+  .difftest_cfg_awready            (difftest_cfg_aw_ready),
+  .difftest_cfg_awaddr             (difftest_cfg_aw_bits_addr),
+  .difftest_cfg_awprot             (difftest_cfg_aw_bits_prot),
+  .difftest_cfg_wvalid             (difftest_cfg_w_valid),
+  .difftest_cfg_wready             (difftest_cfg_w_ready),
+  .difftest_cfg_wdata              (difftest_cfg_w_bits_data),
+  .difftest_cfg_wstrb              (difftest_cfg_w_bits_strb),
+  .difftest_cfg_bvalid             (difftest_cfg_b_valid),
+  .difftest_cfg_bready             (difftest_cfg_b_ready),
+  .difftest_cfg_bresp              (difftest_cfg_b_bits_resp),
+  .difftest_cfg_arvalid            (difftest_cfg_ar_valid),
+  .difftest_cfg_arready            (difftest_cfg_ar_ready),
+  .difftest_cfg_araddr             (difftest_cfg_ar_bits_addr),
+  .difftest_cfg_arprot             (difftest_cfg_ar_bits_prot),
+  .difftest_cfg_rvalid             (difftest_cfg_r_valid),
+  .difftest_cfg_rready             (difftest_cfg_r_ready),
+  .difftest_cfg_rdata              (difftest_cfg_r_bits_data),
+  .difftest_cfg_rresp              (difftest_cfg_r_bits_resp),
+
+  .difftest_clock_enable           (difftest_clock_enable),
+
+  // Control outputs
+  .difftest_HOST_IO_RESET          (difftest_HOST_IO_RESET),
+  .difftest_HOST_IO_DIFFTEST_ENABLE(difftest_HOST_IO_DIFFTEST_ENABLE)
 );
 
 

@@ -25,8 +25,14 @@ module jtag_ddr_subsys_wrapper
     DDR4_dqs_t,
     DDR4_odt,
     DDR4_reset_n,
+    H2C_CLK,
     OSC_SYS_CLK_clk_n,
     OSC_SYS_CLK_clk_p,
+    S_AXIS_H2C_tdata,
+    S_AXIS_H2C_tkeep,
+    S_AXIS_H2C_tlast,
+    S_AXIS_H2C_tready,
+    S_AXIS_H2C_tvalid,
     SOC_CLK,
     SOC_M_AXI_araddr,
     SOC_M_AXI_arburst,
@@ -69,6 +75,7 @@ module jtag_ddr_subsys_wrapper
     SOC_M_AXI_wvalid,
     calib_complete,
     ddr_rstn,
+    h2c_rstn,
     soc_rstn);
   output DDR4_act_n;
   output [16:0]DDR4_adr;
@@ -84,8 +91,14 @@ module jtag_ddr_subsys_wrapper
   inout [7:0]DDR4_dqs_t;
   output [0:0]DDR4_odt;
   output DDR4_reset_n;
+  input H2C_CLK;
   input OSC_SYS_CLK_clk_n;
   input OSC_SYS_CLK_clk_p;
+  input [255:0]S_AXIS_H2C_tdata;
+  input [31:0]S_AXIS_H2C_tkeep;
+  input S_AXIS_H2C_tlast;
+  output S_AXIS_H2C_tready;
+  input S_AXIS_H2C_tvalid;
   input SOC_CLK;
   input [32:0]SOC_M_AXI_araddr;
   input [1:0]SOC_M_AXI_arburst;
@@ -140,6 +153,7 @@ module jtag_ddr_subsys_wrapper
   input SOC_M_AXI_wvalid;
   output calib_complete;
   input ddr_rstn;
+  input h2c_rstn;
   input soc_rstn;
 
   wire DDR4_act_n;
@@ -156,8 +170,14 @@ module jtag_ddr_subsys_wrapper
   wire [7:0]DDR4_dqs_t;
   wire [0:0]DDR4_odt;
   wire DDR4_reset_n;
+  wire H2C_CLK;
   wire OSC_SYS_CLK_clk_n;
   wire OSC_SYS_CLK_clk_p;
+  wire [255:0]S_AXIS_H2C_tdata;
+  wire [31:0]S_AXIS_H2C_tkeep;
+  wire S_AXIS_H2C_tlast;
+  wire S_AXIS_H2C_tready;
+  wire S_AXIS_H2C_tvalid;
   wire SOC_CLK;
   wire [32:0]SOC_M_AXI_araddr;
   wire [1:0]SOC_M_AXI_arburst;
@@ -200,6 +220,7 @@ module jtag_ddr_subsys_wrapper
   wire SOC_M_AXI_wvalid;
   wire calib_complete;
   wire ddr_rstn;
+  wire h2c_rstn;
   wire soc_rstn;
 
   jtag_ddr_subsys jtag_ddr_subsys_i
@@ -217,8 +238,14 @@ module jtag_ddr_subsys_wrapper
         .DDR4_dqs_t(DDR4_dqs_t),
         .DDR4_odt(DDR4_odt),
         .DDR4_reset_n(DDR4_reset_n),
+        .H2C_CLK(H2C_CLK),
         .OSC_SYS_CLK_clk_n(OSC_SYS_CLK_clk_n),
         .OSC_SYS_CLK_clk_p(OSC_SYS_CLK_clk_p),
+        .S_AXIS_H2C_tdata(S_AXIS_H2C_tdata),
+        .S_AXIS_H2C_tkeep(S_AXIS_H2C_tkeep),
+        .S_AXIS_H2C_tlast(S_AXIS_H2C_tlast),
+        .S_AXIS_H2C_tready(S_AXIS_H2C_tready),
+        .S_AXIS_H2C_tvalid(S_AXIS_H2C_tvalid),
         .SOC_CLK(SOC_CLK),
         .SOC_M_AXI_araddr(SOC_M_AXI_araddr),
         .SOC_M_AXI_arburst(SOC_M_AXI_arburst),
@@ -261,5 +288,6 @@ module jtag_ddr_subsys_wrapper
         .SOC_M_AXI_wvalid(SOC_M_AXI_wvalid),
         .calib_complete(calib_complete),
         .ddr_rstn(ddr_rstn),
+        .h2c_rstn(h2c_rstn),
         .soc_rstn(soc_rstn));
 endmodule

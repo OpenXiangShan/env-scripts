@@ -144,12 +144,130 @@ module SimTop_wrapper(
 
 input          difftest_ref_clock,
                difftest_pcie_clock,
-               difftest_to_host_axis_ready,
+
+// C2H (DUT -> Host)
+input          difftest_to_host_axis_ready,
 output         difftest_to_host_axis_valid,
 output [511:0] difftest_to_host_axis_bits_data,
 output         difftest_to_host_axis_bits_last,
-               difftest_clock_enable
+
+// H2C (Host -> DUT)
+input          difftest_h2c_axis_valid,
+output         difftest_h2c_axis_ready,
+input  [63:0]  difftest_h2c_axis_bits_data,
+input          difftest_h2c_axis_bits_last,
+
+// Config AXI4-Lite
+input          difftest_cfg_aw_valid,
+output         difftest_cfg_aw_ready,
+input  [31:0]  difftest_cfg_aw_bits_addr,
+input  [2:0]   difftest_cfg_aw_bits_prot,
+input          difftest_cfg_w_valid,
+output         difftest_cfg_w_ready,
+input  [31:0]  difftest_cfg_w_bits_data,
+input  [3:0]   difftest_cfg_w_bits_strb,
+output         difftest_cfg_b_valid,
+input          difftest_cfg_b_ready,
+output [1:0]   difftest_cfg_b_bits_resp,
+input          difftest_cfg_ar_valid,
+output         difftest_cfg_ar_ready,
+input  [31:0]  difftest_cfg_ar_bits_addr,
+input  [2:0]   difftest_cfg_ar_bits_prot,
+output         difftest_cfg_r_valid,
+input          difftest_cfg_r_ready,
+output [31:0]  difftest_cfg_r_bits_data,
+output [1:0]   difftest_cfg_r_bits_resp,
+
+output         difftest_clock_enable,
+
+// Control outputs from config registers
+output         difftest_HOST_IO_RESET,
+output         difftest_HOST_IO_DIFFTEST_ENABLE
 );
+
+// // Route CPU memory traffic through difftest_cpu_mem <-> difftest_ddr_mem path.
+// wire         cpu_mem_awready;
+// wire         cpu_mem_awvalid;
+// wire [31:0]  cpu_mem_awaddr;
+// wire [2:0]   cpu_mem_awprot;
+// wire         cpu_mem_awid;
+// wire         cpu_mem_awuser;
+// wire [7:0]   cpu_mem_awlen;
+// wire [2:0]   cpu_mem_awsize;
+// wire [1:0]   cpu_mem_awburst;
+// wire         cpu_mem_awlock;
+// wire [3:0]   cpu_mem_awcache;
+// wire [3:0]   cpu_mem_awqos;
+// wire         cpu_mem_wready;
+// wire         cpu_mem_wvalid;
+// wire [63:0]  cpu_mem_wdata;
+// wire [7:0]   cpu_mem_wstrb;
+// wire         cpu_mem_wlast;
+// wire         cpu_mem_bready;
+// wire         cpu_mem_bvalid;
+// wire [1:0]   cpu_mem_bresp;
+// wire         cpu_mem_bid;
+// wire         cpu_mem_buser;
+// wire         cpu_mem_arready;
+// wire         cpu_mem_arvalid;
+// wire [31:0]  cpu_mem_araddr;
+// wire [2:0]   cpu_mem_arprot;
+// wire         cpu_mem_arid;
+// wire         cpu_mem_aruser;
+// wire [7:0]   cpu_mem_arlen;
+// wire [2:0]   cpu_mem_arsize;
+// wire [1:0]   cpu_mem_arburst;
+// wire         cpu_mem_arlock;
+// wire [3:0]   cpu_mem_arcache;
+// wire [3:0]   cpu_mem_arqos;
+// wire         cpu_mem_rready;
+// wire         cpu_mem_rvalid;
+// wire [1:0]   cpu_mem_rresp;
+// wire [63:0]  cpu_mem_rdata;
+// wire         cpu_mem_rlast;
+// wire         cpu_mem_rid;
+// wire         cpu_mem_ruser;
+
+// assign mem_core_awvalid = cpu_mem_awvalid;
+// assign mem_core_awid    = {7'b0, cpu_mem_awid};
+// assign mem_core_awaddr  = cpu_mem_awaddr;
+// assign mem_core_awlen   = cpu_mem_awlen;
+// assign mem_core_awsize  = cpu_mem_awsize;
+// assign mem_core_awburst = cpu_mem_awburst;
+// assign mem_core_awlock  = cpu_mem_awlock;
+// assign mem_core_awcache = cpu_mem_awcache;
+// assign mem_core_awprot  = cpu_mem_awprot;
+// assign mem_core_awqos   = cpu_mem_awqos;
+// assign mem_core_wvalid  = cpu_mem_wvalid;
+// assign mem_core_wdata   = cpu_mem_wdata;
+// assign mem_core_wstrb   = cpu_mem_wstrb;
+// assign mem_core_wlast   = cpu_mem_wlast;
+// assign mem_core_bready  = cpu_mem_bready;
+// assign mem_core_arvalid = cpu_mem_arvalid;
+// assign mem_core_arid    = cpu_mem_arid;
+// assign mem_core_araddr  = cpu_mem_araddr;
+// assign mem_core_arlen   = cpu_mem_arlen;
+// assign mem_core_arsize  = cpu_mem_arsize;
+// assign mem_core_arburst = cpu_mem_arburst;
+// assign mem_core_arlock  = cpu_mem_arlock;
+// assign mem_core_arcache = cpu_mem_arcache;
+// assign mem_core_arprot  = cpu_mem_arprot;
+// assign mem_core_arqos   = cpu_mem_arqos;
+// assign mem_core_rready  = cpu_mem_rready;
+
+// assign cpu_mem_awready = mem_core_awready;
+// assign cpu_mem_wready  = mem_core_wready;
+// assign cpu_mem_bvalid  = mem_core_bvalid;
+// assign cpu_mem_bresp   = mem_core_bresp;
+// assign cpu_mem_bid     = mem_core_bid;
+// assign cpu_mem_buser   = 1'b0;
+// assign cpu_mem_arready = mem_core_arready;
+// assign cpu_mem_rvalid  = mem_core_rvalid;
+// assign cpu_mem_rresp   = mem_core_rresp;
+// assign cpu_mem_rdata   = mem_core_rdata;
+// assign cpu_mem_rlast   = mem_core_rlast;
+// assign cpu_mem_rid     = mem_core_rid;
+// assign cpu_mem_ruser   = 1'b0;
 
 SimTop u_SimTop (
     .clock                      (inter_soc_clk),
@@ -302,11 +420,40 @@ SimTop u_SimTop (
     // difftest
     .difftest_ref_clock              (difftest_ref_clock),
     .difftest_pcie_clock             (difftest_pcie_clock),
+
+    // C2H (DUT -> Host)
     .difftest_to_host_axis_ready     (difftest_to_host_axis_ready),
     .difftest_to_host_axis_valid     (difftest_to_host_axis_valid),
     .difftest_to_host_axis_bits_data (difftest_to_host_axis_bits_data),
     .difftest_to_host_axis_bits_last (difftest_to_host_axis_bits_last),
+
+    // Config AXI4-Lite (note: SimTop uses flat naming without _bits)
+    .difftest_cfg_awvalid            (difftest_cfg_aw_valid),
+    .difftest_cfg_awready            (difftest_cfg_aw_ready),
+    .difftest_cfg_awaddr             (difftest_cfg_aw_bits_addr),
+    .difftest_cfg_awprot             (difftest_cfg_aw_bits_prot),
+    .difftest_cfg_wvalid             (difftest_cfg_w_valid),
+    .difftest_cfg_wready             (difftest_cfg_w_ready),
+    .difftest_cfg_wdata              (difftest_cfg_w_bits_data),
+    .difftest_cfg_wstrb              (difftest_cfg_w_bits_strb),
+    .difftest_cfg_bvalid             (difftest_cfg_b_valid),
+    .difftest_cfg_bready             (difftest_cfg_b_ready),
+    .difftest_cfg_bresp              (difftest_cfg_b_bits_resp),
+    .difftest_cfg_arvalid            (difftest_cfg_ar_valid),
+    .difftest_cfg_arready            (difftest_cfg_ar_ready),
+    .difftest_cfg_araddr             (difftest_cfg_ar_bits_addr),
+    .difftest_cfg_arprot             (difftest_cfg_ar_bits_prot),
+    .difftest_cfg_rvalid             (difftest_cfg_r_valid),
+    .difftest_cfg_rready             (difftest_cfg_r_ready),
+    .difftest_cfg_rdata              (difftest_cfg_r_bits_data),
+    .difftest_cfg_rresp              (difftest_cfg_r_bits_resp),
+
     .difftest_clock_enable           (difftest_clock_enable),
+
+    // Control outputs
+    .difftest_HOST_IO_RESET          (difftest_HOST_IO_RESET),
+    .difftest_HOST_IO_DIFFTEST_ENABLE(difftest_HOST_IO_DIFFTEST_ENABLE),
+
     .difftest_exit              (/* TODO */),
     .difftest_step              (/* TODO */),
     .difftest_perfCtrl_clean    (/* TODO */),
