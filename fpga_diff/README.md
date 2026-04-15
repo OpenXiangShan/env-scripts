@@ -20,6 +20,32 @@ Core RTL to FPGA Steps
 
 6. make write_bitstream
 
-7. make write_jtag_ddr
+7. write DDR and run with diff/no-diff
+```shell
+case 1: No fpga-host
+stty -F /dev/ttyUSB0 raw 115200 ...
+<New terminal>
+make halt_soc
+make write_jtag_ddr
+make reset_cpu
 
-8. run difftest-host
+case 2: With fpga-host (no-diff mode)
+FPGA_DDR_LOAD_CMD="bash -lc ' \
+  source ~/.bash_profile && \
+  make -C /path/to/fpga_diff write_jtag_ddr \
+    FPGA_BIT_HOME=... \
+    WORKLOAD=<workload>.txt \
+'" \
+./fpga-host --no-diff
+
+case 3: With fpga-host (diff mode)
+FPGA_DDR_LOAD_CMD="bash -lc ' \
+  source ~/.bash_profile && \
+  make -C /path/to/fpga_diff write_jtag_ddr \
+    FPGA_BIT_HOME=... \
+    WORKLOAD=<workload>.txt \
+'" \
+./fpga-host --diff <nemu> -i <workload>.bin
+```
+
+
