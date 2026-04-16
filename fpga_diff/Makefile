@@ -55,12 +55,15 @@ write_bitstream:
 	sh tools/pcie-remove.sh
 	vivado -mode tcl -source tools/write_bitstream.tcl -tclargs $(FPGA_BIT_HOME)
 	sh tools/pcie-rescan.sh
+	vivado -mode tcl -source tools/reset_ddr.tcl -tclargs $(FPGA_BIT_HOME)/fpga_top_debug.ltx
+
+# Halt the FPGA SoC (for Write Jtag DDR)
+halt_soc:
+	vivado -mode tcl -source tools/halt_soc.tcl -tclargs $(FPGA_BIT_HOME)/fpga_top_debug.ltx
 
 # Write workload to FPGA DDR via JTAG
 write_jtag_ddr:
-	vivado -mode tcl -source tools/reset_ddr.tcl -tclargs $(FPGA_BIT_HOME)/fpga_top_debug.ltx
 	vivado -mode tcl -source tools/jtag_write_ddr.tcl -tclargs $(WORKLOAD) $(AXI_WIDTH)
-	$(MAKE) reset_cpu
 
 # Reset CPU on FPGA
 reset_cpu:
