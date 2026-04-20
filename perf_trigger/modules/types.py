@@ -11,6 +11,7 @@ class EmuConfig:
     max_instr: int
     threads: int
     with_numactl: bool = True
+    cst_file: str = ""
 
 
 @dataclass
