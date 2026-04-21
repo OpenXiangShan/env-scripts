@@ -56,6 +56,7 @@ write_bitstream:
 	vivado -mode tcl -source tools/write_bitstream.tcl -tclargs $(FPGA_BIT_HOME)
 	sh tools/pcie-rescan.sh
 	vivado -mode tcl -source tools/reset_ddr.tcl -tclargs $(FPGA_BIT_HOME)/fpga_top_debug.ltx
+	$(MAKE) reset_cpu
 
 # Halt the FPGA SoC (for Write Jtag DDR)
 halt_soc:
