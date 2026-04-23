@@ -359,6 +359,12 @@ def main():
     parser.add_argument(
         "--threads", "-T", default=8, type=int, help="number of emu threads"
     )
+    parser.add_argument(
+        "--cst-file",
+        type=str,
+        default="",
+        help="Path to custom constantin file path (empty for default init setting)",
+    )
 
     # autorun
     parser.add_argument(
@@ -458,6 +464,8 @@ def main():
                 raise FileNotFoundError(
                     f"nemu_so_path is not a file: {args.nemu_so_path}"
                 )
+            if args.cst_file and not os.path.isfile(args.cst_file):
+                raise FileNotFoundError(f"cst_file does not exist: {args.cst_file}")
             xiangshan.run(
                 emu_path=args.emu_path,
                 nemu_so_path=args.nemu_so_path,
@@ -466,6 +474,7 @@ def main():
                     warmup=args.warmup,
                     max_instr=args.max_instr,
                     threads=args.threads,
+                    cst_file=args.cst_file,
                 ),
             )
 

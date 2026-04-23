@@ -316,6 +316,11 @@ class Server:
                     ["--diff", self.nemu_so_path]
                     if self.nemu_so_path
                     else ["--no-diff"]
+                )
+                + (
+                    ["--cst-file", shlex.quote(emu_config.cst_file)]
+                    if emu_config.cst_file
+                    else []
                 ),
                 stdout=fout,
                 stderr=ferr,
