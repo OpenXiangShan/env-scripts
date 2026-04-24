@@ -5,6 +5,8 @@ CHI_DIR ?=
 FPGA_BIT_HOME ?=
 WORKLOAD ?=
 AXI_WIDTH ?= 64
+ILA_DEPTH ?= 16384
+export ILA_DEPTH
 # Supported CPU parameters:
 #   kmh
 #   nutshell
@@ -15,7 +17,7 @@ PRJ_NAME = fpga_$(CPU)$(if $(strip $(SUFFIX)),-$(strip $(SUFFIX)),)
 PRJ_DIR ?= $(ENV_SCRIPTS_HOME)/$(PRJ_NAME)
 PRJ ?= $(PRJ_DIR)/$(PRJ_NAME).xpr
 
-.PHONY: bitstream vivado
+.PHONY: bitstream vivado dump_ila
 
 # Get Vivado version
 VIVADO_VERSION := $(shell vivado -version 2>/dev/null | head -1 | grep -o '[0-9]\{4\}\.[0-9]' || echo "unknown")
@@ -69,6 +71,14 @@ write_jtag_ddr:
 # Reset CPU on FPGA
 reset_cpu:
 	vivado -mode tcl -source tools/reset_cpu.tcl -tclargs $(FPGA_BIT_HOME)/fpga_top_debug.ltx
+
+ILA_OUT ?= $(ENV_SCRIPTS_HOME)/ila-dump
+TIMEOUT_MIN ?= 2
+
+# Dump host-trigger ILA data to ila/csv/vcd files
+dump_ila:
+	mkdir -p $(ILA_OUT)
+	vivado -mode tcl -source tools/dump_ila.tcl -tclargs $(FPGA_BIT_HOME)/fpga_top_debug.ltx $(ILA_OUT) $(TIMEOUT_MIN)
 
 # Add system options for memory optimization
 add_sys_option:
