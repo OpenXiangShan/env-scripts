@@ -64,3 +64,6 @@ class GCPT:
                     self.state = GCPT.State.ABORTED
 
         return self.state
+
+    def clear_state(self) -> None:
+        self.state = GCPT.State.NONE

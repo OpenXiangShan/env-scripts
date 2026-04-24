@@ -12,6 +12,7 @@ class EmuConfig:
     threads: int
     with_numactl: bool = True
     cst_file: str = ""
+    dry_run: bool = False
 
 
 @dataclass
