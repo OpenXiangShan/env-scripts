@@ -321,10 +321,7 @@ class Server:
                     ["--cst-file", shlex.quote(emu_config.cst_file)]
                     if emu_config.cst_file
                     else []
-                ),
-                stdout=fout,
-                stderr=ferr,
-                block=False,
+                )
             )
             if emu_config.dry_run:
                 cmd_str = " ".join(run_cmd)
