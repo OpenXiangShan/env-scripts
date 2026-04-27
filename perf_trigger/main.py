@@ -392,7 +392,7 @@ def main():
     parser.add_argument(
         "--dry-run",
         action="store_true",
-        help="Do not run emu, only print command and sleep 10 seconds",
+        help="Run emu with only 2000 instructions to check the function",
     )
 
     parser.add_argument(
