@@ -221,6 +221,8 @@ class XiangShan:
         for gcpt in self.checkpoints:
             # check state from disk
             state = gcpt.refresh_state()
+            if emu_config.dry_run:
+                state = GCPT.State.NONE  # ignore existing state in dry-run mode
             match state:
                 case GCPT.State.RUNNING:
                     self.tracker.warning(
@@ -330,6 +332,7 @@ class XiangShan:
                 os.remove(gcpt.get_stdout_path())
                 os.remove(gcpt.get_stderr_path())
                 os.rmdir(gcpt.get_result_path())
+                gcpt.clear_state()
         logging.info("Reset %d RUNNING GCPTs", num)
 
 
@@ -384,6 +387,12 @@ def main():
     parser.add_argument(
         "--run",
         action="store_true",
+    )
+
+    parser.add_argument(
+        "--dry-run",
+        action="store_true",
+        help="Run emu with only 2000 instructions to check the function",
     )
 
     parser.add_argument(
@@ -455,7 +464,7 @@ def main():
         if args.reset_running:
             xiangshan.reset_running_gcpt()
 
-        if args.run:
+        if args.run or args.dry_run:
             if not args.emu_path:
                 raise ValueError("emu_path is required for --run")
             if not os.path.isfile(args.emu_path):
@@ -475,6 +484,7 @@ def main():
                     max_instr=args.max_instr,
                     threads=args.threads,
                     cst_file=args.cst_file,
+                    dry_run=args.dry_run,
                 ),
             )
 

@@ -289,7 +289,7 @@ class Server:
             open(gcpt.get_stdout_path(), "w", encoding="utf-8") as fout,
             open(gcpt.get_stderr_path(), "w", encoding="utf-8") as ferr,
         ):
-            p = self.run(
+            run_cmd = (
                 (
                     [
                         "numactl",
@@ -304,9 +304,9 @@ class Server:
                 + [
                     self.emu_path,
                     "-W",
-                    str(emu_config.warmup),
+                    str(emu_config.warmup) if not emu_config.dry_run else "1000",
                     "-I",
-                    str(emu_config.max_instr),
+                    str(emu_config.max_instr) if not emu_config.dry_run else "2000",
                     "-i",
                     shlex.quote(os.path.join(gcpt_path, gcpt_file)),
                     "-s",
@@ -321,7 +321,13 @@ class Server:
                     ["--cst-file", shlex.quote(emu_config.cst_file)]
                     if emu_config.cst_file
                     else []
-                ),
+                )
+            )
+            if emu_config.dry_run:
+                cmd_str = " ".join(run_cmd)
+                self.tracker.info("[DRYRUN] CMD: %s", cmd_str)
+            p = self.run(
+                run_cmd,
                 stdout=fout,
                 stderr=ferr,
                 block=False,
