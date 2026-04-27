@@ -32,6 +32,7 @@ module XDMA_AXI4LiteBar(
 
   // sideband
   output        io_host_diff_enable,
+  output        io_host_ila_trigger,
   output        io_host_reset
 );
 
@@ -67,6 +68,7 @@ module XDMA_AXI4LiteBar(
   // Sideband signals
   assign io_host_reset             = regfile_0[0];
   assign io_host_diff_enable       = regfile_1[0];
+  assign io_host_ila_trigger       = regfile_2[0];
   // Byte-lane masked write
   function automatic [31:0] mask_write32(
     input [31:0] oldv, input [31:0] newv, input [3:0] strb

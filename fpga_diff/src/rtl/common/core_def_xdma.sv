@@ -1232,6 +1232,7 @@ wire [0:0]    br2cfg_wvalid;
 
   wire io_host_reset;
   wire io_host_diff_enable;
+    (*mark_debug = "true"*) wire io_host_ila_trigger;
   wire clock_enable;
   wire sys_rstn_io;
   wire cpu_rstn_io;
@@ -1330,6 +1331,7 @@ wire [0:0]    br2cfg_wvalid;
       .io_axi_read_rready    (XDMA_AXI_LITE_rready),
 
       .io_host_diff_enable   (io_host_diff_enable),
+      .io_host_ila_trigger   (io_host_ila_trigger),
       .io_host_reset         (io_host_reset)
   );
 
