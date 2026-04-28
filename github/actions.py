@@ -6,7 +6,7 @@ import time
 
 script_path = os.path.realpath(__file__)
 perf_dir = os.path.join(os.path.dirname(script_path),"../perf")
-sys.path.append(perf_dir)
+sys.path.insert(0, perf_dir)
 
 import perf
 
