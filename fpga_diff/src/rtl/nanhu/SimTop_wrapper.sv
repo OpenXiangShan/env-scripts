@@ -176,12 +176,33 @@ output io_riscv_halt_0,
 output io_riscv_halt_1,
 
 input          difftest_ref_clock,
+               difftest_ref_reset,
                difftest_pcie_clock,
                difftest_to_host_axis_ready,
 output         difftest_to_host_axis_valid,
 output [511:0] difftest_to_host_axis_bits_data,
 output         difftest_to_host_axis_bits_last,
-               difftest_clock_enable
+               difftest_clock_enable,
+               difftest_hostCtrl_reset,
+               difftest_hostCtrl_diffEnable,
+               difftest_hostCtrl_ilaTrigger,
+input  [31:0]  difftest_cfg_axilite_awaddr,
+input          difftest_cfg_axilite_awvalid,
+output         difftest_cfg_axilite_awready,
+input  [31:0]  difftest_cfg_axilite_wdata,
+input  [3:0]   difftest_cfg_axilite_wstrb,
+input          difftest_cfg_axilite_wvalid,
+output         difftest_cfg_axilite_wready,
+output [1:0]   difftest_cfg_axilite_bresp,
+output         difftest_cfg_axilite_bvalid,
+input          difftest_cfg_axilite_bready,
+input  [31:0]  difftest_cfg_axilite_araddr,
+input          difftest_cfg_axilite_arvalid,
+output         difftest_cfg_axilite_arready,
+output [31:0]  difftest_cfg_axilite_rdata,
+output [1:0]   difftest_cfg_axilite_rresp,
+output         difftest_cfg_axilite_rvalid,
+input          difftest_cfg_axilite_rready
 );
 
   wire          cpu_clock       ;
@@ -392,11 +413,32 @@ XlnFpgaTop  XlnFpgaTop_inst(
   //difftest
   .difftest_pcie_clock             (difftest_pcie_clock),
   .difftest_ref_clock              (difftest_ref_clock),
+  .difftest_ref_reset              (difftest_ref_reset),
   .difftest_to_host_axis_ready     (difftest_to_host_axis_ready),
   .difftest_to_host_axis_valid     (difftest_to_host_axis_valid),
   .difftest_to_host_axis_bits_data (difftest_to_host_axis_bits_data),
   .difftest_to_host_axis_bits_last (difftest_to_host_axis_bits_last),
-  .difftest_clock_enable           (difftest_clock_enable)
+  .difftest_clock_enable           (difftest_clock_enable),
+  .difftest_hostCtrl_reset         (difftest_hostCtrl_reset),
+  .difftest_hostCtrl_diffEnable    (difftest_hostCtrl_diffEnable),
+  .difftest_hostCtrl_ilaTrigger    (difftest_hostCtrl_ilaTrigger),
+  .difftest_cfg_axilite_awready    (difftest_cfg_axilite_awready),
+  .difftest_cfg_axilite_awvalid    (difftest_cfg_axilite_awvalid),
+  .difftest_cfg_axilite_awaddr     (difftest_cfg_axilite_awaddr),
+  .difftest_cfg_axilite_wready     (difftest_cfg_axilite_wready),
+  .difftest_cfg_axilite_wvalid     (difftest_cfg_axilite_wvalid),
+  .difftest_cfg_axilite_wdata      (difftest_cfg_axilite_wdata),
+  .difftest_cfg_axilite_wstrb      (difftest_cfg_axilite_wstrb),
+  .difftest_cfg_axilite_bready     (difftest_cfg_axilite_bready),
+  .difftest_cfg_axilite_bvalid     (difftest_cfg_axilite_bvalid),
+  .difftest_cfg_axilite_bresp      (difftest_cfg_axilite_bresp),
+  .difftest_cfg_axilite_arready    (difftest_cfg_axilite_arready),
+  .difftest_cfg_axilite_arvalid    (difftest_cfg_axilite_arvalid),
+  .difftest_cfg_axilite_araddr     (difftest_cfg_axilite_araddr),
+  .difftest_cfg_axilite_rready     (difftest_cfg_axilite_rready),
+  .difftest_cfg_axilite_rvalid     (difftest_cfg_axilite_rvalid),
+  .difftest_cfg_axilite_rdata      (difftest_cfg_axilite_rdata),
+  .difftest_cfg_axilite_rresp      (difftest_cfg_axilite_rresp)
 );
 
 

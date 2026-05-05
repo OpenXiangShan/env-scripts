@@ -6,5 +6,4 @@ set ip_files [list \
  [file normalize "${rtl_dir}/common/syscfg_define.v"] \
  [file normalize "${rtl_dir}/common/sys_define.vh"] \
  [file normalize "${rtl_dir}/common/RST_SYNC.v"] \
- [file normalize "${rtl_dir}/common/XDMA_AXI4LiteBar.sv"] \
 ]
