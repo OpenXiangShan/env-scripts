@@ -181,13 +181,13 @@ class XiangShan:
             target_result_path = self.result_path.replace(
                 "/nfs/home/cirunner", "/nfs/home/ci-runner"
             )
-            target_emu_path = os.path.join(target_result_path, "emu")
+            target_emu_path = os.path.join(target_result_path, os.path.basename(emu_path))
             target_nemu_so_path = None
 
             open_server[0].initialize_open(emu_path, target_emu_path)
 
             if nemu_so_path is not None:
-                target_nemu_so_path = os.path.join(target_result_path, "nemu.so")
+                target_nemu_so_path = os.path.join(target_result_path, os.path.basename(nemu_so_path))
                 open_server[0].initialize_open(nemu_so_path, target_nemu_so_path)
 
             for server in open_server:
