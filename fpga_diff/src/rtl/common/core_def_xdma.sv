@@ -1307,34 +1307,6 @@ wire [0:0]    br2cfg_wvalid;
     .pcie_ep_perstn(pcie_ep_perstn)
   );
 
-  XDMA_AXI4LiteBar u_xdma_axi4lite_bar (
-      .clock           (sys_clk_i),
-      .reset           (~sys_rstn),
-
-      .io_axi_write_awaddr   (XDMA_AXI_LITE_awaddr),
-      .io_axi_write_awvalid  (XDMA_AXI_LITE_awvalid),
-      .io_axi_write_awready  (XDMA_AXI_LITE_awready),
-      .io_axi_write_wdata    (XDMA_AXI_LITE_wdata),
-      .io_axi_write_wstrb    (XDMA_AXI_LITE_wstrb),
-      .io_axi_write_wvalid   (XDMA_AXI_LITE_wvalid),
-      .io_axi_write_wready   (XDMA_AXI_LITE_wready),
-      .io_axi_write_bresp    (XDMA_AXI_LITE_bresp),
-      .io_axi_write_bvalid   (XDMA_AXI_LITE_bvalid),
-      .io_axi_write_bready   (XDMA_AXI_LITE_bready),
-
-      .io_axi_read_araddr    (XDMA_AXI_LITE_araddr),
-      .io_axi_read_arvalid   (XDMA_AXI_LITE_arvalid),
-      .io_axi_read_arready   (XDMA_AXI_LITE_arready),
-      .io_axi_read_rdata     (XDMA_AXI_LITE_rdata),
-      .io_axi_read_rresp     (XDMA_AXI_LITE_rresp),
-      .io_axi_read_rvalid    (XDMA_AXI_LITE_rvalid),
-      .io_axi_read_rready    (XDMA_AXI_LITE_rready),
-
-      .io_host_diff_enable   (io_host_diff_enable),
-      .io_host_ila_trigger   (io_host_ila_trigger),
-      .io_host_reset         (io_host_reset)
-  );
-
   DifftestClockGate SOC_CLK_CTRL(
       .CK  (sys_clk_i),
       .E   ((difftest_clock_enable & xdma_link_up ) || ~io_host_diff_enable || ~sys_rstn_io || ~cpu_rstn_io),
@@ -1952,7 +1924,28 @@ SimTop_wrapper U_CPU_TOP(
     .difftest_to_host_axis_bits_data (difftest_to_host_axis_bits_data),
     .difftest_to_host_axis_bits_last (difftest_to_host_axis_bits_last),
     .difftest_clock_enable           (difftest_clock_enable),
-    .difftest_ref_clock             (sys_clk_i    ),
+    .difftest_ref_clock              (sys_clk_i),
+    .difftest_ref_reset              (~sys_rstn),
+    .difftest_hostCtrl_reset         (io_host_reset),
+    .difftest_hostCtrl_diffEnable    (io_host_diff_enable),
+    .difftest_hostCtrl_ilaTrigger    (io_host_ila_trigger),
+    .difftest_cfg_axilite_awaddr     (XDMA_AXI_LITE_awaddr),
+    .difftest_cfg_axilite_awvalid    (XDMA_AXI_LITE_awvalid),
+    .difftest_cfg_axilite_awready    (XDMA_AXI_LITE_awready),
+    .difftest_cfg_axilite_wdata      (XDMA_AXI_LITE_wdata),
+    .difftest_cfg_axilite_wstrb      (XDMA_AXI_LITE_wstrb),
+    .difftest_cfg_axilite_wvalid     (XDMA_AXI_LITE_wvalid),
+    .difftest_cfg_axilite_wready     (XDMA_AXI_LITE_wready),
+    .difftest_cfg_axilite_bresp      (XDMA_AXI_LITE_bresp),
+    .difftest_cfg_axilite_bvalid     (XDMA_AXI_LITE_bvalid),
+    .difftest_cfg_axilite_bready     (XDMA_AXI_LITE_bready),
+    .difftest_cfg_axilite_araddr     (XDMA_AXI_LITE_araddr),
+    .difftest_cfg_axilite_arvalid    (XDMA_AXI_LITE_arvalid),
+    .difftest_cfg_axilite_arready    (XDMA_AXI_LITE_arready),
+    .difftest_cfg_axilite_rdata      (XDMA_AXI_LITE_rdata),
+    .difftest_cfg_axilite_rresp      (XDMA_AXI_LITE_rresp),
+    .difftest_cfg_axilite_rvalid     (XDMA_AXI_LITE_rvalid),
+    .difftest_cfg_axilite_rready     (XDMA_AXI_LITE_rready),
     .inter_soc_clk                  (inter_soc_clk),
     .sys_rstn_i                     (cpu_rstn_io  ),
     .tmclk                          (inter_rtc_clk),

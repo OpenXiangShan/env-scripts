@@ -1,6 +1,6 @@
 module SimTop_wrapper(
-  input           inter_soc_clk,    
-  input           sys_rstn_i, 
+  input           inter_soc_clk,
+  input           sys_rstn_i,
   input           tmclk,
 
   input           global_reset,     //24MHz
@@ -65,7 +65,7 @@ module SimTop_wrapper(
   (*mark_debug="true"*) output [63:0]   dma_core_rdata,
   (*mark_debug="true"*) output [1:0]    dma_core_rresp,
   (*mark_debug="true"*) output          dma_core_rlast,
-  
+
   (*mark_debug="true"*) input           peri_awready,
   (*mark_debug="true"*) output          peri_awvalid,
   (*mark_debug="true"*) output          peri_awid,
@@ -103,7 +103,7 @@ module SimTop_wrapper(
   (*mark_debug="true"*) input  [63:0]   peri_rdata,
   (*mark_debug="true"*) input  [1:0]    peri_rresp,
   (*mark_debug="true"*) input           peri_rlast,
-  
+
   (*mark_debug="true"*) input           mem_core_awready,
   (*mark_debug="true"*) output          mem_core_awvalid,
   (*mark_debug="true"*) output [7:0]    mem_core_awid,
@@ -143,12 +143,34 @@ module SimTop_wrapper(
   (*mark_debug="true"*) input           mem_core_rlast,
 
 input          difftest_ref_clock,
+               difftest_ref_reset,
                difftest_pcie_clock,
                difftest_to_host_axis_ready,
 output         difftest_to_host_axis_valid,
 output [511:0] difftest_to_host_axis_bits_data,
 output         difftest_to_host_axis_bits_last,
-               difftest_clock_enable
+               difftest_clock_enable,
+               difftest_hostCtrl_reset,
+               difftest_hostCtrl_diffEnable,
+               difftest_hostCtrl_ilaTrigger,
+
+input  [31:0]  difftest_cfg_axilite_awaddr,
+input          difftest_cfg_axilite_awvalid,
+output         difftest_cfg_axilite_awready,
+input  [31:0]  difftest_cfg_axilite_wdata,
+input  [3:0]   difftest_cfg_axilite_wstrb,
+input          difftest_cfg_axilite_wvalid,
+output         difftest_cfg_axilite_wready,
+output [1:0]   difftest_cfg_axilite_bresp,
+output         difftest_cfg_axilite_bvalid,
+input          difftest_cfg_axilite_bready,
+input  [31:0]  difftest_cfg_axilite_araddr,
+input          difftest_cfg_axilite_arvalid,
+output         difftest_cfg_axilite_arready,
+output [31:0]  difftest_cfg_axilite_rdata,
+output [1:0]   difftest_cfg_axilite_rresp,
+output         difftest_cfg_axilite_rvalid,
+input          difftest_cfg_axilite_rready
 );
 
 SimTop u_SimTop (
@@ -301,22 +323,32 @@ SimTop u_SimTop (
 
     // difftest
     .difftest_ref_clock              (difftest_ref_clock),
+    .difftest_ref_reset              (difftest_ref_reset),
     .difftest_pcie_clock             (difftest_pcie_clock),
     .difftest_to_host_axis_ready     (difftest_to_host_axis_ready),
     .difftest_to_host_axis_valid     (difftest_to_host_axis_valid),
     .difftest_to_host_axis_bits_data (difftest_to_host_axis_bits_data),
     .difftest_to_host_axis_bits_last (difftest_to_host_axis_bits_last),
     .difftest_clock_enable           (difftest_clock_enable),
-    .difftest_exit              (/* TODO */),
-    .difftest_step              (/* TODO */),
-    .difftest_perfCtrl_clean    (/* TODO */),
-    .difftest_perfCtrl_dump     (/* TODO */),
-    .difftest_logCtrl_begin     (/* TODO */),
-    .difftest_logCtrl_end       (/* TODO */),
-    .difftest_logCtrl_level     (/* TODO */),
-    .difftest_uart_out_valid    (/* TODO */),
-    .difftest_uart_out_ch       (/* TODO */),
-    .difftest_uart_in_valid     (/* TODO */),
-    .difftest_uart_in_ch        (/* TODO */)
+    .difftest_hostCtrl_reset         (difftest_hostCtrl_reset),
+    .difftest_hostCtrl_diffEnable    (difftest_hostCtrl_diffEnable),
+    .difftest_hostCtrl_ilaTrigger    (difftest_hostCtrl_ilaTrigger),
+    .difftest_cfg_axilite_awready    (difftest_cfg_axilite_awready),
+    .difftest_cfg_axilite_awvalid    (difftest_cfg_axilite_awvalid),
+    .difftest_cfg_axilite_awaddr     (difftest_cfg_axilite_awaddr),
+    .difftest_cfg_axilite_wready     (difftest_cfg_axilite_wready),
+    .difftest_cfg_axilite_wvalid     (difftest_cfg_axilite_wvalid),
+    .difftest_cfg_axilite_wdata      (difftest_cfg_axilite_wdata),
+    .difftest_cfg_axilite_wstrb      (difftest_cfg_axilite_wstrb),
+    .difftest_cfg_axilite_bready     (difftest_cfg_axilite_bready),
+    .difftest_cfg_axilite_bvalid     (difftest_cfg_axilite_bvalid),
+    .difftest_cfg_axilite_bresp      (difftest_cfg_axilite_bresp),
+    .difftest_cfg_axilite_arready    (difftest_cfg_axilite_arready),
+    .difftest_cfg_axilite_arvalid    (difftest_cfg_axilite_arvalid),
+    .difftest_cfg_axilite_araddr     (difftest_cfg_axilite_araddr),
+    .difftest_cfg_axilite_rready     (difftest_cfg_axilite_rready),
+    .difftest_cfg_axilite_rvalid     (difftest_cfg_axilite_rvalid),
+    .difftest_cfg_axilite_rdata      (difftest_cfg_axilite_rdata),
+    .difftest_cfg_axilite_rresp      (difftest_cfg_axilite_rresp)
 );
 endmodule
