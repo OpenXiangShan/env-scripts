@@ -5,8 +5,11 @@ CHI_DIR ?=
 FPGA_BIT_HOME ?=
 WORKLOAD ?=
 AXI_WIDTH ?= 64
+# Host-trigger ILA capture is opt-in. Keep the trigger mark_debug net in RTL,
+# but avoid instantiating the ILA core by default to reduce routing pressure.
+ENABLE_ILA ?= 0
 ILA_DEPTH ?= 16384
-export ILA_DEPTH
+export ENABLE_ILA ILA_DEPTH
 # Supported CPU parameters:
 #   kmh
 #   nutshell
