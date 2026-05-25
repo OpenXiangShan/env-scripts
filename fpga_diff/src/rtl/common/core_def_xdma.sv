@@ -1220,15 +1220,21 @@ wire [0:0]    br2cfg_wvalid;
   wire        XDMA_AXI_LITE_rvalid;
   wire        XDMA_AXI_LITE_rready;
 
-  wire difftest_to_host_axis_ready_io;
-  wire difftest_to_host_axis_valid_io;
-  wire difftest_to_host_axis_ready;
-  wire difftest_to_host_axis_valid;
-  wire [511:0] difftest_to_host_axis_bits_data;
-  wire difftest_to_host_axis_bits_last;
-  wire difftest_clock_enable;
-  wire inter_soc_clk;
-  wire inter_rtc_clk;
+  wire        difftest_to_host_axis_tready_io;
+  wire        difftest_to_host_axis_tvalid_io;
+  wire        difftest_to_host_axis_tready;
+  wire        difftest_to_host_axis_tvalid;
+  wire [511:0] difftest_to_host_axis_tdata;
+  wire [63:0]  difftest_to_host_axis_tkeep;
+  wire        difftest_to_host_axis_tlast;
+  wire        difftest_from_host_axis_tready;
+  wire        difftest_from_host_axis_tvalid;
+  wire [511:0] difftest_from_host_axis_tdata;
+  wire [63:0]  difftest_from_host_axis_tkeep;
+  wire        difftest_from_host_axis_tlast;
+  wire        difftest_clock_enable;
+  wire        inter_soc_clk;
+  wire        inter_rtc_clk;
 
   wire io_host_reset;
   wire io_host_diff_enable;
@@ -1237,6 +1243,7 @@ wire [0:0]    br2cfg_wvalid;
   wire sys_rstn_io;
   wire cpu_rstn_io;
   wire difftest_c2h_rstn;
+  wire difftest_h2c_rstn;
   wire difftest_stream_enable;
   wire difftest_startup_done;
   reg [19:0] difftest_startup_wait;
@@ -1255,6 +1262,7 @@ wire [0:0]    br2cfg_wvalid;
       else           pcie_lnk_sync <= {pcie_lnk_sync[0], pcie_ep_lnk_up};
   end
   wire xdma_link_up = pcie_lnk_sync[1];
+  assign difftest_h2c_rstn = cpu_rstn_io & xdma_link_up;
 
   always @(posedge sys_clk_i) begin
       if (!cpu_rstn_io || !io_host_diff_enable || !xdma_link_up)
@@ -1263,19 +1271,25 @@ wire [0:0]    br2cfg_wvalid;
           difftest_startup_wait <= difftest_startup_wait + 20'b1;
   end
 
-  assign difftest_to_host_axis_ready = difftest_to_host_axis_ready_io & difftest_stream_enable;
-  assign difftest_to_host_axis_valid_io = difftest_to_host_axis_valid & difftest_stream_enable;
+  assign difftest_to_host_axis_tready = difftest_to_host_axis_tready_io & difftest_stream_enable;
+  assign difftest_to_host_axis_tvalid_io = difftest_to_host_axis_tvalid & difftest_stream_enable;
 
   xdma_ep xdma_ep_i(
-    .cpu_clk(sys_clk_i),
-    .cpu_rstn(sys_rstn),
-    .c2h_rstn(difftest_c2h_rstn),
-    .S00_AXIS_0_tdata(difftest_to_host_axis_bits_data),
-    .S00_AXIS_0_tkeep(64'hffffffff_ffffffff),
-    .S00_AXIS_0_tlast(difftest_to_host_axis_bits_last),
-    .S00_AXIS_0_tready(difftest_to_host_axis_ready_io),
-    .S00_AXIS_0_tvalid(difftest_to_host_axis_valid_io),
-    
+    .cpu_clk              (sys_clk_i),
+    .cpu_rstn             (sys_rstn),
+    .c2h_rstn             (difftest_c2h_rstn),
+    .h2c_rstn             (difftest_h2c_rstn),
+    .S00_AXIS_0_tdata     (difftest_to_host_axis_tdata),
+    .S00_AXIS_0_tkeep     (difftest_to_host_axis_tkeep),
+    .S00_AXIS_0_tlast     (difftest_to_host_axis_tlast),
+    .S00_AXIS_0_tready    (difftest_to_host_axis_tready_io),
+    .S00_AXIS_0_tvalid    (difftest_to_host_axis_tvalid_io),
+    .M00_AXIS_0_tdata     (difftest_from_host_axis_tdata),
+    .M00_AXIS_0_tkeep     (difftest_from_host_axis_tkeep),
+    .M00_AXIS_0_tlast     (difftest_from_host_axis_tlast),
+    .M00_AXIS_0_tready    (difftest_from_host_axis_tready),
+    .M00_AXIS_0_tvalid    (difftest_from_host_axis_tvalid),
+
     .XDMA_AXI_LITE_awaddr (XDMA_AXI_LITE_awaddr),
     .XDMA_AXI_LITE_awprot (3'b000),
     .XDMA_AXI_LITE_awvalid(XDMA_AXI_LITE_awvalid),
@@ -1919,10 +1933,16 @@ xs_sys_icn u_icn(
 
 SimTop_wrapper U_CPU_TOP(
     .difftest_pcie_clock             (difftest_pcie_clock),
-    .difftest_to_host_axis_ready     (difftest_to_host_axis_ready),
-    .difftest_to_host_axis_valid     (difftest_to_host_axis_valid),
-    .difftest_to_host_axis_bits_data (difftest_to_host_axis_bits_data),
-    .difftest_to_host_axis_bits_last (difftest_to_host_axis_bits_last),
+    .difftest_to_host_axis_tready    (difftest_to_host_axis_tready),
+    .difftest_to_host_axis_tvalid    (difftest_to_host_axis_tvalid),
+    .difftest_to_host_axis_tdata     (difftest_to_host_axis_tdata),
+    .difftest_to_host_axis_tkeep     (difftest_to_host_axis_tkeep),
+    .difftest_to_host_axis_tlast     (difftest_to_host_axis_tlast),
+    .difftest_from_host_axis_tready  (difftest_from_host_axis_tready),
+    .difftest_from_host_axis_tvalid  (difftest_from_host_axis_tvalid),
+    .difftest_from_host_axis_tdata   (difftest_from_host_axis_tdata),
+    .difftest_from_host_axis_tkeep   (difftest_from_host_axis_tkeep),
+    .difftest_from_host_axis_tlast   (difftest_from_host_axis_tlast),
     .difftest_clock_enable           (difftest_clock_enable),
     .difftest_ref_clock              (sys_clk_i),
     .difftest_ref_reset              (~sys_rstn),

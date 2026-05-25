@@ -219,6 +219,19 @@ proc create_root_design { parentCell } {
    CONFIG.TUSER_WIDTH {0} \
    ] $S00_AXIS_0
 
+  set M00_AXIS_0 [ create_bd_intf_port -mode Master -vlnv xilinx.com:interface:axis_rtl:1.0 M00_AXIS_0 ]
+  set_property -dict [ list \
+   CONFIG.HAS_TKEEP {1} \
+   CONFIG.HAS_TLAST {1} \
+   CONFIG.HAS_TREADY {1} \
+   CONFIG.HAS_TSTRB {0} \
+   CONFIG.LAYERED_METADATA {undef} \
+   CONFIG.TDATA_NUM_BYTES {64} \
+   CONFIG.TDEST_WIDTH {0} \
+   CONFIG.TID_WIDTH {0} \
+   CONFIG.TUSER_WIDTH {0} \
+   ] $M00_AXIS_0
+
   set XDMA_AXI_LITE [ create_bd_intf_port -mode Master -vlnv xilinx.com:interface:aximm_rtl:1.0 XDMA_AXI_LITE ]
   set_property -dict [ list \
    CONFIG.ADDR_WIDTH {32} \
@@ -238,6 +251,7 @@ proc create_root_design { parentCell } {
   # Create ports
   set cpu_rstn [ create_bd_port -dir I -type rst cpu_rstn ]
   set c2h_rstn [ create_bd_port -dir I -type rst c2h_rstn ]
+  set h2c_rstn [ create_bd_port -dir I -type rst h2c_rstn ]
   set pci_exp_rxn [ create_bd_port -dir I -from 7 -to 0 pci_exp_rxn ]
   set pci_exp_rxp [ create_bd_port -dir I -from 7 -to 0 pci_exp_rxp ]
   set pci_exp_txn [ create_bd_port -dir O -from 7 -to 0 pci_exp_txn ]
@@ -246,7 +260,7 @@ proc create_root_design { parentCell } {
   set pcie_ep_perstn [ create_bd_port -dir I -type rst pcie_ep_perstn ]
   set TO_DIFFTEST_PCIE_CLK [ create_bd_port -dir O -type clk TO_DIFFTEST_PCIE_CLK ]
   set_property -dict [ list \
-   CONFIG.ASSOCIATED_BUSIF {S00_AXIS_0} \
+   CONFIG.ASSOCIATED_BUSIF {S00_AXIS_0:M00_AXIS_0} \
  ] $TO_DIFFTEST_PCIE_CLK
   set cpu_clk [ create_bd_port -dir I -type clk -freq_hz 25000000 cpu_clk ]
   set_property -dict [ list \
@@ -333,6 +347,13 @@ proc create_root_design { parentCell } {
    CONFIG.WIDTH {1} \
  ] $xpm_cdc_gen_0
 
+  set xpm_cdc_gen_1 [ create_bd_cell -type ip -vlnv xilinx.com:ip:xpm_cdc_gen:1.0 xpm_cdc_gen_1 ]
+  set_property -dict [ list \
+   CONFIG.CDC_TYPE {xpm_cdc_async_rst} \
+   CONFIG.DEST_SYNC_FF {2} \
+   CONFIG.WIDTH {1} \
+ ] $xpm_cdc_gen_1
+
   # Create instance: logic_and_c2h_rst, and set properties
   set logic_and_c2h_rst [ create_bd_cell -type ip -vlnv xilinx.com:ip:util_vector_logic:2.0 logic_and_c2h_rst ]
   set_property -dict [ list \
@@ -348,13 +369,21 @@ proc create_root_design { parentCell } {
   # Create instance: axis_clock_converter_0, and set properties
   set axis_clock_converter_0 [ create_bd_cell -type ip -vlnv xilinx.com:ip:axis_clock_converter:1.1 axis_clock_converter_0 ]
 
+  set axis_dwidth_converter_1 [ create_bd_cell -type ip -vlnv xilinx.com:ip:axis_dwidth_converter:1.1 axis_dwidth_converter_1 ]
+  set_property CONFIG.M_TDATA_NUM_BYTES {64} $axis_dwidth_converter_1
+
+  set axis_clock_converter_1 [ create_bd_cell -type ip -vlnv xilinx.com:ip:axis_clock_converter:1.1 axis_clock_converter_1 ]
+
   # Create interface connections
   connect_bd_intf_net -intf_net CLK_IN_D_0_1 [get_bd_intf_ports pcie_ep_gt_ref] [get_bd_intf_pins util_ds_buf_0/CLK_IN_D]
   connect_bd_intf_net -intf_net S00_AXIS_0_1 [get_bd_intf_ports S00_AXIS_0] [get_bd_intf_pins axis_clock_converter_0/S_AXIS]
+  connect_bd_intf_net -intf_net M00_AXIS_0_1 [get_bd_intf_ports M00_AXIS_0] [get_bd_intf_pins axis_clock_converter_1/M_AXIS]
   connect_bd_intf_net -intf_net axi_interconnect_0_M00_AXI [get_bd_intf_ports XDMA_AXI_LITE] [get_bd_intf_pins axi_interconnect_0/M00_AXI]
   # Create port connections
   connect_bd_intf_net -intf_net axis_clock_converter_0_M_AXIS [get_bd_intf_pins axis_clock_converter_0/M_AXIS] [get_bd_intf_pins axis_dwidth_converter_0/S_AXIS]
   connect_bd_intf_net -intf_net axis_dwidth_converter_0_M_AXIS [get_bd_intf_pins axis_dwidth_converter_0/M_AXIS] [get_bd_intf_pins xdma_0/S_AXIS_C2H_0]
+  connect_bd_intf_net -intf_net xdma_0_M_AXIS_H2C_0 [get_bd_intf_pins xdma_0/M_AXIS_H2C_0] [get_bd_intf_pins axis_dwidth_converter_1/S_AXIS]
+  connect_bd_intf_net -intf_net axis_dwidth_converter_1_M_AXIS [get_bd_intf_pins axis_dwidth_converter_1/M_AXIS] [get_bd_intf_pins axis_clock_converter_1/S_AXIS]
   connect_bd_intf_net -intf_net xdma_0_M_AXI_LITE [get_bd_intf_pins axi_interconnect_0/S00_AXI] [get_bd_intf_pins xdma_0/M_AXI_LITE]
 
   # Create port connections
@@ -368,17 +397,23 @@ proc create_root_design { parentCell } {
   [get_bd_pins axi_interconnect_0/S00_ACLK] \
   [get_bd_pins axis_clock_converter_0/m_axis_aclk] \
   [get_bd_pins axis_dwidth_converter_0/aclk] \
+  [get_bd_pins axis_dwidth_converter_1/aclk] \
+  [get_bd_pins axis_clock_converter_1/s_axis_aclk] \
   [get_bd_pins clk_wiz_0/clk_in1]
   connect_bd_net -net clk_wiz_0_clk_out1  [get_bd_pins clk_wiz_0/clk_out1] \
   [get_bd_ports TO_DIFFTEST_PCIE_CLK] \
   [get_bd_pins axis_clock_converter_0/s_axis_aclk] \
+  [get_bd_pins axis_clock_converter_1/m_axis_aclk] \
   [get_bd_pins xpm_cdc_gen_0/dest_clk]
+  connect_bd_net -net clk_wiz_0_clk_out1  [get_bd_pins xpm_cdc_gen_1/dest_clk]
   connect_bd_net -net cpu_clk_1  [get_bd_ports cpu_clk] \
   [get_bd_pins axi_interconnect_0/M00_ACLK]
   connect_bd_net -net m_axis_c2h_aresetn_0_1  [get_bd_ports cpu_rstn] \
   [get_bd_pins axi_interconnect_0/M00_ARESETN]
   connect_bd_net -net c2h_rstn_0_1  [get_bd_ports c2h_rstn] \
   [get_bd_pins xpm_cdc_gen_0/src_arst]
+  connect_bd_net -net h2c_rstn_0_1  [get_bd_ports h2c_rstn] \
+  [get_bd_pins xpm_cdc_gen_1/src_arst]
   connect_bd_net -net pci_exp_rxn_0_1  [get_bd_ports pci_exp_rxn] \
   [get_bd_pins xdma_0/pci_exp_rxn]
   connect_bd_net -net pci_exp_rxp_0_1  [get_bd_ports pci_exp_rxp] \
@@ -401,6 +436,10 @@ proc create_root_design { parentCell } {
   connect_bd_net -net logic_and_c2h_rst_Res  [get_bd_pins logic_and_c2h_rst/Res] \
   [get_bd_pins axis_clock_converter_0/m_axis_aresetn] \
   [get_bd_pins axis_dwidth_converter_0/aresetn]
+  connect_bd_net -net xpm_cdc_gen_1_dest_arst  [get_bd_pins xpm_cdc_gen_1/dest_arst] \
+  [get_bd_pins axis_clock_converter_1/m_axis_aresetn]
+  connect_bd_net -net ARESETN_1  [get_bd_pins axis_clock_converter_1/s_axis_aresetn] \
+  [get_bd_pins axis_dwidth_converter_1/aresetn]
 
   # Create address segments
   assign_bd_address -offset 0x00000000 -range 0x00100000 -target_address_space [get_bd_addr_spaces xdma_0/M_AXI_LITE] [get_bd_addr_segs XDMA_AXI_LITE/Reg] -force
