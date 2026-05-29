@@ -213,7 +213,7 @@ proc create_root_design { parentCell } {
    CONFIG.HAS_TREADY {1} \
    CONFIG.HAS_TSTRB {0} \
    CONFIG.LAYERED_METADATA {undef} \
-   CONFIG.TDATA_NUM_BYTES {64} \
+   CONFIG.TDATA_NUM_BYTES {32} \
    CONFIG.TDEST_WIDTH {0} \
    CONFIG.TID_WIDTH {0} \
    CONFIG.TUSER_WIDTH {0} \
@@ -226,7 +226,7 @@ proc create_root_design { parentCell } {
    CONFIG.HAS_TREADY {1} \
    CONFIG.HAS_TSTRB {0} \
    CONFIG.LAYERED_METADATA {undef} \
-   CONFIG.TDATA_NUM_BYTES {64} \
+   CONFIG.TDATA_NUM_BYTES {32} \
    CONFIG.TDEST_WIDTH {0} \
    CONFIG.TID_WIDTH {0} \
    CONFIG.TUSER_WIDTH {0} \
@@ -362,15 +362,8 @@ proc create_root_design { parentCell } {
    CONFIG.LOGO_FILE {data/sym_andgate.png} \
  ] $logic_and_c2h_rst
 
-  # Create instance: axis_dwidth_converter_0, and set properties
-  set axis_dwidth_converter_0 [ create_bd_cell -type ip -vlnv xilinx.com:ip:axis_dwidth_converter:1.1 axis_dwidth_converter_0 ]
-  set_property CONFIG.M_TDATA_NUM_BYTES {32} $axis_dwidth_converter_0
-
   # Create instance: axis_clock_converter_0, and set properties
   set axis_clock_converter_0 [ create_bd_cell -type ip -vlnv xilinx.com:ip:axis_clock_converter:1.1 axis_clock_converter_0 ]
-
-  set axis_dwidth_converter_1 [ create_bd_cell -type ip -vlnv xilinx.com:ip:axis_dwidth_converter:1.1 axis_dwidth_converter_1 ]
-  set_property CONFIG.M_TDATA_NUM_BYTES {64} $axis_dwidth_converter_1
 
   set axis_clock_converter_1 [ create_bd_cell -type ip -vlnv xilinx.com:ip:axis_clock_converter:1.1 axis_clock_converter_1 ]
 
@@ -380,10 +373,8 @@ proc create_root_design { parentCell } {
   connect_bd_intf_net -intf_net M00_AXIS_0_1 [get_bd_intf_ports M00_AXIS_0] [get_bd_intf_pins axis_clock_converter_1/M_AXIS]
   connect_bd_intf_net -intf_net axi_interconnect_0_M00_AXI [get_bd_intf_ports XDMA_AXI_LITE] [get_bd_intf_pins axi_interconnect_0/M00_AXI]
   # Create port connections
-  connect_bd_intf_net -intf_net axis_clock_converter_0_M_AXIS [get_bd_intf_pins axis_clock_converter_0/M_AXIS] [get_bd_intf_pins axis_dwidth_converter_0/S_AXIS]
-  connect_bd_intf_net -intf_net axis_dwidth_converter_0_M_AXIS [get_bd_intf_pins axis_dwidth_converter_0/M_AXIS] [get_bd_intf_pins xdma_0/S_AXIS_C2H_0]
-  connect_bd_intf_net -intf_net xdma_0_M_AXIS_H2C_0 [get_bd_intf_pins xdma_0/M_AXIS_H2C_0] [get_bd_intf_pins axis_dwidth_converter_1/S_AXIS]
-  connect_bd_intf_net -intf_net axis_dwidth_converter_1_M_AXIS [get_bd_intf_pins axis_dwidth_converter_1/M_AXIS] [get_bd_intf_pins axis_clock_converter_1/S_AXIS]
+  connect_bd_intf_net -intf_net axis_clock_converter_0_M_AXIS [get_bd_intf_pins axis_clock_converter_0/M_AXIS] [get_bd_intf_pins xdma_0/S_AXIS_C2H_0]
+  connect_bd_intf_net -intf_net xdma_0_M_AXIS_H2C_0 [get_bd_intf_pins xdma_0/M_AXIS_H2C_0] [get_bd_intf_pins axis_clock_converter_1/S_AXIS]
   connect_bd_intf_net -intf_net xdma_0_M_AXI_LITE [get_bd_intf_pins axi_interconnect_0/S00_AXI] [get_bd_intf_pins xdma_0/M_AXI_LITE]
 
   # Create port connections
@@ -396,8 +387,6 @@ proc create_root_design { parentCell } {
   [get_bd_pins axi_interconnect_0/ACLK] \
   [get_bd_pins axi_interconnect_0/S00_ACLK] \
   [get_bd_pins axis_clock_converter_0/m_axis_aclk] \
-  [get_bd_pins axis_dwidth_converter_0/aclk] \
-  [get_bd_pins axis_dwidth_converter_1/aclk] \
   [get_bd_pins axis_clock_converter_1/s_axis_aclk] \
   [get_bd_pins clk_wiz_0/clk_in1]
   connect_bd_net -net clk_wiz_0_clk_out1  [get_bd_pins clk_wiz_0/clk_out1] \
@@ -434,12 +423,10 @@ proc create_root_design { parentCell } {
   [get_bd_pins axis_clock_converter_0/s_axis_aresetn] \
   [get_bd_pins logic_and_c2h_rst/Op2]
   connect_bd_net -net logic_and_c2h_rst_Res  [get_bd_pins logic_and_c2h_rst/Res] \
-  [get_bd_pins axis_clock_converter_0/m_axis_aresetn] \
-  [get_bd_pins axis_dwidth_converter_0/aresetn]
+  [get_bd_pins axis_clock_converter_0/m_axis_aresetn]
   connect_bd_net -net xpm_cdc_gen_1_dest_arst  [get_bd_pins xpm_cdc_gen_1/dest_arst] \
   [get_bd_pins axis_clock_converter_1/m_axis_aresetn]
-  connect_bd_net -net ARESETN_1  [get_bd_pins axis_clock_converter_1/s_axis_aresetn] \
-  [get_bd_pins axis_dwidth_converter_1/aresetn]
+  connect_bd_net -net ARESETN_1  [get_bd_pins axis_clock_converter_1/s_axis_aresetn]
 
   # Create address segments
   assign_bd_address -offset 0x00000000 -range 0x00100000 -target_address_space [get_bd_addr_spaces xdma_0/M_AXI_LITE] [get_bd_addr_segs XDMA_AXI_LITE/Reg] -force

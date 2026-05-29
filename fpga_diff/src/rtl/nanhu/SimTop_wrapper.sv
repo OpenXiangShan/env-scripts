@@ -1,6 +1,6 @@
 module SimTop_wrapper(
-  input           inter_soc_clk,    
-  input           sys_rstn_i, 
+  input           inter_soc_clk,
+  input           sys_rstn_i,
   input           tmclk,
 
   input           global_reset,     //24MHz
@@ -65,7 +65,7 @@ module SimTop_wrapper(
   (*mark_debug="true"*) output [255:0]  dma_core_rdata,
   (*mark_debug="true"*) output [1:0]    dma_core_rresp,
   (*mark_debug="true"*) output          dma_core_rlast,
-  
+
   (*mark_debug="true"*) input           peri_awready,
   (*mark_debug="true"*) output          peri_awvalid,
   (*mark_debug="true"*) output [1:0]    peri_awid,
@@ -103,7 +103,7 @@ module SimTop_wrapper(
   (*mark_debug="true"*) input  [63:0]   peri_rdata,
   (*mark_debug="true"*) input  [1:0]    peri_rresp,
   (*mark_debug="true"*) input           peri_rlast,
-  
+
   (*mark_debug="true"*) input           mem_core_awready,
   (*mark_debug="true"*) output          mem_core_awvalid,
   (*mark_debug="true"*) output [13:0]   mem_core_awid,
@@ -178,15 +178,15 @@ output io_riscv_halt_1,
 input          difftest_ref_clock,
                difftest_ref_reset,
                difftest_pcie_clock,
-               difftest_to_host_axis_tready,
+input          difftest_to_host_axis_tready,
 output         difftest_to_host_axis_tvalid,
-output [511:0] difftest_to_host_axis_tdata,
-output [63:0]  difftest_to_host_axis_tkeep,
+output [255:0] difftest_to_host_axis_tdata,
+output [31:0]  difftest_to_host_axis_tkeep,
 output         difftest_to_host_axis_tlast,
 output         difftest_from_host_axis_tready,
 input          difftest_from_host_axis_tvalid,
-input  [511:0] difftest_from_host_axis_tdata,
-input  [63:0]  difftest_from_host_axis_tkeep,
+input  [255:0] difftest_from_host_axis_tdata,
+input  [31:0]  difftest_from_host_axis_tkeep,
 input          difftest_from_host_axis_tlast,
                difftest_clock_enable,
                difftest_hostCtrl_reset,
@@ -242,7 +242,7 @@ XlnFpgaTop  XlnFpgaTop_inst(
   .io_reset_vector                 (48'h10000000),
   .io_ddr_offset                   (48'h80000000),
   .io_ext_intr                     ({192'b0, io_extIntrs}),  // 64bit -> 256bit
-  
+
   // JTAG
   .io_systemjtag_jtag_TCK          (io_systemjtag_jtag_TCK),
   .io_systemjtag_jtag_TMS          (io_systemjtag_jtag_TMS),
