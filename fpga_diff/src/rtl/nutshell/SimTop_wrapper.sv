@@ -1,3 +1,5 @@
+`include "DifftestMacros.svh"
+
 module SimTop_wrapper(
   input           inter_soc_clk,
   input           sys_rstn_i,
@@ -145,15 +147,15 @@ module SimTop_wrapper(
 input          difftest_ref_clock,
                difftest_ref_reset,
                difftest_pcie_clock,
-               difftest_to_host_axis_tready,
+input          difftest_to_host_axis_tready,
 output         difftest_to_host_axis_tvalid,
-output [511:0] difftest_to_host_axis_tdata,
-output [63:0]  difftest_to_host_axis_tkeep,
+output [`CONFIG_DIFFTEST_HOST_AXIS_WIDTH-1:0] difftest_to_host_axis_tdata,
+output [`CONFIG_DIFFTEST_HOST_AXIS_BYTES-1:0] difftest_to_host_axis_tkeep,
 output         difftest_to_host_axis_tlast,
 output         difftest_from_host_axis_tready,
 input          difftest_from_host_axis_tvalid,
-input  [511:0] difftest_from_host_axis_tdata,
-input  [63:0]  difftest_from_host_axis_tkeep,
+input  [`CONFIG_DIFFTEST_HOST_AXIS_WIDTH-1:0] difftest_from_host_axis_tdata,
+input  [`CONFIG_DIFFTEST_HOST_AXIS_BYTES-1:0] difftest_from_host_axis_tkeep,
 input          difftest_from_host_axis_tlast,
 output         difftest_clock_enable,
                difftest_hostCtrl_reset,
