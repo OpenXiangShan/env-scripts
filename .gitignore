@@ -15,10 +15,21 @@ __pycache__
 *.csv
 *.jou
 *.list
+*.tmp
+.tmp_*
 .Xil/
+.gen/
+.srcs/
 fpga/.Xil
 test*
 json/
+uvhs.tar.gz
+uvhs_*/
+fpga_diff_uvhs_*/
+runtime_uvhs_*/
+*.log.*
+id_ed25519
+microbench-*.bin
 
 # python third-party libraries are stored temporarily
 psutil/

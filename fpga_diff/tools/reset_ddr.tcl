@@ -1,3 +1,5 @@
+source [file normalize [file join [file dirname [info script]] hw_common.tcl]]
+
 puts "probe .ltx path:"
 puts [lindex $argv 0]
 set file_name [lindex $argv 0]
@@ -7,9 +9,7 @@ if {![file exists $file_name]} {
     exit 1
 }
 
-open_hw_manager
-connect_hw_server
-open_hw_target
+open_uvhs_hw_session
 
 current_hw_device [get_hw_devices *]
 

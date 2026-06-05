@@ -12,12 +12,6 @@ set_property PACKAGE_PIN R43 [get_ports clk6_n]
 set_property PACKAGE_PIN C35 [get_ports clk5_p]
 set_property PACKAGE_PIN C36 [get_ports clk5_n]
 
-set_property PACKAGE_PIN BA11 [get_ports refclk_p]
-set_property PACKAGE_PIN BA10 [get_ports refclk_n]
-
-set_property PACKAGE_PIN AR11 [get_ports refclk2_p]
-set_property PACKAGE_PIN AR10 [get_ports refclk2_n]
-
 #set_property PACKAGE_PIN CA36 [get_ports clk4_p]
 #set_property PACKAGE_PIN CA37 [get_ports clk4_n]
 
@@ -260,8 +254,6 @@ set_property IOB TRUE [get_ports RGMII_TXD3]
 #set_clock_groups -asynchronous -group [get_clocks -of_objects [get_ports clk7_p] -include_generated_clocks]
 #set_clock_groups -asynchronous -group [get_clocks -of_objects [get_ports clk6_p] -include_generated_clocks]
 #set_clock_groups -asynchronous -group [get_clocks -of_objects [get_ports clk5_p] -include_generated_clocks]
-#set_clock_groups -asynchronous -group [get_clocks -of_objects [get_ports refclk_p] -include_generated_clocks]
-
 #create_generated_clock -name rgmii1_txc -divide_by 1 -source [get_pins {xs_core_def/u_gmac_top/DWC_gmac_top_u0/DWC_gmac_inst/DWC_gmac_rgmii_inst/DWC_gmac_rgmii_gmrt_inst/clk_tx_div2_neg_reg/C}] [get_ports RGMII_TXCLK]
 
 
@@ -280,9 +272,6 @@ set_property IOB TRUE [get_ports RGMII_TXD3]
 # set_property PACKAGE_PIN BF9 [get_ports PCIE_TXP]
 # set_property PACKAGE_PIN BD3 [get_ports PCIE_RXN]
 # set_property PACKAGE_PIN BD4 [get_ports PCIE_RXP]
-set_property PACKAGE_PIN CB13 [get_ports PERST_N]
-set_property PACKAGE_PIN CB23 [get_ports PERST2_N]
-
 #####################################################################################
 
 
@@ -300,8 +289,6 @@ set_property PACKAGE_PIN CB23 [get_ports PERST2_N]
 # set_property IOSTANDARD LVDS [get_ports clk4_p]
 # set_property IOSTANDARD LVDS [get_ports clk4_n]
 
-#set_property IOSTANDARD LVDS [get_ports refclk_p]
-#set_property IOSTANDARD LVDS [get_ports refclk_n]
 #set_property IOSTANDARD LVCMOS33 [get_ports GPIO_O0]
 #set_property IOSTANDARD LVCMOS33 [get_ports GPIO_O1]
 #set_property IOSTANDARD LVCMOS18 [get_ports led1]
@@ -319,7 +306,6 @@ set_property PACKAGE_PIN CB23 [get_ports PERST2_N]
 #set_clock_groups -group [get_clocks -include_generated_clocks CPU_CLK_IN] -group [get_clocks -include_generated_clocks SOC_SYS_CLK] -asynchronous
 #set_clock_groups -group [get_clocks -include_generated_clocks TMCLK] -group [get_clocks -include_generated_clocks SOC_SYS_CLK] -asynchronous
 #set_clock_groups -group [get_clocks -include_generated_clocks DEBUG_CLK_IN] -group [get_clocks -include_generated_clocks SOC_SYS_CLK] -asynchronous
-#set_clock_groups -group [get_clocks -include_generated_clocks PCIE_CLK_IN] -group [get_clocks -include_generated_clocks SOC_SYS_CLK] -asynchronous
 #set_clock_groups -asynchronous -group [get_clocks -include_generated_clocks GCLK_RGMII_TXC] -group [get_clocks -include_generated_clocks SOC_SYS_CLK]
 #set_clock_groups -asynchronous -group [get_clocks -include_generated_clocks jtag_vclk] -group [get_clocks -include_generated_clocks SOC_SYS_CLK]
 
@@ -381,8 +367,6 @@ set_property DIFF_TERM TRUE [get_ports clk5_p]
 set_property DIFF_TERM_ADV TERM_100  [get_ports clk5_p]
 set_property DIFF_TERM TRUE [get_ports clk6_p]
 set_property DIFF_TERM_ADV TERM_100  [get_ports clk6_p]
-set_property IOSTANDARD LVCMOS18 [get_ports PERST_N]
-set_property IOSTANDARD LVCMOS18 [get_ports PERST2_N]
 set_property IOSTANDARD LVCMOS18 [get_ports rstn_sw6]
 set_property IOSTANDARD LVCMOS18 [get_ports rstn_sw5]
 set_property IOSTANDARD LVCMOS18 [get_ports rstn_sw4]
@@ -459,10 +443,6 @@ set_property PULLUP true [get_ports SD_DATA2]
 set_property PULLUP true [get_ports SD_DATA3]
 set_property PULLUP true [get_ports MDC]
 set_property PULLUP true [get_ports MDIO]
-
-####################################################################################
-# Constraints for difftest_pcie_clock from CLK_WIZ
-####################################################################################
 
 ####################################################################################
 # Constraints from file : 'jtag_ddr_subsys_s01_data_fifo_0_clocks.xdc'

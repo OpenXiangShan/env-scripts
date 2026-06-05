@@ -22,7 +22,9 @@ PRJ_NAME = fpga_$(CPU)$(if $(strip $(SUFFIX)),-$(strip $(SUFFIX)),)
 PRJ_DIR ?= $(ENV_SCRIPTS_HOME)/$(PRJ_NAME)
 PRJ ?= $(PRJ_DIR)/$(PRJ_NAME).xpr
 
-.PHONY: bitstream vivado dump_ila
+UVHS_SUBMAKE = $(MAKE) -f $(CURDIR)/uvhs/Makefile ROOT_DIR="$(CURDIR)"
+
+.PHONY: bitstream vivado dump_ila uvhs_prepare uvhs_filelist uvhs_check_modules uvhs_export_vivado_ip uvhs_fetch_uvw_axi4_to_ddr4 uvhs_frontend uvhs_backend uvhs_all vivado_frontend vivado_backend vivado_all uvhs_vivado_frontend uvhs_vivado_backend uvhs_vivado_all uvhs_clean uvhs_env uvhs_preflight uvhs_status uvhs_check_timing_clean uvhs_export_ltx uvhs_package_bitstream
 
 # Get Vivado version
 VIVADO_VERSION := $(shell vivado -version 2>/dev/null | head -1 | grep -o '[0-9]\{4\}\.[0-9]' || echo "unknown")
@@ -49,6 +51,69 @@ update_chi_flist:
 	find "$(CHI_DIR)" -type f \( -name "*.v" -o -name "*.sv" -o -name "*.svh" \) -printf '%p\n' | \
 	awk -f ./chi_flist.awk > ./src/tcl/chi_files.tcl;
 
+uvhs_prepare:
+	$(UVHS_SUBMAKE) uvhs_prepare
+
+uvhs_export_vivado_ip:
+	$(UVHS_SUBMAKE) uvhs_export_vivado_ip
+
+uvhs_fetch_uvw_axi4_to_ddr4:
+	$(UVHS_SUBMAKE) uvhs_fetch_uvw_axi4_to_ddr4
+
+uvhs_filelist:
+	$(UVHS_SUBMAKE) uvhs_filelist
+
+uvhs_check_modules:
+	$(UVHS_SUBMAKE) uvhs_check_modules
+
+uvhs_frontend:
+	$(UVHS_SUBMAKE) uvhs_frontend
+
+uvhs_backend:
+	$(UVHS_SUBMAKE) uvhs_backend
+
+uvhs_all:
+	$(UVHS_SUBMAKE) uvhs_all
+
+vivado_frontend:
+	$(UVHS_SUBMAKE) vivado_frontend
+
+vivado_backend:
+	$(UVHS_SUBMAKE) vivado_backend
+
+vivado_all:
+	$(UVHS_SUBMAKE) vivado_all
+
+uvhs_vivado_frontend:
+	$(UVHS_SUBMAKE) uvhs_vivado_frontend
+
+uvhs_vivado_backend:
+	$(UVHS_SUBMAKE) uvhs_vivado_backend
+
+uvhs_vivado_all:
+	$(UVHS_SUBMAKE) uvhs_vivado_all
+
+uvhs_clean:
+	$(UVHS_SUBMAKE) uvhs_clean
+
+uvhs_env:
+	$(UVHS_SUBMAKE) uvhs_env
+
+uvhs_preflight:
+	$(UVHS_SUBMAKE) uvhs_preflight
+
+uvhs_status:
+	$(UVHS_SUBMAKE) uvhs_status
+
+uvhs_check_timing_clean:
+	$(UVHS_SUBMAKE) uvhs_check_timing_clean
+
+uvhs_export_ltx:
+	$(UVHS_SUBMAKE) uvhs_export_ltx
+
+uvhs_package_bitstream:
+	$(UVHS_SUBMAKE) uvhs_package_bitstream
+
 # Launch Vivado with FPGA project configuration
 vivado: check_vivado_version
 	vivado -mode batch -source src/tcl/common/xs_uart.tcl -tclargs --cpu $(CPU) --project_name $(PRJ_NAME) --vivado_version $(VIVADO_VERSION)
@@ -59,9 +124,13 @@ check_version:
 
 # Write bitstream to FPGA via PCIe
 write_bitstream:
+ifeq ($(strip $(FPGA_SKIP_PCIE_RESCAN)),0)
 	sh tools/pcie-remove.sh
+endif
 	vivado -mode tcl -source tools/write_bitstream.tcl -tclargs $(FPGA_BIT_HOME)
+ifeq ($(strip $(FPGA_SKIP_PCIE_RESCAN)),0)
 	sh tools/pcie-rescan.sh
+endif
 	vivado -mode tcl -source tools/reset_ddr.tcl -tclargs $(FPGA_BIT_HOME)/fpga_top_debug.ltx
 	$(MAKE) reset_cpu
 
@@ -79,6 +148,7 @@ reset_cpu:
 
 ILA_OUT ?= $(ENV_SCRIPTS_HOME)/ila-dump
 TIMEOUT_MIN ?= 2
+FPGA_SKIP_PCIE_RESCAN ?= 0
 
 # Dump host-trigger ILA data to ila/csv/vcd files
 dump_ila:

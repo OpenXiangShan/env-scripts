@@ -1,0 +1,5 @@
+*
+!.gitignore
+!hw_run_download.tcl
+!hw_run_workload.tcl
+!timing.tcl
