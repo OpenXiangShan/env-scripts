@@ -128,6 +128,39 @@ proc pick_ip_vlnv {base} {
     }
     return [lindex $defs end]
 }
+proc read_difftest_macro_value {macro_name} {
+  set hdrs [get_files -quiet *DifftestMacros.svh]
+  if {[llength $hdrs] == 0} {
+    error "DifftestMacros.svh not found in Vivado sources. Regenerate CPU RTL before creating xdma_ep."
+  }
+
+  set hdr [lindex $hdrs 0]
+  set fp [open $hdr r]
+  set value ""
+  set pattern [format {^\s*`define\s+%s\s+([0-9]+)\s*$} $macro_name]
+  while {[gets $fp line] >= 0} {
+    if {[regexp $pattern $line match macro_value]} {
+      set value $macro_value
+      break
+    }
+  }
+  close $fp
+
+  if {$value eq ""} {
+    error "$macro_name not found in $hdr. Regenerate CPU RTL with a difftest that emits host AXIS macros."
+  }
+  return $value
+}
+proc check_difftest_host_axis_bytes {axis_bytes} {
+  set difftest_axis_bytes [read_difftest_macro_value CONFIG_DIFFTEST_HOST_AXIS_BYTES]
+  if {![string is integer -strict $difftest_axis_bytes] || $difftest_axis_bytes <= 0} {
+    error "CONFIG_DIFFTEST_HOST_AXIS_BYTES must be a positive integer, got '$difftest_axis_bytes'"
+  }
+  if {$difftest_axis_bytes != $axis_bytes} {
+    error "Difftest host AXIS bytes mismatch: Tcl=$axis_bytes, Difftest=$difftest_axis_bytes"
+  }
+  puts "INFO: DiffTest host AXIS bytes match Tcl XDMA config: ${axis_bytes}"
+}
 if { $bCheckIPs == 1 } {
   common::send_gid_msg -ssname BD::TCL -id 2058 -severity "INFO" "Current scripts_vivado_version value: '$::vivado_version'"
   
@@ -203,6 +236,8 @@ proc create_root_design { parentCell } {
 
   # Set parent object as current
   current_bd_instance $parentObj
+  set difftest_host_axis_bytes 32
+  check_difftest_host_axis_bytes $difftest_host_axis_bytes
 
 
   # Create interface ports
@@ -213,7 +248,7 @@ proc create_root_design { parentCell } {
    CONFIG.HAS_TREADY {1} \
    CONFIG.HAS_TSTRB {0} \
    CONFIG.LAYERED_METADATA {undef} \
-   CONFIG.TDATA_NUM_BYTES {32} \
+   CONFIG.TDATA_NUM_BYTES $difftest_host_axis_bytes \
    CONFIG.TDEST_WIDTH {0} \
    CONFIG.TID_WIDTH {0} \
    CONFIG.TUSER_WIDTH {0} \
@@ -226,7 +261,7 @@ proc create_root_design { parentCell } {
    CONFIG.HAS_TREADY {1} \
    CONFIG.HAS_TSTRB {0} \
    CONFIG.LAYERED_METADATA {undef} \
-   CONFIG.TDATA_NUM_BYTES {32} \
+   CONFIG.TDATA_NUM_BYTES $difftest_host_axis_bytes \
    CONFIG.TDEST_WIDTH {0} \
    CONFIG.TID_WIDTH {0} \
    CONFIG.TUSER_WIDTH {0} \

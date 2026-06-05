@@ -11,7 +11,7 @@
 
 module core_def (
       input                                      ddr_clk_p,
-      input                                      ddr_clk_n, 
+      input                                      ddr_clk_n,
       input                                      tmclk,
       input                                      cqetmclk,
       output                                     init_calib_complete,
@@ -22,7 +22,7 @@ module core_def (
       input                                      sys_rstn,
       input                                      cpu_rstn,
       input                                      rstn_sw4,
-`ifdef  XS_XDMA_EP      
+`ifdef  XS_XDMA_EP
       input       [7:0]                          pci_ep_rxn,
       input       [7:0]                          pci_ep_rxp,
       output      [7:0]                          pci_ep_txn,
@@ -31,8 +31,8 @@ module core_def (
       input                                      pcie_ep_gt_ref_clk_p,
       output                                     pcie_ep_lnk_up,
       input                                      pcie_ep_perstn,
-`endif  
-`ifdef  XS_UART   
+`endif
+`ifdef  XS_UART
       input                                      uart0_sin,
       input                                      uart1_sin,
       input                                      uart2_sin,
@@ -40,11 +40,11 @@ module core_def (
       output                                     uart1_sout,
       output                                     uart2_sout,
 `endif
-      output                                     sd_card_clk_out,   
-      output                                     sd_cmd_out     ,       
-      output                                     sd_cmd_out_oe  ,       
-      output          [3:0]                      sd_dat_out     ,       
-      output          [3:0]                      sd_dat_out_oe  ,       
+      output                                     sd_card_clk_out,
+      output                                     sd_cmd_out     ,
+      output                                     sd_cmd_out_oe  ,
+      output          [3:0]                      sd_dat_out     ,
+      output          [3:0]                      sd_dat_out_oe  ,
       input                                      sd_cmd_in      ,
       input           [3:0]                      sd_dat_in      ,
       input                                      sd_card_det_in ,
@@ -68,16 +68,16 @@ module core_def (
       inout           [63:0]                     DDR_DQ                         ,
       inout           [7:0]                      DDR_DQS_T                      ,
       inout           [7:0]                      DDR_DQS_C                      ,
-      
+
       //==JTAG
-      
+
       input           io_systemjtag_jtag_TCK,         // come from gpio
       input           io_systemjtag_jtag_TMS,         // come from gpio
       input           io_systemjtag_jtag_TDI,         // come from gpio
       output          io_systemjtag_jtag_TDO_data,    // come from gpio
       output          io_systemjtag_jtag_TDO_driven,  // come from gpio
       input           io_systemjtag_reset,            // come from gpio
-      
+
       //==gmac
 `ifdef  XS_GMAC
       output                                     io_gmac_mdo_oe                 ,
@@ -98,7 +98,7 @@ module core_def (
       //input                                      xtal_clk_24m                 ,
       input           [1:0]                      chip_mode_i                    ,
       //input           [53-1:0]                   pad_c                        ,
-      input                                      dft_crg_rst_n   
+      input                                      dft_crg_rst_n
 );
 
 // Unbind useless output port {{{
@@ -163,32 +163,32 @@ wire [47:0] cmn2ddr_araddr_mix;
 assign cmn2ddr_awaddr_mix = cmn2ddr_awaddr - 48'h8000_0000;
 assign cmn2ddr_araddr_mix = cmn2ddr_araddr - 48'h8000_0000;
 
-wire                       axi_bclk_sync_rstn        ; 
-wire                       ddr_bus_clk               ; 
-wire                       ddr_bclk_sync_rstn        ; 
-`ifdef  XS_UART 
-wire                       uart_pclk                 ; 
-wire                       uart_pclk_sync_rstn       ; 
-wire                       uart_sclk                 ; 
-wire                       uart_sclk_sync_rstn       ; 
+wire                       axi_bclk_sync_rstn        ;
+wire                       ddr_bus_clk               ;
+wire                       ddr_bclk_sync_rstn        ;
+`ifdef  XS_UART
+wire                       uart_pclk                 ;
+wire                       uart_pclk_sync_rstn       ;
+wire                       uart_sclk                 ;
+wire                       uart_sclk_sync_rstn       ;
 `endif
-wire                       qspi_sclk                 ; 
-wire                       qspi_pclk                 ; 
-wire                       qspi_pclk_sync_rstn       ; 
-wire                       qspi_hclk                 ; 
-wire                       qspi_hclk_sync_rstn       ; 
-wire                       qspi_ref_clk              ; 
-wire                       qspi_rclk_sync_rstn       ; 
-wire                       sd_axi_clk                ; 
-wire                       sd_aclk_sync_rstn         ; 
-wire                       sd_ahb_clk                ; 
-wire                       sd_hclk_sync_rstn         ; 
-wire                       sd_bclk                   ; 
-wire                       sd_bclk_sync_rstn         ; 
-wire                       sd_tmclk                  ; 
-wire                       sd_tclk_sync_rstn         ; 
-wire                       sd_cqetmclk               ; 
-wire                       sd_cqetclk_sync_rstn      ; 
+wire                       qspi_sclk                 ;
+wire                       qspi_pclk                 ;
+wire                       qspi_pclk_sync_rstn       ;
+wire                       qspi_hclk                 ;
+wire                       qspi_hclk_sync_rstn       ;
+wire                       qspi_ref_clk              ;
+wire                       qspi_rclk_sync_rstn       ;
+wire                       sd_axi_clk                ;
+wire                       sd_aclk_sync_rstn         ;
+wire                       sd_ahb_clk                ;
+wire                       sd_hclk_sync_rstn         ;
+wire                       sd_bclk                   ;
+wire                       sd_bclk_sync_rstn         ;
+wire                       sd_tmclk                  ;
+wire                       sd_tclk_sync_rstn         ;
+wire                       sd_cqetmclk               ;
+wire                       sd_cqetclk_sync_rstn      ;
 wire                                           apb_bus_clk_100m               ;
 wire                                           apb_bus_rst_n                  ;
 wire            [31:0]                         hpm_dig_result                 ;
@@ -331,7 +331,7 @@ wire                                           gmac_pmt_int                   ;
 //`endif
 (*mark_debug = "true"*) wire                                           qspi_int                       ;
 wire                                           i2s_int                        ;
-//`ifdef  XS_UART 
+//`ifdef  XS_UART
 wire                                           uart2_int                      ;
 wire                                           uart1_int                      ;
 (*mark_debug = "true"*) wire                                           uart0_int                      ;
@@ -955,19 +955,19 @@ assign cpu_int = {
       i2c0_int        ,
       gpio_int[31:0]  ,
       dma_int         ,
-//`ifdef  XS_GMAC      
+//`ifdef  XS_GMAC
       gmac_lpi_int    ,
       gmac_sbd_int    ,
       gmac_pmt_int
 //`endif
-      
+
 };
 assign cpu_int_mix = {5'b0, cpu_int}; //1-14:not match to 100NL SoC
 assign i2c2_paddr_mix  = i2c2_paddr[7:0] ;
 assign i2c1_paddr_mix  = i2c1_paddr[7:0] ;
 assign i2c0_paddr_mix  = i2c0_paddr[7:0] ;
 assign gpio_paddr_mix  = gpio_paddr[6:0] ;
-`ifdef  XS_GMAC   
+`ifdef  XS_GMAC
 assign gmac_paddr_mix = gmac_paddr[13:0];
 `endif
 assign syscfg_paddr_mix = syscfg_paddr[15:0] ;
@@ -975,7 +975,7 @@ assign syscfg_paddr_mix = syscfg_paddr[15:0] ;
 assign qspi_haddr_mix_pre = qspi_haddr - 32'h1000_0000 ;
 assign qspi_haddr_mix = (qspi_haddr_mix_pre == 0) ? 32'h00000088 : qspi_haddr_mix_pre;
 `endif
-`ifdef  XS_GMAC   
+`ifdef  XS_GMAC
 assign gmac_m_awaddr_mix = cfg_gmac_addr_offset_en ? {{8'h0,gmac_m_awaddr[31:0]}+32'h8000_0000} : {8'h0,gmac_m_awaddr[31:0]};
 assign gmac_m_araddr_mix = cfg_gmac_addr_offset_en ? {{8'h0,gmac_m_araddr[31:0]}+32'h8000_0000} : {8'h0,gmac_m_araddr[31:0]};
 `endif
@@ -986,7 +986,7 @@ assign cpu2ddr_m2s_arid_mix = cpu2ddr_m2s_arid[13:0] ;
 assign cpu2ddr_s2m_bid_mix  = cpu2ddr_s2m_bid[13:0];
 assign cpu2ddr_s2m_rid_mix  = cpu2ddr_s2m_rid[13:0];
 assign io_qspi_cs_out_n_mix = io_qspi_cs_out_n[0];
-`ifdef  XS_GMAC   
+`ifdef  XS_GMAC
 assign io_gmac_txd_mix = io_gmac_txd[3:0];
 assign io_gmac_rxd_mix = {4'b0,io_gmac_rxd[3:0]};
 `endif
@@ -1197,11 +1197,6 @@ wire [0:0]    br2cfg_wready;
 wire [7:0]    br2cfg_wstrb;
 wire [0:0]    br2cfg_wvalid;
 
-  wire [255:0] PCIE_S00_AXIS_0_tdata;
-  wire PCIE_S00_AXIS_0_tlast;
-  wire PCIE_S00_AXIS_0_tready;
-  wire PCIE_S00_AXIS_0_tvalid;
-
   wire [31:0] XDMA_AXI_LITE_awaddr;
   wire        XDMA_AXI_LITE_awvalid;
   wire        XDMA_AXI_LITE_awready;
@@ -1224,13 +1219,13 @@ wire [0:0]    br2cfg_wvalid;
   wire        difftest_to_host_axis_tvalid_io;
   wire        difftest_to_host_axis_tready;
   wire        difftest_to_host_axis_tvalid;
-  wire [255:0] difftest_to_host_axis_tdata;
-  wire [31:0]  difftest_to_host_axis_tkeep;
+  wire [`CONFIG_DIFFTEST_HOST_AXIS_WIDTH-1:0] difftest_to_host_axis_tdata;
+  wire [`CONFIG_DIFFTEST_HOST_AXIS_BYTES-1:0] difftest_to_host_axis_tkeep;
   wire        difftest_to_host_axis_tlast;
   wire        difftest_from_host_axis_tready;
   wire        difftest_from_host_axis_tvalid;
-  wire [255:0] difftest_from_host_axis_tdata;
-  wire [31:0]  difftest_from_host_axis_tkeep;
+  wire [`CONFIG_DIFFTEST_HOST_AXIS_WIDTH-1:0] difftest_from_host_axis_tdata;
+  wire [`CONFIG_DIFFTEST_HOST_AXIS_BYTES-1:0] difftest_from_host_axis_tkeep;
   wire        difftest_from_host_axis_tlast;
   wire        difftest_clock_enable;
   wire        inter_soc_clk;
@@ -1309,7 +1304,7 @@ wire [0:0]    br2cfg_wvalid;
     .XDMA_AXI_LITE_rresp  (XDMA_AXI_LITE_rresp),
     .XDMA_AXI_LITE_rvalid (XDMA_AXI_LITE_rvalid),
     .XDMA_AXI_LITE_rready (XDMA_AXI_LITE_rready),
-    
+
     .TO_DIFFTEST_PCIE_CLK (difftest_pcie_clock),
     .pci_exp_rxn(pci_ep_rxn),
     .pci_exp_rxp(pci_ep_rxp),
@@ -1332,7 +1327,7 @@ wire [0:0]    br2cfg_wvalid;
       .E   ((difftest_clock_enable & xdma_link_up) || ~io_host_diff_enable || ~sys_rstn_io || ~cpu_rstn_io ),
       .Q   (inter_rtc_clk)
   );
- 
+
 xilnx_crg xilnx_crg(
    .sys_clk                         (sys_clk_i                     ),
    .dev_clk                         (dev_clk_i                     ),
@@ -1343,12 +1338,12 @@ xilnx_crg xilnx_crg(
    .axi_bclk_sync_rstn              (axi_bclk_sync_rstn            ),
    .ddr_bus_clk                     (ddr_bus_clk                   ),
    .ddr_bclk_sync_rstn              (ddr_bclk_sync_rstn            ),
- `ifdef  XS_UART  
+ `ifdef  XS_UART
    .uart_pclk                       (uart_pclk                     ),
    .uart_pclk_sync_rstn             (uart_pclk_sync_rstn           ),
    .uart_sclk                       (uart_sclk                     ),
    .uart_sclk_sync_rstn             (uart_sclk_sync_rstn           ),
- `endif  
+ `endif
    .qspi_sclk                       (qspi_sclk                     ),
    .qspi_pclk                       (qspi_pclk                     ),
    .qspi_pclk_sync_rstn             (qspi_pclk_sync_rstn           ),
@@ -1403,43 +1398,43 @@ jtag_ddr_subsys_wrapper U_JTAG_DDR_SUBSYS(
     .SOC_CLK                (inter_soc_clk),
 
 `ifdef CONFIG_USE_XSCORE_AXI
-    .SOC_M_AXI_awid         (cpu2ddr_m2s_awid_mix          ),  
-    .SOC_M_AXI_awaddr       (cpu2ddr_m2s_awaddr_mix        ),   
-    .SOC_M_AXI_awlen        (cpu2ddr_m2s_awlen             ),    
-    .SOC_M_AXI_awsize       (cpu2ddr_m2s_awsize            ),       
-    .SOC_M_AXI_awburst      (cpu2ddr_m2s_awburst           ),       
-    .SOC_M_AXI_awlock       (cpu2ddr_m2s_awlock            ),       
-    .SOC_M_AXI_awcache      (cpu2ddr_m2s_awcache           ),       
-    .SOC_M_AXI_awprot       (cpu2ddr_m2s_awprot            ),       
-    .SOC_M_AXI_awqos        (cpu2ddr_m2s_awqos             ),       
-    .SOC_M_AXI_awvalid      (cpu2ddr_m2s_awvalid           ),       
-    .SOC_M_AXI_awready      (cpu2ddr_s2m_awready           ),       
-    .SOC_M_AXI_wdata        (cpu2ddr_m2s_wdata             ),       
-    .SOC_M_AXI_wstrb        (cpu2ddr_m2s_wstrb             ),       
-    .SOC_M_AXI_wlast        (cpu2ddr_m2s_wlast             ),       
-    .SOC_M_AXI_wvalid       (cpu2ddr_m2s_wvalid            ),       
-    .SOC_M_AXI_wready       (cpu2ddr_s2m_wready            ),       
-    .SOC_M_AXI_bid          (cpu2ddr_s2m_bid               ),       
-    .SOC_M_AXI_bresp        (cpu2ddr_s2m_bresp             ),       
-    .SOC_M_AXI_bvalid       (cpu2ddr_s2m_bvalid            ),       
-    .SOC_M_AXI_bready       (cpu2ddr_m2s_bready            ),       
-    .SOC_M_AXI_arid         (cpu2ddr_m2s_arid_mix          ),       
-    .SOC_M_AXI_araddr       (cpu2ddr_m2s_araddr_mix        ),       
-    .SOC_M_AXI_arlen        (cpu2ddr_m2s_arlen             ),       
-    .SOC_M_AXI_arsize       (cpu2ddr_m2s_arsize            ),       
-    .SOC_M_AXI_arburst      (cpu2ddr_m2s_arburst           ),       
-    .SOC_M_AXI_arlock       (cpu2ddr_m2s_arlock            ),       
-    .SOC_M_AXI_arcache      (cpu2ddr_m2s_arcache           ),       
-    .SOC_M_AXI_arprot       (cpu2ddr_m2s_arprot            ),       
-    .SOC_M_AXI_arqos        (cpu2ddr_m2s_arqos             ),       
-    .SOC_M_AXI_arvalid      (cpu2ddr_m2s_arvalid           ),       
-    .SOC_M_AXI_arready      (cpu2ddr_s2m_arready           ),       
-    .SOC_M_AXI_rid          (cpu2ddr_s2m_rid               ),       
-    .SOC_M_AXI_rdata        (cpu2ddr_s2m_rdata             ),       
-    .SOC_M_AXI_rresp        (cpu2ddr_s2m_rresp             ),       
-    .SOC_M_AXI_rlast        (cpu2ddr_s2m_rlast             ),       
-    .SOC_M_AXI_rvalid       (cpu2ddr_s2m_rvalid            ),       
-    .SOC_M_AXI_rready       (cpu2ddr_m2s_rready            ),    
+    .SOC_M_AXI_awid         (cpu2ddr_m2s_awid_mix          ),
+    .SOC_M_AXI_awaddr       (cpu2ddr_m2s_awaddr_mix        ),
+    .SOC_M_AXI_awlen        (cpu2ddr_m2s_awlen             ),
+    .SOC_M_AXI_awsize       (cpu2ddr_m2s_awsize            ),
+    .SOC_M_AXI_awburst      (cpu2ddr_m2s_awburst           ),
+    .SOC_M_AXI_awlock       (cpu2ddr_m2s_awlock            ),
+    .SOC_M_AXI_awcache      (cpu2ddr_m2s_awcache           ),
+    .SOC_M_AXI_awprot       (cpu2ddr_m2s_awprot            ),
+    .SOC_M_AXI_awqos        (cpu2ddr_m2s_awqos             ),
+    .SOC_M_AXI_awvalid      (cpu2ddr_m2s_awvalid           ),
+    .SOC_M_AXI_awready      (cpu2ddr_s2m_awready           ),
+    .SOC_M_AXI_wdata        (cpu2ddr_m2s_wdata             ),
+    .SOC_M_AXI_wstrb        (cpu2ddr_m2s_wstrb             ),
+    .SOC_M_AXI_wlast        (cpu2ddr_m2s_wlast             ),
+    .SOC_M_AXI_wvalid       (cpu2ddr_m2s_wvalid            ),
+    .SOC_M_AXI_wready       (cpu2ddr_s2m_wready            ),
+    .SOC_M_AXI_bid          (cpu2ddr_s2m_bid               ),
+    .SOC_M_AXI_bresp        (cpu2ddr_s2m_bresp             ),
+    .SOC_M_AXI_bvalid       (cpu2ddr_s2m_bvalid            ),
+    .SOC_M_AXI_bready       (cpu2ddr_m2s_bready            ),
+    .SOC_M_AXI_arid         (cpu2ddr_m2s_arid_mix          ),
+    .SOC_M_AXI_araddr       (cpu2ddr_m2s_araddr_mix        ),
+    .SOC_M_AXI_arlen        (cpu2ddr_m2s_arlen             ),
+    .SOC_M_AXI_arsize       (cpu2ddr_m2s_arsize            ),
+    .SOC_M_AXI_arburst      (cpu2ddr_m2s_arburst           ),
+    .SOC_M_AXI_arlock       (cpu2ddr_m2s_arlock            ),
+    .SOC_M_AXI_arcache      (cpu2ddr_m2s_arcache           ),
+    .SOC_M_AXI_arprot       (cpu2ddr_m2s_arprot            ),
+    .SOC_M_AXI_arqos        (cpu2ddr_m2s_arqos             ),
+    .SOC_M_AXI_arvalid      (cpu2ddr_m2s_arvalid           ),
+    .SOC_M_AXI_arready      (cpu2ddr_s2m_arready           ),
+    .SOC_M_AXI_rid          (cpu2ddr_s2m_rid               ),
+    .SOC_M_AXI_rdata        (cpu2ddr_s2m_rdata             ),
+    .SOC_M_AXI_rresp        (cpu2ddr_s2m_rresp             ),
+    .SOC_M_AXI_rlast        (cpu2ddr_s2m_rlast             ),
+    .SOC_M_AXI_rvalid       (cpu2ddr_s2m_rvalid            ),
+    .SOC_M_AXI_rready       (cpu2ddr_m2s_rready            ),
 `elsif CONFIG_USE_XSCORE_CHI
     .SOC_M_AXI_awid         (cmn2ddr_awid   ),
     .SOC_M_AXI_awaddr       (cmn2ddr_awaddr_mix),
@@ -1548,7 +1543,7 @@ xs_sys_icn u_icn(
     .io_systemjtag_jtag_TDI         (io_systemjtag_jtag_TDI),
     .io_systemjtag_jtag_TDO_data    (io_systemjtag_jtag_TDO_data),
     .io_systemjtag_jtag_TDO_driven  (io_systemjtag_jtag_TDO_driven),
-`endif /* CONFIG_USE_XSCORE_CHI */ 
+`endif /* CONFIG_USE_XSCORE_CHI */
 `endif /* CONFIG_HAVE_ONCHIP_PERI */
 
 `ifdef CONFIG_ICN_CFG_PORT
@@ -2008,7 +2003,7 @@ SimTop_wrapper U_CPU_TOP(
 //    .io_systemjtag_reset            (io_systemjtag_reset),
     .io_systemjtag_reset            (~sys_rstn_io),
     .io_sram_config                 (5'b0  ),
-    
+
     .dma_core_awready               (data_cpu_bridge_s2m_awready),
     .dma_core_awvalid               (data_cpu_bridge_m2s_awvalid),
     .dma_core_awid                  (data_cpu_bridge_m2s_awid),
@@ -2046,7 +2041,7 @@ SimTop_wrapper U_CPU_TOP(
     .dma_core_rdata                 (data_cpu_bridge_s2m_rdata),
     .dma_core_rresp                 (data_cpu_bridge_s2m_rresp),
     .dma_core_rlast                 (data_cpu_bridge_s2m_rlast),
-     
+
     .peri_awready                   (cpu2cfg_s2m_awready),
     .peri_awvalid                   (cpu2cfg_m2s_awvalid),
     .peri_awid                      (cpu2cfg_m2s_awid),
@@ -2083,7 +2078,7 @@ SimTop_wrapper U_CPU_TOP(
     .peri_rid                       (cpu2cfg_s2m_rid),
     .peri_rdata                     (cpu2cfg_s2m_rdata),
     .peri_rresp                     (cpu2cfg_s2m_rresp),
-    .peri_rlast                     (cpu2cfg_s2m_rlast),     
+    .peri_rlast                     (cpu2cfg_s2m_rlast),
 
     .mem_core_awready               (cpu2ddr_s2m_awready),
     .mem_core_awvalid               (cpu2ddr_m2s_awvalid),
@@ -2122,11 +2117,11 @@ SimTop_wrapper U_CPU_TOP(
     .mem_core_rdata                 (cpu2ddr_s2m_rdata),
     .mem_core_rresp                 (cpu2ddr_s2m_rresp),
     .mem_core_rlast                 (cpu2ddr_s2m_rlast),
-    
+
     .io_extIntrs                    (cpu_int_mix)
 `elsif CONFIG_USE_XSCORE_CHI
     .noc_clk                        (noc_clk ),
-    .noc_rstn                       (cpu_rstn_io),  
+    .noc_rstn                       (cpu_rstn_io),
     .clint_int_0                    (clint_int_0[`CONFIG_XSCORE_NR-1:0]),
     .clint_int_1                    (clint_int_1[`CONFIG_XSCORE_NR-1:0]),
     .plic_int                       (plic_int[`CONFIG_XSCORE_NR-1:0]),
@@ -2189,10 +2184,10 @@ syscfg U_SYS_CFG(
 assign hpm_dig_result = 0;
 
 AXI_bridge CFG_AXI_bridge_i
-       (.SYS_INTER_CLK          (inter_soc_clk),          
+       (.SYS_INTER_CLK          (inter_soc_clk),
         .ACLK                   (sys_clk_i),
-        .ARESETN                (axi_bclk_sync_rstn),    
-    
+        .ARESETN                (axi_bclk_sync_rstn),
+
         .S00_AXI_araddr         (cpu2cfg_m2s_araddr),
         .S00_AXI_arburst        (cpu2cfg_m2s_arburst),
         .S00_AXI_arcache        (cpu2cfg_m2s_arcache),
@@ -2230,7 +2225,7 @@ AXI_bridge CFG_AXI_bridge_i
         .S00_AXI_wready         (cpu2cfg_s2m_wready),
         .S00_AXI_wstrb          (cpu2cfg_m2s_wstrb),
         .S00_AXI_wvalid         (cpu2cfg_m2s_wvalid),
-        
+
         .SYS_CFG_APB_paddr      (syscfg_paddr_mix),
         .SYS_CFG_APB_penable    (syscfg_penable),
         .SYS_CFG_APB_prdata     (syscfg_prdata),
@@ -2239,7 +2234,7 @@ AXI_bridge CFG_AXI_bridge_i
         .SYS_CFG_APB_pslverr    (syscfg_pslverr),
         .SYS_CFG_APB_pwdata     (syscfg_pwdata),
         .SYS_CFG_APB_pwrite     (syscfg_pwrite),
-           
+
         .UART_0_baudoutn        (),
         .UART_0_ctsn            (1'b1),
         .UART_0_dcdn            (1'b0),
@@ -2255,7 +2250,7 @@ AXI_bridge CFG_AXI_bridge_i
         .UART_0_txd             (uart0_sout),
         .UART_0_txrdyn          (),
         .uart0_intc             (uart0_int),
-        
+
         .rom_axi_araddr         (rom_axi_araddr),
         .rom_axi_arburst        (),
         .rom_axi_arcache        (),
@@ -2335,7 +2330,7 @@ AXI_bridge CFG_AXI_bridge_i
         .M00_AXI_wready         (data_cpu_bridge_s2m_wready),
         .M00_AXI_wstrb          (data_cpu_bridge_m2s_wstrb),
         .M00_AXI_wvalid         (data_cpu_bridge_m2s_wvalid),
-        
+
       //   .S00_AXI_araddr         (pcie_bridge_m_araddr),
       //   .S00_AXI_arburst        (pcie_bridge_m_arburst),
       //   .S00_AXI_arcache        (pcie_bridge_m_arcache),
@@ -2375,7 +2370,7 @@ AXI_bridge CFG_AXI_bridge_i
       //   .S00_AXI_wready         (pcie_bridge_m_wready),
       //   .S00_AXI_wstrb          (pcie_bridge_m_wstrb),
       //   .S00_AXI_wvalid         (pcie_bridge_m_wvalid),
-        
+
         .S01_AXI_araddr         (gmac_m_araddr),
         .S01_AXI_arburst        (gmac_m_arburst),
         .S01_AXI_arcache        (gmac_m_arcache),
