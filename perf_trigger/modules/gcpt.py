@@ -1,5 +1,5 @@
 from enum import Enum
-import os
+from pathlib import Path
 
 
 class GCPT:
@@ -11,8 +11,8 @@ class GCPT:
 
     def __init__(
         self,
-        gcpt_path: str,
-        result_path: str,
+        gcpt_path: Path,
+        result_path: Path,
         benchmark: str,
         checkpoint: str,
         weight: str,
@@ -22,26 +22,26 @@ class GCPT:
         self.checkpoint = checkpoint
         self.weight = weight
         self.state = GCPT.State.NONE
-        self.result_path = os.path.join(result_path, self.__str__())
+        self.result_path = result_path / str(self)
 
     def __str__(self) -> str:
         return "_".join([self.benchmark, self.checkpoint, str(self.weight)])
 
-    def get_bin_path(self) -> str:
-        return os.path.join(self.gcpt_path, self.benchmark, self.checkpoint)
+    def get_bin_path(self) -> Path:
+        return self.gcpt_path / self.benchmark / self.checkpoint
 
-    def get_result_path(self):
+    def get_result_path(self) -> Path:
         return self.result_path
 
-    def get_stdout_path(self):
-        return os.path.join(self.result_path, "simulator_out.txt")
+    def get_stdout_path(self) -> Path:
+        return self.result_path / "simulator_out.txt"
 
-    def get_stderr_path(self):
-        return os.path.join(self.result_path, "simulator_err.txt")
+    def get_stderr_path(self) -> Path:
+        return self.result_path / "simulator_err.txt"
 
     def refresh_state(self) -> "GCPT.State":
         if (
-            not os.path.exists(self.get_stdout_path())
+            not self.get_stdout_path().exists()
             or self.state == GCPT.State.FINISHED
             or self.state == GCPT.State.ABORTED
         ):

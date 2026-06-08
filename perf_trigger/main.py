@@ -2,7 +2,6 @@ import argparse
 import hashlib
 import json
 import logging
-import os
 from pathlib import Path
 import random
 import time
@@ -101,16 +100,16 @@ HEARTBEAT_INTERVAL = 60
 class XiangShan:
     def __init__(
         self,
-        gcpt_path: str,
-        json_path: str,
-        result_path: str,
+        gcpt_path: Path,
+        json_path: Path,
+        result_path: Path,
         benchmarks: str,
     ):
         self.gcpt_path = gcpt_path
         self.json_path = json_path
         self.result_path = result_path
 
-        with open(json_path, "r", encoding="utf-8") as f:
+        with json_path.open("r", encoding="utf-8") as f:
             self.benchmarks = json.load(f)
 
         if benchmarks != "":
@@ -149,8 +148,8 @@ class XiangShan:
 
     def __init_servers(
         self,
-        emu_path: str,
-        nemu_so_path: str | None,
+        emu_path: Path,
+        nemu_so_path: Path | None,
         server_list: str,
     ) -> None:
         # Do not use open servers unless explicitly specified, as they are too slow
@@ -178,16 +177,18 @@ class XiangShan:
         open_server = [s for s in self.servers if s.hostname.startswith("open")]
         if open_server:
             logging.info("Using open servers, initializing binaries and libs...")
-            target_result_path = self.result_path.replace(
-                "/nfs/home/cirunner", "/nfs/home/ci-runner"
+            target_result_path = Path(
+                str(self.result_path).replace(
+                    "/nfs/home/cirunner", "/nfs/home/ci-runner"
+                )
             )
-            target_emu_path = os.path.join(target_result_path, os.path.basename(emu_path))
+            target_emu_path = target_result_path / emu_path.name
             target_nemu_so_path = None
 
             open_server[0].initialize_open(emu_path, target_emu_path)
 
             if nemu_so_path is not None:
-                target_nemu_so_path = os.path.join(target_result_path, os.path.basename(nemu_so_path))
+                target_nemu_so_path = target_result_path / nemu_so_path.name
                 open_server[0].initialize_open(nemu_so_path, target_nemu_so_path)
 
             for server in open_server:
@@ -298,8 +299,8 @@ class XiangShan:
 
     def run(
         self,
-        emu_path: str,
-        nemu_so_path: str | None,
+        emu_path: Path,
+        nemu_so_path: Path | None,
         server_list: str,
         emu_config: EmuConfig,
     ) -> None:
@@ -329,9 +330,9 @@ class XiangShan:
             if state == GCPT.State.RUNNING:
                 logging.info("Resetting GCPT %s", gcpt)
                 num += 1
-                os.remove(gcpt.get_stdout_path())
-                os.remove(gcpt.get_stderr_path())
-                os.rmdir(gcpt.get_result_path())
+                gcpt.get_stdout_path().unlink()
+                gcpt.get_stderr_path().unlink()
+                gcpt.get_result_path().rmdir()
                 gcpt.clear_state()
         logging.info("Reset %d RUNNING GCPTs", num)
 
@@ -416,7 +417,14 @@ def main():
 
     args = parser.parse_args()
 
-    os.makedirs(args.result_path, exist_ok=True)
+    gcpt_path = Path(args.gcpt_path)
+    json_path = Path(args.json_path)
+    result_path = Path(args.result_path)
+    emu_path = Path(args.emu_path) if args.emu_path else None
+    nemu_so_path = Path(args.nemu_so_path) if args.nemu_so_path else None
+    cst_file = Path(args.cst_file) if args.cst_file else None
+
+    result_path.mkdir(parents=True, exist_ok=True)
 
     # setup logging
     logging.basicConfig(
@@ -424,7 +432,7 @@ def main():
         format="%(asctime)s - %(levelname)5s - %(message)s",
         handlers=[
             logging.FileHandler(
-                os.path.join(args.result_path, f"runner_{time.strftime('%Y-%m-%d_%H-%M-%S')}.log"), encoding="utf-8"
+                result_path / f"runner_{time.strftime('%Y-%m-%d_%H-%M-%S')}.log", encoding="utf-8"
             ),
             logging.StreamHandler(),
         ],
@@ -436,28 +444,28 @@ def main():
             handler.setLevel(logging.DEBUG)
 
     # pre-checks
-    if not os.path.isdir(args.gcpt_path):
-        raise FileNotFoundError(f"gcpt_path is not a directory: {args.gcpt_path}")
-    if not os.path.isfile(args.json_path):
-        raise FileNotFoundError(f"json_path is not a file: {args.json_path}")
+    if not gcpt_path.is_dir():
+        raise FileNotFoundError(f"gcpt_path is not a directory: {gcpt_path}")
+    if not json_path.is_file():
+        raise FileNotFoundError(f"json_path is not a file: {json_path}")
 
     # add lock per (result_path, gcpt_path) pair
     # to prevent the same checkpoint from being run by multiple instances with same result_path simultaneously
-    gcpt_hash = hashlib.sha256(str(Path(args.gcpt_path).resolve()).encode()).hexdigest()[:8]
-    lock = Heartbeat(f"trigger_{gcpt_hash}", Path(args.result_path), HEARTBEAT_INTERVAL)
+    gcpt_hash = hashlib.sha256(str(gcpt_path.resolve()).encode()).hexdigest()[:8]
+    lock = Heartbeat(f"trigger_{gcpt_hash}", result_path, HEARTBEAT_INTERVAL)
     while not lock.try_acquire():
         logging.info(
             "Another instance is running in the same directory (%s), waiting for %d seconds...",
-            args.result_path,
+            result_path,
             HEARTBEAT_INTERVAL,
         )
         time.sleep(HEARTBEAT_INTERVAL)
 
     try:
         xiangshan = XiangShan(
-            gcpt_path=args.gcpt_path,
-            json_path=args.json_path,
-            result_path=args.result_path,
+            gcpt_path=gcpt_path,
+            json_path=json_path,
+            result_path=result_path,
             benchmarks=args.benchmarks,
         )
 
@@ -465,25 +473,25 @@ def main():
             xiangshan.reset_running_gcpt()
 
         if args.run or args.dry_run:
-            if not args.emu_path:
+            if emu_path is None:
                 raise ValueError("emu_path is required for --run")
-            if not os.path.isfile(args.emu_path):
-                raise FileNotFoundError(f"emu_path is not a file: {args.emu_path}")
-            if args.nemu_so_path and not os.path.isfile(args.nemu_so_path):
+            if not emu_path.is_file():
+                raise FileNotFoundError(f"emu_path is not a file: {emu_path}")
+            if nemu_so_path is not None and not nemu_so_path.is_file():
                 raise FileNotFoundError(
-                    f"nemu_so_path is not a file: {args.nemu_so_path}"
+                    f"nemu_so_path is not a file: {nemu_so_path}"
                 )
-            if args.cst_file and not os.path.isfile(args.cst_file):
-                raise FileNotFoundError(f"cst_file does not exist: {args.cst_file}")
+            if cst_file is not None and not cst_file.is_file():
+                raise FileNotFoundError(f"cst_file does not exist: {cst_file}")
             xiangshan.run(
-                emu_path=args.emu_path,
-                nemu_so_path=args.nemu_so_path,
+                emu_path=emu_path,
+                nemu_so_path=nemu_so_path,
                 server_list=args.server_list,
                 emu_config=EmuConfig(
                     warmup=args.warmup,
                     max_instr=args.max_instr,
                     threads=args.threads,
-                    cst_file=args.cst_file,
+                    cst_file=cst_file,
                     dry_run=args.dry_run,
                 ),
             )
