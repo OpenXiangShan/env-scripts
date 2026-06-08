@@ -1,5 +1,6 @@
 from enum import Enum
 from pathlib import Path
+import re
 
 
 class GCPT:
@@ -15,55 +16,120 @@ class GCPT:
         result_path: Path,
         benchmark: str,
         checkpoint: str,
-        weight: str,
+        weight: float,
     ):
-        self.gcpt_path = gcpt_path
-        self.benchmark = benchmark
-        self.checkpoint = checkpoint
-        self.weight = weight
-        self.state = GCPT.State.NONE
-        self.result_path = result_path / str(self)
+        self.__gcpt_path = gcpt_path
+        self.__benchmark = benchmark
+        self.__checkpoint = checkpoint
+        self.__weight = weight
+        self.__state = GCPT.State.NONE
+        self.__result_path = result_path / str(self)
 
     def __str__(self) -> str:
-        return "_".join([self.benchmark, self.checkpoint, str(self.weight)])
+        return "_".join([self.__benchmark, self.__checkpoint, str(self.__weight)])
 
-    def get_bin_path(self) -> Path:
-        return self.gcpt_path / self.benchmark / self.checkpoint
+    @property
+    def benchmark(self) -> str:
+        return self.__benchmark
 
-    def get_result_path(self) -> Path:
-        return self.result_path
+    @property
+    def benchmark_group(self) -> str:
+        return self.__benchmark.split("_")[0] # gcc_s02 -> gcc
 
-    def get_stdout_path(self) -> Path:
-        return self.result_path / "simulator_out.txt"
+    @property
+    def checkpoint(self) -> str:
+        return self.__checkpoint
 
-    def get_stderr_path(self) -> Path:
-        return self.result_path / "simulator_err.txt"
+    @property
+    def weight(self) -> float:
+        return self.__weight
+
+    @property
+    def state(self) -> "GCPT.State":
+        return self.__state
+
+    @property
+    def bin_path(self) -> Path:
+        return self.__gcpt_path / self.__benchmark / self.__checkpoint
+
+    @property
+    def result_path(self) -> Path:
+        return self.__result_path
+
+    @property
+    def stdout_path(self) -> Path:
+        return self.__result_path / "simulator_out.txt"
+
+    @property
+    def stderr_path(self) -> Path:
+        return self.__result_path / "simulator_err.txt"
 
     def refresh_state(self) -> "GCPT.State":
         if (
-            not self.get_stdout_path().exists()
-            or self.state == GCPT.State.FINISHED
-            or self.state == GCPT.State.ABORTED
+            not self.stdout_path.exists()
+            or self.__state == GCPT.State.FINISHED
+            or self.__state == GCPT.State.ABORTED
         ):
-            return self.state
+            return self.__state
 
-        self.state = GCPT.State.RUNNING
-        with (
-            open(self.get_stdout_path(), "r", encoding="utf-8") as stdout,
-            open(self.get_stderr_path(), "r", encoding="utf-8") as stderr,
-        ):
+        self.__state = GCPT.State.RUNNING
+        with self.stdout_path.open("r", encoding="utf-8") as stdout:
             for line in stdout:
                 if "ABORT at pc" in line or "FATAL:" in line or "Error:" in line:
-                    self.state = GCPT.State.ABORTED
+                    self.__state = GCPT.State.ABORTED
+                    break
                 elif "EXCEEDING CYCLE/INSTR LIMIT" in line or "GOOD TRAP" in line:
-                    self.state = GCPT.State.FINISHED
+                    self.__state = GCPT.State.FINISHED
+                    break
                 elif "SOME SIGNAL STOPS THE PROGRAM" in line:
-                    self.state = GCPT.State.NONE
+                    self.__state = GCPT.State.NONE
+                    break
+
+        if self.__state != GCPT.State.RUNNING:
+            return self.__state
+
+        with self.stderr_path.open("r", encoding="utf-8") as stderr:
             for line in stderr:
                 if "Assertion failed" in line:
-                    self.state = GCPT.State.ABORTED
+                    self.__state = GCPT.State.ABORTED
 
-        return self.state
+        return self.__state
 
     def clear_state(self) -> None:
-        self.state = GCPT.State.NONE
+        self.__state = GCPT.State.NONE
+
+    def get_perf(self, counters: set[str] | None = None) -> dict[str, int]:
+        perf_data = {}
+        pattern = re.compile(
+            r".*\[PERF \]\[time=\s*\d+\] (([a-zA-Z0-9_]+\.)+[a-zA-Z0-9_@]+): ((\w| |\')+),\s+(\d+)$"
+        )
+
+        with self.stderr_path.open("r", encoding="utf-8") as f:
+            for line in f:
+                m = pattern.match(line)
+                if not m:
+                    continue
+                name = (
+                    ".".join([str(m.group(1)), str(m.group(3))])
+                    .replace(" ", "_")
+                    .replace("'", "")
+                )
+                try:
+                    value = int(m.group(5))
+                except ValueError:
+                    continue
+                if counters is None or name in counters:
+                    perf_data[name] = value
+
+        return perf_data
+
+    def get_cpi(self) -> float | None:
+        if self.__state != GCPT.State.FINISHED:
+            return None
+
+        data = self.get_perf({"clock_cycle", "commitInstr"})
+
+        if "clock_cycle" not in data or "commitInstr" not in data:
+            return None
+
+        return data["clock_cycle"] / data["commitInstr"]

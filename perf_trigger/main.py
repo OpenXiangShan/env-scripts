@@ -136,7 +136,7 @@ class XiangShan:
                         result_path=result_path,
                         benchmark=benchmark_name,
                         checkpoint=point,
-                        weight=weight,
+                        weight=float(weight),
                     )
                 )
 
@@ -330,9 +330,9 @@ class XiangShan:
             if state == GCPT.State.RUNNING:
                 logging.info("Resetting GCPT %s", gcpt)
                 num += 1
-                gcpt.get_stdout_path().unlink()
-                gcpt.get_stderr_path().unlink()
-                gcpt.get_result_path().rmdir()
+                gcpt.stdout_path.unlink()
+                gcpt.stderr_path.unlink()
+                gcpt.result_path.rmdir()
                 gcpt.clear_state()
         logging.info("Reset %d RUNNING GCPTs", num)
 
@@ -420,9 +420,6 @@ def main():
     gcpt_path = Path(args.gcpt_path)
     json_path = Path(args.json_path)
     result_path = Path(args.result_path)
-    emu_path = Path(args.emu_path) if args.emu_path else None
-    nemu_so_path = Path(args.nemu_so_path) if args.nemu_so_path else None
-    cst_file = Path(args.cst_file) if args.cst_file else None
 
     result_path.mkdir(parents=True, exist_ok=True)
 
@@ -432,7 +429,8 @@ def main():
         format="%(asctime)s - %(levelname)5s - %(message)s",
         handlers=[
             logging.FileHandler(
-                result_path / f"runner_{time.strftime('%Y-%m-%d_%H-%M-%S')}.log", encoding="utf-8"
+                result_path / f"runner_{time.strftime('%Y-%m-%d_%H-%M-%S')}.log",
+                encoding="utf-8",
             ),
             logging.StreamHandler(),
         ],
@@ -473,14 +471,16 @@ def main():
             xiangshan.reset_running_gcpt()
 
         if args.run or args.dry_run:
+            emu_path = Path(args.emu_path) if args.emu_path else None
+            nemu_so_path = Path(args.nemu_so_path) if args.nemu_so_path else None
+            cst_file = Path(args.cst_file) if args.cst_file else None
+
             if emu_path is None:
                 raise ValueError("emu_path is required for --run")
             if not emu_path.is_file():
                 raise FileNotFoundError(f"emu_path is not a file: {emu_path}")
             if nemu_so_path is not None and not nemu_so_path.is_file():
-                raise FileNotFoundError(
-                    f"nemu_so_path is not a file: {nemu_so_path}"
-                )
+                raise FileNotFoundError(f"nemu_so_path is not a file: {nemu_so_path}")
             if cst_file is not None and not cst_file.is_file():
                 raise FileNotFoundError(f"cst_file does not exist: {cst_file}")
             xiangshan.run(
