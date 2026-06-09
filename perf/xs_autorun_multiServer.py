@@ -539,6 +539,7 @@ def xs_debug(all_gcpt):
 
 
 if __name__ == "__main__":
+    print("This script is being deprecated. Consider using perf_trigger/main.py instead.")
     # --show for already running result, including "name, state, ipc, sim speed"
     # --debug for error tests
     # --report for spec scores
