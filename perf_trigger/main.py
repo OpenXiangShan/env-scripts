@@ -4,13 +4,14 @@ import json
 import logging
 from math import isnan
 from multiprocessing import Process, Queue
+import os
 from pathlib import Path
 import random
 import re
 import time
 
 from modules.gcpt import GCPT
-from modules.heartbeat import Heartbeat
+from modules.lock import Heartbeat, FakeLock
 from modules.server import Server
 from modules.spec import Spec, get_int_benchmarks, get_fp_benchmarks
 from modules.types import EmuConfig, FreeCoreInfo
@@ -584,17 +585,24 @@ def main():
 
     result_path.mkdir(parents=True, exist_ok=True)
 
+    log_path = result_path / f"runner_{time.strftime('%Y-%m-%d_%H-%M-%S')}.log"
+    # if log path is not writable, disable logging to file,
+    # to prevent the whole script from failing due to logging error
+    if not os.access(result_path, os.W_OK):
+        log_path = None
+
     # setup logging
     logging.basicConfig(
         level=logging.DEBUG,
         format="%(asctime)s - %(levelname)5s - %(message)s",
         handlers=[
-            logging.FileHandler(
-                result_path / f"runner_{time.strftime('%Y-%m-%d_%H-%M-%S')}.log",
-                encoding="utf-8",
-            ),
             logging.StreamHandler(),
-        ],
+        ]
+        + (
+            [logging.FileHandler(log_path, encoding="utf-8")]
+            if log_path is not None
+            else []
+        ),
     )
     for handler in logging.root.handlers:
         if isinstance(handler, logging.StreamHandler):
@@ -602,16 +610,29 @@ def main():
         if isinstance(handler, logging.FileHandler):
             handler.setLevel(logging.DEBUG)
 
+    if log_path is None:
+        logging.warning(
+            "Log path %s is not writable, logging to file is disabled", result_path
+        )
+
     # pre-checks
     if not gcpt_path.is_dir():
         raise FileNotFoundError(f"gcpt_path is not a directory: {gcpt_path}")
     if not json_path.is_file():
         raise FileNotFoundError(f"json_path is not a file: {json_path}")
 
+    # if only args.report is specified, no need to acquire lock as it is read-only operation.
+    need_lock = args.run or args.dry_run or args.reset_running
+    if not need_lock:
+        logging.info("Only report is requested, skipping lock acquisition")
     # add lock per (result_path, gcpt_path) pair
     # to prevent the same checkpoint from being run by multiple instances with same result_path simultaneously
     gcpt_hash = hashlib.sha256(str(gcpt_path.resolve()).encode()).hexdigest()[:8]
-    lock = Heartbeat(f"trigger_{gcpt_hash}", result_path, HEARTBEAT_INTERVAL)
+    lock = (
+        Heartbeat(f"trigger_{gcpt_hash}", result_path, HEARTBEAT_INTERVAL)
+        if need_lock
+        else FakeLock()
+    )
     while not lock.try_acquire():
         logging.info(
             "Another instance is running in the same directory (%s), waiting for %d seconds...",

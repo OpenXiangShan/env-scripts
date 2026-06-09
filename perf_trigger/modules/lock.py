@@ -4,7 +4,21 @@ import time
 from pathlib import Path
 
 
-class Heartbeat:
+class Lock:
+    def try_acquire(self) -> bool:
+        raise NotImplementedError
+
+    def release(self) -> None:
+        raise NotImplementedError
+
+class FakeLock(Lock):
+    def try_acquire(self) -> bool:
+        return True
+
+    def release(self) -> None:
+        pass
+
+class Heartbeat(Lock):
     def __init__(self, name: str, parent_path: Path, interval: float):
         if not name.isidentifier():
             raise ValueError(f"Name {name} is not a valid identifier")
@@ -97,7 +111,7 @@ class Heartbeat:
                     return False
                 # Loop will retry acquiring the lock.
 
-    def release(self):
+    def release(self) -> None:
         if not self.lock_owned:
             return
 
