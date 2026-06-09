@@ -2,6 +2,7 @@ import argparse
 import hashlib
 import json
 import logging
+from math import isnan
 from multiprocessing import Process, Queue
 from pathlib import Path
 import random
@@ -457,7 +458,7 @@ class XiangShan:
         print(f"{final_name}@{frequency:2.1f}GHz: {final_geomean * frequency:.3f}")
         print()
         print("================ Other Information ===============")
-        final_coverage = min(int_coverages + fp_coverages)
+        final_coverage = min(c for c in int_coverages + fp_coverages if not isnan(c))
         final_checkpoints = len(self.checkpoints)
         final_success_checkpoints = final_checkpoints - len(failed_checkpoints)
         print(f"Checkpoint Version : {self.gcpt_path}")
