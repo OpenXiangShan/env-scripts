@@ -306,7 +306,6 @@ class XiangShan:
 
     def report(
         self,
-        benchspec_dir: Path,
         frequency: float,
         override_version: str | None = None,
     ) -> None:
@@ -322,7 +321,7 @@ class XiangShan:
             )
             return
 
-        spec = Spec(version, benchspec_dir)
+        spec = Spec(version)
 
         # collect checkpoint -> benchmark, i.e. astar_biglakes_2972, astar_biglakes_3421 -> astar_biglakes
         result_queue = Queue()
@@ -519,12 +518,6 @@ def main():
 
     # report configs
     parser.add_argument(
-        "--benchspec-dir",
-        type=str,
-        default=None,
-        help="Path to the SPEC benchspec directory for report",
-    )
-    parser.add_argument(
         "--frequency",
         type=float,
         default=3.0,
@@ -664,10 +657,7 @@ def main():
             )
 
         if args.report:
-            benchspec_dir = Path(args.benchspec_dir) if args.benchspec_dir else None
-            if benchspec_dir is None:
-                raise ValueError("benchspec_dir is required for --report")
-            xiangshan.report(benchspec_dir, args.frequency, args.spec_version)
+            xiangshan.report(args.frequency, args.spec_version)
 
     finally:
         lock.release()

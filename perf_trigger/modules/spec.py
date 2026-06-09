@@ -9,54 +9,56 @@ class Spec:
         SPECRATE17 = "17"
         SPECRATE26 = "26"
 
+    class SubTest(Enum):
+        INT = "int"
+        FP = "fp"
+        ALL = ""
+
     def __init__(
         self,
         version: Version,
-        benchspec_dir: Path,
     ):
         self.version = version
-        self.benchspec_dir = benchspec_dir
 
-    def __get_name(self, sub: str) -> str:
+    def __get_name(self, sub: "Spec.SubTest") -> str:
         match self.version:
             case Spec.Version.SPEC06:
-                return f"SPEC{sub}2006"
+                return f"SPEC{sub.value}2006"
             case Spec.Version.SPECRATE17:
-                return f"SPEC{sub}rate2017"
+                return f"SPEC{sub.value}rate2017"
             case Spec.Version.SPECRATE26:
-                return f"SPEC{sub}rate2026"
+                return f"SPEC{sub.value}rate2026"
 
     def get_name(self) -> str:
-        return self.__get_name("")
+        return self.__get_name(Spec.SubTest.ALL)
 
     def get_int_name(self) -> str:
-        return self.__get_name("int")
+        return self.__get_name(Spec.SubTest.INT)
 
     def get_fp_name(self) -> str:
-        return self.__get_name("fp")
+        return self.__get_name(Spec.SubTest.FP)
 
-    def get_int_benchmarks(self, with_id: bool | None = None) -> list[str]:
-        b = SPEC_INT_BENCHMARKS[self.version].copy()
+    def __get_benchmarks(
+        self, sub: "Spec.SubTest", with_id: bool | None = None
+    ) -> list[str]:
+        ref = SPEC_REFTIME[self.version]
+        if sub == Spec.SubTest.ALL:
+            l = list(ref[Spec.SubTest.INT].keys()) + list(ref[Spec.SubTest.FP].keys())
+        else:
+            l = list(ref[sub].keys())
+
         if with_id is None:
             with_id = self.version != Spec.Version.SPEC06
-        return [bench.split(".")[1] for bench in b] if not with_id else b
-
-    def get_fp_benchmarks(self, with_id: bool | None = None) -> list[str]:
-        b = SPEC_FP_BENCHMARKS[self.version].copy()
-        if with_id is None:
-            with_id = self.version != Spec.Version.SPEC06
-        return [bench.split(".")[1] for bench in b] if not with_id else b
+        return [bench.split(".")[1] for bench in l] if not with_id else l
 
     def get_benchmarks(self, with_id: bool | None = None) -> list[str]:
-        return self.get_int_benchmarks(with_id) + self.get_fp_benchmarks(with_id)
+        return self.__get_benchmarks(Spec.SubTest.ALL, with_id)
 
-    def parse_ref_time(self, path: Path) -> int:
-        with path.open("r", encoding="utf-8") as f:
-            match self.version:
-                case Spec.Version.SPEC06:
-                    return int(f.readlines()[-1].strip())
-                case _:
-                    return int(f.readlines()[0].strip().split()[-1])
+    def get_int_benchmarks(self, with_id: bool | None = None) -> list[str]:
+        return self.__get_benchmarks(Spec.SubTest.INT, with_id)
+
+    def get_fp_benchmarks(self, with_id: bool | None = None) -> list[str]:
+        return self.__get_benchmarks(Spec.SubTest.FP, with_id)
 
     def get_benchmark_fullname(self, bench: str) -> str:
         for b in self.get_benchmarks(with_id=True):
@@ -66,119 +68,122 @@ class Spec:
         return bench
 
     def get_ref_time(self, bench: str) -> int | None:
-        reftime_path = (
-            self.benchspec_dir
-            / self.get_benchmark_fullname(bench)
-            / "data"
-            / (
-                "refrate"
-                if self.version == Spec.Version.SPECRATE17
-                or self.version == Spec.Version.SPECRATE26
-                else "ref"
-            )
-            / "reftime"
+        ref = SPEC_REFTIME[self.version]
+        for sub in [Spec.SubTest.INT, Spec.SubTest.FP]:
+            for b, t in ref[sub].items():
+                if bench in b:
+                    return t
+        logging.warning(
+            "Benchmark %s not found in SPEC %s, cannot get reference time",
+            bench,
+            self.version.value,
         )
-        if not reftime_path.exists():
-            logging.warning("Reftime file not found for %s at %s", bench, reftime_path)
-            return None
-        return self.parse_ref_time(reftime_path)
+        return None
 
 
-# const
-SPEC_INT_BENCHMARKS = {
-    Spec.Version.SPEC06: [
-        "400.perlbench",
-        "401.bzip2",
-        "403.gcc",
-        "429.mcf",
-        "445.gobmk",
-        "456.hmmer",
-        "458.sjeng",
-        "462.libquantum",
-        "464.h264ref",
-        "471.omnetpp",
-        "473.astar",
-        "483.xalancbmk",
-    ],
-    Spec.Version.SPECRATE17: [
-        "500.perlbench_r",
-        "502.gcc_r",
-        "505.mcf_r",
-        "520.omnetpp_r",
-        "523.xalancbmk_r",
-        "525.x264_r",
-        "531.deepsjeng_r",
-        "541.leela_r",
-        "548.exchange2_r",
-        "557.xz_r",
-    ],
-    Spec.Version.SPECRATE26: [
-        "706.stockfish_r",
-        "707.ntest_r",
-        "708.sqlite_r",
-        "710.omnetpp_r",
-        "714.cpython_r",
-        "721.gcc_r",
-        "723.llvm_r",
-        "727.cppcheck_r",
-        "729.abc_r",
-        "734.vpr_r",
-        "735.gem5_r",
-        "750.sealcrypto_r",
-        "753.ns3_r",
-        "777.zstd_r",
-    ],
-}
-
-SPEC_FP_BENCHMARKS = {
-    Spec.Version.SPEC06: [
-        "410.bwaves",
-        "416.gamess",
-        "433.milc",
-        "434.zeusmp",
-        "435.gromacs",
-        "436.cactusADM",
-        "437.leslie3d",
-        "444.namd",
-        "447.dealII",
-        "450.soplex",
-        "453.povray",
-        "454.calculix",
-        "459.GemsFDTD",
-        "465.tonto",
-        "470.lbm",
-        "481.wrf",
-        "482.sphinx3",
-    ],
-    Spec.Version.SPECRATE17: [
-        "503.bwaves_r",
-        "507.cactuBSSN_r",
-        "508.namd_r",
-        "510.parest_r",
-        "511.povray_r",
-        "519.lbm_r",
-        "521.wrf_r",
-        "526.blender_r",
-        "527.cam4_r",
-        "538.imagick_r",
-        "544.nab_r",
-        "549.fotonik3d_r",
-        "554.roms_r",
-    ],
-    Spec.Version.SPECRATE26: [
-        "709.cactus_r",
-        "722.palm_r",
-        "731.astcenc_r",
-        "736.ocio_r",
-        "737.gmsh_r",
-        "748.flightdm_r",
-        "749.fotonik3d_r",
-        "765.roms_r",
-        "766.femflow_r",
-        "767.nest_r",
-        "772.marian_r",
-        "782.lbm_r",
-    ],
+# Reference time extracted from:
+#   cpu2006v99/benchspec/CPU2006/<testcase>/data/ref/reftime
+#   cpu2017/benchspec/CPU/<testcase>/data/refrate/reftime
+#   cpu2026/benchspec/CPU/<testcase>/data/refrate/reftime
+# Also available on SPEC official result site
+#   i.e. https://www.spec.org/cpu2017/results/res2017q2/cpu2017-20161026-00001.csv
+SPEC_REFTIME = {
+    Spec.Version.SPEC06: {
+        Spec.SubTest.INT: {
+            "400.perlbench": 9770,
+            "401.bzip2": 9650,
+            "403.gcc": 8050,
+            "429.mcf": 9120,
+            "445.gobmk": 10490,
+            "456.hmmer": 9330,
+            "458.sjeng": 12100,
+            "462.libquantum": 20720,
+            "464.h264ref": 22130,
+            "471.omnetpp": 6250,
+            "473.astar": 7020,
+            "483.xalancbmk": 6900,
+        },
+        Spec.SubTest.FP: {
+            "410.bwaves": 13590,
+            "416.gamess": 19580,
+            "433.milc": 9180,
+            "434.zeusmp": 9100,
+            "435.gromacs": 7140,
+            "436.cactusADM": 11950,
+            "437.leslie3d": 9400,
+            "444.namd": 8020,
+            "447.dealII": 11440,
+            "450.soplex": 8340,
+            "453.povray": 5320,
+            "454.calculix": 8250,
+            "459.GemsFDTD": 10610,
+            "465.tonto": 9840,
+            "470.lbm": 13740,
+            "481.wrf": 11170,
+            "482.sphinx3": 19490,
+        },
+    },
+    Spec.Version.SPECRATE17: {
+        Spec.SubTest.INT: {
+            "500.perlbench_r": 1592,
+            "502.gcc_r": 1416,
+            "505.mcf_r": 1616,
+            "520.omnetpp_r": 1312,
+            "523.xalancbmk_r": 1056,
+            "525.x264_r": 1751,
+            "531.deepsjeng_r": 1146,
+            "541.leela_r": 1656,
+            "548.exchange2_r": 2620,
+            "557.xz_r": 1080,
+        },
+        Spec.SubTest.FP: {
+            "503.bwaves_r": 10028,
+            "507.cactuBSSN_r": 1266,
+            "508.namd_r": 950,
+            "510.parest_r": 2616,
+            "511.povray_r": 2335,
+            "519.lbm_r": 1054,
+            "521.wrf_r": 2240,
+            "526.blender_r": 1523,
+            "527.cam4_r": 1749,
+            "538.imagick_r": 2487,
+            "544.nab_r": 1683,
+            "549.fotonik3d_r": 3897,
+            "554.roms_r": 1589,
+        },
+    },
+    Spec.Version.SPECRATE26: {
+        Spec.SubTest.INT: {
+            "706.stockfish_r": 1260,
+            "707.ntest_r": 592,
+            "708.sqlite_r": 528,
+            "710.omnetpp_r": 486,
+            "714.cpython_r": 479,
+            "721.gcc_r": 686,
+            "723.llvm_r": 507,
+            "727.cppcheck_r": 359,
+            "729.abc_r": 459,
+            "734.vpr_r": 461,
+            "735.gem5_r": 487,
+            "750.sealcrypto_r": 536,
+            "753.ns3_r": 613,
+            "777.zstd_r": 644,
+        },
+        Spec.SubTest.FP: {
+            "709.cactus_r": 858,
+            "722.palm_r": 1320,
+            "731.astcenc_r": 840,
+            "736.ocio_r": 875,
+            "737.gmsh_r": 459,
+            "748.flightdm_r": 716,
+            "749.fotonik3d_r": 1156,
+            "765.roms_r": 1575,
+            "766.femflow_r": 1467,
+            "767.nest_r": 793,
+            "772.marian_r": 1579,
+            "782.lbm_r": 573,
+        },
+    },
 }
 
 
