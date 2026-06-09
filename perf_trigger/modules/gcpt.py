@@ -98,10 +98,10 @@ class GCPT:
     def clear_state(self) -> None:
         self.__state = GCPT.State.NONE
 
-    def get_perf(self, counters: set[str] | None = None) -> dict[str, int]:
+    def get_perf(self, counters: set[str] | None = None, full_name: bool = False) -> dict[str, int]:
         perf_data = {}
         pattern = re.compile(
-            r".*\[PERF \]\[time=\s*\d+\] (([a-zA-Z0-9_]+\.)+[a-zA-Z0-9_@]+): ((\w| |\')+),\s+(\d+)$"
+            r"\[PERF \]\[time=\d+\] (([a-zA-Z0-9_]+\.)+[a-zA-Z0-9_@]+): ((\w| |\')+),\s+-?(\d+)$"
         )
 
         with self.stderr_path.open("r", encoding="utf-8") as f:
@@ -109,11 +109,7 @@ class GCPT:
                 m = pattern.match(line)
                 if not m:
                     continue
-                name = (
-                    ".".join([str(m.group(1)), str(m.group(3))])
-                    .replace(" ", "_")
-                    .replace("'", "")
-                )
+                name = f"{m.group(1)}.{m.group(3)}" if full_name else m.group(3)
                 try:
                     value = int(m.group(5))
                 except ValueError:
@@ -124,12 +120,16 @@ class GCPT:
         return perf_data
 
     def get_cpi(self) -> float | None:
-        if self.__state != GCPT.State.FINISHED:
-            return None
-
-        data = self.get_perf({"clock_cycle", "commitInstr"})
+        data = self.get_perf({"clock_cycle", "commitInstr"}, full_name=False)
 
         if "clock_cycle" not in data or "commitInstr" not in data:
             return None
 
         return data["clock_cycle"] / data["commitInstr"]
+
+    def get_dramsim3_config(self) -> str:
+        with self.stdout_path.open("r", encoding="utf-8") as f:
+            for line in f:
+                if "DRAMSIM3 config:" in line:
+                    return line.split("DRAMSIM3 config:")[1].strip()
+        return ""
