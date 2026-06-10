@@ -251,6 +251,17 @@ if { [llength $chi_files] > 0 } {
     lappend defines "CONFIG_USE_XSCORE_AXI"
 }
 
+set xdma_pcie_lanes 4
+if {[info exists ::env(XDMA_LINK_WIDTH)] && [string trim $::env(XDMA_LINK_WIDTH)] ne ""} {
+  set xdma_link_width [string trim $::env(XDMA_LINK_WIDTH)]
+  if {![regexp {^X([48])$} $xdma_link_width _ lane_count]} {
+    error "XDMA_LINK_WIDTH must be one of X4/X8, got '$xdma_link_width'"
+  }
+  set xdma_pcie_lanes $lane_count
+}
+lappend defines "XDMA_PCIE_LANES=$xdma_pcie_lanes"
+puts "INFO: XDMA_PCIE_LANES=$xdma_pcie_lanes"
+
 set_property -name "verilog_define" -value "$defines" -objects $obj
 source "$tcl_dir/common/global_includes.tcl"
 

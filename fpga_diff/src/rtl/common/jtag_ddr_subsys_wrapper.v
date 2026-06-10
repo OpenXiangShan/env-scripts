@@ -130,13 +130,14 @@ module jtag_ddr_subsys_wrapper
 
 `ifdef CPU_NUTSHELL
   input [63:0]SOC_M_AXI_wdata;
+  input [7:0]SOC_M_AXI_wstrb;
 `else
   input [255:0]SOC_M_AXI_wdata;
+  input [31:0]SOC_M_AXI_wstrb;
 `endif // CPU_NUTSHELL
 
   input SOC_M_AXI_wlast;
   output SOC_M_AXI_wready;
-  input [31:0]SOC_M_AXI_wstrb;
   input SOC_M_AXI_wvalid;
   output calib_complete;
   input ddr_rstn;
@@ -187,16 +188,25 @@ module jtag_ddr_subsys_wrapper
   wire SOC_M_AXI_bready;
   wire [1:0]SOC_M_AXI_bresp;
   wire SOC_M_AXI_bvalid;
+`ifdef CPU_NUTSHELL
+  wire [63:0]SOC_M_AXI_rdata;
+`else
   wire [255:0]SOC_M_AXI_rdata;
+`endif // CPU_NUTSHELL
   wire [17:0]SOC_M_AXI_rid;
   wire SOC_M_AXI_rlast;
   wire SOC_M_AXI_rready;
   wire [1:0]SOC_M_AXI_rresp;
   wire SOC_M_AXI_rvalid;
+`ifdef CPU_NUTSHELL
+  wire [63:0]SOC_M_AXI_wdata;
+  wire [7:0]SOC_M_AXI_wstrb;
+`else
   wire [255:0]SOC_M_AXI_wdata;
+  wire [31:0]SOC_M_AXI_wstrb;
+`endif // CPU_NUTSHELL
   wire SOC_M_AXI_wlast;
   wire SOC_M_AXI_wready;
-  wire [31:0]SOC_M_AXI_wstrb;
   wire SOC_M_AXI_wvalid;
   wire calib_complete;
   wire ddr_rstn;

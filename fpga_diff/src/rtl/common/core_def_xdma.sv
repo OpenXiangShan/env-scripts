@@ -1,6 +1,10 @@
 `include "sys_define.vh"
 `include "DifftestMacros.svh"
 
+`ifndef XDMA_PCIE_LANES
+`define XDMA_PCIE_LANES 4
+`endif
+
 `ifdef CONFIG_USE_XSCORE_CHI
 `include "kconfig.svh"
 `include "chi_icn_defines.svh"
@@ -23,10 +27,10 @@ module core_def (
       input                                      cpu_rstn,
       input                                      rstn_sw4,
 `ifdef  XS_XDMA_EP
-      input       [7:0]                          pci_ep_rxn,
-      input       [7:0]                          pci_ep_rxp,
-      output      [7:0]                          pci_ep_txn,
-      output      [7:0]                          pci_ep_txp,
+      input       [`XDMA_PCIE_LANES-1:0]         pci_ep_rxn,
+      input       [`XDMA_PCIE_LANES-1:0]         pci_ep_rxp,
+      output      [`XDMA_PCIE_LANES-1:0]         pci_ep_txn,
+      output      [`XDMA_PCIE_LANES-1:0]         pci_ep_txp,
       input                                      pcie_ep_gt_ref_clk_n,
       input                                      pcie_ep_gt_ref_clk_p,
       output                                     pcie_ep_lnk_up,
@@ -526,7 +530,11 @@ wire                                           data_x2x_bridge_s2m_rvalid     ;
 wire            [39:0]                         data_x2x_bridge_m2s_awaddr     ;
 wire            [39:0]                         data_x2x_bridge_m2s_araddr     ;
 (*mark_debug = "true"*) wire           [17:0]                       cpu2ddr_m2s_awid_mix           ;
+`ifdef CPU_NUTSHELL
+(*mark_debug = "true"*) wire           [32:0]                      cpu2ddr_m2s_awaddr_mix         ;
+`else
 (*mark_debug = "true"*) wire           [39:0]                      cpu2ddr_m2s_awaddr_mix         ;
+`endif
 (*mark_debug = "true"*) wire           [7:0]                       cpu2ddr_m2s_awlen              ;
 (*mark_debug = "true"*) wire           [2:0]                       cpu2ddr_m2s_awsize             ;
 (*mark_debug = "true"*) wire           [1:0]                       cpu2ddr_m2s_awburst            ;
@@ -534,10 +542,19 @@ wire           [3:0]                       cpu2ddr_m2s_awcache            ;
 wire           [2:0]                       cpu2ddr_m2s_awprot             ;
 wire           [3:0]                       cpu2ddr_m2s_awqos              ;
 wire           [3:0]                       cpu2ddr_m2s_awregion           ;
+`ifdef CPU_NUTSHELL
+(*mark_debug = "true"*) wire           [63:0]                      cpu2ddr_m2s_wdata              ;
+(*mark_debug = "true"*) wire           [7:0]                       cpu2ddr_m2s_wstrb              ;
+`else
 (*mark_debug = "true"*) wire           [255:0]                     cpu2ddr_m2s_wdata              ;
 (*mark_debug = "true"*) wire           [31:0]                      cpu2ddr_m2s_wstrb              ;
+`endif
 (*mark_debug = "true"*) wire           [17:0]                       cpu2ddr_m2s_arid_mix           ;
+`ifdef CPU_NUTSHELL
+(*mark_debug = "true"*) wire           [32:0]                      cpu2ddr_m2s_araddr_mix         ;
+`else
 (*mark_debug = "true"*) wire           [39:0]                      cpu2ddr_m2s_araddr_mix         ;
+`endif
 (*mark_debug = "true"*) wire           [7:0]                       cpu2ddr_m2s_arlen              ;
 (*mark_debug = "true"*) wire           [2:0]                       cpu2ddr_m2s_arsize             ;
 (*mark_debug = "true"*) wire           [1:0]                       cpu2ddr_m2s_arburst            ;
@@ -548,7 +565,11 @@ wire           [3:0]                       cpu2ddr_m2s_arregion           ;
 (*mark_debug = "true"*) wire           [17:0]                      cpu2ddr_s2m_bid                ;
 (*mark_debug = "true"*) wire           [1:0]                       cpu2ddr_s2m_bresp              ;
 (*mark_debug = "true"*) wire           [17:0]                      cpu2ddr_s2m_rid                ;
+`ifdef CPU_NUTSHELL
+(*mark_debug = "true"*) wire           [63:0]                      cpu2ddr_s2m_rdata              ;
+`else
 (*mark_debug = "true"*) wire           [255:0]                     cpu2ddr_s2m_rdata              ;
+`endif
 (*mark_debug = "true"*) wire           [1:0]                       cpu2ddr_s2m_rresp              ;
 wire                                           ddr_core_clk                   ;
 wire                                           sys_ddr_rst_n                  ;
@@ -1237,8 +1258,6 @@ wire [0:0]    br2cfg_wvalid;
   wire clock_enable;
   wire sys_rstn_io;
   wire cpu_rstn_io;
-  wire difftest_c2h_rstn;
-  wire difftest_h2c_rstn;
   wire difftest_stream_enable;
   wire difftest_startup_done;
   reg [19:0] difftest_startup_wait;
@@ -1248,7 +1267,6 @@ wire [0:0]    br2cfg_wvalid;
   assign cpu_rstn_io = cpu_rstn & ~io_host_reset;
   assign difftest_startup_done = &difftest_startup_wait;
   assign difftest_stream_enable = xdma_link_up & io_host_diff_enable & difftest_startup_done;
-  assign difftest_c2h_rstn = cpu_rstn_io & difftest_stream_enable;
   assign noc_clk = inter_soc_clk;
 
   reg [1:0] pcie_lnk_sync;
@@ -1257,7 +1275,6 @@ wire [0:0]    br2cfg_wvalid;
       else           pcie_lnk_sync <= {pcie_lnk_sync[0], pcie_ep_lnk_up};
   end
   wire xdma_link_up = pcie_lnk_sync[1];
-  assign difftest_h2c_rstn = cpu_rstn_io & xdma_link_up;
 
   always @(posedge sys_clk_i) begin
       if (!cpu_rstn_io || !io_host_diff_enable || !xdma_link_up)
@@ -1272,8 +1289,6 @@ wire [0:0]    br2cfg_wvalid;
   xdma_ep xdma_ep_i(
     .cpu_clk              (sys_clk_i),
     .cpu_rstn             (sys_rstn),
-    .c2h_rstn             (difftest_c2h_rstn),
-    .h2c_rstn             (difftest_h2c_rstn),
     .S00_AXIS_0_tdata     (difftest_to_host_axis_tdata),
     .S00_AXIS_0_tkeep     (difftest_to_host_axis_tkeep),
     .S00_AXIS_0_tlast     (difftest_to_host_axis_tlast),

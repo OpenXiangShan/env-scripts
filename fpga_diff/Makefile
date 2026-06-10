@@ -9,7 +9,9 @@ AXI_WIDTH ?= 64
 # but avoid instantiating the ILA core by default to reduce routing pressure.
 ENABLE_ILA ?= 0
 ILA_DEPTH ?= 16384
-export ENABLE_ILA ILA_DEPTH
+XDMA_LINK_WIDTH ?= X4
+VIVADO_JOBS ?=
+export ENABLE_ILA ILA_DEPTH XDMA_LINK_WIDTH VIVADO_JOBS
 # Supported CPU parameters:
 #   kmh
 #   nutshell
@@ -34,7 +36,7 @@ synth:
 
 # Generate FPGA bitstream
 bitstream:
-	vivado -mode batch -source ./tools/gen_bitstream.tcl -tclargs $(PRJ)
+	vivado -mode batch -source ./tools/gen_bitstream.tcl -tclargs $(PRJ) impl_1 $(VIVADO_JOBS)
 
 # Update file list for core RTL files
 update_core_flist:
