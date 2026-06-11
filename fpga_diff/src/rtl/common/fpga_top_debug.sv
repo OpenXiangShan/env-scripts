@@ -2,6 +2,10 @@
 
 `include "sys_define.vh"
 
+`ifndef XDMA_PCIE_LANES
+`define XDMA_PCIE_LANES 4
+`endif
+
 module fpga_top_debug
 (
    input                 clk8_p, // 1MHz clock
@@ -36,10 +40,10 @@ module fpga_top_debug
    input                 refclk2_n,
    output                PERST2_N,
 `ifdef XS_XDMA_EP
-   input    [7:0]        pci_ep_rxn,
-   input    [7:0]        pci_ep_rxp,
-   output   [7:0]        pci_ep_txn,
-   output   [7:0]        pci_ep_txp,
+   input    [`XDMA_PCIE_LANES-1:0] pci_ep_rxn,
+   input    [`XDMA_PCIE_LANES-1:0] pci_ep_rxp,
+   output   [`XDMA_PCIE_LANES-1:0] pci_ep_txn,
+   output   [`XDMA_PCIE_LANES-1:0] pci_ep_txp,
    input                 pcie_ep_gt_ref_clk_n,
    input                 pcie_ep_gt_ref_clk_p,
    output                pcie_ep_lnk_up,
@@ -485,4 +489,3 @@ assign GPIO_O1 = |gpio_porta_dr;
 */
 
 endmodule
-

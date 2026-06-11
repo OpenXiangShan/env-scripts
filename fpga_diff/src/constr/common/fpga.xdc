@@ -52,26 +52,38 @@ set_property PACKAGE_PIN BY22 [get_ports pcie_ep_perstn]
 set_property PACKAGE_PIN AU11 [get_ports pcie_ep_gt_ref_clk_p]
 set_property PACKAGE_PIN AD15 [get_ports pcie_ep_lnk_up]
 
-set_property PACKAGE_PIN AT4 [get_ports {pci_ep_rxp[7]} ]
-set_property PACKAGE_PIN AR2 [get_ports {pci_ep_rxp[6]} ]
-set_property PACKAGE_PIN AP4 [get_ports {pci_ep_rxp[5]} ]
-set_property PACKAGE_PIN AN2 [get_ports {pci_ep_rxp[4]} ]
+set xdma_link_width X4
+if {[info exists ::env(XDMA_LINK_WIDTH)] && [string trim $::env(XDMA_LINK_WIDTH)] ne ""} {
+  set xdma_link_width [string trim $::env(XDMA_LINK_WIDTH)]
+}
+if {[lsearch -exact {X4 X8} $xdma_link_width] < 0} {
+  error "XDMA_LINK_WIDTH must be one of X4/X8, got '$xdma_link_width'"
+}
+puts "INFO: fpga.xdc applying PCIe lane constraints for XDMA_LINK_WIDTH=$xdma_link_width"
+
 set_property PACKAGE_PIN AM4 [get_ports {pci_ep_rxp[3]} ]
 set_property PACKAGE_PIN AL2 [get_ports {pci_ep_rxp[2]} ]
 set_property PACKAGE_PIN AK4 [get_ports {pci_ep_rxp[1]} ]
 set_property PACKAGE_PIN AJ2 [get_ports {pci_ep_rxp[0]} ]
 
-set_property PACKAGE_PIN AV9 [get_ports {pci_ep_txp[7]} ]
-set_property PACKAGE_PIN AU7 [get_ports {pci_ep_txp[6]} ]
-set_property PACKAGE_PIN AT9 [get_ports {pci_ep_txp[5]} ]
-set_property PACKAGE_PIN AR7 [get_ports {pci_ep_txp[4]} ]
 set_property PACKAGE_PIN AP9 [get_ports {pci_ep_txp[3]} ]
 set_property PACKAGE_PIN AN7 [get_ports {pci_ep_txp[2]} ]
 set_property PACKAGE_PIN AM9 [get_ports {pci_ep_txp[1]} ]
 set_property PACKAGE_PIN AL7 [get_ports {pci_ep_txp[0]} ]
+if {$xdma_link_width eq "X8"} {
+  set_property PACKAGE_PIN AT4 [get_ports {pci_ep_rxp[7]}]
+  set_property PACKAGE_PIN AR2 [get_ports {pci_ep_rxp[6]}]
+  set_property PACKAGE_PIN AP4 [get_ports {pci_ep_rxp[5]}]
+  set_property PACKAGE_PIN AN2 [get_ports {pci_ep_rxp[4]}]
+
+  set_property PACKAGE_PIN AV9 [get_ports {pci_ep_txp[7]}]
+  set_property PACKAGE_PIN AU7 [get_ports {pci_ep_txp[6]}]
+  set_property PACKAGE_PIN AT9 [get_ports {pci_ep_txp[5]}]
+  set_property PACKAGE_PIN AR7 [get_ports {pci_ep_txp[4]}]
+}
 set_property IOSTANDARD LVCMOS33 [get_ports pcie_ep_lnk_up]
 set_property IOSTANDARD LVCMOS18 [get_ports pcie_ep_perstn]
-create_clock -name PCIE_CLK -period 10.000 [get_ports pcie_sys_clk_p]
+create_clock -name PCIE_EP_CLK_IN -period 10.000 [get_ports pcie_ep_gt_ref_clk_p]
 #gpio
 #set_property PACKAGE_PIN AA15 [get_ports GPIO_O0]
 
@@ -394,9 +406,9 @@ set_property IOSTANDARD LVDS [get_ports clk6_p]
 set_property IOSTANDARD LVDS [get_ports clk6_n]
 set_property IOSTANDARD LVDS [get_ports clk5_p]
 set_property IOSTANDARD LVDS [get_ports clk5_n]
-set_property DIFF_TERM <true> [get_ports clk5_p]
+set_property DIFF_TERM TRUE [get_ports clk5_p]
 set_property DIFF_TERM_ADV TERM_100  [get_ports clk5_p]
-set_property DIFF_TERM <true> [get_ports clk6_p]
+set_property DIFF_TERM TRUE [get_ports clk6_p]
 set_property DIFF_TERM_ADV TERM_100  [get_ports clk6_p]
 set_property IOSTANDARD LVCMOS18 [get_ports PERST_N]
 set_property IOSTANDARD LVCMOS18 [get_ports PERST2_N]
@@ -442,7 +454,7 @@ set_property IOSTANDARD LVCMOS18 [get_ports PHY_RESET_B]
 create_clock -period 400.000 -name mdc_clk [get_ports MDC]
 create_clock -period 5.000 -name CPU_CLK_IN [get_ports clk6_p]
 create_clock -period 1000.000 -name TMCLK [get_ports clk8_p]
-create_clock -period 40.000 -name DEBUG_CLK_IN [get_ports clk5_p]
+create_clock -period 20.000 -name DEBUG_CLK_IN [get_ports clk5_p]
 create_clock -period 10.000 -name PCIE_CLK_IN [get_ports refclk_p]
 create_clock -period 10.000 -name PCIE2_CLK_IN [get_ports refclk2_p]
 create_clock -period 83.333 -name jtag_vclk [get_ports JTAG_TCK]
@@ -479,12 +491,7 @@ set_property PULLUP true [get_ports MDIO]
 ####################################################################################
 # Constraints for difftest_pcie_clock from CLK_WIZ
 ####################################################################################
-set_clock_groups -asynchronous -group [get_clocks difftest_pcie_clock] -group [get_clocks DEBUG_CLK_IN]
-set_clock_groups -asynchronous -group [get_clocks clk_out1_xdma_ep_clk_wiz_0_0] -group [get_clocks DEBUG_CLK_IN]
-
-set_clock_groups -asynchronous -group [get_clocks -of_objects [get_pins core_def/xdma_ep_i/xdma_0/inst/pcie4c_ip_i/inst/xdma_ep_xdma_0_0_pcie4c_ip_gt_top_i/diablo_gt.diablo_gt_phy_wrapper/phy_clk_i/bufg_gt_userclk/O]] -group [get_clocks DEBUG_CLK_IN]
 
 ####################################################################################
 # Constraints from file : 'jtag_ddr_subsys_s01_data_fifo_0_clocks.xdc'
 ####################################################################################
-

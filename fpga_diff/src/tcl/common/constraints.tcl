@@ -4,6 +4,15 @@ set constr_files [list \
   [file normalize ${constr_dir}/debug.xdc] \
 ]
 
+set xdma_link_width X4
+if {[info exists ::env(XDMA_LINK_WIDTH)] && [string trim $::env(XDMA_LINK_WIDTH)] ne ""} {
+  set xdma_link_width [string trim $::env(XDMA_LINK_WIDTH)]
+}
+if {[lsearch -exact {X4 X8} $xdma_link_width] < 0} {
+  error "XDMA_LINK_WIDTH must be one of X4/X8, got '$xdma_link_width'"
+}
+puts "INFO: XDMA_LINK_WIDTH=$xdma_link_width; PCIe lane constraints are selected in fpga.xdc"
+
 set enable_ila 0
 if {[info exists ::env(ENABLE_ILA)]} {
   set enable_ila_value [string tolower [string trim $::env(ENABLE_ILA)]]
