@@ -398,6 +398,7 @@ def xs_debug(all_gcpt):
     gcpt.debug()
 
 if __name__ == "__main__":
+  print("This script is being deprecated. Consider using perf_trigger/main.py instead.")
   parser = argparse.ArgumentParser(description="autorun script for xs")
   parser.add_argument('gcpt_path', metavar='gcpt_path', type=str,
                       help='path to gcpt checkpoints')

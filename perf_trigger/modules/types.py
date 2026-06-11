@@ -1,4 +1,5 @@
 from dataclasses import dataclass, field
+from pathlib import Path
 import subprocess
 import time
 
@@ -11,7 +12,7 @@ class EmuConfig:
     max_instr: int
     threads: int
     with_numactl: bool = True
-    cst_file: str = ""
+    cst_file: Path | None = None
     dry_run: bool = False
 
 
@@ -54,7 +55,7 @@ class PendingTask:
     proc: subprocess.Popen
     name: str
     free: FreeCoreInfo
-    started: float = field(default_factory=lambda: time.time())
+    started: float = field(default_factory=time.time)
 
     def elapsed(self) -> float:
         return time.time() - self.started

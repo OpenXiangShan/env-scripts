@@ -22,3 +22,6 @@ json/
 
 # python third-party libraries are stored temporarily
 psutil/
+
+# python virtual environment
+.venv/

@@ -1,5 +1,5 @@
 import logging
-import os
+from pathlib import Path
 import random
 import re
 import shlex
@@ -103,9 +103,9 @@ class Server:
     def __init__(
         self,
         hostname: str,
-        emu_path: str,
+        emu_path: Path,
         tracker: Tracker,
-        nemu_so_path: str | None = None,
+        nemu_so_path: Path | None = None,
     ):
         self.hostname = hostname
         self.emu_path = emu_path
@@ -258,18 +258,17 @@ class Server:
         emu_config: EmuConfig,
         free_cores: FreeCoreInfo,
     ):
-        os.makedirs(gcpt.get_result_path(), exist_ok=True)
+        gcpt.result_path.mkdir(parents=True, exist_ok=True)
 
         # find binary
-        gcpt_path = gcpt.get_bin_path()
         p = self.run(
             [
                 "ls",
-                shlex.quote(gcpt_path),
+                shlex.quote(str(gcpt.bin_path)),
             ]
         )
         if p.returncode != 0 or p.stdout is None:
-            self.tracker.error("Failed to find gcpt binary: %s", gcpt_path)
+            self.tracker.error("Failed to find gcpt binary: %s", gcpt.bin_path)
             return
 
         gcpt_file = [f.strip() for f in p.stdout.read().decode().split()]
@@ -279,15 +278,15 @@ class Server:
             if f.endswith(".gz") or f.endswith(".zstd") or f.endswith(".bin")
         ]
         if len(gcpt_file) == 0:
-            self.tracker.error("Failed to find gcpt binary: %s", gcpt_path)
+            self.tracker.error("Failed to find gcpt binary: %s", gcpt.bin_path)
             return
         if len(gcpt_file) > 1:
             self.tracker.warning("Multiple gcpt binaries found, using the first one.")
         gcpt_file = gcpt_file[0]
 
         with (
-            open(gcpt.get_stdout_path(), "w", encoding="utf-8") as fout,
-            open(gcpt.get_stderr_path(), "w", encoding="utf-8") as ferr,
+            gcpt.stdout_path.open("w", encoding="utf-8") as fout,
+            gcpt.stderr_path.open("w", encoding="utf-8") as ferr,
         ):
             run_cmd = (
                 (
@@ -302,23 +301,23 @@ class Server:
                     else []
                 )
                 + [
-                    self.emu_path,
+                    str(self.emu_path),
                     "-W",
                     str(emu_config.warmup) if not emu_config.dry_run else "1000",
                     "-I",
                     str(emu_config.max_instr) if not emu_config.dry_run else "2000",
                     "-i",
-                    shlex.quote(os.path.join(gcpt_path, gcpt_file)),
+                    shlex.quote(str(gcpt.bin_path / gcpt_file)),
                     "-s",
                     str(random.randint(0, 9999)),
                 ]
                 + (
-                    ["--diff", self.nemu_so_path]
+                    ["--diff", str(self.nemu_so_path)]
                     if self.nemu_so_path
                     else ["--no-diff"]
                 )
                 + (
-                    ["--cst-file", shlex.quote(emu_config.cst_file)]
+                    ["--cst-file", shlex.quote(str(emu_config.cst_file))]
                     if emu_config.cst_file
                     else []
                 )
@@ -348,7 +347,7 @@ class Server:
 
         if self.pending_task:
             # send kill signal to all remaining emu processes
-            p = self.run(["pkill", "-e", "-f", shlex.quote(self.emu_path)], check=False)
+            p = self.run(["pkill", "-e", "-f", shlex.quote(str(self.emu_path))], check=False)
 
             if p.stdout is not None:
                 logging.info(
@@ -357,19 +356,18 @@ class Server:
 
         self.pending_task = []
 
-    def initialize_open(self, source_path: str, target_path: str):
+    def initialize_open(self, source_path: Path, target_path: Path):
         """Open servers does not share the same nfs with node, rsync emu to server target_path"""
         assert self.hostname.startswith("open")
 
-        if os.path.islink(source_path):
-            source_path = os.path.realpath(source_path)
+        source_path = source_path.resolve()
 
         # Skip if already exists
         p = self.run(
             [
                 "test",
                 "-e",
-                shlex.quote(target_path),
+                shlex.quote(str(target_path)),
             ],
         )
         if p.returncode == 0:
@@ -380,12 +378,12 @@ class Server:
 
         # Ensure remote parent directory exists
         self.run(
-            ["mkdir", "-p", shlex.quote(os.path.dirname(target_path))],
+            ["mkdir", "-p", shlex.quote(str(target_path.parent))],
             check=True,
         )
 
-        lock_path = f"{target_path}.copy.lock"
-        tmp_path = f"{target_path}.tmp"
+        lock_path = Path(f"{target_path}.copy.lock")
+        tmp_path = Path(f"{target_path}.tmp")
 
         lock_state = "BLOCKED"
         try:
@@ -395,7 +393,7 @@ class Server:
                     "-lc",
                     (
                         "umask 077 >/dev/null; LOCK="
-                        + shlex.quote(lock_path)
+                        + shlex.quote(str(lock_path))
                         + '; if mkdir "$LOCK"; then echo ACQUIRED; else echo BLOCKED; fi'
                     ),
                 ],
@@ -414,7 +412,7 @@ class Server:
                     [
                         "rsync",
                         "-a",
-                        source_path,
+                        str(source_path),
                         f"{self.hostname}:{tmp_path}",
                     ],
                     check=True,
@@ -424,8 +422,8 @@ class Server:
                     [
                         "mv",
                         "-f",
-                        shlex.quote(tmp_path),
-                        shlex.quote(target_path),
+                        shlex.quote(str(tmp_path)),
+                        shlex.quote(str(target_path)),
                     ],
                     check=True,
                 )
@@ -433,7 +431,7 @@ class Server:
                 logging.error(e)
             finally:
                 # Always release lock
-                self.run(["rmdir", shlex.quote(lock_path)])
+                self.run(["rmdir", shlex.quote(str(lock_path))])
         else:
             # Another process is copying; wait until path exists or lock disappears
             deadline = time.time() + 300  # 5 minutes timeout
@@ -442,7 +440,7 @@ class Server:
                     [
                         "test",
                         "-e",
-                        shlex.quote(target_path),
+                        shlex.quote(str(target_path)),
                     ]
                 )
                 if cr.returncode == 0:
@@ -454,12 +452,12 @@ class Server:
             [
                 "test",
                 "-e",
-                shlex.quote(target_path),
+                shlex.quote(str(target_path)),
             ],
             check=True,
         )
         logging.info(
             "Copied %s to open server (%s) successfully.",
-            os.path.basename(source_path),
+            source_path.name,
             target_path,
         )
