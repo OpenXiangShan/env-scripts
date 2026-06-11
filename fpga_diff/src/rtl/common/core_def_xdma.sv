@@ -1258,15 +1258,17 @@ wire [0:0]    br2cfg_wvalid;
   wire clock_enable;
   wire sys_rstn_io;
   wire cpu_rstn_io;
-  wire difftest_stream_enable;
-  wire difftest_startup_done;
-  reg [19:0] difftest_startup_wait;
+  wire difftest_startup_ready_pcie;
+  wire difftest_startup_done_pcie;
+  wire cpu_rstn_pcie;
+  wire io_host_diff_enable_pcie;
+  wire xdma_link_up_pcie;
+  reg [19:0] difftest_startup_wait_pcie;
+  reg difftest_stream_enable_pcie;
 
   wire difftest_pcie_clock;
   assign sys_rstn_io = sys_rstn & ~io_host_reset;
   assign cpu_rstn_io = cpu_rstn & ~io_host_reset;
-  assign difftest_startup_done = &difftest_startup_wait;
-  assign difftest_stream_enable = xdma_link_up & io_host_diff_enable & difftest_startup_done;
   assign noc_clk = inter_soc_clk;
 
   reg [1:0] pcie_lnk_sync;
@@ -1276,15 +1278,52 @@ wire [0:0]    br2cfg_wvalid;
   end
   wire xdma_link_up = pcie_lnk_sync[1];
 
-  always @(posedge sys_clk_i) begin
-      if (!cpu_rstn_io || !io_host_diff_enable || !xdma_link_up)
-          difftest_startup_wait <= 20'b0;
-      else if (!difftest_startup_done)
-          difftest_startup_wait <= difftest_startup_wait + 20'b1;
+  RST_SYNC #(
+      .SYNC_STAGES(3),
+      .PIPELINE_STAGES(1),
+      .INIT(1'b0)
+  ) difftest_cpu_rstn_pcie_sync (
+      .clk      (difftest_pcie_clock),
+      .async_in (cpu_rstn_io),
+      .sync_out (cpu_rstn_pcie)
+  );
+
+  RST_SYNC #(
+      .SYNC_STAGES(3),
+      .PIPELINE_STAGES(1),
+      .INIT(1'b0)
+  ) difftest_host_enable_pcie_sync (
+      .clk      (difftest_pcie_clock),
+      .async_in (io_host_diff_enable),
+      .sync_out (io_host_diff_enable_pcie)
+  );
+
+  RST_SYNC #(
+      .SYNC_STAGES(3),
+      .PIPELINE_STAGES(1),
+      .INIT(1'b0)
+  ) difftest_link_up_pcie_sync (
+      .clk      (difftest_pcie_clock),
+      .async_in (xdma_link_up),
+      .sync_out (xdma_link_up_pcie)
+  );
+
+  assign difftest_startup_ready_pcie = cpu_rstn_pcie & io_host_diff_enable_pcie & xdma_link_up_pcie;
+  assign difftest_startup_done_pcie = &difftest_startup_wait_pcie;
+
+  always @(posedge difftest_pcie_clock) begin
+      if (!difftest_startup_ready_pcie) begin
+          difftest_startup_wait_pcie <= 20'b0;
+          difftest_stream_enable_pcie <= 1'b0;
+      end else begin
+          difftest_stream_enable_pcie <= difftest_startup_done_pcie;
+          if (!difftest_startup_done_pcie)
+              difftest_startup_wait_pcie <= difftest_startup_wait_pcie + 20'b1;
+      end
   end
 
-  assign difftest_to_host_axis_tready = difftest_to_host_axis_tready_io & difftest_stream_enable;
-  assign difftest_to_host_axis_tvalid_io = difftest_to_host_axis_tvalid & difftest_stream_enable;
+  assign difftest_to_host_axis_tready = difftest_to_host_axis_tready_io & difftest_stream_enable_pcie;
+  assign difftest_to_host_axis_tvalid_io = difftest_to_host_axis_tvalid & difftest_stream_enable_pcie;
 
   xdma_ep xdma_ep_i(
     .cpu_clk              (sys_clk_i),
