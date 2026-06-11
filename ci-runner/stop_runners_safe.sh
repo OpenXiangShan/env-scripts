@@ -79,8 +79,8 @@ wait_until_all_runners_stopped() {
             pane_target="$session_name:0.$i"
 
             if ! tmux list-panes -t "$pane_target" >/dev/null 2>&1; then
-                echo "Error: pane '$pane_target' for runner '$runner_name' does not exist"
-                return 1
+                echo "  [$runner_name] pane '$pane_target' does not exist, skip"
+                continue
             fi
 
             eval "stop_sent=\${stop_sent_${i}}"
@@ -124,8 +124,10 @@ if [[ "$dry_run" == true ]]; then
     echo "Dry run mode: skip safe-stop probing and only print stop/kill commands"
 else
     if ! tmux has-session -t "$session_name" 2>/dev/null; then
-        echo "Error: Session '$session_name' does not exist"
-        exit 1
+        echo "Session '$session_name' does not exist, treat as already stopped"
+        echo
+        echo "Complete! Safe stop finished for session '$session_name'"
+        exit 0
     fi
 fi
 
