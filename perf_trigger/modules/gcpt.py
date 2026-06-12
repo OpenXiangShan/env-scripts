@@ -101,7 +101,7 @@ class GCPT:
     def get_perf(self, counters: set[str] | None = None, full_name: bool = False) -> dict[str, int]:
         perf_data = {}
         pattern = re.compile(
-            r"\[PERF \]\[time=\d+\] (([a-zA-Z0-9_]+\.)+[a-zA-Z0-9_@]+): ((\w| |\')+),\s+-?(\d+)$"
+            r"\[PERF\s*\]\[time=\s*\d+\] (([a-zA-Z0-9_]+\.)+[a-zA-Z0-9_@]+): ((\w| |\')+),\s+-?(\d+)$"
         )
 
         with self.stderr_path.open("r", encoding="utf-8") as f:
