@@ -14,7 +14,7 @@ module fpga_top_debug
    input                 clk7_n, 
    input                 clk6_p, // system 200MHz
    input                 clk6_n,
-   input                 clk5_p, // debug 50MHz
+   input                 clk5_p, // debug 25MHz
    input                 clk5_n,
    input                 rstn_sw6,
    input                 rstn_sw5,
@@ -166,7 +166,7 @@ BUFG bufg_cqetmclk
 
 wire    dbg_clk;
 wire    dbg_clk_buf;
-IBUFGDS ibufgds_dbgclk_50MHz
+IBUFGDS ibufgds_dbgclk_25MHz
 (
 	.I              (clk5_p),
 	.IB             (clk5_n),

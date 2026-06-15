@@ -11,7 +11,14 @@ if {[info exists ::env(XDMA_LINK_WIDTH)] && [string trim $::env(XDMA_LINK_WIDTH)
 if {[lsearch -exact {X4 X8} $xdma_link_width] < 0} {
   error "XDMA_LINK_WIDTH must be one of X4/X8, got '$xdma_link_width'"
 }
-puts "INFO: XDMA_LINK_WIDTH=$xdma_link_width; PCIe lane constraints are selected in fpga.xdc"
+if {$xdma_link_width eq "X4"} {
+  set xdma_lane_xdc xdma_x4_lanes.xdc
+  lappend constr_files [file normalize ${constr_dir}/xdma_x4_lanes.xdc]
+} else {
+  set xdma_lane_xdc xdma_x8_lanes.xdc
+  lappend constr_files [file normalize ${constr_dir}/xdma_x8_lanes.xdc]
+}
+puts "INFO: XDMA_LINK_WIDTH=$xdma_link_width; selected $xdma_lane_xdc"
 
 set enable_ila 0
 if {[info exists ::env(ENABLE_ILA)]} {
