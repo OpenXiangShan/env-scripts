@@ -15,8 +15,11 @@ import argparse
 import csv
 import json
 import os
+import queue
+import sys
 from multiprocessing import Process, Queue
 
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from perf import PerfCounters
 
 
@@ -47,8 +50,11 @@ def read_ipc(sim_err_path):
 
 
 def worker(task_q, result_q):
-    while not task_q.empty():
-        ckpt, sim_err = task_q.get()
+    while True:
+        try:
+            ckpt, sim_err = task_q.get_nowait()
+        except queue.Empty:
+            break
         result_q.put((ckpt, read_ipc(sim_err)))
 
 
@@ -70,7 +76,7 @@ def collect_ipc(spec_dir, json_path, jobs):
         p.join()
 
     ipc_map = {}
-    while not result_q.empty():
+    for _ in range(len(ckpts)):
         ckpt, ipc = result_q.get()
         ipc_map[ckpt] = ipc
     return ipc_map
@@ -90,7 +96,7 @@ def compute_rates(row, base_idx=0):
         if base is None or v is None or base == 0:
             rates.append(None)
         else:
-            rates.append(v / base - 1)
+            rates.append((v / base - 1) * 100)
     return rates
 
 
