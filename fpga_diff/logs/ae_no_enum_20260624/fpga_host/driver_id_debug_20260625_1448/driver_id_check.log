@@ -1,0 +1,56 @@
+## host
+open28
+2026-06-25T14:49:25+08:00
+Linux open28 6.8.0-124-generic #124~22.04.1-Ubuntu SMP PREEMPT_DYNAMIC Tue May 26 21:05:19 UTC  x86_64 x86_64 x86_64 GNU/Linux
+## endpoint
+01:00.0 Memory controller [0580]: Xilinx Corporation Device [10ee:9048]
+## modalias
+pci:v000010EEd00009048sv000010EEsd00000007bc05sc80i00
+## bound driver
+/sys/devices/pci0000:00/0000:00:01.0/0000:01:00.0/driver
+## installed module alias match
+## installed xdma modules
+/lib/modules/6.8.0-124-generic/kernel/drivers/dma/xilinx/xdma.ko
+## modinfo installed xdma
+filename:       /lib/modules/6.8.0-124-generic/kernel/drivers/dma/xilinx/xdma.ko
+description:    AMD XDMA driver
+vermagic:       6.8.0-124-generic SMP preempt mod_unload modversions 
+## modinfo installed xdma_chr
+## minjie/prandr/build source id grep
+/home/user01/project/minjie-playground/dma_ip_drivers/XDMA/linux-kernel/xdma/xdma_mod.c:49:	{ PCI_DEVICE(0x10ee, 0x9048), },
+/home/user01/project/minjie-playground/dma_ip_drivers/XDMA/linux-kernel/xdma/xdma_mod.c:50:	{ PCI_DEVICE(0x10ee, 0x8034), },
+/home/user01/project/minjie-playground/dma_ip_drivers/XDMA/linux-kernel/xdma/xdma_mod.c:52:	{ PCI_DEVICE(XDMA_VENDOR_ID, XDMA_DEVICE_ID), },
+/home/user01/project/minjie-playground/dma_ip_drivers/XDMA/linux-kernel/xdma/xdma-chr.mod.c:159:MODULE_ALIAS("pci:v000010EEd00009048sv*sd*bc*sc*i*");
+/home/user01/project/minjie-playground/dma_ip_drivers/XDMA/linux-kernel/xdma/xdma-chr.mod.c:160:MODULE_ALIAS("pci:v000010EEd00008034sv*sd*bc*sc*i*");
+/home/user01/project/minjie-playground/dma_ip_drivers/XDMA/linux-kernel/xdma/xdma-chr.mod.c:161:MODULE_ALIAS("pci:v000010EEd00009048sv*sd*bc*sc*i*");
+/home/user01/dma_ip_drivers_prandr/XDMA/linux-kernel/xdma/xdma_mod.c:49:	{ PCI_DEVICE(0x10ee, 0x8034), },
+/home/user01/dma_ip_drivers_prandr/XDMA/linux-kernel/xdma/xdma_mod.c:51:	{ PCI_DEVICE(XDMA_VENDOR_ID, XDMA_DEVICE_ID), },
+/home/user01/dma_ip_drivers_prandr/XDMA/linux-kernel/xdma/xdma-chr.mod.c:159:MODULE_ALIAS("pci:v000010EEd00008034sv*sd*bc*sc*i*");
+/home/user01/dma_ip_drivers_prandr/XDMA/linux-kernel/xdma/xdma-chr.mod.c:160:MODULE_ALIAS("pci:v000010EEd00009048sv*sd*bc*sc*i*");
+/home/user01/uvhs-debug-logs/xdma_chr_build_20260624_1738/src/xdma/xdma_mod.c:49:	{ PCI_DEVICE(0x10ee, 0x9048), },
+/home/user01/uvhs-debug-logs/xdma_chr_build_20260624_1738/src/xdma/xdma_mod.c:50:	{ PCI_DEVICE(0x10ee, 0x8034), },
+/home/user01/uvhs-debug-logs/xdma_chr_build_20260624_1738/src/xdma/xdma_mod.c:52:	{ PCI_DEVICE(XDMA_VENDOR_ID, XDMA_DEVICE_ID), },
+/home/user01/uvhs-debug-logs/xdma_chr_build_20260624_1738/src/xdma/xdma-chr.mod.c:159:MODULE_ALIAS("pci:v000010EEd00009048sv*sd*bc*sc*i*");
+/home/user01/uvhs-debug-logs/xdma_chr_build_20260624_1738/src/xdma/xdma-chr.mod.c:160:MODULE_ALIAS("pci:v000010EEd00008034sv*sd*bc*sc*i*");
+/home/user01/uvhs-debug-logs/xdma_chr_build_20260624_1738/src/xdma/xdma-chr.mod.c:161:MODULE_ALIAS("pci:v000010EEd00009048sv*sd*bc*sc*i*");
+## candidate ko modinfo
+-- /home/user01/project/minjie-playground/dma_ip_drivers/XDMA/linux-kernel/xdma/xdma-chr.ko
+filename:       /home/user01/project/minjie-playground/dma_ip_drivers/XDMA/linux-kernel/xdma/xdma-chr.ko
+description:    Reworked XDMA Driver
+alias:          pci:v000010EEd00009048sv*sd*bc*sc*i*
+alias:          pci:v000010EEd00008034sv*sd*bc*sc*i*
+alias:          pci:v000010EEd00009048sv*sd*bc*sc*i*
+vermagic:       6.8.0-111-generic SMP preempt mod_unload modversions 
+-- /home/user01/dma_ip_drivers_prandr/XDMA/linux-kernel/xdma/xdma-chr.ko
+filename:       /home/user01/dma_ip_drivers_prandr/XDMA/linux-kernel/xdma/xdma-chr.ko
+description:    Reworked XDMA Driver
+alias:          pci:v000010EEd00009048sv*sd*bc*sc*i*
+alias:          pci:v000010EEd00008034sv*sd*bc*sc*i*
+vermagic:       6.8.0-111-generic SMP preempt mod_unload modversions 
+-- /home/user01/uvhs-debug-logs/xdma_chr_build_20260624_1738/src/xdma/xdma-chr.ko
+filename:       /home/user01/uvhs-debug-logs/xdma_chr_build_20260624_1738/src/xdma/xdma-chr.ko
+description:    Reworked XDMA Driver
+alias:          pci:v000010EEd00009048sv*sd*bc*sc*i*
+alias:          pci:v000010EEd00008034sv*sd*bc*sc*i*
+alias:          pci:v000010EEd00009048sv*sd*bc*sc*i*
+vermagic:       6.8.0-124-generic SMP preempt mod_unload modversions 

@@ -23,8 +23,8 @@ What is currently proven:
   host rebooted.
 - On the FPGA host, the endpoint now enumerates as `10ee:9048` at
   `0000:01:00.0` after safe rescan.
-- The current blocker is XDMA BAR discovery / driver acceptance, not basic PCIe
-  enumeration.
+- The current blocker is XDMA driver installation / BAR discovery, not basic
+  PCIe enumeration or a missing `10ee:9048` device-ID patch.
 
 Latest FPGA-host probe facts:
 
@@ -33,6 +33,19 @@ Latest FPGA-host probe facts:
 - `lspci -vv` shows BAR0 and BAR1 present, but the raw BAR identifier reads did
   not yield the XDMA `0x1fc2` / `0x1fc3` signatures.
 - `xdma_chr` probe still failed to detect the XDMA config BAR.
+- On the current 2026-06-25 boot, `dmesg` shows clean enumeration under
+  `0000:00:01.0 -> 0000:01:00.0`: `10ee:9048`, BAR0 1 MiB, BAR1 64 KiB, Gen3
+  x4. There are no new XDMA probe lines because no driver is bound.
+- The current host kernel tree only has Ubuntu's in-tree
+  `/lib/modules/6.8.0-124-generic/kernel/drivers/dma/xilinx/xdma.ko`; it has no
+  `xdma_chr` module and no installed alias matching `10ee:9048`.
+- MinJie's XDMA driver is adapted for this ID:
+  `/home/user01/project/minjie-playground/dma_ip_drivers/XDMA/linux-kernel/xdma/xdma_mod.c`
+  contains `PCI_DEVICE(0x10ee, 0x9048)`, and the compatible rebuilt
+  `/home/user01/uvhs-debug-logs/xdma_chr_build_20260624_1738/src/xdma/xdma-chr.ko`
+  has `vermagic: 6.8.0-124-generic` plus an alias for `10ee:9048`.
+- Therefore, do not chase `10ee:0948`; the observed endpoint is `10ee:9048` and
+  the matching MinJie driver build already covers it.
 
 ## Safe Operating Rules
 

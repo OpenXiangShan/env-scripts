@@ -1,0 +1,335 @@
+## host
+open28
+2026-06-25T14:46:54+08:00
+## uname
+Linux open28 6.8.0-124-generic #124~22.04.1-Ubuntu SMP PREEMPT_DYNAMIC Tue May 26 21:05:19 UTC  x86_64 x86_64 x86_64 GNU/Linux
+## uptime
+ 14:46:54 up 6 min,  0 users,  load average: 0.06, 0.03, 0.00
+## lspci xdma
+01:00.0 Memory controller [0580]: Xilinx Corporation Device [10ee:9048]
+## lspci verbose endpoint
+01:00.0 Memory controller [0580]: Xilinx Corporation Device [10ee:9048]
+	Subsystem: Xilinx Corporation Device [10ee:0007]
+	Control: I/O- Mem- BusMaster- SpecCycle- MemWINV- VGASnoop- ParErr- Stepping- SERR- FastB2B- DisINTx-
+	Status: Cap+ 66MHz- UDF- FastB2B- ParErr- DEVSEL=fast >TAbort- <TAbort- <MAbort- >SERR- <PERR- INTx-
+	Interrupt: pin A routed to IRQ 255
+	IOMMU group: 16
+	Region 0: Memory at 85e00000 (32-bit, non-prefetchable) [disabled] [size=1M]
+	Region 1: Memory at 85f00000 (32-bit, non-prefetchable) [disabled] [size=64K]
+	Capabilities: [40] Power Management version 3
+		Flags: PMEClk- DSI- D1- D2- AuxCurrent=0mA PME(D0-,D1-,D2-,D3hot-,D3cold-)
+		Status: D0 NoSoftRst+ PME-Enable- DSel=0 DScale=0 PME-
+	Capabilities: [48] MSI: Enable- Count=1/1 Maskable- 64bit+
+		Address: 0000000000000000  Data: 0000
+	Capabilities: [70] Express (v2) Endpoint, MSI 00
+		DevCap:	MaxPayload 1024 bytes, PhantFunc 0, Latency L0s <64ns, L1 <1us
+			ExtTag+ AttnBtn- AttnInd- PwrInd- RBE+ FLReset- SlotPowerLimit 75.000W
+		DevCtl:	CorrErr+ NonFatalErr+ FatalErr+ UnsupReq+
+			RlxdOrd+ ExtTag+ PhantFunc- AuxPwr- NoSnoop+
+			MaxPayload 256 bytes, MaxReadReq 512 bytes
+		DevSta:	CorrErr- NonFatalErr- FatalErr- UnsupReq- AuxPwr- TransPend-
+		LnkCap:	Port #0, Speed 8GT/s, Width x4, ASPM not supported
+			ClockPM- Surprise- LLActRep- BwNot- ASPMOptComp+
+		LnkCtl:	ASPM Disabled; RCB 64 bytes, Disabled- CommClk+
+			ExtSynch- ClockPM- AutWidDis- BWInt- AutBWInt-
+		LnkSta:	Speed 8GT/s (ok), Width x4 (ok)
+			TrErr- Train- SlotClk+ DLActive- BWMgmt- ABWMgmt-
+		DevCap2: Completion Timeout: Range BC, TimeoutDis+ NROPrPrP- LTR-
+			 10BitTagComp- 10BitTagReq- OBFF Not Supported, ExtFmt- EETLPPrefix-
+			 EmergencyPowerReduction Not Supported, EmergencyPowerReductionInit-
+			 FRS- TPHComp- ExtTPHComp-
+			 AtomicOpsCap: 32bit- 64bit- 128bitCAS-
+		DevCtl2: Completion Timeout: 50us to 50ms, TimeoutDis- LTR- OBFF Disabled,
+			 AtomicOpsCtl: ReqEn-
+		LnkCap2: Supported Link Speeds: 2.5-8GT/s, Crosslink- Retimer- 2Retimers- DRS-
+		LnkCtl2: Target Link Speed: 8GT/s, EnterCompliance- SpeedDis-
+			 Transmit Margin: Normal Operating Range, EnterModifiedCompliance- ComplianceSOS-
+			 Compliance De-emphasis: -6dB
+		LnkSta2: Current De-emphasis Level: -6dB, EqualizationComplete+ EqualizationPhase1+
+			 EqualizationPhase2+ EqualizationPhase3+ LinkEqualizationRequest-
+			 Retimer- 2Retimers- CrosslinkRes: unsupported
+	Capabilities: [100 v1] Advanced Error Reporting
+		UESta:	DLP- SDES- TLP- FCP- CmpltTO- CmpltAbrt- UnxCmplt- RxOF- MalfTLP- ECRC- UnsupReq- ACSViol-
+		UEMsk:	DLP- SDES- TLP- FCP- CmpltTO- CmpltAbrt- UnxCmplt- RxOF- MalfTLP- ECRC- UnsupReq- ACSViol-
+		UESvrt:	DLP+ SDES+ TLP- FCP+ CmpltTO- CmpltAbrt- UnxCmplt- RxOF+ MalfTLP+ ECRC- UnsupReq- ACSViol-
+		CESta:	RxErr- BadTLP- BadDLLP- Rollover- Timeout- AdvNonFatalErr-
+		CEMsk:	RxErr- BadTLP- BadDLLP- Rollover- Timeout- AdvNonFatalErr+
+		AERCap:	First Error Pointer: 00, ECRCGenCap- ECRCGenEn- ECRCChkCap- ECRCChkEn-
+			MultHdrRecCap- MultHdrRecEn- TLPPfxPres- HdrLogCap-
+		HeaderLog: 00000000 00000000 00000000 00000000
+	Capabilities: [1c0 v1] Secondary PCI Express
+		LnkCtl3: LnkEquIntrruptEn- PerformEqu-
+		LaneErrStat: 0
+	Capabilities: [1f0 v1] Virtual Channel
+		Caps:	LPEVC=0 RefClk=100ns PATEntryBits=1
+		Arb:	Fixed- WRR32- WRR64- WRR128-
+		Ctrl:	ArbSelect=Fixed
+		Status:	InProgress-
+		Port Arbitration Table [500] <?>
+		VC0:	Caps:	PATOffset=00 MaxTimeSlots=1 RejSnoopTrans-
+			Arb:	Fixed- WRR32- WRR64- WRR128- TWRR128- WRR256-
+			Ctrl:	Enable+ ID=0 ArbSelect=Fixed TC/VC=ff
+			Status:	NegoPending- InProgress-
+
+## driver symlink
+/sys/devices/pci0000:00/0000:00:01.0/0000:01:00.0/driver
+## modalias
+pci:v000010EEd00009048sv000010EEsd00000007bc05sc80i00
+## resource
+0x0000000085e00000 0x0000000085efffff 0x0000000000040200
+0x0000000085f00000 0x0000000085f0ffff 0x0000000000040200
+0x0000000000000000 0x0000000000000000 0x0000000000000000
+0x0000000000000000 0x0000000000000000 0x0000000000000000
+0x0000000000000000 0x0000000000000000 0x0000000000000000
+0x0000000000000000 0x0000000000000000 0x0000000000000000
+0x0000000000000000 0x0000000000000000 0x0000000000000000
+0x0000000000000000 0x0000000000000000 0x0000000000000000
+0x0000000000000000 0x0000000000000000 0x0000000000000000
+0x0000000000000000 0x0000000000000000 0x0000000000000000
+0x0000000000000000 0x0000000000000000 0x0000000000000000
+0x0000000000000000 0x0000000000000000 0x0000000000000000
+0x0000000000000000 0x0000000000000000 0x0000000000000000
+## enable
+0
+## lsmod
+## dev nodes
+## dmesg filtered
+[Thu Jun 25 14:40:46 2026] [mem 0x80800000-0xfdffffff] available for PCI devices
+[Thu Jun 25 14:40:46 2026] Booting paravirtualized kernel on bare hardware
+[Thu Jun 25 14:40:46 2026] Spectre V1 : Mitigation: usercopy/swapgs barriers and __user pointer sanitization
+[Thu Jun 25 14:40:46 2026] Spectre V2 : mitigation: Enabling conditional Indirect Branch Prediction Barrier
+[Thu Jun 25 14:40:46 2026] ACPI FADT declares the system doesn't support PCIe ASPM, so disable it
+[Thu Jun 25 14:40:46 2026] acpiphp: ACPI Hot Plug PCI Controller Driver version: 0.5
+[Thu Jun 25 14:40:46 2026] PCI: ECAM [mem 0xc0000000-0xcfffffff] (base 0xc0000000) for domain 0000 [bus 00-ff]
+[Thu Jun 25 14:40:46 2026] PCI: Using configuration type 1 for base access
+[Thu Jun 25 14:40:46 2026] PCI: Using host bridge windows from ACPI; if necessary, use "pci=nocrs" and report a bug
+[Thu Jun 25 14:40:46 2026] PCI: Using E820 reservations for host bridge windows
+[Thu Jun 25 14:40:46 2026] ACPI: PCI Root Bridge [PC00] (domain 0000 [bus 00-e0])
+[Thu Jun 25 14:40:46 2026] acpi PNP0A08:00: _OSC: OS now controls [PCIeHotplug SHPCHotplug PME AER PCIeCapability LTR DPC]
+[Thu Jun 25 14:40:46 2026] PCI host bridge to bus 0000:00
+[Thu Jun 25 14:40:46 2026] pci_bus 0000:00: root bus resource [io  0x0000-0x0cf7 window]
+[Thu Jun 25 14:40:46 2026] pci_bus 0000:00: root bus resource [io  0x0d00-0xffff window]
+[Thu Jun 25 14:40:46 2026] pci_bus 0000:00: root bus resource [mem 0x000a0000-0x000bffff window]
+[Thu Jun 25 14:40:46 2026] pci_bus 0000:00: root bus resource [mem 0x000e0000-0x000effff window]
+[Thu Jun 25 14:40:46 2026] pci_bus 0000:00: root bus resource [mem 0x80800000-0xbfffffff window]
+[Thu Jun 25 14:40:46 2026] pci_bus 0000:00: root bus resource [mem 0x4000000000-0x7fffffffff window]
+[Thu Jun 25 14:40:46 2026] pci_bus 0000:00: root bus resource [bus 00-e0]
+[Thu Jun 25 14:40:46 2026] pci 0000:00:00.0: [8086:4660] type 00 class 0x060000 conventional PCI endpoint
+[Thu Jun 25 14:40:46 2026] pci 0000:00:01.0: [8086:460d] type 01 class 0x060400 PCIe Root Port
+[Thu Jun 25 14:40:46 2026] pci 0000:00:01.0: PCI bridge to [bus 01]
+[Thu Jun 25 14:40:46 2026] pci 0000:00:01.0:   bridge window [mem 0x85e00000-0x85ffffff]
+[Thu Jun 25 14:40:46 2026] pci 0000:00:01.0: PME# supported from D0 D3hot D3cold
+[Thu Jun 25 14:40:46 2026] pci 0000:00:01.0: PTM enabled (root), 4ns granularity
+[Thu Jun 25 14:40:46 2026] pci 0000:00:02.0: [8086:4680] type 00 class 0x030000 PCIe Root Complex Integrated Endpoint
+[Thu Jun 25 14:40:46 2026] pci 0000:00:02.0: BAR 0 [mem 0x6002000000-0x6002ffffff 64bit]
+[Thu Jun 25 14:40:46 2026] pci 0000:00:02.0: BAR 2 [mem 0x4000000000-0x400fffffff 64bit pref]
+[Thu Jun 25 14:40:46 2026] pci 0000:00:02.0: BAR 4 [io  0x7000-0x703f]
+[Thu Jun 25 14:40:46 2026] pci 0000:00:02.0: DMAR: Skip IOMMU disabling for graphics
+[Thu Jun 25 14:40:46 2026] pci 0000:00:02.0: Video device with shadowed ROM at [mem 0x000c0000-0x000dffff]
+[Thu Jun 25 14:40:46 2026] pci 0000:00:02.0: VF BAR 0 [mem 0x00000000-0x00ffffff 64bit]
+[Thu Jun 25 14:40:46 2026] pci 0000:00:02.0: VF BAR 0 [mem 0x00000000-0x06ffffff 64bit]: contains BAR 0 for 7 VFs
+[Thu Jun 25 14:40:46 2026] pci 0000:00:02.0: VF BAR 2 [mem 0x00000000-0x1fffffff 64bit pref]
+[Thu Jun 25 14:40:46 2026] pci 0000:00:02.0: VF BAR 2 [mem 0x00000000-0xdfffffff 64bit pref]: contains BAR 2 for 7 VFs
+[Thu Jun 25 14:40:46 2026] pci 0000:00:0a.0: [8086:467d] type 00 class 0x118000 PCIe Root Complex Integrated Endpoint
+[Thu Jun 25 14:40:46 2026] pci 0000:00:0a.0: BAR 0 [mem 0x6003210000-0x6003217fff 64bit]
+[Thu Jun 25 14:40:46 2026] pci 0000:00:0a.0: enabling Extended Tags
+[Thu Jun 25 14:40:46 2026] pci 0000:00:0e.0: [8086:467f] type 00 class 0x010400 PCIe Root Complex Integrated Endpoint
+[Thu Jun 25 14:40:46 2026] pci 0000:00:0e.0: BAR 0 [mem 0x6000000000-0x6001ffffff 64bit]
+[Thu Jun 25 14:40:46 2026] pci 0000:00:0e.0: BAR 2 [mem 0x82000000-0x83ffffff]
+[Thu Jun 25 14:40:46 2026] pci 0000:00:0e.0: BAR 4 [mem 0x6003100000-0x60031fffff 64bit]
+[Thu Jun 25 14:40:46 2026] pci 0000:00:14.0: [8086:7ae0] type 00 class 0x0c0330 conventional PCI endpoint
+[Thu Jun 25 14:40:46 2026] pci 0000:00:14.0: BAR 0 [mem 0x6003200000-0x600320ffff 64bit]
+[Thu Jun 25 14:40:46 2026] pci 0000:00:14.0: PME# supported from D3hot D3cold
+[Thu Jun 25 14:40:46 2026] pci 0000:00:14.2: [8086:7aa7] type 00 class 0x050000 conventional PCI endpoint
+[Thu Jun 25 14:40:46 2026] pci 0000:00:14.2: BAR 0 [mem 0x6003220000-0x6003223fff 64bit]
+[Thu Jun 25 14:40:46 2026] pci 0000:00:14.2: BAR 2 [mem 0x6003229000-0x6003229fff 64bit]
+[Thu Jun 25 14:40:46 2026] pci 0000:00:14.3: [8086:7af0] type 00 class 0x028000 PCIe Root Complex Integrated Endpoint
+[Thu Jun 25 14:40:46 2026] pci 0000:00:14.3: BAR 0 [mem 0x600321c000-0x600321ffff 64bit]
+[Thu Jun 25 14:40:46 2026] pci 0000:00:14.3: PME# supported from D0 D3hot D3cold
+[Thu Jun 25 14:40:46 2026] pci 0000:00:15.0: [8086:7acc] type 00 class 0x0c8000 conventional PCI endpoint
+[Thu Jun 25 14:40:46 2026] pci 0000:00:15.0: BAR 0 [mem 0x00000000-0x00000fff 64bit]
+[Thu Jun 25 14:40:46 2026] pci 0000:00:15.1: [8086:7acd] type 00 class 0x0c8000 conventional PCI endpoint
+[Thu Jun 25 14:40:46 2026] pci 0000:00:15.1: BAR 0 [mem 0x00000000-0x00000fff 64bit]
+[Thu Jun 25 14:40:46 2026] pci 0000:00:15.2: [8086:7ace] type 00 class 0x0c8000 conventional PCI endpoint
+[Thu Jun 25 14:40:46 2026] pci 0000:00:15.2: BAR 0 [mem 0x00000000-0x00000fff 64bit]
+[Thu Jun 25 14:40:46 2026] pci 0000:00:16.0: [8086:7ae8] type 00 class 0x078000 conventional PCI endpoint
+[Thu Jun 25 14:40:46 2026] pci 0000:00:16.0: BAR 0 [mem 0x6003225000-0x6003225fff 64bit]
+[Thu Jun 25 14:40:46 2026] pci 0000:00:16.0: PME# supported from D3hot
+[Thu Jun 25 14:40:46 2026] pci 0000:00:17.0: [8086:7ae2] type 00 class 0x010601 conventional PCI endpoint
+[Thu Jun 25 14:40:46 2026] pci 0000:00:17.0: BAR 0 [mem 0x86100000-0x86101fff]
+[Thu Jun 25 14:40:46 2026] pci 0000:00:17.0: BAR 1 [mem 0x86103000-0x861030ff]
+[Thu Jun 25 14:40:46 2026] pci 0000:00:17.0: BAR 2 [io  0x7090-0x7097]
+[Thu Jun 25 14:40:46 2026] pci 0000:00:17.0: BAR 3 [io  0x7080-0x7083]
+[Thu Jun 25 14:40:46 2026] pci 0000:00:17.0: BAR 4 [io  0x7060-0x707f]
+[Thu Jun 25 14:40:46 2026] pci 0000:00:17.0: BAR 5 [mem 0x86102000-0x861027ff]
+[Thu Jun 25 14:40:46 2026] pci 0000:00:17.0: PME# supported from D3hot
+[Thu Jun 25 14:40:46 2026] pci 0000:00:1a.0: [8086:7ac8] type 01 class 0x060400 PCIe Root Port
+[Thu Jun 25 14:40:46 2026] pci 0000:00:1a.0: PCI bridge to [bus 02]
+[Thu Jun 25 14:40:46 2026] pci 0000:00:1a.0:   bridge window [io  0x6000-0x6fff]
+[Thu Jun 25 14:40:46 2026] pci 0000:00:1a.0:   bridge window [mem 0x85400000-0x85dfffff]
+[Thu Jun 25 14:40:46 2026] pci 0000:00:1a.0: PME# supported from D0 D3hot D3cold
+[Thu Jun 25 14:40:46 2026] pci 0000:00:1b.0: [8086:7ac0] type 01 class 0x060400 PCIe Root Port
+[Thu Jun 25 14:40:46 2026] pci 0000:00:1b.0: PCI bridge to [bus 03]
+[Thu Jun 25 14:40:46 2026] pci 0000:00:1b.0: PME# supported from D0 D3hot D3cold
+[Thu Jun 25 14:40:46 2026] pci 0000:00:1c.0: [8086:7ab8] type 01 class 0x060400 PCIe Root Port
+[Thu Jun 25 14:40:46 2026] pci 0000:00:1c.0: PCI bridge to [bus 04]
+[Thu Jun 25 14:40:46 2026] pci 0000:00:1c.0:   bridge window [io  0x5000-0x5fff]
+[Thu Jun 25 14:40:46 2026] pci 0000:00:1c.0:   bridge window [mem 0x84a00000-0x853fffff]
+[Thu Jun 25 14:40:46 2026] pci 0000:00:1c.0: PME# supported from D0 D3hot D3cold
+[Thu Jun 25 14:40:46 2026] pci 0000:00:1c.2: [8086:7aba] type 01 class 0x060400 PCIe Root Port
+[Thu Jun 25 14:40:46 2026] pci 0000:00:1c.2: PCI bridge to [bus 05]
+[Thu Jun 25 14:40:46 2026] pci 0000:00:1c.2:   bridge window [io  0x4000-0x4fff]
+[Thu Jun 25 14:40:46 2026] pci 0000:00:1c.2:   bridge window [mem 0x86000000-0x860fffff]
+[Thu Jun 25 14:40:46 2026] pci 0000:00:1c.2: PME# supported from D0 D3hot D3cold
+[Thu Jun 25 14:40:46 2026] pci 0000:00:1c.2: PTM enabled (root), 4ns granularity
+[Thu Jun 25 14:40:46 2026] pci 0000:00:1d.0: [8086:7ab0] type 01 class 0x060400 PCIe Root Port
+[Thu Jun 25 14:40:46 2026] pci 0000:00:1d.0: PCI bridge to [bus 06]
+[Thu Jun 25 14:40:46 2026] pci 0000:00:1d.0:   bridge window [io  0x3000-0x3fff]
+[Thu Jun 25 14:40:46 2026] pci 0000:00:1d.0:   bridge window [mem 0x84000000-0x849fffff]
+[Thu Jun 25 14:40:46 2026] pci 0000:00:1d.0: PME# supported from D0 D3hot D3cold
+[Thu Jun 25 14:40:46 2026] pci 0000:00:1f.0: [8086:7a84] type 00 class 0x060100 conventional PCI endpoint
+[Thu Jun 25 14:40:46 2026] pci 0000:00:1f.3: [8086:7ad0] type 00 class 0x040300 conventional PCI endpoint
+[Thu Jun 25 14:40:46 2026] pci 0000:00:1f.3: BAR 0 [mem 0x6003218000-0x600321bfff 64bit]
+[Thu Jun 25 14:40:46 2026] pci 0000:00:1f.3: BAR 4 [mem 0x6003000000-0x60030fffff 64bit]
+[Thu Jun 25 14:40:46 2026] pci 0000:00:1f.3: PME# supported from D3hot D3cold
+[Thu Jun 25 14:40:46 2026] pci 0000:00:1f.4: [8086:7aa3] type 00 class 0x0c0500 conventional PCI endpoint
+[Thu Jun 25 14:40:46 2026] pci 0000:00:1f.4: BAR 0 [mem 0x6003224000-0x60032240ff 64bit]
+[Thu Jun 25 14:40:46 2026] pci 0000:00:1f.4: BAR 4 [io  0xefa0-0xefbf]
+[Thu Jun 25 14:40:46 2026] pci 0000:00:1f.5: [8086:7aa4] type 00 class 0x0c8000 conventional PCI endpoint
+[Thu Jun 25 14:40:46 2026] pci 0000:00:1f.5: BAR 0 [mem 0xfe010000-0xfe010fff]
+[Thu Jun 25 14:40:46 2026] pci 0000:01:00.0: [10ee:9048] type 00 class 0x058000 PCIe Endpoint
+[Thu Jun 25 14:40:46 2026] pci 0000:01:00.0: BAR 0 [mem 0x85e00000-0x85efffff]
+[Thu Jun 25 14:40:46 2026] pci 0000:01:00.0: BAR 1 [mem 0x85f00000-0x85f0ffff]
+[Thu Jun 25 14:40:46 2026] pci 0000:00:01.0: PCI bridge to [bus 01]
+[Thu Jun 25 14:40:46 2026] pci 0000:00:1a.0: PCI bridge to [bus 02]
+[Thu Jun 25 14:40:46 2026] pci 0000:00:1b.0: PCI bridge to [bus 03]
+[Thu Jun 25 14:40:46 2026] pci 0000:00:1c.0: PCI bridge to [bus 04]
+[Thu Jun 25 14:40:46 2026] pci 0000:05:00.0: [10ec:8125] type 00 class 0x020000 PCIe Endpoint
+[Thu Jun 25 14:40:46 2026] pci 0000:05:00.0: BAR 0 [io  0x4000-0x40ff]
+[Thu Jun 25 14:40:46 2026] pci 0000:05:00.0: BAR 2 [mem 0x86000000-0x8600ffff 64bit]
+[Thu Jun 25 14:40:46 2026] pci 0000:05:00.0: BAR 4 [mem 0x86010000-0x86013fff 64bit]
+[Thu Jun 25 14:40:46 2026] pci 0000:05:00.0: supports D1 D2
+[Thu Jun 25 14:40:46 2026] pci 0000:05:00.0: PME# supported from D0 D1 D2 D3hot D3cold
+[Thu Jun 25 14:40:46 2026] pci 0000:00:1c.2: PCI bridge to [bus 05]
+[Thu Jun 25 14:40:46 2026] pci 0000:00:1d.0: PCI bridge to [bus 06]
+[Thu Jun 25 14:40:46 2026] ACPI: PCI: Interrupt link LNKA configured for IRQ 0
+[Thu Jun 25 14:40:46 2026] ACPI: PCI: Interrupt link LNKB configured for IRQ 1
+[Thu Jun 25 14:40:46 2026] ACPI: PCI: Interrupt link LNKC configured for IRQ 0
+[Thu Jun 25 14:40:46 2026] ACPI: PCI: Interrupt link LNKD configured for IRQ 0
+[Thu Jun 25 14:40:46 2026] ACPI: PCI: Interrupt link LNKE configured for IRQ 0
+[Thu Jun 25 14:40:46 2026] ACPI: PCI: Interrupt link LNKF configured for IRQ 0
+[Thu Jun 25 14:40:46 2026] ACPI: PCI: Interrupt link LNKG configured for IRQ 0
+[Thu Jun 25 14:40:46 2026] ACPI: PCI: Interrupt link LNKH configured for IRQ 0
+[Thu Jun 25 14:40:46 2026] PCI: Using ACPI for IRQ routing
+[Thu Jun 25 14:40:46 2026] PCI: pci_cache_line_size set to 64 bytes
+[Thu Jun 25 14:40:46 2026] pci 0000:00:1f.5: BAR 0 [mem 0xfe010000-0xfe010fff]: can't claim; no compatible bridge window
+[Thu Jun 25 14:40:46 2026] pci 0000:00:02.0: vgaarb: setting as boot VGA device
+[Thu Jun 25 14:40:46 2026] pci 0000:00:02.0: vgaarb: bridge control possible
+[Thu Jun 25 14:40:46 2026] pci 0000:00:02.0: vgaarb: VGA device added: decodes=io+mem,owns=io+mem,locks=none
+[Thu Jun 25 14:40:46 2026] pnp 00:03: disabling [mem 0xc0000000-0xcfffffff] because it overlaps 0000:00:02.0 BAR 9 [mem 0x00000000-0xdfffffff 64bit pref]
+[Thu Jun 25 14:40:46 2026] pci_bus 0000:00: max bus depth: 1 pci_try_num: 2
+[Thu Jun 25 14:40:46 2026] pci 0000:00:02.0: VF BAR 2 [mem 0x4020000000-0x40ffffffff 64bit pref]: assigned
+[Thu Jun 25 14:40:46 2026] pci 0000:00:02.0: VF BAR 0 [mem 0x4010000000-0x4016ffffff 64bit]: assigned
+[Thu Jun 25 14:40:46 2026] pci 0000:00:1a.0: bridge window [mem 0x4017000000-0x40171fffff 64bit pref]: assigned
+[Thu Jun 25 14:40:46 2026] pci 0000:00:1c.0: bridge window [mem 0x4017200000-0x40173fffff 64bit pref]: assigned
+[Thu Jun 25 14:40:46 2026] pci 0000:00:1d.0: bridge window [mem 0x4017400000-0x40175fffff 64bit pref]: assigned
+[Thu Jun 25 14:40:46 2026] pci 0000:00:15.0: BAR 0 [mem 0x4017600000-0x4017600fff 64bit]: assigned
+[Thu Jun 25 14:40:46 2026] pci 0000:00:15.1: BAR 0 [mem 0x4017601000-0x4017601fff 64bit]: assigned
+[Thu Jun 25 14:40:46 2026] pci 0000:00:15.2: BAR 0 [mem 0x4017602000-0x4017602fff 64bit]: assigned
+[Thu Jun 25 14:40:46 2026] pci 0000:00:1f.5: BAR 0 [mem 0x80800000-0x80800fff]: assigned
+[Thu Jun 25 14:40:46 2026] pci 0000:00:01.0: PCI bridge to [bus 01]
+[Thu Jun 25 14:40:46 2026] pci 0000:00:01.0:   bridge window [mem 0x85e00000-0x85ffffff]
+[Thu Jun 25 14:40:46 2026] pci 0000:00:1a.0: PCI bridge to [bus 02]
+[Thu Jun 25 14:40:46 2026] pci 0000:00:1a.0:   bridge window [io  0x6000-0x6fff]
+[Thu Jun 25 14:40:46 2026] pci 0000:00:1a.0:   bridge window [mem 0x85400000-0x85dfffff]
+[Thu Jun 25 14:40:46 2026] pci 0000:00:1a.0:   bridge window [mem 0x4017000000-0x40171fffff 64bit pref]
+[Thu Jun 25 14:40:46 2026] pci 0000:00:1b.0: PCI bridge to [bus 03]
+[Thu Jun 25 14:40:46 2026] pci 0000:00:1c.0: PCI bridge to [bus 04]
+[Thu Jun 25 14:40:46 2026] pci 0000:00:1c.0:   bridge window [io  0x5000-0x5fff]
+[Thu Jun 25 14:40:46 2026] pci 0000:00:1c.0:   bridge window [mem 0x84a00000-0x853fffff]
+[Thu Jun 25 14:40:46 2026] pci 0000:00:1c.0:   bridge window [mem 0x4017200000-0x40173fffff 64bit pref]
+[Thu Jun 25 14:40:46 2026] pci 0000:00:1c.2: PCI bridge to [bus 05]
+[Thu Jun 25 14:40:46 2026] pci 0000:00:1c.2:   bridge window [io  0x4000-0x4fff]
+[Thu Jun 25 14:40:46 2026] pci 0000:00:1c.2:   bridge window [mem 0x86000000-0x860fffff]
+[Thu Jun 25 14:40:46 2026] pci 0000:00:1d.0: PCI bridge to [bus 06]
+[Thu Jun 25 14:40:46 2026] pci 0000:00:1d.0:   bridge window [io  0x3000-0x3fff]
+[Thu Jun 25 14:40:46 2026] pci 0000:00:1d.0:   bridge window [mem 0x84000000-0x849fffff]
+[Thu Jun 25 14:40:46 2026] pci 0000:00:1d.0:   bridge window [mem 0x4017400000-0x40175fffff 64bit pref]
+[Thu Jun 25 14:40:46 2026] pci_bus 0000:00: resource 4 [io  0x0000-0x0cf7 window]
+[Thu Jun 25 14:40:46 2026] pci_bus 0000:00: resource 5 [io  0x0d00-0xffff window]
+[Thu Jun 25 14:40:46 2026] pci_bus 0000:00: resource 6 [mem 0x000a0000-0x000bffff window]
+[Thu Jun 25 14:40:46 2026] pci_bus 0000:00: resource 7 [mem 0x000e0000-0x000effff window]
+[Thu Jun 25 14:40:46 2026] pci_bus 0000:00: resource 8 [mem 0x80800000-0xbfffffff window]
+[Thu Jun 25 14:40:46 2026] pci_bus 0000:00: resource 9 [mem 0x4000000000-0x7fffffffff window]
+[Thu Jun 25 14:40:46 2026] pci_bus 0000:01: resource 1 [mem 0x85e00000-0x85ffffff]
+[Thu Jun 25 14:40:46 2026] pci_bus 0000:02: resource 0 [io  0x6000-0x6fff]
+[Thu Jun 25 14:40:46 2026] pci_bus 0000:02: resource 1 [mem 0x85400000-0x85dfffff]
+[Thu Jun 25 14:40:46 2026] pci_bus 0000:02: resource 2 [mem 0x4017000000-0x40171fffff 64bit pref]
+[Thu Jun 25 14:40:46 2026] pci_bus 0000:04: resource 0 [io  0x5000-0x5fff]
+[Thu Jun 25 14:40:46 2026] pci_bus 0000:04: resource 1 [mem 0x84a00000-0x853fffff]
+[Thu Jun 25 14:40:46 2026] pci_bus 0000:04: resource 2 [mem 0x4017200000-0x40173fffff 64bit pref]
+[Thu Jun 25 14:40:46 2026] pci_bus 0000:05: resource 0 [io  0x4000-0x4fff]
+[Thu Jun 25 14:40:46 2026] pci_bus 0000:05: resource 1 [mem 0x86000000-0x860fffff]
+[Thu Jun 25 14:40:46 2026] pci_bus 0000:06: resource 0 [io  0x3000-0x3fff]
+[Thu Jun 25 14:40:46 2026] pci_bus 0000:06: resource 1 [mem 0x84000000-0x849fffff]
+[Thu Jun 25 14:40:46 2026] pci_bus 0000:06: resource 2 [mem 0x4017400000-0x40175fffff 64bit pref]
+[Thu Jun 25 14:40:46 2026] PCI: CLS 64 bytes, default 64
+[Thu Jun 25 14:40:46 2026] pci 0000:00:02.0: Adding to iommu group 0
+[Thu Jun 25 14:40:46 2026] pci 0000:00:00.0: Adding to iommu group 1
+[Thu Jun 25 14:40:46 2026] pci 0000:00:01.0: Adding to iommu group 2
+[Thu Jun 25 14:40:46 2026] pci 0000:00:0a.0: Adding to iommu group 3
+[Thu Jun 25 14:40:46 2026] pci 0000:00:0e.0: Adding to iommu group 4
+[Thu Jun 25 14:40:46 2026] pci 0000:00:14.0: Adding to iommu group 5
+[Thu Jun 25 14:40:46 2026] pci 0000:00:14.2: Adding to iommu group 5
+[Thu Jun 25 14:40:46 2026] pci 0000:00:14.3: Adding to iommu group 6
+[Thu Jun 25 14:40:46 2026] pci 0000:00:15.0: Adding to iommu group 7
+[Thu Jun 25 14:40:46 2026] pci 0000:00:15.1: Adding to iommu group 7
+[Thu Jun 25 14:40:46 2026] pci 0000:00:15.2: Adding to iommu group 7
+[Thu Jun 25 14:40:46 2026] pci 0000:00:16.0: Adding to iommu group 8
+[Thu Jun 25 14:40:46 2026] pci 0000:00:17.0: Adding to iommu group 9
+[Thu Jun 25 14:40:46 2026] pci 0000:00:1a.0: Adding to iommu group 10
+[Thu Jun 25 14:40:46 2026] pci 0000:00:1b.0: Adding to iommu group 11
+[Thu Jun 25 14:40:46 2026] pci 0000:00:1c.0: Adding to iommu group 12
+[Thu Jun 25 14:40:46 2026] pci 0000:00:1c.2: Adding to iommu group 13
+[Thu Jun 25 14:40:46 2026] pci 0000:00:1d.0: Adding to iommu group 14
+[Thu Jun 25 14:40:46 2026] pci 0000:00:1f.0: Adding to iommu group 15
+[Thu Jun 25 14:40:46 2026] pci 0000:00:1f.3: Adding to iommu group 15
+[Thu Jun 25 14:40:46 2026] pci 0000:00:1f.4: Adding to iommu group 15
+[Thu Jun 25 14:40:46 2026] pci 0000:00:1f.5: Adding to iommu group 15
+[Thu Jun 25 14:40:46 2026] pci 0000:01:00.0: Adding to iommu group 16
+[Thu Jun 25 14:40:46 2026] pci 0000:05:00.0: Adding to iommu group 17
+[Thu Jun 25 14:40:46 2026] PCI-DMA: Using software bounce buffering for IO (SWIOTLB)
+[Thu Jun 25 14:40:46 2026] pcieport 0000:00:01.0: PME: Signaling with IRQ 122
+[Thu Jun 25 14:40:46 2026] pcieport 0000:00:01.0: AER: enabled with IRQ 122
+[Thu Jun 25 14:40:46 2026] pcieport 0000:00:1a.0: PME: Signaling with IRQ 123
+[Thu Jun 25 14:40:46 2026] pcieport 0000:00:1a.0: pciehp: Slot #0 AttnBtn- PwrCtrl- MRL- AttnInd- PwrInd- HotPlug+ Surprise+ Interlock- NoCompl+ IbPresDis- LLActRep+
+[Thu Jun 25 14:40:46 2026] pcieport 0000:00:1b.0: PME: Signaling with IRQ 124
+[Thu Jun 25 14:40:46 2026] pcieport 0000:00:1c.0: PME: Signaling with IRQ 125
+[Thu Jun 25 14:40:46 2026] pcieport 0000:00:1c.0: pciehp: Slot #0 AttnBtn- PwrCtrl- MRL- AttnInd- PwrInd- HotPlug+ Surprise+ Interlock- NoCompl+ IbPresDis- LLActRep+
+[Thu Jun 25 14:40:46 2026] pcieport 0000:00:1c.2: PME: Signaling with IRQ 126
+[Thu Jun 25 14:40:46 2026] pcieport 0000:00:1c.2: AER: enabled with IRQ 126
+[Thu Jun 25 14:40:46 2026] pcieport 0000:00:1d.0: PME: Signaling with IRQ 127
+[Thu Jun 25 14:40:46 2026] pcieport 0000:00:1d.0: pciehp: Slot #0 AttnBtn- PwrCtrl- MRL- AttnInd- PwrInd- HotPlug+ Surprise+ Interlock- NoCompl+ IbPresDis- LLActRep+
+[Thu Jun 25 14:40:46 2026] shpchp: Standard Hot Plug PCI Controller Driver version: 0.4
+[Thu Jun 25 14:40:46 2026] vmd 0000:00:0e.0: PCI host bridge to bus 10000:e0
+[Thu Jun 25 14:40:46 2026] pci_bus 10000:e0: root bus resource [bus e0-ff]
+[Thu Jun 25 14:40:46 2026] pci_bus 10000:e0: root bus resource [mem 0x82000000-0x83ffffff]
+[Thu Jun 25 14:40:46 2026] pci_bus 10000:e0: root bus resource [mem 0x6003102000-0x60031fffff 64bit]
+[Thu Jun 25 14:40:46 2026] i801_smbus 0000:00:1f.4: SMBus using PCI interrupt
+[Thu Jun 25 14:40:46 2026] ata5: SATA max UDMA/133 abar m2048@0x86102000 port 0x86102300 irq 155 lpm-pol 0
+[Thu Jun 25 14:40:46 2026] ata6: SATA max UDMA/133 abar m2048@0x86102000 port 0x86102380 irq 155 lpm-pol 0
+[Thu Jun 25 14:40:46 2026] ata7: SATA max UDMA/133 abar m2048@0x86102000 port 0x86102400 irq 155 lpm-pol 0
+[Thu Jun 25 14:40:46 2026] ata8: SATA max UDMA/133 abar m2048@0x86102000 port 0x86102480 irq 155 lpm-pol 0
+[Thu Jun 25 14:40:46 2026] vmd 0000:00:0e.0: Bound to PCI domain 10000
+[Thu Jun 25 14:40:49 2026] iwlwifi 0000:00:14.3: PCI dev 7af0/0074, rev=0x430, rfid=0x10a100
+[Thu Jun 25 14:40:49 2026] input: HDA Intel PCH Rear Mic as /devices/pci0000:00/0000:00:1f.3/sound/card0/input6
+[Thu Jun 25 14:40:49 2026] input: HDA Intel PCH Front Mic as /devices/pci0000:00/0000:00:1f.3/sound/card0/input7
+[Thu Jun 25 14:40:49 2026] input: HDA Intel PCH Line as /devices/pci0000:00/0000:00:1f.3/sound/card0/input8
+[Thu Jun 25 14:40:49 2026] input: HDA Intel PCH Line Out Front as /devices/pci0000:00/0000:00:1f.3/sound/card0/input9
+[Thu Jun 25 14:40:49 2026] input: HDA Intel PCH Line Out Surround as /devices/pci0000:00/0000:00:1f.3/sound/card0/input10
+[Thu Jun 25 14:40:49 2026] input: HDA Intel PCH Line Out CLFE as /devices/pci0000:00/0000:00:1f.3/sound/card0/input11
+[Thu Jun 25 14:40:49 2026] input: HDA Intel PCH Front Headphone as /devices/pci0000:00/0000:00:1f.3/sound/card0/input12
+[Thu Jun 25 14:40:49 2026] input: HDA Intel PCH HDMI/DP,pcm=3 as /devices/pci0000:00/0000:00:1f.3/sound/card0/input13
+[Thu Jun 25 14:40:49 2026] input: HDA Intel PCH HDMI/DP,pcm=7 as /devices/pci0000:00/0000:00:1f.3/sound/card0/input14
+[Thu Jun 25 14:40:49 2026] input: HDA Intel PCH HDMI/DP,pcm=8 as /devices/pci0000:00/0000:00:1f.3/sound/card0/input15
+[Thu Jun 25 14:40:49 2026] input: HDA Intel PCH HDMI/DP,pcm=9 as /devices/pci0000:00/0000:00:1f.3/sound/card0/input16
