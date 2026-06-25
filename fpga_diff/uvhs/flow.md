@@ -46,6 +46,11 @@ Latest FPGA-host probe facts:
   has `vermagic: 6.8.0-124-generic` plus an alias for `10ee:9048`.
 - Therefore, do not chase `10ee:0948`; the observed endpoint is `10ee:9048` and
   the matching MinJie driver build already covers it.
+- MinJie's `xdma_chr` BAR check is in `libxdma.c:is_config_bar()`: for each
+  mapped BAR at least `0x8000` bytes, it reads `BAR + 0x2000` and
+  `BAR + 0x3000` and requires high bits `0x1fc2` and `0x1fc3`. Setting
+  `config_bar_num=0` still calls this same check, so it does not bypass a bad
+  or missing XDMA config register aperture.
 
 ## Safe Operating Rules
 
@@ -95,6 +100,10 @@ Decision:
 - If BAR0/BAR1 expose `0x1fc2` and `0x1fc3`, proceed to XDMA smoke.
 - If not, keep the current conclusion: the endpoint enumerates, but the XDMA
   config BAR is not being identified by the MinJie driver.
+- Do not load `xdma_chr` again just to test the ID table. That question is
+  answered. The next useful experiment is a controlled BAR signature read after
+  fresh bit download plus FPGA-host reboot/rescan, or a regenerated XDMA IP
+  where the expected config block is known to decode.
 
 ### XDMA smoke
 

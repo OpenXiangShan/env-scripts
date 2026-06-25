@@ -56,6 +56,22 @@ So the remaining driver branch is not "add 10ee:9048 to the ID table". The
 next meaningful check is why a matching `xdma_chr` probe maps BAR0/BAR1 but
 does not find the XDMA config block.
 
+The MinJie driver source explains exactly what "find the XDMA config block"
+means:
+
+- `libxdma.h` defines `XDMA_OFS_INT_CTRL=0x2000`,
+  `XDMA_OFS_CONFIG=0x3000`, `IRQ_BLOCK_ID=0x1fc20000`, and
+  `CONFIG_BLOCK_ID=0x1fc30000`
+- `libxdma.c:is_config_bar()` maps a BAR, requires length at least `0x8000`,
+  reads `BAR + 0x2000` and `BAR + 0x3000`, and compares the high 16 bits
+  against `0x1fc2` and `0x1fc3`
+- `config_bar_num=0` does not skip this test; it only says which BAR to check
+  first and still fails if the identifier reads are not present
+
+Therefore the active debug question is whether the current `xdma_ep` bitstream
+actually decodes those XDMA identifier registers inside BAR0 or BAR1. The
+driver-ID table itself is not the blocker.
+
 This shifts the active debug branch from HGC/APC physical enumeration toward
 the generated XDMA BAR/register layout, while keeping the earlier 1EP/no-enum
 package as AE history.

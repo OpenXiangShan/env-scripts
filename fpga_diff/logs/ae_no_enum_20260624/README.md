@@ -102,6 +102,11 @@ tests need a fresh bit download followed by FPGA-host reboot/rescan.
   check. The current kernel module tree has no installed `xdma_chr` and no
   installed alias for `10ee:9048`, while MinJie's source and the rebuilt
   `6.8.0-124-generic` `xdma-chr.ko` both include the `10ee:9048` alias.
+- `fpga_host/driver_bar_identify_source_20260625_1457/`: read-only MinJie
+  driver source capture for BAR identification. It records that `xdma_chr`
+  reads BAR offsets `0x2000` and `0x3000` and expects identifier high bits
+  `0x1fc2` and `0x1fc3`; `config_bar_num=0` still runs this check and does not
+  bypass a missing config register aperture.
 - `fpga_host/xdma_chr_build_20260624_1738/`: rebuilt `xdma_chr` for host kernel
   `6.8.0-124-generic`, with alias for `10ee:9048`.
 - `fpga_host/xdma_chr_load_20260624_1738/`: driver probe evidence. Probe mapped
