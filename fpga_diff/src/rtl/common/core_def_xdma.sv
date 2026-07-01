@@ -58,6 +58,7 @@ module core_def (
       output      [1:0]                          uhs1_drv_sth                   ,
       output                                     uhs1_swvolt_en                 ,
       output                                     sd_led_control                 ,
+`ifndef UVHS_UVW_AXI4_TO_DDR4
       output      [`CONFIG_RANK_WIDTH-1:0]       DDR_CK_T                       ,
       output      [`CONFIG_RANK_WIDTH-1:0]       DDR_CK_C                       ,
       output      [`CONFIG_RANK_WIDTH-1:0]       DDR_CKE                        ,
@@ -72,6 +73,7 @@ module core_def (
       inout           [63:0]                     DDR_DQ                         ,
       inout           [7:0]                      DDR_DQS_T                      ,
       inout           [7:0]                      DDR_DQS_C                      ,
+`endif
 
       //==JTAG
 
@@ -106,8 +108,6 @@ module core_def (
 );
 
 // Unbind useless output port {{{
-assign cpu_rd_qspi_valid = 0;
-assign cpu_wr_ddr_valid = 0;
 assign uart1_sout = 0;
 assign uart2_sout = 0;
 assign sd_card_clk_out = 0;
@@ -786,6 +786,67 @@ wire            [1:0]                          gmac_m_arlock                  ;
 wire            [3:0]                          gmac_m_arcache                 ;
 wire            [2:0]                          gmac_m_arprot                  ;
 wire                                           gmac_m_rready                  ;
+`elsif UVHS_SOC_ADAPT
+wire            [39:0]                         gmac_m_awaddr                  ;
+wire            [39:0]                         gmac_m_araddr                  ;
+wire                                           gmac_m_awready                 ;
+wire                                           gmac_m_wready                  ;
+wire            [0:0]                          gmac_m_bid                     ;
+wire            [1:0]                          gmac_m_bresp                   ;
+wire                                           gmac_m_bvalid                  ;
+wire                                           gmac_m_arready                 ;
+wire            [0:0]                          gmac_m_rid                     ;
+wire            [1:0]                          gmac_m_rresp                   ;
+wire            [31:0]                         gmac_m_rdata                   ;
+wire                                           gmac_m_rvalid                  ;
+wire                                           gmac_m_rlast                   ;
+wire            [7:0]                          gmac_m_awlen                   ;
+wire            [0:0]                          gmac_m_awid                    ;
+wire            [1:0]                          gmac_m_awburst                 ;
+wire                                           gmac_m_awvalid                 ;
+wire            [2:0]                          gmac_m_awsize                  ;
+wire                                           gmac_m_awlock                  ;
+wire            [3:0]                          gmac_m_awcache                 ;
+wire            [2:0]                          gmac_m_awprot                  ;
+wire            [31:0]                         gmac_m_wdata                   ;
+wire            [3:0]                          gmac_m_wstrb                   ;
+wire                                           gmac_m_wlast                   ;
+wire                                           gmac_m_wvalid                  ;
+wire                                           gmac_m_bready                  ;
+wire            [7:0]                          gmac_m_arlen                   ;
+wire            [0:0]                          gmac_m_arid                    ;
+wire            [1:0]                          gmac_m_arburst                 ;
+wire                                           gmac_m_arvalid                 ;
+wire            [2:0]                          gmac_m_arsize                  ;
+wire                                           gmac_m_arlock                  ;
+wire            [3:0]                          gmac_m_arcache                 ;
+wire            [2:0]                          gmac_m_arprot                  ;
+wire                                           gmac_m_rready                  ;
+
+assign gmac_m_awaddr = 40'b0;
+assign gmac_m_awlen = 8'b0;
+assign gmac_m_awid = 1'b0;
+assign gmac_m_awburst = 2'b0;
+assign gmac_m_awvalid = 1'b0;
+assign gmac_m_awsize = 3'b0;
+assign gmac_m_awlock = 1'b0;
+assign gmac_m_awcache = 4'b0;
+assign gmac_m_awprot = 3'b0;
+assign gmac_m_wdata = 32'b0;
+assign gmac_m_wstrb = 4'b0;
+assign gmac_m_wlast = 1'b0;
+assign gmac_m_wvalid = 1'b0;
+assign gmac_m_bready = 1'b1;
+assign gmac_m_araddr = 40'b0;
+assign gmac_m_arlen = 8'b0;
+assign gmac_m_arid = 1'b0;
+assign gmac_m_arburst = 2'b0;
+assign gmac_m_arvalid = 1'b0;
+assign gmac_m_arsize = 3'b0;
+assign gmac_m_arlock = 1'b0;
+assign gmac_m_arcache = 4'b0;
+assign gmac_m_arprot = 3'b0;
+assign gmac_m_rready = 1'b1;
 `endif
 `ifdef  XS_UART
 wire                                           uart2_penable                  ;
@@ -1219,6 +1280,7 @@ wire [7:0]    br2cfg_wstrb;
 wire [0:0]    br2cfg_wvalid;
 
   wire [31:0] XDMA_AXI_LITE_awaddr;
+  wire [2:0]  XDMA_AXI_LITE_awprot;
   wire        XDMA_AXI_LITE_awvalid;
   wire        XDMA_AXI_LITE_awready;
   wire [31:0] XDMA_AXI_LITE_wdata;
@@ -1229,12 +1291,31 @@ wire [0:0]    br2cfg_wvalid;
   wire        XDMA_AXI_LITE_bvalid;
   wire        XDMA_AXI_LITE_bready;
   wire [31:0] XDMA_AXI_LITE_araddr;
+  wire [2:0]  XDMA_AXI_LITE_arprot;
   wire        XDMA_AXI_LITE_arvalid;
   wire        XDMA_AXI_LITE_arready;
   wire [31:0] XDMA_AXI_LITE_rdata;
   wire [1:0]  XDMA_AXI_LITE_rresp;
   wire        XDMA_AXI_LITE_rvalid;
   wire        XDMA_AXI_LITE_rready;
+
+  wire [31:0] difftest_cfg_axilite_awaddr;
+  wire        difftest_cfg_axilite_awvalid;
+  wire        difftest_cfg_axilite_awready;
+  wire [31:0] difftest_cfg_axilite_wdata;
+  wire [3:0]  difftest_cfg_axilite_wstrb;
+  wire        difftest_cfg_axilite_wvalid;
+  wire        difftest_cfg_axilite_wready;
+  wire [1:0]  difftest_cfg_axilite_bresp;
+  wire        difftest_cfg_axilite_bvalid;
+  wire        difftest_cfg_axilite_bready;
+  wire [31:0] difftest_cfg_axilite_araddr;
+  wire        difftest_cfg_axilite_arvalid;
+  wire        difftest_cfg_axilite_arready;
+  wire [31:0] difftest_cfg_axilite_rdata;
+  wire [1:0]  difftest_cfg_axilite_rresp;
+  wire        difftest_cfg_axilite_rvalid;
+  wire        difftest_cfg_axilite_rready;
 
   wire        difftest_to_host_axis_tready_io;
   wire        difftest_to_host_axis_tvalid_io;
@@ -1252,9 +1333,24 @@ wire [0:0]    br2cfg_wvalid;
   wire        inter_soc_clk;
   wire        inter_rtc_clk;
 
+`ifdef NUTSHELL_LEGACY_DIFFTEST_HOSTIF
+  reg io_host_reset_q;
+  reg io_host_diff_enable_q;
+  (*mark_debug = "true"*) reg io_host_ila_trigger_q;
+  reg uvhs_legacy_cfg_aw_seen;
+  reg uvhs_legacy_cfg_w_seen;
+  reg uvhs_legacy_cfg_bvalid_q;
+  reg uvhs_legacy_cfg_rvalid_q;
+  reg [31:0] uvhs_legacy_cfg_rdata_q;
+
+  wire io_host_reset = io_host_reset_q;
+  wire io_host_diff_enable = io_host_diff_enable_q;
+  wire io_host_ila_trigger = io_host_ila_trigger_q;
+`else
   wire io_host_reset;
   wire io_host_diff_enable;
-    (*mark_debug = "true"*) wire io_host_ila_trigger;
+  (*mark_debug = "true"*) wire io_host_ila_trigger;
+`endif
   wire clock_enable;
   wire sys_rstn_io;
   wire cpu_rstn_io;
@@ -1265,16 +1361,31 @@ wire [0:0]    br2cfg_wvalid;
   wire xdma_link_up_pcie;
   reg [19:0] difftest_startup_wait_pcie;
   reg difftest_stream_enable_pcie;
+  wire difftest_c2h_rstn;
+  wire difftest_h2c_rstn;
+`ifdef UVHS_UVW_AXI4_TO_DDR4
+  wire difftest_clock_gate_enable = 1'b1;
+`else
+  wire difftest_clock_gate_enable = difftest_clock_enable;
+`endif
+`ifdef NUTSHELL_LEGACY_DIFFTEST_HOSTIF
+  wire uvhs_legacy_cfg_aw_fire = difftest_cfg_axilite_awvalid && difftest_cfg_axilite_awready;
+  wire uvhs_legacy_cfg_w_fire = difftest_cfg_axilite_wvalid && difftest_cfg_axilite_wready;
+`endif
 
   wire difftest_pcie_clock;
+  wire pcie_ep_lnk_up_raw;
   assign sys_rstn_io = sys_rstn & ~io_host_reset;
   assign cpu_rstn_io = cpu_rstn & ~io_host_reset;
+  assign difftest_c2h_rstn = cpu_rstn_pcie & difftest_stream_enable_pcie;
+  assign difftest_h2c_rstn = cpu_rstn_pcie;
   assign noc_clk = inter_soc_clk;
+  assign pcie_ep_lnk_up = pcie_lnk_sync[1];
 
   reg [1:0] pcie_lnk_sync;
   always @(posedge sys_clk_i) begin
       if (!sys_rstn) pcie_lnk_sync <= 2'b00;
-      else           pcie_lnk_sync <= {pcie_lnk_sync[0], pcie_ep_lnk_up};
+      else           pcie_lnk_sync <= {pcie_lnk_sync[0], pcie_ep_lnk_up_raw};
   end
   wire xdma_link_up = pcie_lnk_sync[1];
 
@@ -1325,6 +1436,130 @@ wire [0:0]    br2cfg_wvalid;
   assign difftest_to_host_axis_tready = difftest_to_host_axis_tready_io & difftest_stream_enable_pcie;
   assign difftest_to_host_axis_tvalid_io = difftest_to_host_axis_tvalid & difftest_stream_enable_pcie;
 
+`ifdef NUTSHELL_LEGACY_DIFFTEST_HOSTIF
+  assign difftest_cfg_axilite_awaddr = XDMA_AXI_LITE_awaddr;
+  assign difftest_cfg_axilite_awvalid = XDMA_AXI_LITE_awvalid;
+  assign difftest_cfg_axilite_wdata = XDMA_AXI_LITE_wdata;
+  assign difftest_cfg_axilite_wstrb = XDMA_AXI_LITE_wstrb;
+  assign difftest_cfg_axilite_wvalid = XDMA_AXI_LITE_wvalid;
+  assign difftest_cfg_axilite_bready = XDMA_AXI_LITE_bready;
+  assign difftest_cfg_axilite_awready = !uvhs_legacy_cfg_bvalid_q && !uvhs_legacy_cfg_aw_seen;
+  assign difftest_cfg_axilite_wready = !uvhs_legacy_cfg_bvalid_q && !uvhs_legacy_cfg_w_seen;
+  assign difftest_cfg_axilite_bresp = 2'b00;
+  assign difftest_cfg_axilite_bvalid = uvhs_legacy_cfg_bvalid_q;
+  assign difftest_cfg_axilite_arready = !uvhs_legacy_cfg_rvalid_q;
+  assign difftest_cfg_axilite_rdata = uvhs_legacy_cfg_rdata_q;
+  assign difftest_cfg_axilite_rresp = 2'b00;
+  assign difftest_cfg_axilite_rvalid = uvhs_legacy_cfg_rvalid_q;
+
+  always @(posedge sys_clk_i) begin
+      if (!sys_rstn) begin
+          io_host_reset_q <= 1'b1;
+          io_host_diff_enable_q <= 1'b0;
+          io_host_ila_trigger_q <= 1'b0;
+          uvhs_legacy_cfg_aw_seen <= 1'b0;
+          uvhs_legacy_cfg_w_seen <= 1'b0;
+          uvhs_legacy_cfg_bvalid_q <= 1'b0;
+          uvhs_legacy_cfg_rvalid_q <= 1'b0;
+          uvhs_legacy_cfg_rdata_q <= 32'b0;
+      end else begin
+          if (uvhs_legacy_cfg_bvalid_q) begin
+              if (difftest_cfg_axilite_bready) begin
+                  uvhs_legacy_cfg_bvalid_q <= 1'b0;
+              end
+          end else begin
+              uvhs_legacy_cfg_aw_seen <= (uvhs_legacy_cfg_aw_seen || uvhs_legacy_cfg_aw_fire) &&
+                                         !(uvhs_legacy_cfg_w_seen || uvhs_legacy_cfg_w_fire);
+              uvhs_legacy_cfg_w_seen <= (uvhs_legacy_cfg_w_seen || uvhs_legacy_cfg_w_fire) &&
+                                        !(uvhs_legacy_cfg_aw_seen || uvhs_legacy_cfg_aw_fire);
+              if ((uvhs_legacy_cfg_aw_seen || uvhs_legacy_cfg_aw_fire) &&
+                  (uvhs_legacy_cfg_w_seen || uvhs_legacy_cfg_w_fire)) begin
+                  uvhs_legacy_cfg_aw_seen <= 1'b0;
+                  uvhs_legacy_cfg_w_seen <= 1'b0;
+                  uvhs_legacy_cfg_bvalid_q <= 1'b1;
+                  case (difftest_cfg_axilite_awaddr[7:0])
+                      8'h00: io_host_reset_q <= difftest_cfg_axilite_wdata[0];
+                      8'h04: io_host_diff_enable_q <= difftest_cfg_axilite_wdata[0];
+                      8'h08: io_host_ila_trigger_q <= difftest_cfg_axilite_wdata[0];
+                      default: ;
+                  endcase
+              end
+          end
+
+          if (uvhs_legacy_cfg_rvalid_q) begin
+              if (difftest_cfg_axilite_rready) begin
+                  uvhs_legacy_cfg_rvalid_q <= 1'b0;
+              end
+          end else if (difftest_cfg_axilite_arvalid) begin
+              uvhs_legacy_cfg_rvalid_q <= 1'b1;
+              case (difftest_cfg_axilite_araddr[7:0])
+                  8'h00: uvhs_legacy_cfg_rdata_q <= {31'b0, io_host_reset_q};
+                  8'h04: uvhs_legacy_cfg_rdata_q <= {31'b0, io_host_diff_enable_q};
+                  8'h08: uvhs_legacy_cfg_rdata_q <= {31'b0, io_host_ila_trigger_q};
+                  default: uvhs_legacy_cfg_rdata_q <= 32'b0;
+              endcase
+          end
+      end
+  end
+`else
+  assign difftest_cfg_axilite_awaddr = XDMA_AXI_LITE_awaddr;
+  assign difftest_cfg_axilite_awvalid = XDMA_AXI_LITE_awvalid;
+  assign difftest_cfg_axilite_wdata = XDMA_AXI_LITE_wdata;
+  assign difftest_cfg_axilite_wstrb = XDMA_AXI_LITE_wstrb;
+  assign difftest_cfg_axilite_wvalid = XDMA_AXI_LITE_wvalid;
+  assign difftest_cfg_axilite_bready = XDMA_AXI_LITE_bready;
+`endif
+
+  assign difftest_cfg_axilite_araddr = XDMA_AXI_LITE_araddr;
+  assign difftest_cfg_axilite_arvalid = XDMA_AXI_LITE_arvalid;
+  assign difftest_cfg_axilite_rready = XDMA_AXI_LITE_rready;
+  assign XDMA_AXI_LITE_awready = difftest_cfg_axilite_awready;
+  assign XDMA_AXI_LITE_wready = difftest_cfg_axilite_wready;
+  assign XDMA_AXI_LITE_bresp = difftest_cfg_axilite_bresp;
+  assign XDMA_AXI_LITE_bvalid = difftest_cfg_axilite_bvalid;
+  assign XDMA_AXI_LITE_arready = difftest_cfg_axilite_arready;
+  assign XDMA_AXI_LITE_rvalid = difftest_cfg_axilite_rvalid;
+  assign XDMA_AXI_LITE_rdata = difftest_cfg_axilite_rdata;
+  assign XDMA_AXI_LITE_rresp = difftest_cfg_axilite_rresp;
+
+
+  reg cpu_ddr_read_seen;
+  reg difftest_axis_valid_seen;
+  wire cpu_ddr_read_fire = cpu2ddr_m2s_arvalid & cpu2ddr_s2m_arready;
+
+  always @(posedge sys_clk_i) begin
+      if (!cpu_rstn_io) begin
+          cpu_ddr_read_seen <= 1'b0;
+          difftest_axis_valid_seen <= 1'b0;
+      end else begin
+          cpu_ddr_read_seen <= cpu_ddr_read_seen | cpu_ddr_read_fire;
+          difftest_axis_valid_seen <= difftest_axis_valid_seen | difftest_to_host_axis_valid_io;
+      end
+  end
+
+  assign cpu_rd_qspi_valid = cpu_ddr_read_seen;
+  assign cpu_wr_ddr_valid = difftest_axis_valid_seen;
+
+`ifdef UVHS_CPU_LIVENESS_GBD
+  uvhs_cpu_liveness_gbd U_UVHS_CPU_LIVENESS_GBD (
+    .clk              (sys_clk_i),
+    .rstn             (sys_rstn),
+    .cpu_rstn         (cpu_rstn_io),
+    .host_reset       (io_host_reset),
+    .host_diff_enable (io_host_diff_enable),
+    .ddr_init_done    (init_calib_complete),
+    .mem_arvalid      (cpu2ddr_m2s_arvalid),
+    .mem_arready      (cpu2ddr_s2m_arready),
+    .mem_araddr       (cpu2ddr_m2s_araddr),
+    .mem_rvalid       (cpu2ddr_s2m_rvalid),
+    .mem_rready       (cpu2ddr_m2s_rready),
+    .axis_valid       (difftest_to_host_axis_tvalid),
+    .axis_ready       (difftest_to_host_axis_tready),
+    .backend_valid    (U_CPU_TOP.u_SimTop.cpu.nutcore.backend.io_in_0_valid),
+    .backend_pc       (U_CPU_TOP.u_SimTop.cpu.nutcore.backend.io_in_0_bits_cf_pc)
+  );
+`endif
+
   xdma_ep xdma_ep_i(
     .cpu_clk              (sys_clk_i),
     .cpu_rstn             (sys_rstn),
@@ -1340,7 +1575,7 @@ wire [0:0]    br2cfg_wvalid;
     .M00_AXIS_0_tvalid    (difftest_from_host_axis_tvalid),
 
     .XDMA_AXI_LITE_awaddr (XDMA_AXI_LITE_awaddr),
-    .XDMA_AXI_LITE_awprot (3'b000),
+    .XDMA_AXI_LITE_awprot (XDMA_AXI_LITE_awprot),
     .XDMA_AXI_LITE_awvalid(XDMA_AXI_LITE_awvalid),
     .XDMA_AXI_LITE_awready(XDMA_AXI_LITE_awready),
     .XDMA_AXI_LITE_wdata  (XDMA_AXI_LITE_wdata),
@@ -1351,7 +1586,7 @@ wire [0:0]    br2cfg_wvalid;
     .XDMA_AXI_LITE_bvalid (XDMA_AXI_LITE_bvalid),
     .XDMA_AXI_LITE_bready (XDMA_AXI_LITE_bready),
     .XDMA_AXI_LITE_araddr (XDMA_AXI_LITE_araddr),
-    .XDMA_AXI_LITE_arprot (3'b000),
+    .XDMA_AXI_LITE_arprot (XDMA_AXI_LITE_arprot),
     .XDMA_AXI_LITE_arvalid(XDMA_AXI_LITE_arvalid),
     .XDMA_AXI_LITE_arready(XDMA_AXI_LITE_arready),
     .XDMA_AXI_LITE_rdata  (XDMA_AXI_LITE_rdata),
@@ -1366,19 +1601,19 @@ wire [0:0]    br2cfg_wvalid;
     .pci_exp_txp(pci_ep_txp),
     .pcie_ep_gt_ref_clk_n(pcie_ep_gt_ref_clk_n),
     .pcie_ep_gt_ref_clk_p(pcie_ep_gt_ref_clk_p),
-    .pcie_ep_lnk_up(pcie_ep_lnk_up),
+    .pcie_ep_lnk_up(pcie_ep_lnk_up_raw),
     .pcie_ep_perstn(pcie_ep_perstn)
   );
 
   DifftestClockGate SOC_CLK_CTRL(
       .CK  (sys_clk_i),
-      .E   ((difftest_clock_enable & xdma_link_up ) || ~io_host_diff_enable || ~sys_rstn_io || ~cpu_rstn_io),
+      .E   ((difftest_clock_gate_enable & xdma_link_up ) || ~io_host_diff_enable || ~sys_rstn_io || ~cpu_rstn_io),
       .Q   (inter_soc_clk)
   );
 
   DifftestClockGate RTC_CLK_CTRL(
       .CK  (tmclk),
-      .E   ((difftest_clock_enable & xdma_link_up) || ~io_host_diff_enable || ~sys_rstn_io || ~cpu_rstn_io ),
+      .E   ((difftest_clock_gate_enable & xdma_link_up) || ~io_host_diff_enable || ~sys_rstn_io || ~cpu_rstn_io ),
       .Q   (inter_rtc_clk)
   );
 
@@ -1431,6 +1666,247 @@ mode_ctrl U_MODE_CTRL(
     .scan_mode                      (                              )
 );
 
+`ifdef UVHS_UVW_AXI4_TO_DDR4
+wire [13:0]  uvhs_ddr_awid;
+wire [33:0]  uvhs_ddr_awaddr;
+wire [7:0]   uvhs_ddr_awlen;
+wire [2:0]   uvhs_ddr_awsize;
+wire [1:0]   uvhs_ddr_awburst;
+wire [0:0]   uvhs_ddr_awlock;
+wire [3:0]   uvhs_ddr_awcache;
+wire [2:0]   uvhs_ddr_awprot;
+wire [3:0]   uvhs_ddr_awqos;
+wire [3:0]   uvhs_ddr_awregion;
+wire         uvhs_ddr_awvalid;
+wire         uvhs_ddr_awready;
+wire [255:0] uvhs_ddr_wdata;
+wire [31:0]  uvhs_ddr_wstrb;
+wire         uvhs_ddr_wlast;
+wire         uvhs_ddr_wvalid;
+wire         uvhs_ddr_wready;
+wire [13:0]  uvhs_ddr_bid;
+wire [1:0]   uvhs_ddr_bresp;
+wire         uvhs_ddr_bvalid;
+wire         uvhs_ddr_bready;
+wire [13:0]  uvhs_ddr_arid;
+wire [33:0]  uvhs_ddr_araddr;
+wire [7:0]   uvhs_ddr_arlen;
+wire [2:0]   uvhs_ddr_arsize;
+wire [1:0]   uvhs_ddr_arburst;
+wire [0:0]   uvhs_ddr_arlock;
+wire [3:0]   uvhs_ddr_arcache;
+wire [2:0]   uvhs_ddr_arprot;
+wire [3:0]   uvhs_ddr_arqos;
+wire [3:0]   uvhs_ddr_arregion;
+wire         uvhs_ddr_arvalid;
+wire         uvhs_ddr_arready;
+wire [255:0] uvhs_ddr_rdata;
+wire [13:0]  uvhs_ddr_rid;
+wire [1:0]   uvhs_ddr_rresp;
+wire         uvhs_ddr_rlast;
+wire         uvhs_ddr_rvalid;
+wire         uvhs_ddr_rready;
+wire         uvhs_ddr_user_clk;
+wire         uvhs_ddr_user_rst;
+wire [255:0] uvhs_ddr_sysbus_i;
+wire [255:0] uvhs_ddr_sysbus_o;
+
+assign uvhs_ddr_sysbus_i = 256'b0;
+assign init_calib_complete = rstn_sw4 & ~uvhs_ddr_user_rst;
+
+`ifdef CONFIG_USE_XSCORE_AXI
+`ifdef CPU_NUTSHELL
+uvhs_axi64_to_axi256 u_uvhs_axi64_to_axi256 (
+    .clk                   (inter_soc_clk),
+    .rstn                  (rstn_sw4),
+    .s_axi_awid            (cpu2ddr_m2s_awid_mix[13:0]),
+    .s_axi_awaddr          (cpu2ddr_m2s_awaddr_mix),
+    .s_axi_awlen           (cpu2ddr_m2s_awlen),
+    .s_axi_awsize          (cpu2ddr_m2s_awsize),
+    .s_axi_awburst         (cpu2ddr_m2s_awburst),
+    .s_axi_awlock          (cpu2ddr_m2s_awlock),
+    .s_axi_awcache         (cpu2ddr_m2s_awcache),
+    .s_axi_awprot          (cpu2ddr_m2s_awprot),
+    .s_axi_awqos           (cpu2ddr_m2s_awqos),
+    .s_axi_awvalid         (cpu2ddr_m2s_awvalid),
+    .s_axi_awready         (cpu2ddr_s2m_awready),
+    .s_axi_wdata           (cpu2ddr_m2s_wdata[63:0]),
+    .s_axi_wstrb           (cpu2ddr_m2s_wstrb[7:0]),
+    .s_axi_wlast           (cpu2ddr_m2s_wlast),
+    .s_axi_wvalid          (cpu2ddr_m2s_wvalid),
+    .s_axi_wready          (cpu2ddr_s2m_wready),
+    .s_axi_bid             (cpu2ddr_s2m_bid[13:0]),
+    .s_axi_bresp           (cpu2ddr_s2m_bresp),
+    .s_axi_bvalid          (cpu2ddr_s2m_bvalid),
+    .s_axi_bready          (cpu2ddr_m2s_bready),
+    .s_axi_arid            (cpu2ddr_m2s_arid_mix[13:0]),
+    .s_axi_araddr          (cpu2ddr_m2s_araddr_mix),
+    .s_axi_arlen           (cpu2ddr_m2s_arlen),
+    .s_axi_arsize          (cpu2ddr_m2s_arsize),
+    .s_axi_arburst         (cpu2ddr_m2s_arburst),
+    .s_axi_arlock          (cpu2ddr_m2s_arlock),
+    .s_axi_arcache         (cpu2ddr_m2s_arcache),
+    .s_axi_arprot          (cpu2ddr_m2s_arprot),
+    .s_axi_arqos           (cpu2ddr_m2s_arqos),
+    .s_axi_arvalid         (cpu2ddr_m2s_arvalid),
+    .s_axi_arready         (cpu2ddr_s2m_arready),
+    .s_axi_rid             (cpu2ddr_s2m_rid[13:0]),
+    .s_axi_rdata           (cpu2ddr_s2m_rdata[63:0]),
+    .s_axi_rresp           (cpu2ddr_s2m_rresp),
+    .s_axi_rlast           (cpu2ddr_s2m_rlast),
+    .s_axi_rvalid          (cpu2ddr_s2m_rvalid),
+    .s_axi_rready          (cpu2ddr_m2s_rready),
+    .m_axi_awid            (uvhs_ddr_awid),
+    .m_axi_awaddr          (uvhs_ddr_awaddr),
+    .m_axi_awlen           (uvhs_ddr_awlen),
+    .m_axi_awsize          (uvhs_ddr_awsize),
+    .m_axi_awburst         (uvhs_ddr_awburst),
+    .m_axi_awlock          (uvhs_ddr_awlock),
+    .m_axi_awcache         (uvhs_ddr_awcache),
+    .m_axi_awprot          (uvhs_ddr_awprot),
+    .m_axi_awqos           (uvhs_ddr_awqos),
+    .m_axi_awregion        (uvhs_ddr_awregion),
+    .m_axi_awvalid         (uvhs_ddr_awvalid),
+    .m_axi_awready         (uvhs_ddr_awready),
+    .m_axi_wdata           (uvhs_ddr_wdata),
+    .m_axi_wstrb           (uvhs_ddr_wstrb),
+    .m_axi_wlast           (uvhs_ddr_wlast),
+    .m_axi_wvalid          (uvhs_ddr_wvalid),
+    .m_axi_wready          (uvhs_ddr_wready),
+    .m_axi_bid             (uvhs_ddr_bid),
+    .m_axi_bresp           (uvhs_ddr_bresp),
+    .m_axi_bvalid          (uvhs_ddr_bvalid),
+    .m_axi_bready          (uvhs_ddr_bready),
+    .m_axi_arid            (uvhs_ddr_arid),
+    .m_axi_araddr          (uvhs_ddr_araddr),
+    .m_axi_arlen           (uvhs_ddr_arlen),
+    .m_axi_arsize          (uvhs_ddr_arsize),
+    .m_axi_arburst         (uvhs_ddr_arburst),
+    .m_axi_arlock          (uvhs_ddr_arlock),
+    .m_axi_arcache         (uvhs_ddr_arcache),
+    .m_axi_arprot          (uvhs_ddr_arprot),
+    .m_axi_arqos           (uvhs_ddr_arqos),
+    .m_axi_arregion        (uvhs_ddr_arregion),
+    .m_axi_arvalid         (uvhs_ddr_arvalid),
+    .m_axi_arready         (uvhs_ddr_arready),
+    .m_axi_rid             (uvhs_ddr_rid),
+    .m_axi_rdata           (uvhs_ddr_rdata),
+    .m_axi_rresp           (uvhs_ddr_rresp),
+    .m_axi_rlast           (uvhs_ddr_rlast),
+    .m_axi_rvalid          (uvhs_ddr_rvalid),
+    .m_axi_rready          (uvhs_ddr_rready)
+);
+assign cpu2ddr_s2m_bid[17:14] = 4'b0;
+assign cpu2ddr_s2m_rid[17:14] = 4'b0;
+assign cpu2ddr_s2m_rdata[255:64] = 192'b0;
+`else
+assign uvhs_ddr_awid     = cpu2ddr_m2s_awid_mix[13:0];
+assign uvhs_ddr_awaddr   = cpu2ddr_m2s_awaddr_mix[33:0];
+assign uvhs_ddr_awlen    = cpu2ddr_m2s_awlen;
+assign uvhs_ddr_awsize   = cpu2ddr_m2s_awsize;
+assign uvhs_ddr_awburst  = cpu2ddr_m2s_awburst;
+assign uvhs_ddr_awlock   = cpu2ddr_m2s_awlock;
+assign uvhs_ddr_awcache  = cpu2ddr_m2s_awcache;
+assign uvhs_ddr_awprot   = cpu2ddr_m2s_awprot;
+assign uvhs_ddr_awqos    = cpu2ddr_m2s_awqos;
+assign uvhs_ddr_awregion = cpu2ddr_m2s_awregion;
+assign uvhs_ddr_awvalid  = cpu2ddr_m2s_awvalid;
+assign cpu2ddr_s2m_awready = uvhs_ddr_awready;
+assign uvhs_ddr_wdata    = cpu2ddr_m2s_wdata;
+assign uvhs_ddr_wstrb    = cpu2ddr_m2s_wstrb;
+assign uvhs_ddr_wlast    = cpu2ddr_m2s_wlast;
+assign uvhs_ddr_wvalid   = cpu2ddr_m2s_wvalid;
+assign cpu2ddr_s2m_wready = uvhs_ddr_wready;
+assign cpu2ddr_s2m_bid   = {4'b0, uvhs_ddr_bid};
+assign cpu2ddr_s2m_bresp = uvhs_ddr_bresp;
+assign cpu2ddr_s2m_bvalid = uvhs_ddr_bvalid;
+assign uvhs_ddr_bready   = cpu2ddr_m2s_bready;
+assign uvhs_ddr_arid     = cpu2ddr_m2s_arid_mix[13:0];
+assign uvhs_ddr_araddr   = cpu2ddr_m2s_araddr_mix[33:0];
+assign uvhs_ddr_arlen    = cpu2ddr_m2s_arlen;
+assign uvhs_ddr_arsize   = cpu2ddr_m2s_arsize;
+assign uvhs_ddr_arburst  = cpu2ddr_m2s_arburst;
+assign uvhs_ddr_arlock   = cpu2ddr_m2s_arlock;
+assign uvhs_ddr_arcache  = cpu2ddr_m2s_arcache;
+assign uvhs_ddr_arprot   = cpu2ddr_m2s_arprot;
+assign uvhs_ddr_arqos    = cpu2ddr_m2s_arqos;
+assign uvhs_ddr_arregion = cpu2ddr_m2s_arregion;
+assign uvhs_ddr_arvalid  = cpu2ddr_m2s_arvalid;
+assign cpu2ddr_s2m_arready = uvhs_ddr_arready;
+assign cpu2ddr_s2m_rid   = {4'b0, uvhs_ddr_rid};
+assign cpu2ddr_s2m_rdata = uvhs_ddr_rdata;
+assign cpu2ddr_s2m_rresp = uvhs_ddr_rresp;
+assign cpu2ddr_s2m_rlast = uvhs_ddr_rlast;
+assign cpu2ddr_s2m_rvalid = uvhs_ddr_rvalid;
+assign uvhs_ddr_rready   = cpu2ddr_m2s_rready;
+`endif
+`endif
+
+uvw_axi4_to_ddr4 U_UVHS_UVW_AXI4_TO_DDR4 (
+    .ddr4ip_dut_axi_aclk     (inter_soc_clk),
+    .ddr4ip_dut_axi_aresetn  (rstn_sw4),
+    .ddr4ip_dut_axi_awaddr   (uvhs_ddr_awaddr),
+    .ddr4ip_dut_axi_awburst  (uvhs_ddr_awburst),
+    .ddr4ip_dut_axi_awcache  (uvhs_ddr_awcache),
+    .ddr4ip_dut_axi_awid     (uvhs_ddr_awid),
+    .ddr4ip_dut_axi_awlen    (uvhs_ddr_awlen),
+    .ddr4ip_dut_axi_awlock   (uvhs_ddr_awlock),
+    .ddr4ip_dut_axi_awprot   (uvhs_ddr_awprot),
+    .ddr4ip_dut_axi_awqos    (uvhs_ddr_awqos),
+    .ddr4ip_dut_axi_awready  (uvhs_ddr_awready),
+    .ddr4ip_dut_axi_awregion (uvhs_ddr_awregion),
+    .ddr4ip_dut_axi_awsize   (uvhs_ddr_awsize),
+    .ddr4ip_dut_axi_awvalid  (uvhs_ddr_awvalid),
+    .ddr4ip_dut_axi_wdata    (uvhs_ddr_wdata),
+    .ddr4ip_dut_axi_wlast    (uvhs_ddr_wlast),
+    .ddr4ip_dut_axi_wready   (uvhs_ddr_wready),
+    .ddr4ip_dut_axi_wstrb    (uvhs_ddr_wstrb),
+    .ddr4ip_dut_axi_wvalid   (uvhs_ddr_wvalid),
+    .ddr4ip_dut_axi_bid      (uvhs_ddr_bid),
+    .ddr4ip_dut_axi_bready   (uvhs_ddr_bready),
+    .ddr4ip_dut_axi_bresp    (uvhs_ddr_bresp),
+    .ddr4ip_dut_axi_bvalid   (uvhs_ddr_bvalid),
+    .ddr4ip_dut_axi_araddr   (uvhs_ddr_araddr),
+    .ddr4ip_dut_axi_arburst  (uvhs_ddr_arburst),
+    .ddr4ip_dut_axi_arcache  (uvhs_ddr_arcache),
+    .ddr4ip_dut_axi_arid     (uvhs_ddr_arid),
+    .ddr4ip_dut_axi_arlen    (uvhs_ddr_arlen),
+    .ddr4ip_dut_axi_arlock   (uvhs_ddr_arlock),
+    .ddr4ip_dut_axi_arprot   (uvhs_ddr_arprot),
+    .ddr4ip_dut_axi_arqos    (uvhs_ddr_arqos),
+    .ddr4ip_dut_axi_arready  (uvhs_ddr_arready),
+    .ddr4ip_dut_axi_arregion (uvhs_ddr_arregion),
+    .ddr4ip_dut_axi_arsize   (uvhs_ddr_arsize),
+    .ddr4ip_dut_axi_arvalid  (uvhs_ddr_arvalid),
+    .ddr4ip_dut_axi_rdata    (uvhs_ddr_rdata),
+    .ddr4ip_dut_axi_rid      (uvhs_ddr_rid),
+    .ddr4ip_dut_axi_rlast    (uvhs_ddr_rlast),
+    .ddr4ip_dut_axi_rready   (uvhs_ddr_rready),
+    .ddr4ip_dut_axi_rresp    (uvhs_ddr_rresp),
+    .ddr4ip_dut_axi_rvalid   (uvhs_ddr_rvalid),
+    .ddr4ip_dut_axi_aclk_en  (1'b1),
+    .ddr4ip_ddr4_user_clk    (uvhs_ddr_user_clk),
+    .ddr4ip_ddr4_user_rst    (uvhs_ddr_user_rst),
+    .sysbus_ghbd_i           (uvhs_ddr_sysbus_i),
+    .sysbus_ghbd_o           (uvhs_ddr_sysbus_o),
+    .FP_CLK_200M_P           (),
+    .FP_CLK_200M_N           (),
+    .DDR4_DIMM_ACT_N         (),
+    .DDR4_DIMM_A             (),
+    .DDR4_DIMM_BA            (),
+    .DDR4_DIMM_BG            (),
+    .DDR4_DIMM_CK_N          (),
+    .DDR4_DIMM_CK_P          (),
+    .DDR4_DIMM_CKE           (),
+    .DDR4_DIMM_CS_N          (),
+    .DDR4_DIMM_ODT           (),
+    .DDR4_DIMM_RST_B         (),
+    .DDR4_DIMM_DM            (),
+    .DDR4_DIMM_DQ            (),
+    .DDR4_DIMM_DQS_N         (),
+    .DDR4_DIMM_DQS_P         ()
+);
+`else
 jtag_ddr_subsys_wrapper U_JTAG_DDR_SUBSYS(
     .DDR4_act_n             (DDR_ACT_N),
     .DDR4_adr               (DDR_A),
@@ -1572,6 +2048,7 @@ jtag_ddr_subsys_wrapper U_JTAG_DDR_SUBSYS(
     .soc_rstn               (rstn_sw4),
     .calib_complete         (init_calib_complete)
 );
+`endif
 
 `ifdef CONFIG_USE_XSCORE_CHI
 xs_sys_icn u_icn(
@@ -1998,6 +2475,25 @@ SimTop_wrapper U_CPU_TOP(
     .difftest_hostCtrl_reset         (io_host_reset),
     .difftest_hostCtrl_diffEnable    (io_host_diff_enable),
     .difftest_hostCtrl_ilaTrigger    (io_host_ila_trigger),
+`ifdef NUTSHELL_LEGACY_DIFFTEST_HOSTIF
+    .difftest_cfg_axilite_awaddr     (),
+    .difftest_cfg_axilite_awvalid    (),
+    .difftest_cfg_axilite_awready    (),
+    .difftest_cfg_axilite_wdata      (),
+    .difftest_cfg_axilite_wstrb      (),
+    .difftest_cfg_axilite_wvalid     (),
+    .difftest_cfg_axilite_wready     (),
+    .difftest_cfg_axilite_bresp      (),
+    .difftest_cfg_axilite_bvalid     (),
+    .difftest_cfg_axilite_bready     (),
+    .difftest_cfg_axilite_araddr     (),
+    .difftest_cfg_axilite_arvalid    (),
+    .difftest_cfg_axilite_arready    (),
+    .difftest_cfg_axilite_rdata      (),
+    .difftest_cfg_axilite_rresp      (),
+    .difftest_cfg_axilite_rvalid     (),
+    .difftest_cfg_axilite_rready     (),
+`else
     .difftest_cfg_axilite_awaddr     (XDMA_AXI_LITE_awaddr),
     .difftest_cfg_axilite_awvalid    (XDMA_AXI_LITE_awvalid),
     .difftest_cfg_axilite_awready    (XDMA_AXI_LITE_awready),
@@ -2008,13 +2504,14 @@ SimTop_wrapper U_CPU_TOP(
     .difftest_cfg_axilite_bresp      (XDMA_AXI_LITE_bresp),
     .difftest_cfg_axilite_bvalid     (XDMA_AXI_LITE_bvalid),
     .difftest_cfg_axilite_bready     (XDMA_AXI_LITE_bready),
-    .difftest_cfg_axilite_araddr     (XDMA_AXI_LITE_araddr),
-    .difftest_cfg_axilite_arvalid    (XDMA_AXI_LITE_arvalid),
-    .difftest_cfg_axilite_arready    (XDMA_AXI_LITE_arready),
-    .difftest_cfg_axilite_rdata      (XDMA_AXI_LITE_rdata),
-    .difftest_cfg_axilite_rresp      (XDMA_AXI_LITE_rresp),
-    .difftest_cfg_axilite_rvalid     (XDMA_AXI_LITE_rvalid),
-    .difftest_cfg_axilite_rready     (XDMA_AXI_LITE_rready),
+    .difftest_cfg_axilite_araddr     (difftest_cfg_axilite_araddr),
+    .difftest_cfg_axilite_arvalid    (difftest_cfg_axilite_arvalid),
+    .difftest_cfg_axilite_arready    (difftest_cfg_axilite_arready),
+    .difftest_cfg_axilite_rdata      (difftest_cfg_axilite_rdata),
+    .difftest_cfg_axilite_rresp      (difftest_cfg_axilite_rresp),
+    .difftest_cfg_axilite_rvalid     (difftest_cfg_axilite_rvalid),
+    .difftest_cfg_axilite_rready     (difftest_cfg_axilite_rready),
+`endif
     .inter_soc_clk                  (inter_soc_clk),
     .sys_rstn_i                     (cpu_rstn_io  ),
     .tmclk                          (inter_rtc_clk),
@@ -2251,6 +2748,9 @@ AXI_bridge CFG_AXI_bridge_i
         .S00_AXI_arprot         (cpu2cfg_m2s_arprot),
         .S00_AXI_arqos          (cpu2cfg_m2s_arqos),
         .S00_AXI_arready        (cpu2cfg_s2m_arready),
+`ifdef UVHS_SOC_ADAPT
+        .S00_AXI_arregion       (4'b0),
+`endif
         .S00_AXI_arsize         (cpu2cfg_m2s_arsize),
         .S00_AXI_arvalid        (cpu2cfg_m2s_arvalid),
         .S00_AXI_awaddr         (cpu2cfg_m2s_awaddr),
@@ -2262,6 +2762,9 @@ AXI_bridge CFG_AXI_bridge_i
         .S00_AXI_awprot         (cpu2cfg_m2s_awprot),
         .S00_AXI_awqos          (cpu2cfg_m2s_awqos),
         .S00_AXI_awready        (cpu2cfg_s2m_awready),
+`ifdef UVHS_SOC_ADAPT
+        .S00_AXI_awregion       (4'b0),
+`endif
         .S00_AXI_awsize         (cpu2cfg_m2s_awsize),
         .S00_AXI_awvalid        (cpu2cfg_m2s_awvalid),
         .S00_AXI_bid            (cpu2cfg_s2m_bid),
@@ -2288,7 +2791,16 @@ AXI_bridge CFG_AXI_bridge_i
         .SYS_CFG_APB_pslverr    (syscfg_pslverr),
         .SYS_CFG_APB_pwdata     (syscfg_pwdata),
         .SYS_CFG_APB_pwrite     (syscfg_pwrite),
+`ifdef UVHS_SOC_ADAPT
+        .DMAC_CFG_AHB_hrdata    (32'b0),
+        .DMAC_CFG_AHB_hready    (1'b1),
+        .DMAC_CFG_AHB_hresp     (1'b0),
+        .IOMMU_CFG_APB_prdata   (32'b0),
+        .IOMMU_CFG_APB_pready   (1'b1),
+        .IOMMU_CFG_APB_pslverr  (1'b0),
 
+        .UART_CLK               (sys_clk_i),
+`endif
         .UART_0_baudoutn        (),
         .UART_0_ctsn            (1'b1),
         .UART_0_dcdn            (1'b0),
@@ -2304,6 +2816,28 @@ AXI_bridge CFG_AXI_bridge_i
         .UART_0_txd             (uart0_sout),
         .UART_0_txrdyn          (),
         .uart0_intc             (uart0_int),
+`ifdef UVHS_SOC_ADAPT
+        .UARTLITE_AXI_arready   (1'b1),
+        .UARTLITE_AXI_awready   (1'b1),
+        .UARTLITE_AXI_bid       (2'b0),
+        .UARTLITE_AXI_bresp     (2'b0),
+        .UARTLITE_AXI_bvalid    (1'b0),
+        .UARTLITE_AXI_rdata     (64'b0),
+        .UARTLITE_AXI_rid       (2'b0),
+        .UARTLITE_AXI_rlast     (1'b0),
+        .UARTLITE_AXI_rresp     (2'b0),
+        .UARTLITE_AXI_rvalid    (1'b0),
+        .UARTLITE_AXI_wready    (1'b1),
+        .pcie_cfg_arready       (1'b1),
+        .pcie_cfg_awready       (1'b1),
+        .pcie_cfg_bresp         (2'b0),
+        .pcie_cfg_bvalid        (1'b0),
+        .pcie_cfg_rdata         (32'b0),
+        .pcie_cfg_rlast         (1'b0),
+        .pcie_cfg_rresp         (2'b0),
+        .pcie_cfg_rvalid        (1'b0),
+        .pcie_cfg_wready        (1'b1),
+`endif
 
         .rom_axi_araddr         (rom_axi_araddr),
         .rom_axi_arburst        (),

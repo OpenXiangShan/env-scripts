@@ -1,29 +1,10 @@
+source [file normalize [file join [file dirname [info script]] hw_common.tcl]]
+
 puts "workload path:"
 puts [lindex $argv 0]
 set file_name [lindex $argv 0]
-# Initialize LabTools system
-if {[catch {open_hw_manager} errmsg]} {
-    puts "Error initializing LabTools system: $errmsg"
-    exit
-} else {
-    puts "LabTools system initialized"
-}
 
-# Connect to hardware server
-if {[catch {connect_hw_server} errmsg]} {
-    puts "Error connecting to hardware server: $errmsg"
-    exit
-} else {
-    puts "Connected to hardware server"
-}
-
-# Open hardware target (JTAG device)
-if {[catch {open_hw_target} errmsg]} {
-    puts "Error opening hardware target: $errmsg"
-    exit
-} else {
-    puts "Opened hardware target"
-}
+open_uvhs_hw_session
 
 set_property PARAM.FREQUENCY 12000000 [current_hw_target]
 

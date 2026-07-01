@@ -337,19 +337,41 @@ proc create_root_design { parentCell } {
       CONFIG.PF3_DEVICE_ID_mqdma {9348} \
       CONFIG.axi_data_width {256_bit} \
       CONFIG.axilite_master_en {true} \
+      CONFIG.axilite_master_scale {Megabytes} \
+      CONFIG.axilite_master_size {1} \
       CONFIG.axisten_freq $xdma_axisten_freq \
+      CONFIG.bar0_indicator {1} \
+      CONFIG.bar1_indicator {0} \
+      CONFIG.bar_indicator {BAR_0} \
       CONFIG.cfg_mgmt_if {false} \
       CONFIG.copy_pf0 {true} \
+      CONFIG.dma_reset_source_sel {Phy_Ready} \
       CONFIG.en_gt_selection {true} \
       CONFIG.enable_gtwizard {false} \
       CONFIG.mode_selection {Advanced} \
-      CONFIG.pcie_blk_locn {PCIE4C_X0Y4} \
+      CONFIG.pcie_blk_locn {PCIE4C_X0Y6} \
+      CONFIG.pf0_bar0_64bit {false} \
+      CONFIG.pf0_bar0_enabled {true} \
+      CONFIG.pf0_bar0_scale {Kilobytes} \
+      CONFIG.pf0_bar0_size {128} \
+      CONFIG.pf0_bar0_type_mqdma {DMA} \
+      CONFIG.pf0_bar1_enabled {false} \
+      CONFIG.pf0_base_class_menu {Memory_controller} \
+      CONFIG.pf0_base_class_menu_mqdma {Memory_controller} \
+      CONFIG.pf0_class_code {058000} \
+      CONFIG.pf0_class_code_base {05} \
+      CONFIG.pf0_class_code_base_mqdma {05} \
+      CONFIG.pf0_class_code_interface {00} \
+      CONFIG.pf0_class_code_interface_mqdma {00} \
+      CONFIG.pf0_class_code_mqdma {058000} \
+      CONFIG.pf0_class_code_sub {80} \
+      CONFIG.pf0_class_code_sub_mqdma {80} \
       CONFIG.pf0_device_id {9048} \
       CONFIG.pl_link_cap_max_link_speed {8.0_GT/s} \
       CONFIG.pl_link_cap_max_link_width $xdma_link_width \
       CONFIG.plltype {QPLL1} \
       CONFIG.runbit_fix {false} \
-      CONFIG.select_quad {GTY_Quad_231} \
+      CONFIG.select_quad {GTY_Quad_236} \
       CONFIG.xdma_axi_intf_mm {AXI_Stream} \
     ] $xdma_0
   } elseif { [string match "*4.1" $xdma_vlnv] } {
@@ -359,19 +381,41 @@ proc create_root_design { parentCell } {
       CONFIG.PF3_DEVICE_ID_mqdma {9048} \
       CONFIG.axi_data_width {256_bit} \
       CONFIG.axilite_master_en {true} \
+      CONFIG.axilite_master_scale {Megabytes} \
+      CONFIG.axilite_master_size {1} \
       CONFIG.axisten_freq $xdma_axisten_freq \
+      CONFIG.bar0_indicator {1} \
+      CONFIG.bar1_indicator {0} \
+      CONFIG.bar_indicator {BAR_0} \
       CONFIG.cfg_mgmt_if {false} \
       CONFIG.coreclk_freq {500} \
+      CONFIG.dma_reset_source_sel {Phy_Ready} \
       CONFIG.en_gt_selection {true} \
       CONFIG.mode_selection {Advanced} \
-      CONFIG.pcie_blk_locn {PCIE4C_X0Y4} \
+      CONFIG.pcie_blk_locn {PCIE4C_X0Y6} \
+      CONFIG.pf0_bar0_64bit {false} \
+      CONFIG.pf0_bar0_enabled {true} \
+      CONFIG.pf0_bar0_scale {Kilobytes} \
+      CONFIG.pf0_bar0_size {128} \
+      CONFIG.pf0_bar0_type_mqdma {DMA} \
+      CONFIG.pf0_bar1_enabled {false} \
+      CONFIG.pf0_base_class_menu {Memory_controller} \
+      CONFIG.pf0_base_class_menu_mqdma {Memory_controller} \
+      CONFIG.pf0_class_code {058000} \
+      CONFIG.pf0_class_code_base {05} \
+      CONFIG.pf0_class_code_base_mqdma {05} \
+      CONFIG.pf0_class_code_interface {00} \
+      CONFIG.pf0_class_code_interface_mqdma {00} \
+      CONFIG.pf0_class_code_mqdma {058000} \
+      CONFIG.pf0_class_code_sub {80} \
+      CONFIG.pf0_class_code_sub_mqdma {80} \
       CONFIG.pf0_device_id {9048} \
       CONFIG.pf0_msix_cap_pba_bir {BAR_1} \
       CONFIG.pf0_msix_cap_table_bir {BAR_1} \
       CONFIG.pl_link_cap_max_link_speed {8.0_GT/s} \
       CONFIG.pl_link_cap_max_link_width $xdma_link_width \
       CONFIG.plltype {QPLL1} \
-      CONFIG.select_quad {GTY_Quad_231} \
+      CONFIG.select_quad {GTY_Quad_236} \
       CONFIG.xdma_axi_intf_mm {AXI_Stream} \
     ] $xdma_0
   } else {

@@ -1,3 +1,5 @@
+source [file normalize [file join [file dirname [info script]] hw_common.tcl]]
+
 proc require_single {objs label} {
   if {[llength $objs] != 1} {
     puts stderr "ERROR: expected exactly one object for $label, got [llength $objs]"
@@ -70,9 +72,7 @@ if {[llength $argv] >= 3} {
 
 file mkdir $out_dir
 
-open_hw_manager
-connect_hw_server
-open_hw_target
+open_uvhs_hw_session
 
 set hw_device [require_single [get_hw_devices *] "hw_device"]
 current_hw_device $hw_device

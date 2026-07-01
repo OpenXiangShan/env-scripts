@@ -332,7 +332,6 @@ SimTop u_SimTop (
 
     // difftest
     .difftest_ref_clock              (difftest_ref_clock),
-    .difftest_ref_reset              (difftest_ref_reset),
     .difftest_pcie_clock             (difftest_pcie_clock),
     .difftest_to_host_axis_tready    (difftest_to_host_axis_tready),
     .difftest_to_host_axis_tvalid    (difftest_to_host_axis_tvalid),
@@ -344,7 +343,11 @@ SimTop u_SimTop (
     .difftest_from_host_axis_tdata   (difftest_from_host_axis_tdata),
     .difftest_from_host_axis_tkeep   (difftest_from_host_axis_tkeep),
     .difftest_from_host_axis_tlast   (difftest_from_host_axis_tlast),
+`ifdef NUTSHELL_LEGACY_DIFFTEST_HOSTIF
+    .difftest_clock_enable           (difftest_clock_enable)
+`else
     .difftest_clock_enable           (difftest_clock_enable),
+    .difftest_ref_reset              (difftest_ref_reset),
     .difftest_hostCtrl_reset         (difftest_hostCtrl_reset),
     .difftest_hostCtrl_diffEnable    (difftest_hostCtrl_diffEnable),
     .difftest_hostCtrl_ilaTrigger    (difftest_hostCtrl_ilaTrigger),
@@ -366,5 +369,6 @@ SimTop u_SimTop (
     .difftest_cfg_axilite_rvalid     (difftest_cfg_axilite_rvalid),
     .difftest_cfg_axilite_rdata      (difftest_cfg_axilite_rdata),
     .difftest_cfg_axilite_rresp      (difftest_cfg_axilite_rresp)
+`endif
 );
 endmodule

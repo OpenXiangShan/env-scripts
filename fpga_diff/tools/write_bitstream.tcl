@@ -1,3 +1,5 @@
+source [file normalize [file join [file dirname [info script]] hw_common.tcl]]
+
 puts "Bitstream folder path:"
 puts [lindex $argv 0]
 set bitdir [lindex $argv 0]
@@ -22,9 +24,7 @@ if { $ltx_file eq "" } {
 puts "Found bitstream: $bit_file"
 puts "Found ltx: $ltx_file"
 
-open_hw_manager
-connect_hw_server
-open_hw_target
+open_uvhs_hw_session
 
 set_property PARAM.FREQUENCY 12000000 [current_hw_target]
 
