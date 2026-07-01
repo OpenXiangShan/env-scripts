@@ -99,6 +99,9 @@ class GCPT:
         self.__state = GCPT.State.NONE
 
     def get_perf(self, counters: set[str] | None = None, full_name: bool = False) -> dict[str, int]:
+        if self.refresh_state() != GCPT.State.FINISHED:
+            return {}
+
         perf_data = {}
         pattern = re.compile(
             r"\[PERF\s*\]\[time=\s*\d+\] (([a-zA-Z0-9_]+\.)+[a-zA-Z0-9_@]+): ((\w| |\')+),\s+-?(\d+)$"
@@ -120,6 +123,9 @@ class GCPT:
         return perf_data
 
     def get_cpi(self) -> float | None:
+        if self.refresh_state() != GCPT.State.FINISHED:
+            return None
+
         data = self.get_perf({"clock_cycle", "commitInstr"}, full_name=False)
 
         if "clock_cycle" not in data or "commitInstr" not in data:
