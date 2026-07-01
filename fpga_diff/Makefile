@@ -22,7 +22,7 @@ PRJ_NAME = fpga_$(CPU)$(if $(strip $(SUFFIX)),-$(strip $(SUFFIX)),)
 PRJ_DIR ?= $(ENV_SCRIPTS_HOME)/$(PRJ_NAME)
 PRJ ?= $(PRJ_DIR)/$(PRJ_NAME).xpr
 
-.PHONY: bitstream vivado dump_ila
+.PHONY: bitstream vivado dump_ila write_jtag_flash
 
 # Get Vivado version
 VIVADO_VERSION := $(shell vivado -version 2>/dev/null | head -1 | grep -o '[0-9]\{4\}\.[0-9]' || echo "unknown")
@@ -72,6 +72,10 @@ halt_soc:
 # Write workload to FPGA DDR via JTAG
 write_jtag_ddr:
 	vivado -mode tcl -source tools/jtag_write_ddr.tcl -tclargs $(WORKLOAD) $(AXI_WIDTH)
+
+# Write a raw binary image to the BRAM-backed flash via the flash-only JTAG AXI
+write_jtag_flash:
+	vivado -mode tcl -source tools/jtag_write_flash.tcl -tclargs $(WORKLOAD)
 
 # Reset CPU on FPGA
 reset_cpu:

@@ -125,6 +125,7 @@ if { $bCheckIPs == 1 } {
    set list_check_ips "\ 
 xilinx.com:ip:axi_apb_bridge:3.0\
 xilinx.com:ip:axi_uart16550:2.0\
+xilinx.com:ip:jtag_axi:1.2\
 xilinx.com:ip:xlconstant:1.1\
 "
 
@@ -230,7 +231,7 @@ proc create_root_design { parentCell } {
    CONFIG.ADDR_WIDTH {32} \
    CONFIG.DATA_WIDTH {32} \
    CONFIG.FREQ_HZ {25000000} \
-   CONFIG.HAS_BURST {0} \
+   CONFIG.HAS_BURST {1} \
    CONFIG.HAS_CACHE {0} \
    CONFIG.HAS_LOCK {0} \
    CONFIG.HAS_PROT {0} \
@@ -239,8 +240,8 @@ proc create_root_design { parentCell } {
    CONFIG.NUM_READ_OUTSTANDING {2} \
    CONFIG.NUM_WRITE_OUTSTANDING {2} \
    CONFIG.PROTOCOL {AXI4} \
+   CONFIG.SUPPORTS_NARROW_BURST {1} \
    ] $rom_axi
-
 
   # Create ports
   set ACLK [ create_bd_port -dir I -type clk -freq_hz 25000000 ACLK ]
@@ -265,10 +266,22 @@ proc create_root_design { parentCell } {
   set axi_interconnect_0 [ create_bd_cell -type ip -vlnv xilinx.com:ip:axi_interconnect:2.1 axi_interconnect_0 ]
   set_property -dict [ list \
    CONFIG.NUM_MI {3} \
+   CONFIG.NUM_SI {2} \
  ] $axi_interconnect_0
 
   # Create instance: axi_uart16550_0, and set properties
   set axi_uart16550_0 [ create_bd_cell -type ip -vlnv xilinx.com:ip:axi_uart16550:2.0 axi_uart16550_0 ]
+
+  # Create instance: jtag_axi_flash, and set properties
+  set jtag_axi_flash [ create_bd_cell -type ip -vlnv xilinx.com:ip:jtag_axi:1.2 jtag_axi_flash ]
+  set_property -dict [ list \
+   CONFIG.M_AXI_ADDR_WIDTH {32} \
+   CONFIG.M_AXI_DATA_WIDTH {32} \
+   CONFIG.M_AXI_ID_WIDTH {1} \
+   CONFIG.M_HAS_BURST {1} \
+   CONFIG.RD_TXN_QUEUE_LENGTH {8} \
+   CONFIG.WR_TXN_QUEUE_LENGTH {8} \
+ ] $jtag_axi_flash
 
   # Create instance: xlconstant_0, and set properties
   set xlconstant_0 [ create_bd_cell -type ip -vlnv xilinx.com:ip:xlconstant:1.1 xlconstant_0 ]
@@ -284,11 +297,12 @@ proc create_root_design { parentCell } {
   connect_bd_intf_net -intf_net axi_interconnect_0_M01_AXI [get_bd_intf_pins axi_interconnect_0/M01_AXI] [get_bd_intf_pins axi_uart16550_0/S_AXI]
   set_property HDL_ATTRIBUTE.DEBUG {true} [get_bd_intf_nets axi_interconnect_0_M01_AXI]
   connect_bd_intf_net -intf_net axi_interconnect_0_M02_AXI [get_bd_intf_ports rom_axi] [get_bd_intf_pins axi_interconnect_0/M02_AXI]
+  connect_bd_intf_net -intf_net jtag_axi_flash_M_AXI [get_bd_intf_pins axi_interconnect_0/S01_AXI] [get_bd_intf_pins jtag_axi_flash/M_AXI]
   connect_bd_intf_net -intf_net axi_uart16550_0_UART [get_bd_intf_ports UART_0] [get_bd_intf_pins axi_uart16550_0/UART]
 
   # Create port connections
-  connect_bd_net -net ACLK_0_1 [get_bd_ports ACLK] [get_bd_pins axi_apb_bridge_0/s_axi_aclk] [get_bd_pins axi_interconnect_0/ACLK] [get_bd_pins axi_interconnect_0/M00_ACLK] [get_bd_pins axi_interconnect_0/M01_ACLK] [get_bd_pins axi_interconnect_0/M02_ACLK] [get_bd_pins axi_uart16550_0/s_axi_aclk]
-  connect_bd_net -net ARESETN_0_1 [get_bd_ports ARESETN] [get_bd_pins axi_apb_bridge_0/s_axi_aresetn] [get_bd_pins axi_interconnect_0/ARESETN] [get_bd_pins axi_interconnect_0/M00_ARESETN] [get_bd_pins axi_interconnect_0/M01_ARESETN] [get_bd_pins axi_interconnect_0/M02_ARESETN] [get_bd_pins axi_interconnect_0/S00_ARESETN] [get_bd_pins axi_uart16550_0/s_axi_aresetn]
+  connect_bd_net -net ACLK_0_1 [get_bd_ports ACLK] [get_bd_pins axi_apb_bridge_0/s_axi_aclk] [get_bd_pins axi_interconnect_0/ACLK] [get_bd_pins axi_interconnect_0/M00_ACLK] [get_bd_pins axi_interconnect_0/M01_ACLK] [get_bd_pins axi_interconnect_0/M02_ACLK] [get_bd_pins axi_interconnect_0/S01_ACLK] [get_bd_pins axi_uart16550_0/s_axi_aclk] [get_bd_pins jtag_axi_flash/aclk]
+  connect_bd_net -net ARESETN_0_1 [get_bd_ports ARESETN] [get_bd_pins axi_apb_bridge_0/s_axi_aresetn] [get_bd_pins axi_interconnect_0/ARESETN] [get_bd_pins axi_interconnect_0/M00_ARESETN] [get_bd_pins axi_interconnect_0/M01_ARESETN] [get_bd_pins axi_interconnect_0/M02_ARESETN] [get_bd_pins axi_interconnect_0/S00_ARESETN] [get_bd_pins axi_interconnect_0/S01_ARESETN] [get_bd_pins axi_uart16550_0/s_axi_aresetn] [get_bd_pins jtag_axi_flash/aresetn]
   connect_bd_net -net SYS_INTER_CLK_1 [get_bd_ports SYS_INTER_CLK] [get_bd_pins axi_interconnect_0/S00_ACLK]
   connect_bd_net -net axi_uart16550_0_ip2intc_irpt [get_bd_ports uart0_intc] [get_bd_pins axi_uart16550_0/ip2intc_irpt]
   connect_bd_net -net xlconstant_0_dout [get_bd_pins axi_uart16550_0/freeze] [get_bd_pins xlconstant_0/dout]
@@ -297,6 +311,9 @@ proc create_root_design { parentCell } {
   assign_bd_address -offset 0x31200000 -range 0x00010000 -target_address_space [get_bd_addr_spaces S00_AXI] [get_bd_addr_segs SYS_CFG_APB/Reg] -force
   assign_bd_address -offset 0x310B0000 -range 0x00010000 -target_address_space [get_bd_addr_spaces S00_AXI] [get_bd_addr_segs axi_uart16550_0/S_AXI/Reg] -force
   assign_bd_address -offset 0x10000000 -range 0x10000000 -target_address_space [get_bd_addr_spaces S00_AXI] [get_bd_addr_segs rom_axi/Reg] -force
+  assign_bd_address -offset 0x10000000 -range 0x00100000 -target_address_space [get_bd_addr_spaces jtag_axi_flash/Data] [get_bd_addr_segs rom_axi/Reg] -force
+  exclude_bd_addr_seg -target_address_space [get_bd_addr_spaces jtag_axi_flash/Data] [get_bd_addr_segs SYS_CFG_APB/Reg]
+  exclude_bd_addr_seg -target_address_space [get_bd_addr_spaces jtag_axi_flash/Data] [get_bd_addr_segs axi_uart16550_0/S_AXI/Reg]
 
 
   # Restore current instance
@@ -315,4 +332,3 @@ create_root_design ""
 
 
 common::send_gid_msg -ssname BD::TCL -id 2053 -severity "WARNING" "This Tcl script was generated from a block design that has not been validated. It is possible that design <$design_name> may result in errors during validation."
-

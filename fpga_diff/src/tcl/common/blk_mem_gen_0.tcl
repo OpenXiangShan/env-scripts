@@ -91,7 +91,7 @@ set_property -dict {
   CONFIG.Byte_Size {8}
   CONFIG.Assume_Synchronous_Clk {true}
   CONFIG.Write_Width_A {32}
-  CONFIG.Write_Depth_A {1024}
+  CONFIG.Write_Depth_A {8192}
   CONFIG.Read_Width_A {32}
   CONFIG.Operating_Mode_A {READ_FIRST}
   CONFIG.Write_Width_B {32}
@@ -114,4 +114,3 @@ set_property -dict {
 } $blk_mem_gen_0
 
 ##################################################################
-
