@@ -80,8 +80,8 @@ for ((i=0; i<runner_count; i++)); do
     else
         echo "Setting up runner $runner_name"
         run_cmd tmux select-pane -t "$pane_target" -T "$runner_name"
-        run_cmd tmux send-keys -t "$pane_target" "cd '$runner_dir'" C-m
-        run_cmd tmux send-keys -t "$pane_target" "proxychains -q ./run.sh" C-m
+        run_cmd tmux send-keys -t "$pane_target" " cd '$runner_dir'" C-m
+        run_cmd tmux send-keys -t "$pane_target" " proxychains -q ./run.sh" C-m
     fi
 
 done
