@@ -19,9 +19,9 @@ function help() {
 function run_cmd() {
     # Avoid eval so arguments (especially trailing \;) are preserved exactly
     if [[ "$dry_run" == true ]]; then
-        echo "  (DRY RUN) -> $*"
+        echo "  (DRY RUN) -> $*" >&2
     else
-        echo "  -> $*"
+        echo "  -> $*" >&2
         "$@"
     fi
     return $?
