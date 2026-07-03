@@ -88,7 +88,7 @@ for ((i=0; i<runner_count; i++)); do
 
     # Run configuration command
     echo "Executing configuration command"
-    run_cmd proxychains ./config.sh --unattended --url $url --token $token --replace --name $runner_name --labels $label
+    run_cmd proxychains -q ./config.sh --unattended --url $url --token $token --replace --name $runner_name --labels $label
 
     # Workaround: GitHub action runner ./bin/Runner.Listener writes .runner files to absolute path of parent of bin/ (i.e. shared_runner_dir)
     #             We need to move them back to runner_dir to avoid conflicts between runners sharing the same shared_runner_dir
