@@ -2,6 +2,30 @@
 
 此文件夹包含一系列用于维护 Self-hosted Runner 的妙妙脚本，能够有效降低维护 runner 的工作强度，提升幸福感。
 
+## 配置
+
+新版本的脚本已支持从 json 文件中读取配置（包括前缀 `-r`、运行目录 `-d` 和数量 `-n`，RUNNER_FILE 等配置仍通过环境变量配置）
+
+示例 `xs.json`：
+```json
+{
+    "runner": {
+        "basename": "runner",
+        "directory": "/nfs/home/ci-runner",
+        "count": "16"
+    },
+    "builder": {
+        "basename": "builder",
+        "directory": "/nfs/home/ci-runner",
+        "count": "4"
+    }
+}
+```
+
+随后通过 `--config <json_path>#<key>` 参数使用，如 `./start_runner.sh --config xs.json#runner` 等效于 `./start_runner.sh -r runner -d /nfs/home/ci-runner -n 16`。
+
+**注意**：`--config` 和其它参数是按顺序解析的，后面的参数会覆盖前面的配置。例如 `./start_runner.sh -n 10 --config xs.json#runner` 会完全使用 `xs.json` 的配置（n=16），而 `./start_runner.sh --config xs.json#runner -n 10` 会使用 `xs.json` 的配置，但 runner 数量被命令行覆盖为n=10。
+
 ## 创建 runners
 `create_runners.sh` 脚本用于创建 self-hosted runner。需要根据 GitHub 上 Add new self-hosted runner 页面的指示设置环境变量 `RUNNER_URL`、`RUNNER_TOKEN`。需要下载 Runner Package 并将地址设为 `RUNNER_FILE` 环境变量。需要根据需要设置 `RUNNER_LABELS` 环境变量（逗号分隔）。
 
