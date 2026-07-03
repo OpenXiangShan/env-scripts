@@ -2,6 +2,9 @@
 
 SCRIPT_DIR="$(dirname "$(realpath "${BASH_SOURCE[0]}")")"
 
+# Load user configuration
+. "$SCRIPT_DIR/config.sh"
+
 # Ensure required GitHub runner environment variables are provided
 require_env() {
     local var_name="$1"
@@ -34,9 +37,6 @@ if [[ -z "$runner_version" ]]; then
     echo "Error: Unable to extract runner version from filename '$runner_file'"
     exit 1
 fi
-
-# Load user configuration
-. "$SCRIPT_DIR/config.sh"
 
 # Create base directory if needed
 run_cmd mkdir -p "$base_dir"

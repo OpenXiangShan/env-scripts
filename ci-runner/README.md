@@ -4,7 +4,7 @@
 
 ## 配置
 
-新版本的脚本已支持从 json 文件中读取配置（包括前缀 `-r`、运行目录 `-d` 和数量 `-n`，RUNNER_FILE 等配置仍通过环境变量配置）
+新版本的脚本已支持从 json 文件中读取配置（包括前缀 `-r`、运行目录 `-d` 和数量 `-n`，以及 `RUNNER_LABELS`，其余 RUNNER_FILE 等配置仍通过环境变量配置）
 
 示例 `xs.json`：
 ```json
@@ -12,12 +12,14 @@
     "runner": {
         "basename": "runner",
         "directory": "/nfs/home/ci-runner",
-        "count": "16"
+        "count": "16",
+        "labels": "bosc,runner"
     },
     "builder": {
         "basename": "builder",
         "directory": "/nfs/home/ci-runner",
-        "count": "4"
+        "count": "4",
+        "labels": "bosc,builder"
     }
 }
 ```

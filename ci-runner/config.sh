@@ -64,6 +64,11 @@ function load_config_json() {
     if [[ -n "$_runner_count" && "$_runner_count" != "null" ]]; then
         runner_count="$_runner_count"
     fi
+
+    _runner_labels=$(jq -r .labels <<< "$cfg")
+    if [[ -n "$_runner_labels" && "$_runner_labels" != "null" ]]; then
+        export RUNNER_LABELS="$_runner_labels"
+    fi
 }
 
 # Parse command line arguments
@@ -106,6 +111,13 @@ echo "  Runner name: $runner_base_name"
 echo "  Session: $session_name"
 echo "  Base directory: $base_dir"
 echo "  Runner count: $runner_count"
+echo
+
+echo "Environment variables (can be empty):"
+echo "  RUNNER_LABELS: $RUNNER_LABELS"
+echo "  RUNNER_FILE: $RUNNER_FILE"
+echo "  RUNNER_URL: $RUNNER_URL"
+echo "  RUNNER_TOKEN: $RUNNER_TOKEN"
 echo
 
 # Calculate digit width
