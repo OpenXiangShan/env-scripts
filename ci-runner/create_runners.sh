@@ -2,6 +2,9 @@
 
 SCRIPT_DIR="$(dirname "$(realpath "${BASH_SOURCE[0]}")")"
 
+# Load user configuration
+. "$SCRIPT_DIR/config.sh"
+
 # Ensure required GitHub runner environment variables are provided
 require_env() {
     local var_name="$1"
@@ -34,9 +37,6 @@ if [[ -z "$runner_version" ]]; then
     echo "Error: Unable to extract runner version from filename '$runner_file'"
     exit 1
 fi
-
-# Load user configuration
-. "$SCRIPT_DIR/config.sh"
 
 # Create base directory if needed
 run_cmd mkdir -p "$base_dir"
@@ -88,7 +88,7 @@ for ((i=0; i<runner_count; i++)); do
 
     # Run configuration command
     echo "Executing configuration command"
-    run_cmd proxychains ./config.sh --unattended --url $url --token $token --replace --name $runner_name --labels $label
+    run_cmd proxychains -q ./config.sh --unattended --url $url --token $token --replace --name $runner_name --labels $label
 
     # Workaround: GitHub action runner ./bin/Runner.Listener writes .runner files to absolute path of parent of bin/ (i.e. shared_runner_dir)
     #             We need to move them back to runner_dir to avoid conflicts between runners sharing the same shared_runner_dir
