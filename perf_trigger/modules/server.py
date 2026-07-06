@@ -321,6 +321,15 @@ class Server:
                     if emu_config.cst_file
                     else []
                 )
+                + (
+                    [
+                        "--dump-db",
+                        "--db-path",
+                        shlex.quote(str(gcpt.db_path)),
+                    ]
+                    if emu_config.dump_db
+                    else []
+                )
             )
             if emu_config.dry_run:
                 cmd_str = " ".join(run_cmd)
