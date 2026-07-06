@@ -480,6 +480,7 @@ class XiangShan:
                 num += 1
                 gcpt.stdout_path.unlink()
                 gcpt.stderr_path.unlink()
+                gcpt.db_path.unlink(missing_ok=True)
                 gcpt.result_path.rmdir()
                 gcpt.clear_state()
         logging.info("Reset %d RUNNING GCPTs", num)
@@ -516,6 +517,11 @@ def main():
         type=str,
         default="",
         help="Path to custom constantin file path (empty for default init setting)",
+    )
+    parser.add_argument(
+        "--dump-db",
+        action="store_true",
+        help="Run emu with --dump-db and store simulator.db in each checkpoint result directory",
     )
 
     # report configs
@@ -674,6 +680,7 @@ def main():
                     max_instr=args.max_instr,
                     threads=args.threads,
                     cst_file=cst_file,
+                    dump_db=args.dump_db,
                     dry_run=args.dry_run,
                 ),
             )

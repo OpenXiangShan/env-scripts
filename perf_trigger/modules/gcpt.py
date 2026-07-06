@@ -64,6 +64,10 @@ class GCPT:
     def stderr_path(self) -> Path:
         return self.__result_path / "simulator_err.txt"
 
+    @property
+    def db_path(self) -> Path:
+        return self.__result_path / "simulator.db"
+
     def refresh_state(self) -> "GCPT.State":
         if (
             not self.stdout_path.exists()

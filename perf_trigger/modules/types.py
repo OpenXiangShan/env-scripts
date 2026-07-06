@@ -13,6 +13,7 @@ class EmuConfig:
     threads: int
     with_numactl: bool = True
     cst_file: Path | None = None
+    dump_db: bool = False
     dry_run: bool = False
 
 
