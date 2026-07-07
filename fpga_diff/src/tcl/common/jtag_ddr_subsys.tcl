@@ -203,9 +203,30 @@ proc create_root_design { parentCell } {
       set SOC_M_AXI_DATA_WIDTH 256
    }
 
+  if {[info exists ::ddr_axi_addr_width]} {
+    set ddr_axi_addr_width $::ddr_axi_addr_width
+  } else {
+    set ddr_axi_addr_width 33
+  }
+  if {[info exists ::ddr_memory_part]} {
+    set ddr_memory_part $::ddr_memory_part
+  } else {
+    set ddr_memory_part "MTA8ATF1G64HZ-2G3"
+  }
+  if {[info exists ::ddr_address_range]} {
+    set ddr_address_range $::ddr_address_range
+  } else {
+    set ddr_address_range "0x000200000000"
+  }
+  if {$ddr_axi_addr_width > 32} {
+    set jtag_axi_addr_width 64
+  } else {
+    set jtag_axi_addr_width 32
+  }
+
   set SOC_M_AXI [ create_bd_intf_port -mode Slave -vlnv xilinx.com:interface:aximm_rtl:1.0 SOC_M_AXI ]
   set_property -dict [ list \
-   CONFIG.ADDR_WIDTH {33} \
+   CONFIG.ADDR_WIDTH $ddr_axi_addr_width \
    CONFIG.ARUSER_WIDTH {0} \
    CONFIG.AWUSER_WIDTH {0} \
    CONFIG.BUSER_WIDTH {0} \
@@ -270,20 +291,20 @@ proc create_root_design { parentCell } {
     CONFIG.ADDN_UI_CLKOUT2_FREQ_HZ {None} \
     CONFIG.ADDN_UI_CLKOUT3_FREQ_HZ {None} \
     CONFIG.ADDN_UI_CLKOUT4_FREQ_HZ {None} \
-    CONFIG.C0.DDR4_AxiAddressWidth {33} \
+    CONFIG.C0.DDR4_AxiAddressWidth $ddr_axi_addr_width \
     CONFIG.C0.DDR4_AxiDataWidth {64} \
     CONFIG.C0.DDR4_CasLatency {11} \
     CONFIG.C0.DDR4_CasWriteLatency {11} \
     CONFIG.C0.DDR4_DataWidth {64} \
     CONFIG.C0.DDR4_InputClockPeriod {12500} \
-    CONFIG.C0.DDR4_MemoryPart {MTA8ATF1G64HZ-2G3} \
+    CONFIG.C0.DDR4_MemoryPart $ddr_memory_part \
     CONFIG.C0.DDR4_MemoryType {SODIMMs} \
     CONFIG.C0.DDR4_TimePeriod {1250} \
   ] $ddr4_0
   # Create instance: jtag_axi_0, and set properties
   set jtag_axi_0 [ create_bd_cell -type ip -vlnv xilinx.com:ip:jtag_axi:1.2 jtag_axi_0 ]
   set_property -dict [list \
-    CONFIG.M_AXI_ADDR_WIDTH {32} \
+    CONFIG.M_AXI_ADDR_WIDTH $jtag_axi_addr_width \
     CONFIG.M_AXI_DATA_WIDTH {64} \
     CONFIG.M_AXI_ID_WIDTH {1} \
     CONFIG.M_HAS_BURST {1} \
@@ -335,8 +356,8 @@ proc create_root_design { parentCell } {
   [get_bd_pins ddr4_0/sys_rst]
 
   # Create address segments
-  assign_bd_address -offset 0x00000000 -range 0x000100000000 -target_address_space [get_bd_addr_spaces jtag_axi_0/Data] [get_bd_addr_segs ddr4_0/C0_DDR4_MEMORY_MAP/C0_DDR4_ADDRESS_BLOCK] -force
-  assign_bd_address -offset 0x00000000 -range 0x000200000000 -target_address_space [get_bd_addr_spaces SOC_M_AXI] [get_bd_addr_segs ddr4_0/C0_DDR4_MEMORY_MAP/C0_DDR4_ADDRESS_BLOCK] -force
+  assign_bd_address -offset 0x00000000 -range $ddr_address_range -target_address_space [get_bd_addr_spaces jtag_axi_0/Data] [get_bd_addr_segs ddr4_0/C0_DDR4_MEMORY_MAP/C0_DDR4_ADDRESS_BLOCK] -force
+  assign_bd_address -offset 0x00000000 -range $ddr_address_range -target_address_space [get_bd_addr_spaces SOC_M_AXI] [get_bd_addr_segs ddr4_0/C0_DDR4_MEMORY_MAP/C0_DDR4_ADDRESS_BLOCK] -force
 
 
   # Restore current instance
@@ -353,5 +374,3 @@ proc create_root_design { parentCell } {
 ##################################################################
 
 create_root_design ""
-
-

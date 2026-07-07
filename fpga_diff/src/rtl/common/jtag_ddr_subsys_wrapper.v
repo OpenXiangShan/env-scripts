@@ -9,6 +9,12 @@
 //--------------------------------------------------------------------------------
 `timescale 1 ps / 1 ps
 `include "DifftestMacros.svh"
+`ifndef CONFIG_RANK_WIDTH
+`define CONFIG_RANK_WIDTH 1
+`endif
+`ifndef DDR_AXI_ADDR_WIDTH
+`define DDR_AXI_ADDR_WIDTH 33
+`endif
 
 module jtag_ddr_subsys_wrapper
    (DDR4_act_n,
@@ -74,20 +80,20 @@ module jtag_ddr_subsys_wrapper
   output [16:0]DDR4_adr;
   output [1:0]DDR4_ba;
   output [1:0]DDR4_bg;
-  output [0:0]DDR4_ck_c;
-  output [0:0]DDR4_ck_t;
-  output [0:0]DDR4_cke;
-  output [0:0]DDR4_cs_n;
+  output [`CONFIG_RANK_WIDTH-1:0]DDR4_ck_c;
+  output [`CONFIG_RANK_WIDTH-1:0]DDR4_ck_t;
+  output [`CONFIG_RANK_WIDTH-1:0]DDR4_cke;
+  output [`CONFIG_RANK_WIDTH-1:0]DDR4_cs_n;
   inout [7:0]DDR4_dm_n;
   inout [63:0]DDR4_dq;
   inout [7:0]DDR4_dqs_c;
   inout [7:0]DDR4_dqs_t;
-  output [0:0]DDR4_odt;
+  output [`CONFIG_RANK_WIDTH-1:0]DDR4_odt;
   output DDR4_reset_n;
   input OSC_SYS_CLK_clk_n;
   input OSC_SYS_CLK_clk_p;
   input SOC_CLK;
-  input [32:0]SOC_M_AXI_araddr;
+  input [`DDR_AXI_ADDR_WIDTH-1:0]SOC_M_AXI_araddr;
   input [1:0]SOC_M_AXI_arburst;
   input [3:0]SOC_M_AXI_arcache;
   input [17:0]SOC_M_AXI_arid;
@@ -99,7 +105,7 @@ module jtag_ddr_subsys_wrapper
   input [3:0]SOC_M_AXI_arregion;
   input [2:0]SOC_M_AXI_arsize;
   input SOC_M_AXI_arvalid;
-  input [32:0]SOC_M_AXI_awaddr;
+  input [`DDR_AXI_ADDR_WIDTH-1:0]SOC_M_AXI_awaddr;
   input [1:0]SOC_M_AXI_awburst;
   input [3:0]SOC_M_AXI_awcache;
   input [17:0]SOC_M_AXI_awid;
@@ -147,20 +153,20 @@ module jtag_ddr_subsys_wrapper
   wire [16:0]DDR4_adr;
   wire [1:0]DDR4_ba;
   wire [1:0]DDR4_bg;
-  wire [0:0]DDR4_ck_c;
-  wire [0:0]DDR4_ck_t;
-  wire [0:0]DDR4_cke;
-  wire [0:0]DDR4_cs_n;
+  wire [`CONFIG_RANK_WIDTH-1:0]DDR4_ck_c;
+  wire [`CONFIG_RANK_WIDTH-1:0]DDR4_ck_t;
+  wire [`CONFIG_RANK_WIDTH-1:0]DDR4_cke;
+  wire [`CONFIG_RANK_WIDTH-1:0]DDR4_cs_n;
   wire [7:0]DDR4_dm_n;
   wire [63:0]DDR4_dq;
   wire [7:0]DDR4_dqs_c;
   wire [7:0]DDR4_dqs_t;
-  wire [0:0]DDR4_odt;
+  wire [`CONFIG_RANK_WIDTH-1:0]DDR4_odt;
   wire DDR4_reset_n;
   wire OSC_SYS_CLK_clk_n;
   wire OSC_SYS_CLK_clk_p;
   wire SOC_CLK;
-  wire [32:0]SOC_M_AXI_araddr;
+  wire [`DDR_AXI_ADDR_WIDTH-1:0]SOC_M_AXI_araddr;
   wire [1:0]SOC_M_AXI_arburst;
   wire [3:0]SOC_M_AXI_arcache;
   wire [17:0]SOC_M_AXI_arid;
@@ -172,7 +178,7 @@ module jtag_ddr_subsys_wrapper
   wire [3:0]SOC_M_AXI_arregion;
   wire [2:0]SOC_M_AXI_arsize;
   wire SOC_M_AXI_arvalid;
-  wire [32:0]SOC_M_AXI_awaddr;
+  wire [`DDR_AXI_ADDR_WIDTH-1:0]SOC_M_AXI_awaddr;
   wire [1:0]SOC_M_AXI_awburst;
   wire [3:0]SOC_M_AXI_awcache;
   wire [17:0]SOC_M_AXI_awid;
