@@ -8,11 +8,7 @@
 
 
 
-#set_property PACKAGE_PIN AA51 [get_ports {DDR0_CK_T[1]}]
-#set_property PACKAGE_PIN AA52 [get_ports {DDR0_CK_C[1]}]
-#set_property PACKAGE_PIN V55 [get_ports {DDR0_ODT[1]}]
-#set_property PACKAGE_PIN V54 [get_ports {DDR0_CS_N[1]}]
-#set_property PACKAGE_PIN AC45 [get_ports {DDR0_CKE[1]}]
+# Rank1 pins are in ddr_rank1.xdc and are added only when DDR_RANK_WIDTH=2.
 
 
 ####################################################################################
@@ -154,4 +150,3 @@ set_property IOSTANDARD SSTL12_DCI [get_ports DDR0_RESET_N]
 ####################################################################################
 # Constraints from file : 'xiangshan.xdc'
 ####################################################################################
-

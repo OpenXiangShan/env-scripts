@@ -9,9 +9,10 @@
 `include "kconfig.svh"
 `include "chi_icn_defines.svh"
 `elsif CONFIG_USE_XSCORE_AXI
+`ifndef CONFIG_RANK_WIDTH
 `define CONFIG_RANK_WIDTH 1
 `endif
-
+`endif
 
 module core_def (
       input                                      ddr_clk_p,

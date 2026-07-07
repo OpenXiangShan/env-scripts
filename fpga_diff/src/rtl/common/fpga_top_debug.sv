@@ -1,6 +1,9 @@
 `timescale 1ns/1ps
 
 `include "sys_define.vh"
+`ifndef CONFIG_RANK_WIDTH
+`define CONFIG_RANK_WIDTH 1
+`endif
 
 `ifndef XDMA_PCIE_LANES
 `define XDMA_PCIE_LANES 4
@@ -50,11 +53,11 @@ module fpga_top_debug
    input                 pcie_ep_perstn,
 `endif 
    //DDR
-   output    [0:0]       DDR0_CK_T,
-   output    [0:0]       DDR0_CK_C,
-   output    [0:0]       DDR0_CKE,
-   output    [0:0]       DDR0_CS_N,
-   output    [0:0]       DDR0_ODT,
+   output    [`CONFIG_RANK_WIDTH-1:0] DDR0_CK_T,
+   output    [`CONFIG_RANK_WIDTH-1:0] DDR0_CK_C,
+   output    [`CONFIG_RANK_WIDTH-1:0] DDR0_CKE,
+   output    [`CONFIG_RANK_WIDTH-1:0] DDR0_CS_N,
+   output    [`CONFIG_RANK_WIDTH-1:0] DDR0_ODT,
    output                DDR0_ACT_N,
    output    [1:0]       DDR0_BG,
    output    [1:0]       DDR0_BA,

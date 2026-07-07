@@ -262,6 +262,29 @@ if {[info exists ::env(XDMA_LINK_WIDTH)] && [string trim $::env(XDMA_LINK_WIDTH)
 lappend defines "XDMA_PCIE_LANES=$xdma_pcie_lanes"
 puts "INFO: XDMA_PCIE_LANES=$xdma_pcie_lanes"
 
+set ddr_rank_width 1
+if {[info exists ::env(DDR_RANK_WIDTH)] && [string trim $::env(DDR_RANK_WIDTH)] ne ""} {
+  set ddr_rank_width [string trim $::env(DDR_RANK_WIDTH)]
+}
+if {![string is integer -strict $ddr_rank_width] || [lsearch -exact {1 2} $ddr_rank_width] < 0} {
+  error "DDR_RANK_WIDTH must be 1 or 2, got '$ddr_rank_width'"
+}
+set ::ddr_rank_width $ddr_rank_width
+if {$ddr_rank_width == 2} {
+  set ::ddr_axi_addr_width 34
+  set ::ddr_memory_part "MTA16ATF2G64HZ-2G3"
+  set ::ddr_address_range "0x000400000000"
+  lappend constr_files [file normalize ${constr_dir}/ddr_rank1.xdc]
+  puts "INFO: DDR rank1 constraints enabled: ddr_rank1.xdc"
+} else {
+  set ::ddr_axi_addr_width 33
+  set ::ddr_memory_part "MTA8ATF1G64HZ-2G3"
+  set ::ddr_address_range "0x000200000000"
+}
+lappend defines "CONFIG_RANK_WIDTH=$ddr_rank_width"
+lappend defines "DDR_AXI_ADDR_WIDTH=$::ddr_axi_addr_width"
+puts "INFO: DDR_RANK_WIDTH=$ddr_rank_width; DDR_AXI_ADDR_WIDTH=$::ddr_axi_addr_width; DDR4_MEMORY_PART=$::ddr_memory_part"
+
 set_property -name "verilog_define" -value "$defines" -objects $obj
 source "$tcl_dir/common/global_includes.tcl"
 
