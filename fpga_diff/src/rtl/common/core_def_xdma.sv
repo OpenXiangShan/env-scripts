@@ -1051,32 +1051,33 @@ wire [1 : 0]                rom_axi_rresp    ;
 
 `ifdef  XS_QSPI2ROM
 blk_mem_gen_0 u_rom (
-  .rsta_busy      (rsta_busy),          // output wire rsta_busy
-  .rstb_busy      (rstb_busy),          // output wire rstb_busy
-  .s_aclk         (sys_clk_i),                // input wire s_aclk
-  .s_aresetn      (axi_bclk_sync_rstn ),          // input wire s_aresetn
-  .s_axi_awaddr   (rom_axi_awaddr     ),    // input wire [31 : 0] s_axi_awaddr
-  .s_axi_awlen    (rom_axi_awlen      ),      // input wire [7 : 0] s_axi_awlen
-  .s_axi_awvalid  (rom_axi_awvalid    ),  // input wire s_axi_awvalid
-  .s_axi_awready  (rom_axi_awready    ),  // output wire s_axi_awready
-  .s_axi_wdata    (rom_axi_wdata      ),      // input wire [31 : 0] s_axi_wdata
-  .s_axi_wstrb    (rom_axi_wstrb      ),      // input wire [3 : 0] s_axi_wstrb
-  .s_axi_wlast    (rom_axi_wlast      ),      // input wire s_axi_wlast
-  .s_axi_wvalid   (rom_axi_wvalid     ),    // input wire s_axi_wvalid
-  .s_axi_wready   (rom_axi_wready     ),    // output wire s_axi_wready
-  .s_axi_bresp    (rom_axi_bresp      ),      // output wire [1 : 0] s_axi_bresp
-  .s_axi_bvalid   (rom_axi_bvalid     ),    // output wire s_axi_bvalid
-  .s_axi_bready   (rom_axi_bready     ),    // input wire s_axi_bready
-  .s_axi_araddr   (rom_axi_araddr     ),    // input wire [31 : 0] s_axi_araddr
-  .s_axi_arlen    (rom_axi_arlen      ),      // input wire [7 : 0] s_axi_arlen
-  .s_axi_arvalid  (rom_axi_arvalid    ),  // input wire s_axi_arvalid
-  .s_axi_arready  (rom_axi_arready    ),  // output wire s_axi_arready
-  .s_axi_rdata    (rom_axi_rdata      ),      // output wire [31 : 0] s_axi_rdata
-  .s_axi_rresp    (rom_axi_rresp      ),      // output wire [1 : 0] s_axi_rresp
-  .s_axi_rlast    (rom_axi_rlast      ),      // output wire s_axi_rlast
-  .s_axi_rvalid   (rom_axi_rvalid     ),    // output wire s_axi_rvalid
-  .s_axi_rready   (rom_axi_rready     )    // input wire s_axi_rready
+  .rsta_busy      (rsta_busy          ),
+  .rstb_busy      (rstb_busy          ),
+  .s_aclk         (sys_clk_i          ),
+  .s_aresetn      (axi_bclk_sync_rstn ),
+  .s_axi_awaddr   (rom_axi_awaddr     ),
+  .s_axi_awlen    (rom_axi_awlen      ),
+  .s_axi_awvalid  (rom_axi_awvalid    ),
+  .s_axi_awready  (rom_axi_awready    ),
+  .s_axi_wdata    (rom_axi_wdata      ),
+  .s_axi_wstrb    (rom_axi_wstrb      ),
+  .s_axi_wlast    (rom_axi_wlast      ),
+  .s_axi_wvalid   (rom_axi_wvalid     ),
+  .s_axi_wready   (rom_axi_wready     ),
+  .s_axi_bresp    (rom_axi_bresp      ),
+  .s_axi_bvalid   (rom_axi_bvalid     ),
+  .s_axi_bready   (rom_axi_bready     ),
+  .s_axi_araddr   (rom_axi_araddr     ),
+  .s_axi_arlen    (rom_axi_arlen      ),
+  .s_axi_arvalid  (rom_axi_arvalid    ),
+  .s_axi_arready  (rom_axi_arready    ),
+  .s_axi_rdata    (rom_axi_rdata      ),
+  .s_axi_rresp    (rom_axi_rresp      ),
+  .s_axi_rlast    (rom_axi_rlast      ),
+  .s_axi_rvalid   (rom_axi_rvalid     ),
+  .s_axi_rready   (rom_axi_rready     )
 );
+
 `endif
 
 `ifndef  XS_XDMA
