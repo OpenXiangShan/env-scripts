@@ -23,7 +23,7 @@ PRJ_NAME = fpga_$(CPU)$(if $(strip $(SUFFIX)),-$(strip $(SUFFIX)),)
 PRJ_DIR ?= $(ENV_SCRIPTS_HOME)/$(PRJ_NAME)
 PRJ ?= $(PRJ_DIR)/$(PRJ_NAME).xpr
 
-.PHONY: bitstream vivado dump_ila write_jtag_flash
+.PHONY: bitstream route vivado dump_ila write_jtag_flash incremental-flow
 
 # Get Vivado version
 VIVADO_VERSION := $(shell vivado -version 2>/dev/null | head -1 | grep -o '[0-9]\{4\}\.[0-9]' || echo "unknown")
@@ -38,6 +38,10 @@ synth:
 # Generate FPGA bitstream
 bitstream:
 	vivado -mode batch -source ./tools/gen_bitstream.tcl -tclargs $(PRJ) impl_1 $(VIVADO_JOBS)
+
+# Run implementation through route_design without writing a bitstream
+route:
+	vivado -mode batch -source ./tools/run_impl_route.tcl -tclargs $(PRJ) impl_1 $(VIVADO_JOBS)
 
 # Update file list for core RTL files
 update_core_flist:
@@ -97,6 +101,21 @@ add_sys_option:
 # Display implementation log
 get_impl_log:
 	cat $(PRJ_DIR)/$(PRJ_NAME).runs/impl_1/runme.log
+
+INCREMENTAL_BASELINE_RELEASE ?=
+INCREMENTAL_MODIFIED_RELEASE ?=
+INCREMENTAL_OUT_DIR ?=
+INCREMENTAL_EXTRA_ARGS ?=
+
+# Run whole-project incremental synthesis and implementation.
+incremental-flow:
+	tools/cpu_dcp_split/run_incremental_flow.py \
+	  --baseline-release "$(INCREMENTAL_BASELINE_RELEASE)" \
+	  --modified-release "$(INCREMENTAL_MODIFIED_RELEASE)" \
+	  --cpu "$(CPU)" \
+	  $(if $(strip $(INCREMENTAL_OUT_DIR)),--out-dir "$(INCREMENTAL_OUT_DIR)",) \
+	  $(if $(strip $(VIVADO_JOBS)),--jobs "$(VIVADO_JOBS)",) \
+	  $(INCREMENTAL_EXTRA_ARGS)
 
 # Display synthesis log
 get_synth_log:
