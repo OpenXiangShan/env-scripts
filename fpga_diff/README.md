@@ -48,4 +48,41 @@ FPGA_DDR_LOAD_CMD="bash -lc ' \
 ./fpga-host --diff <nemu> -i <workload>.bin
 ```
 
+## Incremental Vivado Flows
+
+The incremental drivers consume generated release directories containing
+`build/rtl` and write checkpoints, logs, and manifests outside the release.
+
+### Whole Project
+
+```sh
+make incremental-flow \
+  CPU=nutshell \
+  INCREMENTAL_BASELINE_RELEASE=/path/to/baseline-release \
+  INCREMENTAL_MODIFIED_RELEASE=/path/to/modified-release \
+  INCREMENTAL_OUT_DIR=/path/to/output \
+  VIVADO_JOBS=8
+```
+
+Use `INCREMENTAL_EXTRA_ARGS` for `--stop-after route`,
+`--synth-incremental-mode quick`, `--impl-directive RuntimeOptimized`, or
+`--dry-run`. Inspect `<output>/manifest.env`, checkpoint files, incremental
+reuse reports, timing, and route status before accepting a result.
+
+### CPU-DCP
+
+```sh
+make cpu-dcp-flow \
+  CPU=nutshell \
+  CPU_DCP_BASELINE_RELEASE=/path/to/baseline-release \
+  CPU_DCP_MODIFIED_RELEASE=/path/to/modified-release \
+  CPU_DCP_OUT_DIR=/path/to/output \
+  VIVADO_JOBS=8
+```
+
+This flow checks release compatibility, prepares an OOC CPU checkpoint, imports
+it into the top-level partition, then performs incremental implementation. Use
+`make cpu-dcp-interface` to generate or validate only a `CpuDcpTop` interface.
+When a routed reference is supplied, inspect `report_incremental_reuse`,
+`timing_summary.rpt`, and `route_status.rpt` under the output directory.
 
