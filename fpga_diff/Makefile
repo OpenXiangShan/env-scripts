@@ -23,7 +23,7 @@ PRJ_NAME = fpga_$(CPU)$(if $(strip $(SUFFIX)),-$(strip $(SUFFIX)),)
 PRJ_DIR ?= $(ENV_SCRIPTS_HOME)/$(PRJ_NAME)
 PRJ ?= $(PRJ_DIR)/$(PRJ_NAME).xpr
 
-.PHONY: bitstream route vivado dump_ila write_jtag_flash incremental-flow
+.PHONY: bitstream route vivado dump_ila write_jtag_flash incremental-flow cpu-dcp-interface
 
 # Get Vivado version
 VIVADO_VERSION := $(shell vivado -version 2>/dev/null | head -1 | grep -o '[0-9]\{4\}\.[0-9]' || echo "unknown")
@@ -116,6 +116,26 @@ incremental-flow:
 	  $(if $(strip $(INCREMENTAL_OUT_DIR)),--out-dir "$(INCREMENTAL_OUT_DIR)",) \
 	  $(if $(strip $(VIVADO_JOBS)),--jobs "$(VIVADO_JOBS)",) \
 	  $(INCREMENTAL_EXTRA_ARGS)
+
+
+CPU_DCP_MODIFIED_RELEASE ?=
+CPU_DCP_CPU_MODULE ?=
+CPU_DCP_PARTITION_MODULE ?=
+CPU_DCP_INTERFACE_MODE ?= stub
+CPU_DCP_INTERFACE_OUT ?=
+CPU_DCP_INTERFACE_JSON ?=
+
+# Copy the generated CPU RTL port contract onto a CpuDcpTop-style partition
+# module. This is useful for inspecting or regenerating only the DCP shell
+# interface without running Vivado.
+cpu-dcp-interface:
+	tools/cpu_dcp_split/sync_cpu_dcp_interface.py \
+	  --release "$(CPU_DCP_MODIFIED_RELEASE)" \
+	  $(if $(strip $(CPU_DCP_CPU_MODULE)),--cpu-module "$(CPU_DCP_CPU_MODULE)",) \
+	  --partition-module "$(or $(strip $(CPU_DCP_PARTITION_MODULE)),CpuDcpTop)" \
+	  --mode "$(CPU_DCP_INTERFACE_MODE)" \
+	  $(if $(strip $(CPU_DCP_INTERFACE_OUT)),--out "$(CPU_DCP_INTERFACE_OUT)" --force,) \
+	  $(if $(strip $(CPU_DCP_INTERFACE_JSON)),--json-out "$(CPU_DCP_INTERFACE_JSON)",)
 
 # Display synthesis log
 get_synth_log:
