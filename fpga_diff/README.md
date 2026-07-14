@@ -69,6 +69,12 @@ Use `INCREMENTAL_EXTRA_ARGS` for `--stop-after route`,
 `--dry-run`. Inspect `<output>/manifest.env`, checkpoint files, incremental
 reuse reports, timing, and route status before accepting a result.
 
+Both flows also write `implementation-fingerprint.json`. It hashes the release
+build inputs, implementation Tcl/Make inputs, CPU and partition interfaces, and
+the Vivado/implementation settings. Its `decision.recommended_action` states
+whether no implementation changed, a CPU DCP must be rebuilt, or a whole-project
+incremental route is required.
+
 ### CPU-DCP
 
 ```sh
@@ -85,4 +91,7 @@ it into the top-level partition, then performs incremental implementation. Use
 `make cpu-dcp-interface` to generate or validate only a `CpuDcpTop` interface.
 When a routed reference is supplied, inspect `report_incremental_reuse`,
 `timing_summary.rpt`, and `route_status.rpt` under the output directory.
-
+For an externally retained routed DCP, also pass its prior fingerprint through
+`CPU_DCP_REFERENCE_FINGERPRINT=/path/to/implementation-fingerprint.json`; the
+flow rejects reuse if the reference baseline, interface, or implementation
+context no longer matches.

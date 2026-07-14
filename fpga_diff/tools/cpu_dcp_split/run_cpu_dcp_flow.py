@@ -5,6 +5,7 @@ import argparse
 import datetime as dt
 import os
 import shutil
+import sys
 from pathlib import Path
 
 import flow_common as flow
@@ -18,6 +19,10 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--modified-release", required=True)
     parser.add_argument("--reference-routed-dcp")
     parser.add_argument("--reference-synth-dcp")
+    parser.add_argument(
+        "--reference-fingerprint",
+        help="fingerprint JSON created with the routed reference DCP; reject incompatible reuse",
+    )
     parser.add_argument("--cpu", choices=["kmh", "nanhu", "nutshell"])
     parser.add_argument("--module", dest="cpu_module")
     parser.add_argument("--cpu-instance")
@@ -164,10 +169,12 @@ def main() -> int:
             "reference-subpartition-top-overlay",
             "cpu-subpartition-top-overlay",
             "reference-synth-dcp",
+            "implementation-fingerprint",
         }
         return label not in run_in_dry
 
     runner = flow.FlowRunner(out_dir, dry_run=args.dry_run, dry_skip=dry_skip)
+    vivado_version = flow.vivado_version(vivado_cmd, args.dry_run)
 
     def write_manifest() -> None:
         flow.write_lines(
@@ -194,6 +201,7 @@ def main() -> int:
                 f"overlay_project={overlay_xpr}",
                 f"reference_routed_dcp={reference_routed_dcp or ''}",
                 f"reference_synth_dcp={reference_synth_dcp}",
+                f"reference_fingerprint={args.reference_fingerprint or ''}",
                 f"cpu_dcp={cpu_dcp}",
                 f"stop_after={args.stop_after}",
                 f"synth_incremental_mode={args.synth_incremental_mode}",
@@ -201,7 +209,7 @@ def main() -> int:
                 f"build_reference={int(args.build_reference)}",
                 f"dry_run={int(args.dry_run)}",
                 f"vivado_command={vivado_cmd}",
-                f"vivado_version={flow.vivado_version(vivado_cmd, args.dry_run)}",
+                f"vivado_version={vivado_version}",
             ],
         )
 
@@ -346,6 +354,29 @@ def main() -> int:
             runner.run(f"{label_prefix}-{role}", cmd)
 
     write_manifest()
+    fingerprint_cmd = [
+        sys.executable, str(paths.script_dir / "implementation_fingerprint.py"),
+        "--baseline-release", str(baseline_release),
+        "--modified-release", str(modified_release),
+        "--fpga-diff-dir", str(paths.fpga_diff_dir),
+        "--cpu", cpu,
+        "--cpu-module", cpu_module,
+        "--partition-module", args.partition_module or cpu_module,
+        "--cpu-cell", cpu_cell,
+        "--vivado-version", vivado_version,
+        "--synth-incremental-mode", args.synth_incremental_mode,
+        "--impl-directive", args.impl_directive,
+        "--stop-after", args.stop_after,
+        "--reference-routed-dcp", str(reference_routed_dcp or ""),
+        "--reference-synth-dcp", str(reference_synth_dcp),
+        "--out", str(out_dir / "implementation-fingerprint.json"),
+    ]
+    if args.reference_fingerprint:
+        fingerprint_cmd.extend([
+            "--reference-fingerprint", args.reference_fingerprint,
+            "--require-reference-compatible",
+        ])
+    runner.run("implementation-fingerprint", fingerprint_cmd)
 
     runner.run(
         "rtl-diff",

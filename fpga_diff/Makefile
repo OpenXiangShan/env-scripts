@@ -127,6 +127,7 @@ CPU_DCP_INTERFACE_JSON ?=
 CPU_DCP_BASELINE_RELEASE ?=
 CPU_DCP_REFERENCE_DCP ?=
 CPU_DCP_REFERENCE_SYNTH_DCP ?=
+CPU_DCP_REFERENCE_FINGERPRINT ?=
 CPU_DCP_CPU_CELL ?=
 CPU_DCP_CPU_INSTANCE ?=
 CPU_DCP_SUBPARTITION_PRESET ?=
@@ -158,6 +159,7 @@ cpu-dcp-flow:
 	  $(if $(strip $(CPU)),--cpu "$(CPU)",) \
 	  $(if $(strip $(CPU_DCP_REFERENCE_DCP)),--reference-routed-dcp "$(CPU_DCP_REFERENCE_DCP)",) \
 	  $(if $(strip $(CPU_DCP_REFERENCE_SYNTH_DCP)),--reference-synth-dcp "$(CPU_DCP_REFERENCE_SYNTH_DCP)",) \
+	  $(if $(strip $(CPU_DCP_REFERENCE_FINGERPRINT)),--reference-fingerprint "$(CPU_DCP_REFERENCE_FINGERPRINT)",) \
 	  $(if $(strip $(CPU_DCP_CPU_CELL)),--cpu-cell "$(CPU_DCP_CPU_CELL)",) \
 	  $(if $(strip $(CPU_DCP_CPU_MODULE)),--module "$(CPU_DCP_CPU_MODULE)",) \
 	  $(if $(strip $(CPU_DCP_CPU_INSTANCE)),--cpu-instance "$(CPU_DCP_CPU_INSTANCE)",) \

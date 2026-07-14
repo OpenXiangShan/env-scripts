@@ -4,6 +4,7 @@ from __future__ import annotations
 import argparse
 import datetime as dt
 import os
+import sys
 from pathlib import Path
 
 import flow_common as flow
@@ -65,7 +66,12 @@ def main() -> int:
     base_synth_dcp = out_dir / "checkpoints" / "base-synth.dcp"
     base_impl_dcp = out_dir / "checkpoints" / "base-routed.dcp"
 
-    runner = flow.FlowRunner(out_dir, dry_run=args.dry_run)
+    runner = flow.FlowRunner(
+        out_dir,
+        dry_run=args.dry_run,
+        dry_skip=lambda label: label != "implementation-fingerprint",
+    )
+    vivado_version = flow.vivado_version(vivado_cmd, args.dry_run)
 
     def fpga_make(target: str, suffix: str, core_dir: Path | None = None) -> list[str]:
         return flow.make_cmd(
@@ -95,11 +101,26 @@ def main() -> int:
                 f"synth_incremental_mode={args.synth_incremental_mode}",
                 f"implementation_directive={args.impl_directive}",
                 f"vivado_command={vivado_cmd}",
-                f"vivado_version={flow.vivado_version(vivado_cmd, args.dry_run)}",
+                f"vivado_version={vivado_version}",
             ],
         )
 
     write_manifest()
+    runner.run(
+        "implementation-fingerprint",
+        [
+            sys.executable, str(paths.script_dir / "implementation_fingerprint.py"),
+            "--baseline-release", str(baseline_release),
+            "--modified-release", str(modified_release),
+            "--fpga-diff-dir", str(paths.fpga_diff_dir),
+            "--cpu", args.cpu,
+            "--vivado-version", vivado_version,
+            "--synth-incremental-mode", args.synth_incremental_mode,
+            "--impl-directive", args.impl_directive,
+            "--stop-after", args.stop_after,
+            "--out", str(out_dir / "implementation-fingerprint.json"),
+        ],
+    )
 
     runner.run(
         "baseline-project",
