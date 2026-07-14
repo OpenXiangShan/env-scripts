@@ -79,49 +79,15 @@ def locate_module_rtl(release_root: Path | None, simtop_path: Path, module_name:
 
 
 def parse_header_ports(header_text: str) -> list[dict]:
-    body = header_text[header_text.find("(") + 1: header_text.rfind(")")]
-    body = strip_comments(body)
-    ports: list[dict] = []
-    current_direction = ""
-    current_range = ""
-    current_kind = ""
-
-    for raw in split_top_level_commas(body):
-        item = normalize_ws(raw)
-        if not item:
-            continue
-
-        direction_match = re.match(r"^(input|output|inout)\b\s*(.*)$", item)
-        if direction_match:
-            current_direction = direction_match.group(1)
-            item = direction_match.group(2).strip()
-            current_range = ""
-            current_kind = ""
-
-        kind_match = re.match(r"^(wire|reg|logic)\b\s*(.*)$", item)
-        if kind_match:
-            current_kind = kind_match.group(1)
-            item = kind_match.group(2).strip()
-
-        range_match = re.match(r"^(\[[^\]]+\])\s*(.*)$", item)
-        if range_match:
-            current_range = normalize_ws(range_match.group(1))
-            item = range_match.group(2).strip()
-
-        name_match = re.search(r"([A-Za-z_][A-Za-z0-9_$]*)\s*$", item)
-        if not name_match:
-            continue
-        name = name_match.group(1)
-        ports.append({
-            "name": name,
-            "direction": current_direction,
-            "kind": current_kind,
-            "range": current_range,
-            "width": parse_width(current_range) or 1,
-            "area": classify_port(name),
-            "family": port_family(name),
-        })
-    return ports
+    """Parse ports once, then annotate the SimTop-specific classifications."""
+    return [
+        {
+            **port,
+            "area": classify_port(str(port["name"])),
+            "family": port_family(str(port["name"])),
+        }
+        for port in rtl_if.parse_header_ports(header_text)
+    ]
 
 
 def parse_declared_signals(body_text: str) -> dict[str, dict]:
