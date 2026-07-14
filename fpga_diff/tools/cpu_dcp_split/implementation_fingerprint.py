@@ -30,12 +30,33 @@ def stable_hash(value: object) -> str:
     return hashlib.sha256(encoded).hexdigest()
 
 
+def semantic_file_hash(path: Path) -> str:
+    """Hash RTL after removing layout-only changes that do not reach synthesis."""
+    if path.suffix.lower() not in {".v", ".sv", ".svh"}:
+        return sha256_file(path)
+    text = path.read_text(encoding="utf-8", errors="replace")
+    return hashlib.sha256(rtl_if.normalize_ws(rtl_if.strip_comments(text)).encode()).hexdigest()
+
+
 def fingerprint_files(root: Path, paths: list[Path]) -> dict[str, object]:
     files = [
-        {"path": path.relative_to(root).as_posix(), "sha256": sha256_file(path)}
+        {
+            "path": path.relative_to(root).as_posix(),
+            "sha256": sha256_file(path),
+            "semantic_sha256": semantic_file_hash(path),
+        }
         for path in sorted(paths)
     ]
-    return {"file_count": len(files), "files": files, "sha256": stable_hash(files)}
+    semantic_files = [
+        {"path": entry["path"], "sha256": entry["semantic_sha256"]}
+        for entry in files
+    ]
+    return {
+        "file_count": len(files),
+        "files": files,
+        "sha256": stable_hash([{key: value for key, value in entry.items() if key != "semantic_sha256"} for entry in files]),
+        "semantic_sha256": stable_hash(semantic_files),
+    }
 
 
 def build_fingerprint(release: Path) -> dict[str, object]:
@@ -52,10 +73,10 @@ def project_fingerprint(fpga_diff_dir: Path) -> dict[str, object]:
 
 def interface_fingerprint(release: Path, module: str, *, cpu: bool) -> dict[str, object]:
     if not module:
-        return {"module": "", "present": False, "interface_hash": "", "source_sha256": ""}
+        return {"module": "", "present": False, "interface_hash": "", "source_sha256": "", "semantic_sha256": ""}
     source = release / "build" / "rtl" / f"{module}.sv"
     if not source.is_file():
-        return {"module": module, "present": False, "interface_hash": "", "source_sha256": ""}
+        return {"module": module, "present": False, "interface_hash": "", "source_sha256": "", "semantic_sha256": ""}
     interface = (
         rtl_if.read_cpu_interface(source, module)
         if cpu
@@ -66,6 +87,7 @@ def interface_fingerprint(release: Path, module: str, *, cpu: bool) -> dict[str,
         "present": True,
         "interface_hash": interface["interface_hash"],
         "source_sha256": interface.get("source_cpu_rtl_sha256", interface.get("source_rtl_sha256", "")),
+        "semantic_sha256": semantic_file_hash(source),
         "port_count": interface["port_count"],
     }
 
@@ -99,8 +121,8 @@ def reference_compatibility(reference: dict, current: dict) -> dict[str, object]
     checks = {
         "implementation_context_changed": reference_context != current["implementation_context_sha256"],
         "reference_source_does_not_match_baseline": (
-            reference_baseline.get("build", {}).get("sha256", "")
-            != current_baseline["build"]["sha256"]
+            reference_baseline.get("build", {}).get("semantic_sha256", "")
+            != current_baseline["build"]["semantic_sha256"]
         ),
         "cpu_interface_changed": (
             reference_baseline.get("cpu_interface", {}).get("interface_hash", "")
@@ -125,11 +147,11 @@ def release_record(release: Path, cpu_module: str, partition_module: str) -> dic
 
 
 def route_decision(baseline: dict, modified: dict, reference: dict) -> dict[str, object]:
-    build_changed = baseline["build"]["sha256"] != modified["build"]["sha256"]
+    build_changed = baseline["build"]["semantic_sha256"] != modified["build"]["semantic_sha256"]
     cpu_dcp_checked = bool(
         baseline["cpu_interface"]["present"] and modified["cpu_interface"]["present"]
     )
-    cpu_source_changed = baseline["cpu_interface"]["source_sha256"] != modified["cpu_interface"]["source_sha256"]
+    cpu_source_changed = baseline["cpu_interface"]["semantic_sha256"] != modified["cpu_interface"]["semantic_sha256"]
     cpu_interface_changed = baseline["cpu_interface"]["interface_hash"] != modified["cpu_interface"]["interface_hash"]
     partition_interface_changed = (
         baseline["partition_interface"]["interface_hash"]
@@ -201,7 +223,7 @@ def main() -> int:
         "stop_after": args.stop_after,
     }
     result: dict[str, object] = {
-        "schema_version": 1,
+        "schema_version": 2,
         "implementation_context": context,
         "implementation_context_sha256": stable_hash(context),
         "reference_checkpoints": {
