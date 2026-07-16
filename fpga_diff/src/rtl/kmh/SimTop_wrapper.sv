@@ -1,11 +1,6 @@
 `include "DifftestMacros.svh"
 `include "sys_define.vh"
 
-`ifdef CONFIG_USE_XSCORE_CHI
-`include "kconfig.svh"
-`include "chi_icn_defines.svh"
-`endif
-
 module SimTop_wrapper(
   input           inter_soc_clk,
   input           sys_rstn_i,
@@ -21,7 +16,6 @@ module SimTop_wrapper(
   input  [15:0]   soc_to_cpu,   // none
   output [15:0]   cpu_to_soc,   //none
 
-`ifdef CONFIG_USE_XSCORE_AXI
   input  [63:0]   io_extIntrs,   // come from IPs, Max : 600MHz
 
   input  [15:0]   io_sram_config,  //apb clk : 100MHz
@@ -151,50 +145,6 @@ module SimTop_wrapper(
   (*mark_debug="true"*) input  [1:0]    mem_core_rresp,
   (*mark_debug="true"*) input           mem_core_rlast,
 
-`elsif CONFIG_USE_XSCORE_CHI
-  input                                 noc_clk,
-  input                                 noc_rstn,
-  input                                 clint_int_0[`CONFIG_XSCORE_NR-1:0],
-  input                                 clint_int_1[`CONFIG_XSCORE_NR-1:0],
-  input  [1:0]                          plic_int[`CONFIG_XSCORE_NR-1:0],
-  input                                 io_debug_module_hart[`CONFIG_XSCORE_NR-1:0],
-  output                                io_hartIsInReset[`CONFIG_XSCORE_NR-1:0],
-  input                                 io_clintTime_valid,
-  input  [63:0]                         io_clintTime_bits,
-  output                                io_riscv_halt[`CONFIG_XSCORE_NR-1:0],
-  output                                io_chi_syscoreq[`CONFIG_XSCORE_NR-1:0],
-  input                                 io_chi_syscoack[`CONFIG_XSCORE_NR-1:0],
-  output                                io_chi_txsactive[`CONFIG_XSCORE_NR-1:0],
-  input                                 io_chi_rxsactive[`CONFIG_XSCORE_NR-1:0],
-  output                                io_chi_tx_linkactivereq[`CONFIG_XSCORE_NR-1:0],
-  input                                 io_chi_tx_linkactiveack[`CONFIG_XSCORE_NR-1:0],
-  output                                io_chi_tx_req_flitpend[`CONFIG_XSCORE_NR-1:0],
-  output                                io_chi_tx_req_flitv[`CONFIG_XSCORE_NR-1:0],
-  output [`CHI_REQFLIT_WIDTH-1:0]       io_chi_tx_req_flit[`CONFIG_XSCORE_NR-1:0],
-  input                                 io_chi_tx_req_lcrdv[`CONFIG_XSCORE_NR-1:0],
-  output                                io_chi_tx_rsp_flitpend[`CONFIG_XSCORE_NR-1:0],
-  output                                io_chi_tx_rsp_flitv[`CONFIG_XSCORE_NR-1:0],
-  output [`CHI_RSPFLIT_WIDTH-1:0]       io_chi_tx_rsp_flit[`CONFIG_XSCORE_NR-1:0],
-  input                                 io_chi_tx_rsp_lcrdv[`CONFIG_XSCORE_NR-1:0],
-  output                                io_chi_tx_dat_flitpend[`CONFIG_XSCORE_NR-1:0],
-  output                                io_chi_tx_dat_flitv[`CONFIG_XSCORE_NR-1:0],
-  output [`CHI_DATFLIT_WIDTH-1:0]       io_chi_tx_dat_flit[`CONFIG_XSCORE_NR-1:0],
-  input                                 io_chi_tx_dat_lcrdv[`CONFIG_XSCORE_NR-1:0],
-  input                                 io_chi_rx_linkactivereq[`CONFIG_XSCORE_NR-1:0],
-  output                                io_chi_rx_linkactiveack[`CONFIG_XSCORE_NR-1:0],
-  input                                 io_chi_rx_rsp_flitpend[`CONFIG_XSCORE_NR-1:0],
-  input                                 io_chi_rx_rsp_flitv[`CONFIG_XSCORE_NR-1:0],
-  input  [`CHI_RSPFLIT_WIDTH-1:0]       io_chi_rx_rsp_flit[`CONFIG_XSCORE_NR-1:0],
-  output                                io_chi_rx_rsp_lcrdv[`CONFIG_XSCORE_NR-1:0],
-  input                                 io_chi_rx_dat_flitpend[`CONFIG_XSCORE_NR-1:0],
-  input                                 io_chi_rx_dat_flitv[`CONFIG_XSCORE_NR-1:0],
-  input  [`CHI_DATFLIT_WIDTH-1:0]       io_chi_rx_dat_flit[`CONFIG_XSCORE_NR-1:0],
-  output                                io_chi_rx_dat_lcrdv[`CONFIG_XSCORE_NR-1:0],
-  input                                 io_chi_rx_snp_flitpend[`CONFIG_XSCORE_NR-1:0],
-  input                                 io_chi_rx_snp_flitv[`CONFIG_XSCORE_NR-1:0],
-  input  [`CHI_SNPFLIT_WIDTH-1:0]       io_chi_rx_snp_flit[`CONFIG_XSCORE_NR-1:0],
-  output                                io_chi_rx_snp_lcrdv[`CONFIG_XSCORE_NR-1:0],
-`endif
 `ifdef CONFIG_USE_IMSIC
   output                                io_imsic_awready[`CONFIG_XSCORE_NR-1:0],
   input                                 io_imsic_awvalid[`CONFIG_XSCORE_NR-1:0],
@@ -270,7 +220,6 @@ module SimTop_wrapper(
   input           difftest_cfg_axilite_rready
 );
 
-`ifdef CONFIG_USE_XSCORE_AXI
   wire          cpu_clock       ;
   wire          cpu_global_reset;
   wire          global_reset_sync;
@@ -301,6 +250,20 @@ wire [149:0] trace_iaddr;
 wire [11:0]  trace_itype;
 wire [20:0]  trace_iretire;
 wire [2:0]   trace_ilastsize;
+
+`ifndef CONFIG_SIMTOP_HAS_DMA
+assign dma_core_awready = 1'b0;
+assign dma_core_wready  = 1'b0;
+assign dma_core_bvalid  = 1'b0;
+assign dma_core_bid     = '0;
+assign dma_core_bresp   = '0;
+assign dma_core_arready = 1'b0;
+assign dma_core_rvalid  = 1'b0;
+assign dma_core_rid     = '0;
+assign dma_core_rdata   = '0;
+assign dma_core_rresp   = '0;
+assign dma_core_rlast   = 1'b0;
+`endif
 
 SimTop  u_XSTop(
   .clock                         (inter_soc_clk),
@@ -346,6 +309,7 @@ SimTop  u_XSTop(
   .peripheral_rdata              (peri_rdata    ),
   .peripheral_rresp              (peri_rresp    ),
   .peripheral_rlast              (peri_rlast    ),
+`ifdef CONFIG_SIMTOP_HAS_DMA
   .dma_awready                   (dma_core_awready ),
   .dma_awvalid                   (dma_core_awvalid ),
   .dma_awid                      (dma_core_awid    ),
@@ -383,7 +347,7 @@ SimTop  u_XSTop(
   .dma_rdata                     (dma_core_rdata   ),
   .dma_rresp                     (dma_core_rresp   ),
   .dma_rlast                     (dma_core_rlast   ),
-
+`endif
   .io_systemjtag_jtag_TCK          (io_systemjtag_jtag_TCK),
   .io_systemjtag_jtag_TMS          (io_systemjtag_jtag_TMS),
   .io_systemjtag_jtag_TDI          (io_systemjtag_jtag_TDI),
@@ -517,206 +481,4 @@ SimTop  u_XSTop(
   .io_traceCoreInterface_0_toEncoder_iretire  (trace_iretire),
   .io_traceCoreInterface_0_toEncoder_ilastsize(trace_ilastsize)
 );
-`elsif CONFIG_USE_XSCORE_CHI
-
-  wire xstile_cpu_reset;
-  XSTileResetGen reset_sync_resetSync_cpu (
-      .clock   (inter_soc_clk),
-      .reset   (~sys_rstn_i),
-      .o_reset (xstile_cpu_reset)
-  );
-  wire xstile_soc_reset;
-  XSTileResetGen reset_sync_resetSync_sys (
-      .clock   (inter_soc_clk),
-      .reset   (~sys_rstn_i),
-      .o_reset (xstile_soc_reset)
-  );
-
-  generate
-    genvar i;
-
-    for (i = 0; i < `CONFIG_XSCORE_NR; i = i+1)
-    begin: u_CPU_TOP
-
-      wire [`CHI_DATFLIT_WIDTH-1:0] _io_chi_tx_dat_flit;
-      wire [6:0] nodeID;
-      case (i)
-`ifdef CONFIG_USE_XSCORE_CHI_ISSUE_B
-        0: assign nodeID = 7'd12;
-        1: assign nodeID = 7'd44;
-`elsif CONFIG_USE_XSCORE_CHI_ISSUE_E
-        0: assign nodeID = 7'd10;
-        1: assign nodeID = 7'd42;
-`endif
-      endcase
-
-     SimTop u_XSTop (
-         .clint_0_0               (clint_int_0[i]),
-         .clint_0_1               (clint_int_1[i]),
-         .debug_0_0               (io_debug_module_hart[i]),
-         .io_hartIsInReset        (io_hartIsInReset[i]),
-         .plic_1_0                (plic_int[i][1:1]),
-         .plic_0_0                (plic_int[i][0:0]),
-         .beu_0_0                 (),
-         .nmi_0_0                 (1'b0),
-         .nmi_0_1                 (1'b0),
-         .clock                   (inter_soc_clk),
-         .reset                   (xstile_cpu_reset),
-         .noc_clock               (noc_clk),
-         .noc_reset               (xstile_soc_reset),
-         .soc_clock               (inter_soc_clk),
-         .soc_reset               (xstile_soc_reset),
-         .io_hartId               (64'h0 + i),
-         .io_clintTime_valid      (io_clintTime_valid),
-         .io_clintTime_bits       (io_clintTime_bits),
-         .io_riscv_halt           (io_riscv_halt[i]),
-         .io_riscv_rst_vec        (38'h10000000),
-         .io_chi_syscoreq         (io_chi_syscoreq[i]),
-         .io_chi_syscoack         (io_chi_syscoack[i]),
-         .io_chi_txsactive        (io_chi_txsactive[i]),
-         .io_chi_rxsactive        (io_chi_rxsactive[i]),
-         .io_chi_tx_linkactivereq (io_chi_tx_linkactivereq[i]),
-         .io_chi_tx_linkactiveack (io_chi_tx_linkactiveack[i]),
-         .io_chi_tx_req_flitpend  (io_chi_tx_req_flitpend[i]),
-         .io_chi_tx_req_flitv     (io_chi_tx_req_flitv[i]),
-         .io_chi_tx_req_flit      (io_chi_tx_req_flit[i]),
-         .io_chi_tx_req_lcrdv     (io_chi_tx_req_lcrdv[i]),
-         .io_chi_tx_rsp_flitpend  (io_chi_tx_rsp_flitpend[i]),
-         .io_chi_tx_rsp_flitv     (io_chi_tx_rsp_flitv[i]),
-         .io_chi_tx_rsp_flit      (io_chi_tx_rsp_flit[i]),
-         .io_chi_tx_rsp_lcrdv     (io_chi_tx_rsp_lcrdv[i]),
-         .io_chi_tx_dat_flitpend  (io_chi_tx_dat_flitpend[i]),
-         .io_chi_tx_dat_flitv     (io_chi_tx_dat_flitv[i]),
-         .io_chi_tx_dat_flit      (_io_chi_tx_dat_flit),
-         .io_chi_tx_dat_lcrdv     (io_chi_tx_dat_lcrdv[i]),
-         .io_chi_rx_linkactivereq (io_chi_rx_linkactivereq[i]),
-         .io_chi_rx_linkactiveack (io_chi_rx_linkactiveack[i]),
-         .io_chi_rx_rsp_flitpend  (io_chi_rx_rsp_flitpend[i]),
-         .io_chi_rx_rsp_flitv     (io_chi_rx_rsp_flitv[i]),
-         .io_chi_rx_rsp_flit      (io_chi_rx_rsp_flit[i]),
-         .io_chi_rx_rsp_lcrdv     (io_chi_rx_rsp_lcrdv[i]),
-         .io_chi_rx_dat_flitpend  (io_chi_rx_dat_flitpend[i]),
-         .io_chi_rx_dat_flitv     (io_chi_rx_dat_flitv[i]),
-         .io_chi_rx_dat_flit      (io_chi_rx_dat_flit[i]),
-         .io_chi_rx_dat_lcrdv     (io_chi_rx_dat_lcrdv[i]),
-         .io_chi_rx_snp_flitpend  (io_chi_rx_snp_flitpend[i]),
-         .io_chi_rx_snp_flitv     (io_chi_rx_snp_flitv[i]),
-         .io_chi_rx_snp_flit      (io_chi_rx_snp_flit[i]),
-         .io_chi_rx_snp_lcrdv     (io_chi_rx_snp_lcrdv[i]),
-         .io_nodeID               (nodeID),
-
-         .difftest_ref_clock              (difftest_ref_clock),
-         .difftest_ref_reset              (difftest_ref_reset),
-         .difftest_pcie_clock             (difftest_pcie_clock),
-         .difftest_to_host_axis_tready    (difftest_to_host_axis_tready),
-         .difftest_to_host_axis_tvalid    (difftest_to_host_axis_tvalid),
-         .difftest_to_host_axis_tdata     (difftest_to_host_axis_tdata),
-         .difftest_to_host_axis_tkeep     (difftest_to_host_axis_tkeep),
-         .difftest_to_host_axis_tlast     (difftest_to_host_axis_tlast),
-         .difftest_from_host_axis_tready  (difftest_from_host_axis_tready),
-         .difftest_from_host_axis_tvalid  (difftest_from_host_axis_tvalid),
-         .difftest_from_host_axis_tdata   (difftest_from_host_axis_tdata),
-         .difftest_from_host_axis_tkeep   (difftest_from_host_axis_tkeep),
-         .difftest_from_host_axis_tlast   (difftest_from_host_axis_tlast),
-         .difftest_clock_enable           (difftest_clock_enable),
-         .difftest_hostCtrl_reset         (difftest_hostCtrl_reset),
-         .difftest_hostCtrl_diffEnable    (difftest_hostCtrl_diffEnable),
-         .difftest_hostCtrl_ilaTrigger    (difftest_hostCtrl_ilaTrigger),
-         .difftest_cfg_axilite_awready    (difftest_cfg_axilite_awready),
-         .difftest_cfg_axilite_awvalid    (difftest_cfg_axilite_awvalid),
-         .difftest_cfg_axilite_awaddr     (difftest_cfg_axilite_awaddr),
-         .difftest_cfg_axilite_wready     (difftest_cfg_axilite_wready),
-         .difftest_cfg_axilite_wvalid     (difftest_cfg_axilite_wvalid),
-         .difftest_cfg_axilite_wdata      (difftest_cfg_axilite_wdata),
-         .difftest_cfg_axilite_wstrb      (difftest_cfg_axilite_wstrb),
-         .difftest_cfg_axilite_bready     (difftest_cfg_axilite_bready),
-         .difftest_cfg_axilite_bvalid     (difftest_cfg_axilite_bvalid),
-         .difftest_cfg_axilite_bresp      (difftest_cfg_axilite_bresp),
-         .difftest_cfg_axilite_arready    (difftest_cfg_axilite_arready),
-         .difftest_cfg_axilite_arvalid    (difftest_cfg_axilite_arvalid),
-         .difftest_cfg_axilite_araddr     (difftest_cfg_axilite_araddr),
-         .difftest_cfg_axilite_rready     (difftest_cfg_axilite_rready),
-         .difftest_cfg_axilite_rvalid     (difftest_cfg_axilite_rvalid),
-         .difftest_cfg_axilite_rdata      (difftest_cfg_axilite_rdata),
-         .difftest_cfg_axilite_rresp      (difftest_cfg_axilite_rresp),
-
-         /* trace */
-`ifdef CONFIG_HAVE_XSCORE_TRACE
-         .io_traceCoreInterface_fromEncoder_enable (1'b0),
-         .io_traceCoreInterface_fromEncoder_stall  (1'b0),
-         .io_traceCoreInterface_toEncoder_cause    (),
-         .io_traceCoreInterface_toEncoder_tval     (),
-         .io_traceCoreInterface_toEncoder_priv     (),
-         .io_traceCoreInterface_toEncoder_iaddr    (),
-         .io_traceCoreInterface_toEncoder_itype    (),
-         .io_traceCoreInterface_toEncoder_iretire  (),
-         .io_traceCoreInterface_toEncoder_ilastsize(),
-`endif /* CONFIG_HAVE_XSCORE_TRACE */
-
-`ifdef CONFIG_USE_IMSIC
-         .imsic_axi4_awready  (io_imsic_awready[i]),
-         .imsic_axi4_awvalid  (io_imsic_awvalid[i]),
-         .imsic_axi4_awid     (io_imsic_awid[i]),
-         .imsic_axi4_awaddr   (io_imsic_awaddr[i]),
-         .imsic_axi4_wready   (io_imsic_wready[i]),
-         .imsic_axi4_wvalid   (io_imsic_wvalid[i]),
-         .imsic_axi4_wdata    (io_imsic_wdata[i]),
-         .imsic_axi4_bready   (io_imsic_bready[i]),
-         .imsic_axi4_bvalid   (io_imsic_bvalid[i]),
-         .imsic_axi4_bid      (io_imsic_bid[i]),
-         .imsic_axi4_bresp    (io_imsic_bresp[i]),
-         .imsic_axi4_arready  (io_imsic_arready[i]),
-         .imsic_axi4_arvalid  (io_imsic_arvalid[i]),
-         .imsic_axi4_arid     (io_imsic_arid[i]),
-         .imsic_axi4_araddr   (io_imsic_araddr[i]),
-         .imsic_axi4_rready   (io_imsic_rready[i]),
-         .imsic_axi4_rvalid   (io_imsic_rvalid[i]),
-         .imsic_axi4_rid      (io_imsic_rid[i]),
-         .imsic_axi4_rdata    (io_imsic_rdata[i]),
-         .imsic_axi4_rresp    (io_imsic_rresp[i])
-`else
-         .imsic_axi4_awready  (),
-         .imsic_axi4_awvalid  (1'b0),
-         .imsic_axi4_awid     (5'b0),
-         .imsic_axi4_awaddr   (32'b0),
-         .imsic_axi4_wready   (),
-         .imsic_axi4_wvalid   (1'b0),
-         .imsic_axi4_wdata    (32'b0),
-         .imsic_axi4_bready   (1'b0),
-         .imsic_axi4_bvalid   (),
-         .imsic_axi4_bid      (),
-         .imsic_axi4_bresp    (),
-         .imsic_axi4_arready  (),
-         .imsic_axi4_arvalid  (1'b0),
-         .imsic_axi4_arid     (5'b0),
-         .imsic_axi4_araddr   (32'b0),
-         .imsic_axi4_rready   (1'b0),
-         .imsic_axi4_rvalid   (),
-         .imsic_axi4_rid      (),
-         .imsic_axi4_rdata    (),
-         .imsic_axi4_rresp    ()
-`endif /* CONFIG_USE_IMSIC */
-     );
-
-/* HACK: io_chi_tx_dat_flit.{DataCheck,Poison} */
-`ifndef CONFIG_HAVE_XSCORE_DATACHK
-      `define TXDAT_FLIT_DATA		(`CHI_DATFLIT_NOCHKWIDTH - 256)
-      wire [31:0] tx_dat_flit_datachk;
-      genvar idx;
-      for (idx = 0; idx < 32; idx = idx + 1) begin: u_tx_dat_chk
-          assign tx_dat_flit_datachk[idx] =
-              ~^(_io_chi_tx_dat_flit[`TXDAT_FLIT_DATA + 8*idx +: 8]);
-      end: u_tx_dat_chk
-      assign io_chi_tx_dat_flit[i] = {
-          4'b0 /* Poison */, tx_dat_flit_datachk[31:0],
-          _io_chi_tx_dat_flit[`CHI_DATFLIT_NOCHKWIDTH-1:0]
-      };
-`else
-      assign io_chi_tx_dat_flit[i] = _io_chi_tx_dat_flit;
-`endif /* !CONFIG_HAVE_XSCORE_DATACHK */
-    end
-  endgenerate
-
-`endif
-
 endmodule
