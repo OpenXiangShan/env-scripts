@@ -302,6 +302,20 @@ wire [11:0]  trace_itype;
 wire [20:0]  trace_iretire;
 wire [2:0]   trace_ilastsize;
 
+`ifndef CONFIG_SIMTOP_HAS_DMA
+assign dma_core_awready = 1'b0;
+assign dma_core_wready  = 1'b0;
+assign dma_core_bvalid  = 1'b0;
+assign dma_core_bid     = '0;
+assign dma_core_bresp   = '0;
+assign dma_core_arready = 1'b0;
+assign dma_core_rvalid  = 1'b0;
+assign dma_core_rid     = '0;
+assign dma_core_rdata   = '0;
+assign dma_core_rresp   = '0;
+assign dma_core_rlast   = 1'b0;
+`endif
+
 SimTop  u_XSTop(
   .clock                         (inter_soc_clk),
   .reset                         (~sys_rstn_i),
@@ -346,6 +360,7 @@ SimTop  u_XSTop(
   .peripheral_rdata              (peri_rdata    ),
   .peripheral_rresp              (peri_rresp    ),
   .peripheral_rlast              (peri_rlast    ),
+`ifdef CONFIG_SIMTOP_HAS_DMA
   .dma_awready                   (dma_core_awready ),
   .dma_awvalid                   (dma_core_awvalid ),
   .dma_awid                      (dma_core_awid    ),
@@ -383,7 +398,7 @@ SimTop  u_XSTop(
   .dma_rdata                     (dma_core_rdata   ),
   .dma_rresp                     (dma_core_rresp   ),
   .dma_rlast                     (dma_core_rlast   ),
-
+`endif
   .io_systemjtag_jtag_TCK          (io_systemjtag_jtag_TCK),
   .io_systemjtag_jtag_TMS          (io_systemjtag_jtag_TMS),
   .io_systemjtag_jtag_TDI          (io_systemjtag_jtag_TDI),

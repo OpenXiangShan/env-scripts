@@ -132,6 +132,7 @@ source "$tcl_dir/common/rtl_files.tcl"
 source "$tcl_dir/common/constraints.tcl"
 source "$tcl_dir/common/defines.tcl"
 source "$tcl_dir/common/include_dirs.tcl"
+source "$tcl_dir/common/header_files.tcl"
 
 set cpu_hit "no"
 foreach cpu_candidate $cpu_candidates {
@@ -139,6 +140,9 @@ foreach cpu_candidate $cpu_candidates {
     set cpu_hit "yes"
   }
 }
+set cpu_files_has_rtl_include 0
+set cpu_files_has_dma 1
+set rtl_include_files [list]
 if {[string equal $cpu_hit "no"]} {
   puts "ERROR: Unknown cpu target '$cpu' specified by '--cpu', please select one from {$cpu_candidates}.\n"
   return 1
@@ -154,7 +158,19 @@ if { [file exists "$tcl_dir/chi_files.tcl"] } {
   source "$tcl_dir/chi_files.tcl"
 }
 
-set xs_files [list {*}$cpu_files {*}$ip_files {*}$rtl_files {*}$chi_files]
+if {$cpu_files_has_rtl_include} {
+  foreach rtl_file $rtl_include_files {
+    set rtl_include_dir [file normalize [file dirname $rtl_file]]
+    if {[lsearch -exact $include_dirs $rtl_include_dir] < 0} {
+      lappend include_dirs $rtl_include_dir
+    }
+  }
+}
+
+# Keep auxiliary RTL after the local FPGA wrapper.  Some auxiliary headers
+# define interconnect protocol macros, while the local wrapper must retain its
+# AXI top-level elaboration.
+set xs_files [list {*}$cpu_files {*}$ip_files {*}$rtl_files {*}$chi_files {*}$rtl_include_files]
 
 # Check for paths and files needed for project creation
 set validate_required 1
@@ -204,36 +220,7 @@ set obj [get_filesets sources_1]
 set_property SOURCE_SET sources_1 [get_filesets sim_1]
 add_files -norecurse -fileset $obj $xs_files
 
-# Set file type to "SystemVerilog" for all .v files as base type
-# This should be done before setting specific files to "Verilog Header"
-foreach file $xs_files {
-  set file_extension [file extension $file]
-  if { [string equal -nocase $file_extension ".v"] } {
-    set_property -name file_type -value {SystemVerilog} -objects [get_files $file]
-  }
-}
-
-# Set file type to "Verilog Header" for files matching specific patterns in CHI files
-foreach chi_file $chi_files {
-  set filename [file tail $chi_file]
-  if { [string match "*_define*" $filename] || [string match "*_structs*" $filename] ||
-       [string match "*_params*" $filename] || [string match "*rnid_inc*" $filename] ||
-       [string match "*hns_inc*" $filename] || [string match "*hni_inc*" $filename] ||
-       [string match "*_pkg*" $filename] || [string match "*_function*" $filename] ||
-       [string match "*_localparam*" $filename] || [string match "*axi_lite_slave*" $filename]} {
-      puts "INFO: Setting $filename file_type to 'Verilog Header'"
-      set_property -name file_type -value {Verilog Header} -objects [get_files $chi_file]
-    }
-}
-
-# If DifftestMacros.v exists, set its file_type to 'Verilog Header' to avoid being treated as a top/regular synthesizable source
-set difftest_hdr [get_files -quiet *DifftestMacros.v]
-if {[llength $difftest_hdr] > 0} {
-  puts "INFO: Setting DifftestMacros.v file_type to 'Verilog Header'"
-  set_property -name file_type -value {Verilog Header} -objects $difftest_hdr
-} else {
-  puts "INFO: DifftestMacros.v not found at add phase; skip header type setting"
-}
+fpga_set_header_file_types $xs_files $include_dirs
 
 # Set 'sources_1' fileset properties
 set obj [get_filesets sources_1]
@@ -241,14 +228,26 @@ set_property -name "include_dirs" -value "$include_dirs" -objects $obj
 set_property -name "top" -value "fpga_top_debug" -objects $obj
 set_property -name "top_auto_set" -value "0" -objects $obj
 
-# Define MSI_MODE macro only if CHI files exist
+# RTL_INCLUDE may add auxiliary RTL to an AXI SimTop_wrapper. Only the
+# legacy CHI_DIR flow changes the generated top-level interface to CHI.
 if { [llength $chi_files] > 0 } {
     lappend defines "MSI_MODE"
     lappend defines "CONFIG_USE_XSCORE_CHI"
-    puts "INFO: Defined MSI_MODE macro as CHI files are present"
-} else {
-    puts "INFO: MSI_MODE macro not defined as CHI files are not present"
+    puts "INFO: Defined MSI_MODE and CONFIG_USE_XSCORE_CHI for CHI RTL"
+} elseif { $cpu_files_has_rtl_include } {
+    lappend defines "MSI_MODE"
     lappend defines "CONFIG_USE_XSCORE_AXI"
+    puts "INFO: Defined MSI_MODE for RTL_INCLUDE without changing SimTop_wrapper to CHI"
+} else {
+    puts "INFO: MSI_MODE macro not defined as external RTL files are not present"
+    lappend defines "CONFIG_USE_XSCORE_AXI"
+}
+
+if {$cpu_files_has_dma} {
+    lappend defines "CONFIG_SIMTOP_HAS_DMA"
+    puts "INFO: SimTop DMA ports detected"
+} else {
+    puts "INFO: SimTop DMA ports not present; wrapper DMA is tied off"
 }
 
 set xdma_pcie_lanes 4
