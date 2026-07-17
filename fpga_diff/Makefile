@@ -23,7 +23,7 @@ PRJ_NAME = fpga_$(CPU)$(if $(strip $(SUFFIX)),-$(strip $(SUFFIX)),)
 PRJ_DIR ?= $(ENV_SCRIPTS_HOME)/$(PRJ_NAME)
 PRJ ?= $(PRJ_DIR)/$(PRJ_NAME).xpr
 
-.PHONY: bitstream vivado dump_ila write_jtag_flash
+.PHONY: bitstream route vivado dump_ila write_jtag_flash incremental-flow cpu-dcp-interface cpu-dcp-flow
 
 # Get Vivado version
 VIVADO_VERSION := $(shell vivado -version 2>/dev/null | head -1 | grep -o '[0-9]\{4\}\.[0-9]' || echo "unknown")
@@ -38,6 +38,10 @@ synth:
 # Generate FPGA bitstream
 bitstream:
 	vivado -mode batch -source ./tools/gen_bitstream.tcl -tclargs $(PRJ) impl_1 $(VIVADO_JOBS)
+
+# Run implementation through route_design without writing a bitstream
+route:
+	vivado -mode batch -source ./tools/run_impl_route.tcl -tclargs $(PRJ) impl_1 $(VIVADO_JOBS)
 
 # Update file list for core RTL files
 update_core_flist:
@@ -98,6 +102,75 @@ add_sys_option:
 get_impl_log:
 	cat $(PRJ_DIR)/$(PRJ_NAME).runs/impl_1/runme.log
 
+INCREMENTAL_BASELINE_RELEASE ?=
+INCREMENTAL_MODIFIED_RELEASE ?=
+INCREMENTAL_OUT_DIR ?=
+INCREMENTAL_EXTRA_ARGS ?=
+
+# Run whole-project incremental synthesis and implementation.
+incremental-flow:
+	tools/cpu_dcp_split/run_incremental_flow.py \
+	  --baseline-release "$(INCREMENTAL_BASELINE_RELEASE)" \
+	  --modified-release "$(INCREMENTAL_MODIFIED_RELEASE)" \
+	  --cpu "$(CPU)" \
+	  $(if $(strip $(INCREMENTAL_OUT_DIR)),--out-dir "$(INCREMENTAL_OUT_DIR)",) \
+	  $(if $(strip $(VIVADO_JOBS)),--jobs "$(VIVADO_JOBS)",) \
+	  $(INCREMENTAL_EXTRA_ARGS)
+
+
+CPU_DCP_MODIFIED_RELEASE ?=
+CPU_DCP_CPU_MODULE ?=
+CPU_DCP_PARTITION_MODULE ?=
+CPU_DCP_INTERFACE_MODE ?= stub
+CPU_DCP_INTERFACE_OUT ?=
+CPU_DCP_INTERFACE_JSON ?=
+CPU_DCP_BASELINE_RELEASE ?=
+CPU_DCP_REFERENCE_DCP ?=
+CPU_DCP_REFERENCE_SYNTH_DCP ?=
+CPU_DCP_REFERENCE_FINGERPRINT ?=
+CPU_DCP_CPU_CELL ?=
+CPU_DCP_CPU_INSTANCE ?=
+CPU_DCP_SUBPARTITION_PRESET ?=
+CPU_DCP_DCP ?=
+CPU_DCP_OUT_DIR ?=
+CPU_DCP_STOP_AFTER ?= route
+CPU_DCP_SYNTH_INCREMENTAL_MODE ?= default
+CPU_DCP_EXTRA_ARGS ?=
+
+# Copy the generated CPU RTL port contract onto a CpuDcpTop-style partition
+# module. This is useful for inspecting or regenerating only the DCP shell
+# interface without running Vivado.
+cpu-dcp-interface:
+	tools/cpu_dcp_split/sync_cpu_dcp_interface.py \
+	  --release "$(CPU_DCP_MODIFIED_RELEASE)" \
+	  $(if $(strip $(CPU_DCP_CPU_MODULE)),--cpu-module "$(CPU_DCP_CPU_MODULE)",) \
+	  --partition-module "$(or $(strip $(CPU_DCP_PARTITION_MODULE)),CpuDcpTop)" \
+	  --mode "$(CPU_DCP_INTERFACE_MODE)" \
+	  $(if $(strip $(CPU_DCP_INTERFACE_OUT)),--out "$(CPU_DCP_INTERFACE_OUT)" --force,) \
+	  $(if $(strip $(CPU_DCP_INTERFACE_JSON)),--json-out "$(CPU_DCP_INTERFACE_JSON)",)
+
+
+# Run the DiffTest hot path with CPU fixed as a DCP partition. If no routed
+# reference is provided, the flow builds one from the baseline release.
+cpu-dcp-flow:
+	tools/cpu_dcp_split/run_cpu_dcp_flow.py \
+	  --baseline-release "$(CPU_DCP_BASELINE_RELEASE)" \
+	  --modified-release "$(CPU_DCP_MODIFIED_RELEASE)" \
+	  $(if $(strip $(CPU)),--cpu "$(CPU)",) \
+	  $(if $(strip $(CPU_DCP_REFERENCE_DCP)),--reference-routed-dcp "$(CPU_DCP_REFERENCE_DCP)",) \
+	  $(if $(strip $(CPU_DCP_REFERENCE_SYNTH_DCP)),--reference-synth-dcp "$(CPU_DCP_REFERENCE_SYNTH_DCP)",) \
+	  $(if $(strip $(CPU_DCP_REFERENCE_FINGERPRINT)),--reference-fingerprint "$(CPU_DCP_REFERENCE_FINGERPRINT)",) \
+	  $(if $(strip $(CPU_DCP_CPU_CELL)),--cpu-cell "$(CPU_DCP_CPU_CELL)",) \
+	  $(if $(strip $(CPU_DCP_CPU_MODULE)),--module "$(CPU_DCP_CPU_MODULE)",) \
+	  $(if $(strip $(CPU_DCP_CPU_INSTANCE)),--cpu-instance "$(CPU_DCP_CPU_INSTANCE)",) \
+	  $(if $(strip $(CPU_DCP_SUBPARTITION_PRESET)),--subpartition-preset "$(CPU_DCP_SUBPARTITION_PRESET)",--partition-module "$(or $(strip $(CPU_DCP_PARTITION_MODULE)),CpuDcpTop)") \
+	  $(if $(strip $(CPU_DCP_DCP)),--cpu-dcp "$(CPU_DCP_DCP)",) \
+	  $(if $(strip $(CPU_DCP_REFERENCE_DCP)),,--build-reference) \
+	  $(if $(strip $(CPU_DCP_OUT_DIR)),--out-dir "$(CPU_DCP_OUT_DIR)",) \
+	  --stop-after "$(CPU_DCP_STOP_AFTER)" \
+	  --synth-incremental-mode "$(CPU_DCP_SYNTH_INCREMENTAL_MODE)" \
+	  $(if $(strip $(VIVADO_JOBS)),--jobs "$(VIVADO_JOBS)",) \
+	  $(CPU_DCP_EXTRA_ARGS)
 # Display synthesis log
 get_synth_log:
 	cat $(PRJ_DIR)/$(PRJ_NAME).runs/synth_1/runme.log
