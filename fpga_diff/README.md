@@ -72,7 +72,7 @@ reuse reports, timing, and route status before accepting a result.
 Both flows also write `implementation-fingerprint.json`. It hashes the release
 build inputs, implementation Tcl/Make inputs, CPU and partition interfaces, and
 the Vivado/implementation settings. Its `decision.recommended_action` states
-whether no implementation changed, a CPU DCP must be rebuilt, or a whole-project
+whether no implementation changed, the CPU DCP is reusable, or a whole-project
 incremental route is required.
 
 ### CPU-DCP

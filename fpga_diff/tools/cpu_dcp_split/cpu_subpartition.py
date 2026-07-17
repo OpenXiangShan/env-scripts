@@ -150,7 +150,9 @@ def closure_hash(release: Path, top: str, modules: dict[str, Path]) -> tuple[str
         signature.append({
             "module": module,
             "relative_path": str(path.relative_to(rtl_dir(release))),
-            "sha256": rtl_if.stable_json_hash(module_text(text, module)),
+            "sha256": rtl_if.sha256_text(
+                rtl_if.strip_comments(module_text(text, module))
+            ),
         })
     return rtl_if.stable_json_hash(signature), closure
 

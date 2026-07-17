@@ -6,6 +6,7 @@ from __future__ import annotations
 import argparse
 import hashlib
 import json
+import os
 from pathlib import Path
 
 import cpu_rtl_interface as rtl_if
@@ -19,6 +20,13 @@ PROJECT_INPUTS = (
     "tools/gen_synth.tcl",
     "tools/gen_bitstream.tcl",
     "tools/run_impl_route.tcl",
+)
+IMPLEMENTATION_ENV = (
+    "CHI_DIR",
+    "DDR_RANK_WIDTH",
+    "ENABLE_ILA",
+    "ILA_DEPTH",
+    "XDMA_LINK_WIDTH",
 )
 
 
@@ -35,7 +43,7 @@ def semantic_file_hash(path: Path) -> str:
     if path.suffix.lower() not in {".v", ".sv", ".svh"}:
         return sha256_file(path)
     text = path.read_text(encoding="utf-8", errors="replace")
-    return hashlib.sha256(rtl_if.normalize_ws(rtl_if.strip_comments(text)).encode()).hexdigest()
+    return hashlib.sha256(rtl_if.strip_comments(text).encode()).hexdigest()
 
 
 def fingerprint_files(root: Path, paths: list[Path]) -> dict[str, object]:
@@ -67,7 +75,7 @@ def build_fingerprint(release: Path) -> dict[str, object]:
 
 def project_fingerprint(fpga_diff_dir: Path) -> dict[str, object]:
     paths = [fpga_diff_dir / rel for rel in PROJECT_INPUTS if (fpga_diff_dir / rel).is_file()]
-    paths.extend(path for path in (fpga_diff_dir / "src" / "tcl").rglob("*") if path.is_file())
+    paths.extend(path for path in (fpga_diff_dir / "src").rglob("*") if path.is_file())
     return fingerprint_files(fpga_diff_dir, paths)
 
 
@@ -117,7 +125,9 @@ def reference_compatibility(reference: dict, current: dict) -> dict[str, object]
 
     reference_context = str(reference.get("implementation_context_sha256", ""))
     reference_baseline = reference.get("baseline", {})
+    reference_checkpoints = reference.get("reference_checkpoints", {})
     current_baseline = current["baseline"]
+    current_checkpoints = current["reference_checkpoints"]
     checks = {
         "implementation_context_changed": reference_context != current["implementation_context_sha256"],
         "reference_source_does_not_match_baseline": (
@@ -131,6 +141,16 @@ def reference_compatibility(reference: dict, current: dict) -> dict[str, object]
         "partition_interface_changed": (
             reference_baseline.get("partition_interface", {}).get("interface_hash", "")
             != current_baseline["partition_interface"]["interface_hash"]
+        ),
+        "routed_reference_dcp_changed": (
+            bool(current_checkpoints["routed"]["sha256"])
+            and reference_checkpoints.get("routed", {}).get("sha256", "")
+            != current_checkpoints["routed"]["sha256"]
+        ),
+        "synthesis_reference_dcp_changed": (
+            bool(current_checkpoints["synth"]["sha256"])
+            and reference_checkpoints.get("synth", {}).get("sha256", "")
+            != current_checkpoints["synth"]["sha256"]
         ),
     }
     reasons = [name for name, failed in checks.items() if failed]
@@ -164,7 +184,7 @@ def route_decision(baseline: dict, modified: dict, reference: dict) -> dict[str,
     elif cpu_interface_changed or partition_interface_changed or not reference["compatible"]:
         action = "whole-project-incremental-route"
     elif cpu_source_changed:
-        action = "rebuild-cpu-dcp-and-incremental-route"
+        action = "whole-project-incremental-route"
     else:
         action = "reuse-cpu-dcp-and-incremental-route"
     return {
@@ -216,6 +236,7 @@ def main() -> int:
         "cpu_module": args.cpu_module,
         "partition_module": args.partition_module,
         "cpu_cell": args.cpu_cell,
+        "environment": {name: os.environ.get(name, "") for name in IMPLEMENTATION_ENV},
         "project": project_fingerprint(fpga_diff_dir),
         "vivado_version": args.vivado_version,
         "synth_incremental_mode": args.synth_incremental_mode,

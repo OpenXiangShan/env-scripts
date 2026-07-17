@@ -46,6 +46,11 @@ def parse_args() -> argparse.Namespace:
         help="directive for incremental placement and routing after CPU-DCP import",
     )
     parser.add_argument("--build-reference", action="store_true")
+    parser.add_argument(
+        "--allow-unknown-changes",
+        action="store_true",
+        help="continue after manually reviewing RTL changes that the reuse gate cannot classify",
+    )
     parser.add_argument("--dry-run", action="store_true")
     args = parser.parse_args()
     if args.subpartition_preset and args.partition_module:
@@ -170,6 +175,7 @@ def main() -> int:
             "cpu-subpartition-top-overlay",
             "reference-synth-dcp",
             "implementation-fingerprint",
+            "implementation-fingerprint-final",
         }
         return label not in run_in_dry
 
@@ -391,8 +397,13 @@ def main() -> int:
             "WARNING: CPU-DCP whole-CPU reuse gate failed; "
             f"subpartition plan will check whether CPU changes are covered by {args.subpartition_preset}."
         )
+    elif gate_rc == 2 and not args.allow_unknown_changes:
+        raise SystemExit(
+            "ERROR: CPU-DCP reuse gate found unknown RTL changes. "
+            "Review rtl-diff, then pass --allow-unknown-changes to continue."
+        )
     elif gate_rc == 2:
-        print("WARNING: CPU-DCP reuse gate needs manual review; continuing.")
+        print("WARNING: continuing after explicit approval of unknown RTL changes.")
     elif gate_rc != 0:
         raise SystemExit(gate_rc)
 
@@ -568,6 +579,7 @@ def main() -> int:
             args.impl_directive,
         ),
     )
+    runner.run("implementation-fingerprint-final", fingerprint_cmd)
 
     print(f"INFO: CPU-DCP flow complete: {out_dir}")
     print(f"INFO: implementation manifest: {out_dir / 'import-impl' / 'cpu-dcp-import-impl.json'}")

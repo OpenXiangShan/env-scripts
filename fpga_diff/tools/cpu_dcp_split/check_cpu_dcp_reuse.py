@@ -1,11 +1,12 @@
 #!/usr/bin/env python3
 import argparse
 import csv
-import hashlib
 import json
 import re
 from dataclasses import dataclass
 from pathlib import Path
+
+import cpu_rtl_interface as rtl_if
 
 MODULE_RE = re.compile(r"(?m)^\s*module\s+([A-Za-z_][A-Za-z0-9_$]*)\b")
 ENDMODULE_RE = re.compile(r"(?m)^\s*endmodule\b")
@@ -23,7 +24,7 @@ def classify_name(name: str, rel_path: str) -> str:
     if re.search(r"Difftest|DiffTest|Gateway|Batch|Delta|Host|XDMA|DifftestClockGate", haystack):
         return "difftest"
     if re.search(
-        r"XSTop|XSCore|XSTile|xiangshan|XiangShan|NutShell|NutCore|"
+        r"XSTop|XSCore|XSTile|xiangshan|XiangShan|NutShell|NutCore|CpuDcpTop|"
         r"Frontend|Backend|IFU|BPU|IDU|ISU|EXU|LSU|WBU|CSR|ALU|MDU|"
         r"Cache|TLB|SRAMTemplate|array_|rf_",
         haystack,
@@ -42,11 +43,11 @@ def iter_rtl_files(root: Path) -> list[Path]:
 
 
 def digest(text: str) -> str:
-    return hashlib.sha256(text.encode("utf-8", errors="replace")).hexdigest()
+    return rtl_if.sha256_text(rtl_if.strip_comments(text))
 
 
 def file_digest(path: Path) -> str:
-    return hashlib.sha256(path.read_bytes()).hexdigest()
+    return digest(path.read_text(encoding="utf-8", errors="replace"))
 
 
 def compare_files(baseline_rtl: Path, modified_rtl: Path) -> list[dict[str, str]]:
@@ -149,7 +150,11 @@ def gate_from_rows(rows: list[dict[str, str]]) -> dict[str, object]:
     unknown_changed = area_counts.get("unknown", 0) > 0
     mixed_changed = area_counts.get("mixed-boundary", 0) > 0
 
-    if cpu_changed:
+    if not rows:
+        verdict = "no-change"
+        reason = "No generated RTL changes were detected."
+        exit_code = 0
+    elif cpu_changed:
         verdict = "cpu-dcp-invalid"
         reason = "CPU-area module changes were detected; do not assume a baseline CPU checkpoint is reusable."
         exit_code = 1

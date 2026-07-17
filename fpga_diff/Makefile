@@ -165,7 +165,7 @@ cpu-dcp-flow:
 	  $(if $(strip $(CPU_DCP_CPU_INSTANCE)),--cpu-instance "$(CPU_DCP_CPU_INSTANCE)",) \
 	  $(if $(strip $(CPU_DCP_SUBPARTITION_PRESET)),--subpartition-preset "$(CPU_DCP_SUBPARTITION_PRESET)",--partition-module "$(or $(strip $(CPU_DCP_PARTITION_MODULE)),CpuDcpTop)") \
 	  $(if $(strip $(CPU_DCP_DCP)),--cpu-dcp "$(CPU_DCP_DCP)",) \
-	  --build-reference \
+	  $(if $(strip $(CPU_DCP_REFERENCE_DCP)),,--build-reference) \
 	  $(if $(strip $(CPU_DCP_OUT_DIR)),--out-dir "$(CPU_DCP_OUT_DIR)",) \
 	  --stop-after "$(CPU_DCP_STOP_AFTER)" \
 	  --synth-incremental-mode "$(CPU_DCP_SYNTH_INCREMENTAL_MODE)" \
