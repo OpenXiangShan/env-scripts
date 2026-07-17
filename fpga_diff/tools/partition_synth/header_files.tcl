@@ -37,6 +37,13 @@ proc fpga_included_source_files {files include_dirs} {
         continue
       }
 
+      set include_tail [file tail $include_path]
+      if {[info exists files_by_tail($include_tail)] &&
+          [llength $files_by_tail($include_tail)] == 1} {
+        set included_files([lindex $files_by_tail($include_tail) 0]) 1
+        continue
+      }
+
       if {[file pathtype $include_path] eq "absolute"} {
         set candidates [list [file normalize $include_path]]
       } else {
@@ -53,8 +60,8 @@ proc fpga_included_source_files {files include_dirs} {
           break
         }
       }
-      if {$included_path eq "" && [info exists files_by_tail([file tail $include_path])]} {
-        set same_tail $files_by_tail([file tail $include_path])
+      if {$included_path eq "" && [info exists files_by_tail($include_tail)]} {
+        set same_tail $files_by_tail($include_tail)
         if {[llength $same_tail] == 1} {
           set included_path [lindex $same_tail 0]
         }
@@ -74,17 +81,27 @@ proc fpga_set_header_file_types {files include_dirs} {
     set header_files($file) 1
   }
 
+  set header_paths {}
+  set verilog_paths {}
   foreach file $files {
-    set objects [get_files -quiet $file]
-    if {[llength $objects] == 0} {
-      continue
-    }
-
     set extension [string tolower [file extension $file]]
     set path [file normalize $file]
     if {$extension in {.svh .vh} || [info exists header_files($path)]} {
-      set_property -name file_type -value {Verilog Header} -objects $objects
+      lappend header_paths $path
     } elseif {$extension eq ".v"} {
+      lappend verilog_paths $path
+    }
+  }
+
+  if {[llength $header_paths] > 0} {
+    set objects [get_files -quiet $header_paths]
+    if {[llength $objects] > 0} {
+      set_property -name file_type -value {Verilog Header} -objects $objects
+    }
+  }
+  if {[llength $verilog_paths] > 0} {
+    set objects [get_files -quiet $verilog_paths]
+    if {[llength $objects] > 0} {
       set_property -name file_type -value {SystemVerilog} -objects $objects
     }
   }

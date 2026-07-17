@@ -11,6 +11,7 @@ proc fpga_append_unique {var_name value} {
 
 proc fpga_included_source_files {files include_dirs} {
   array set known_files {}
+  array set files_by_tail {}
   set search_dirs {}
 
   foreach dir $include_dirs {
@@ -24,6 +25,8 @@ proc fpga_included_source_files {files include_dirs} {
     }
     set path [file normalize $file]
     set known_files($path) 1
+    lappend files_by_tail([file tail $path]) $path
+    fpga_append_unique search_dirs [file dirname $path]
   }
 
   array set included_files {}
@@ -31,6 +34,13 @@ proc fpga_included_source_files {files include_dirs} {
     set in [open $file r]
     while {[gets $in line] >= 0} {
       if {![regexp {^[[:space:]]*\x60include[[:space:]]+["<]([^">]+)[">]} $line -> include_path]} {
+        continue
+      }
+
+      set include_tail [file tail $include_path]
+      if {[info exists files_by_tail($include_tail)] &&
+          [llength $files_by_tail($include_tail)] == 1} {
+        set included_files([lindex $files_by_tail($include_tail) 0]) 1
         continue
       }
 
@@ -43,11 +53,21 @@ proc fpga_included_source_files {files include_dirs} {
         }
       }
 
+      set included_path ""
       foreach candidate $candidates {
         if {[info exists known_files($candidate)]} {
-          set included_files($candidate) 1
+          set included_path $candidate
           break
         }
+      }
+      if {$included_path eq "" && [info exists files_by_tail($include_tail)]} {
+        set same_tail $files_by_tail($include_tail)
+        if {[llength $same_tail] == 1} {
+          set included_path [lindex $same_tail 0]
+        }
+      }
+      if {$included_path ne ""} {
+        set included_files($included_path) 1
       }
     }
     close $in
@@ -61,17 +81,27 @@ proc fpga_set_header_file_types {files include_dirs} {
     set header_files($file) 1
   }
 
+  set header_paths {}
+  set verilog_paths {}
   foreach file $files {
-    set objects [get_files -quiet $file]
-    if {[llength $objects] == 0} {
-      continue
-    }
-
     set extension [string tolower [file extension $file]]
     set path [file normalize $file]
     if {$extension in {.svh .vh} || [info exists header_files($path)]} {
-      set_property -name file_type -value {Verilog Header} -objects $objects
+      lappend header_paths $path
     } elseif {$extension eq ".v"} {
+      lappend verilog_paths $path
+    }
+  }
+
+  if {[llength $header_paths] > 0} {
+    set objects [get_files -quiet $header_paths]
+    if {[llength $objects] > 0} {
+      set_property -name file_type -value {Verilog Header} -objects $objects
+    }
+  }
+  if {[llength $verilog_paths] > 0} {
+    set objects [get_files -quiet $verilog_paths]
+    if {[llength $objects] > 0} {
       set_property -name file_type -value {SystemVerilog} -objects $objects
     }
   }
