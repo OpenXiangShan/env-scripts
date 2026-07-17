@@ -12,6 +12,11 @@ ILA_DEPTH ?= 16384
 XDMA_LINK_WIDTH ?= X4
 VIVADO_JOBS ?=
 DDR_RANK_WIDTH ?= 2
+PARTITION_SYNTH ?= 0
+PARTITION_SYNTH_OUT ?=
+PARTITION_SYNTH_PARALLEL ?= 16
+PARTITION_SYNTH_JOBS ?= 8
+PARTITION_SYNTH_PROJECT_RUNS ?= 1
 export ENABLE_ILA ILA_DEPTH XDMA_LINK_WIDTH VIVADO_JOBS DDR_RANK_WIDTH
 # Supported CPU parameters:
 #   kmh
@@ -23,7 +28,7 @@ PRJ_NAME = fpga_$(CPU)$(if $(strip $(SUFFIX)),-$(strip $(SUFFIX)),)
 PRJ_DIR ?= $(ENV_SCRIPTS_HOME)/$(PRJ_NAME)
 PRJ ?= $(PRJ_DIR)/$(PRJ_NAME).xpr
 
-.PHONY: bitstream vivado dump_ila write_jtag_flash
+.PHONY: synth bitstream vivado dump_ila write_jtag_flash update_core_flist
 
 # Get Vivado version
 VIVADO_VERSION := $(shell vivado -version 2>/dev/null | head -1 | grep -o '[0-9]\{4\}\.[0-9]' || echo "unknown")
@@ -33,7 +38,16 @@ check_vivado_version:
 
 # Run synthesis using Vivado
 synth:
+ifeq ($(PARTITION_SYNTH),1)
+	@test -f "$(PRJ)" || { echo "ERROR: project not found: $(PRJ)" >&2; exit 1; }
+	tools/partition_synth/run.sh \
+	  --origin-dir . --project "$(PRJ)" \
+	  --parallel "$(PARTITION_SYNTH_PARALLEL)" \
+	  --jobs-per-partition "$(PARTITION_SYNTH_JOBS)" \
+	  $(if $(filter 1,$(PARTITION_SYNTH_PROJECT_RUNS)),--project-runs,) $(if $(strip $(PARTITION_SYNTH_OUT)),--out-dir "$(PARTITION_SYNTH_OUT)",)
+else
 	vivado -mode batch -source ./tools/gen_synth.tcl -tclargs $(PRJ)
+endif
 
 # Generate FPGA bitstream
 bitstream:

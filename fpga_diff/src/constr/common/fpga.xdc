@@ -1,6 +1,7 @@
 ####### Main board
 #clk
 
+source [file normalize [file join [file dirname [info script]] clock_defs.tcl]]
 
 
 set_property PACKAGE_PIN AY50 [get_ports clk8_p]
@@ -54,7 +55,7 @@ set_property PACKAGE_PIN AD15 [get_ports pcie_ep_lnk_up]
 
 set_property IOSTANDARD LVCMOS33 [get_ports pcie_ep_lnk_up]
 set_property IOSTANDARD LVCMOS18 [get_ports pcie_ep_perstn]
-create_clock -name PCIE_EP_CLK_IN -period 10.000 [get_ports pcie_ep_gt_ref_clk_p]
+fpga_create_top_clock PCIE_EP_CLK_IN
 #gpio
 #set_property PACKAGE_PIN AA15 [get_ports GPIO_O0]
 
@@ -351,8 +352,8 @@ set_property PACKAGE_PIN CB23 [get_ports PERST2_N]
 set_property PACKAGE_PIN Y52 [get_ports clk7_p]
 set_property PACKAGE_PIN Y53 [get_ports clk7_n]
 
-create_clock -period 40.000 -name mac_rx_clk [get_ports RGMII_RXCLK]
-create_clock -period 40.000 -name mac_tx_clk [get_ports RGMII_TXCLK]
+fpga_create_top_clock mac_rx_clk
+fpga_create_top_clock mac_tx_clk
 set_clock_groups -asynchronous -group [get_clocks mac_rx_clk -include_generated_clocks]
 create_clock -period 40.000 -name rgmii_rx_vclk_1
 set_false_path -setup -rise_from [get_clocks rgmii_rx_vclk_1] -fall_to [get_clocks mac_rx_clk]
@@ -422,13 +423,13 @@ set_property IOSTANDARD LVCMOS18 [get_ports RGMII_TXD3]
 set_property IOSTANDARD LVCMOS18 [get_ports MDC]
 set_property IOSTANDARD LVCMOS18 [get_ports MDIO]
 set_property IOSTANDARD LVCMOS18 [get_ports PHY_RESET_B]
-create_clock -period 400.000 -name mdc_clk [get_ports MDC]
-create_clock -period 5.000 -name CPU_CLK_IN [get_ports clk6_p]
-create_clock -period 1000.000 -name TMCLK [get_ports clk8_p]
-create_clock -period 40.000 -name DEBUG_CLK_IN [get_ports clk5_p]
-create_clock -period 10.000 -name PCIE_CLK_IN [get_ports refclk_p]
-create_clock -period 10.000 -name PCIE2_CLK_IN [get_ports refclk2_p]
-create_clock -period 83.333 -name jtag_vclk [get_ports JTAG_TCK]
+fpga_create_top_clock mdc_clk
+fpga_create_top_clock CPU_CLK_IN
+fpga_create_top_clock TMCLK
+fpga_create_top_clock DEBUG_CLK_IN
+fpga_create_top_clock PCIE_CLK_IN
+fpga_create_top_clock PCIE2_CLK_IN
+fpga_create_top_clock jtag_vclk
 set_clock_groups -asynchronous -group [get_clocks jtag_vclk -include_generated_clocks]
 set_clock_groups -asynchronous -group [get_clocks -include_generated_clocks CPU_CLK_IN] -group [get_clocks -include_generated_clocks TMCLK]
 set_clock_groups -asynchronous -group [get_clocks -include_generated_clocks CPU_CLK_IN] -group [get_clocks -include_generated_clocks DEBUG_CLK_IN]

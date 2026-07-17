@@ -6,4 +6,5 @@
 !*.tcl
 
 fpga_*/
+partition-synth-*/
 src/tcl/cpu_files.tcl
