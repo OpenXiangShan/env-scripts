@@ -158,6 +158,8 @@ proc ps_partition_source_config {origin_dir partition run_dir} {
   source "$tcl_dir/common/defines.tcl"
   source "$tcl_dir/common/include_dirs.tcl"
   source $clock_defs
+  set cpu_files_has_rtl_include 0
+  set rtl_include_files {}
   source "$tcl_dir/cpu_files.tcl"
 
   set chi_files {}
@@ -165,7 +167,7 @@ proc ps_partition_source_config {origin_dir partition run_dir} {
     source "$tcl_dir/chi_files.tcl"
   }
 
-  set all_source_files [list {*}$cpu_files {*}$chi_files]
+  set all_source_files [list {*}$cpu_files {*}$chi_files {*}$rtl_include_files]
   if {[llength $all_source_files] == 0} {
     error "source_files is empty"
   }
@@ -182,6 +184,8 @@ proc ps_partition_source_config {origin_dir partition run_dir} {
   set partition_defines [list {*}$defines]
   if {[llength $chi_files] > 0} {
     lappend partition_defines MSI_MODE CONFIG_USE_XSCORE_CHI
+  } elseif {$cpu_files_has_rtl_include} {
+    lappend partition_defines MSI_MODE CONFIG_USE_XSCORE_AXI
   } else {
     lappend partition_defines CONFIG_USE_XSCORE_AXI
   }
