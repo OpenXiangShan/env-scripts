@@ -33,6 +33,20 @@ if {[llength $synth_runs] == 0} {
 }
 
 set synth_run [lindex $synth_runs 0]
+
+# A completed partition run leaves a generated root-module blackbox in the
+# project. Restore the ordinary RTL before running the regular synth target.
+set partition_dir [file normalize [file join [file dirname [info script]] partition_synth]]
+if {[file isfile "$partition_dir/defs.tcl"] && [file isfile "$partition_dir/sources.tcl"]} {
+    source "$partition_dir/defs.tcl"
+    source "$partition_dir/sources.tcl"
+    ps_load_partitions
+    set root_module [ps_partition_top [ps_root_partition]]
+    if {[ps_restore_project_sources $root_module]} {
+        reset_run $synth_run
+    }
+}
+
 set status [get_property STATUS $synth_run]
 puts "INFO: synth_1 status: $status"
 
