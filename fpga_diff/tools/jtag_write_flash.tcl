@@ -162,7 +162,8 @@ proc write_flash {bytes hw_axi base_addr max_len} {
     }
 
     set data_hex ""
-    for {set i 0} {$i < $chunk_len} {incr i} {
+    # Vivado maps the rightmost data beat to the lowest INCR address.
+    for {set i [expr {$chunk_len - 1}]} {$i >= 0} {incr i -1} {
       append data_hex [word_hex $bytes [expr {($word_index + $i) * $beat_bytes}]]
     }
 
