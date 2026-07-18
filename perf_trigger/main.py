@@ -13,7 +13,7 @@ import time
 from modules.gcpt import GCPT
 from modules.lock import Heartbeat, FakeLock
 from modules.server import Server
-from modules.spec import Spec, get_int_benchmarks, get_fp_benchmarks
+from modules.spec import Spec, get_benchmarks, get_int_benchmarks, get_fp_benchmarks
 from modules.types import EmuConfig, FreeCoreInfo
 from modules.tracker import Tracker
 from modules.utils import geomean
@@ -122,8 +122,7 @@ class XiangShan:
         with self.json_path.open("r", encoding="utf-8") as f:
             benchmarks = json.load(f)
         for version in Spec.Version:
-            example = get_int_benchmarks(version)[0]
-            if example in benchmarks:
+            if any(probe in benchmarks for probe in get_benchmarks(version)):
                 return version
 
         return None
