@@ -1,6 +1,5 @@
 from enum import Enum
 import logging
-from pathlib import Path
 
 
 class Spec:
@@ -189,12 +188,12 @@ SPEC_REFTIME = {
 
 # global method for easier use
 def get_int_benchmarks(version: Spec.Version, with_id: bool | None = None) -> list[str]:
-    return Spec(version, Path()).get_int_benchmarks(with_id)
+    return Spec(version).get_int_benchmarks(with_id)
 
 
 def get_fp_benchmarks(version: Spec.Version, with_id: bool | None = None) -> list[str]:
-    return Spec(version, Path()).get_fp_benchmarks(with_id)
+    return Spec(version).get_fp_benchmarks(with_id)
 
 
 def get_benchmarks(version: Spec.Version, with_id: bool | None = None) -> list[str]:
-    return Spec(version, Path()).get_benchmarks(with_id)
+    return Spec(version).get_benchmarks(with_id)
