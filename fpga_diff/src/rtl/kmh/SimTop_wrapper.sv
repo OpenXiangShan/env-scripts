@@ -1,7 +1,7 @@
 `include "DifftestMacros.svh"
 `include "sys_define.vh"
 
-`ifdef CONFIG_USE_XSCORE_CHI
+`ifdef CONFIG_FPGA_XSCORE_CHI
 `include "kconfig.svh"
 `include "chi_icn_defines.svh"
 `endif
@@ -21,7 +21,7 @@ module SimTop_wrapper(
   input  [15:0]   soc_to_cpu,   // none
   output [15:0]   cpu_to_soc,   //none
 
-`ifdef CONFIG_USE_XSCORE_AXI
+`ifdef CONFIG_FPGA_XSCORE_AXI
   input  [63:0]   io_extIntrs,   // come from IPs, Max : 600MHz
 
   input  [15:0]   io_sram_config,  //apb clk : 100MHz
@@ -151,7 +151,7 @@ module SimTop_wrapper(
   (*mark_debug="true"*) input  [1:0]    mem_core_rresp,
   (*mark_debug="true"*) input           mem_core_rlast,
 
-`elsif CONFIG_USE_XSCORE_CHI
+`elsif CONFIG_FPGA_XSCORE_CHI
   input                                 noc_clk,
   input                                 noc_rstn,
   input                                 clint_int_0[`CONFIG_XSCORE_NR-1:0],
@@ -270,7 +270,7 @@ module SimTop_wrapper(
   input           difftest_cfg_axilite_rready
 );
 
-`ifdef CONFIG_USE_XSCORE_AXI
+`ifdef CONFIG_FPGA_XSCORE_AXI
   wire          cpu_clock       ;
   wire          cpu_global_reset;
   wire          global_reset_sync;
@@ -532,7 +532,7 @@ SimTop  u_XSTop(
   .io_traceCoreInterface_0_toEncoder_iretire  (trace_iretire),
   .io_traceCoreInterface_0_toEncoder_ilastsize(trace_ilastsize)
 );
-`elsif CONFIG_USE_XSCORE_CHI
+`elsif CONFIG_FPGA_XSCORE_CHI
 
   wire xstile_cpu_reset;
   XSTileResetGen reset_sync_resetSync_cpu (

@@ -228,19 +228,22 @@ set_property -name "include_dirs" -value "$include_dirs" -objects $obj
 set_property -name "top" -value "fpga_top_debug" -objects $obj
 set_property -name "top_auto_set" -value "0" -objects $obj
 
-# RTL_INCLUDE may add auxiliary RTL to an AXI SimTop_wrapper. Only the
-# legacy CHI_DIR flow changes the generated top-level interface to CHI.
+# External RTL may define CONFIG_USE_XSCORE_CHI internally. Keep the
+# platform wrapper selection separate from those source-local macros.
 if { [llength $chi_files] > 0 } {
     lappend defines "MSI_MODE"
     lappend defines "CONFIG_USE_XSCORE_CHI"
-    puts "INFO: Defined MSI_MODE and CONFIG_USE_XSCORE_CHI for CHI RTL"
+    lappend defines "CONFIG_FPGA_XSCORE_CHI"
+    puts "INFO: Defined MSI_MODE and CONFIG_FPGA_XSCORE_CHI for CHI RTL"
 } elseif { $cpu_files_has_rtl_include } {
     lappend defines "MSI_MODE"
     lappend defines "CONFIG_USE_XSCORE_AXI"
-    puts "INFO: Defined MSI_MODE for RTL_INCLUDE without changing SimTop_wrapper to CHI"
+    lappend defines "CONFIG_FPGA_XSCORE_AXI"
+    puts "INFO: Defined MSI_MODE and CONFIG_FPGA_XSCORE_AXI for RTL_INCLUDE"
 } else {
     puts "INFO: MSI_MODE macro not defined as external RTL files are not present"
     lappend defines "CONFIG_USE_XSCORE_AXI"
+    lappend defines "CONFIG_FPGA_XSCORE_AXI"
 }
 
 if {$cpu_files_has_dma} {

@@ -5,10 +5,10 @@
 `define XDMA_PCIE_LANES 4
 `endif
 
-`ifdef CONFIG_USE_XSCORE_CHI
+`ifdef CONFIG_FPGA_XSCORE_CHI
 `include "kconfig.svh"
 `include "chi_icn_defines.svh"
-`elsif CONFIG_USE_XSCORE_AXI
+`elsif CONFIG_FPGA_XSCORE_AXI
 `ifndef CONFIG_RANK_WIDTH
 `define CONFIG_RANK_WIDTH 1
 `endif
@@ -1121,7 +1121,7 @@ assign cfg_pcie1_s2m_rvalid = 1;
     wire [31:0]                   xstile_imsic_rdata          [`CONFIG_XSCORE_NR-1:0];
     wire [1:0]                    xstile_imsic_rresp          [`CONFIG_XSCORE_NR-1:0];
 `endif /* CONFIG_USE_IMSIC */
-`ifdef CONFIG_USE_XSCORE_CHI
+`ifdef CONFIG_FPGA_XSCORE_CHI
     /* XSTile RN-F */
     wire                          xstile_chi_syscoreq         [`CONFIG_XSCORE_NR-1:0];
     wire                          xstile_chi_syscoack         [`CONFIG_XSCORE_NR-1:0];
@@ -1453,7 +1453,7 @@ jtag_ddr_subsys_wrapper U_JTAG_DDR_SUBSYS(
     // AXI INTERFACE CLK
     .SOC_CLK                (inter_soc_clk),
 
-`ifdef CONFIG_USE_XSCORE_AXI
+`ifdef CONFIG_FPGA_XSCORE_AXI
     .SOC_M_AXI_awid         (cpu2ddr_m2s_awid_mix          ),
     .SOC_M_AXI_awaddr       (cpu2ddr_m2s_awaddr_mix        ),
     .SOC_M_AXI_awlen        (cpu2ddr_m2s_awlen             ),
@@ -1491,7 +1491,7 @@ jtag_ddr_subsys_wrapper U_JTAG_DDR_SUBSYS(
     .SOC_M_AXI_rlast        (cpu2ddr_s2m_rlast             ),
     .SOC_M_AXI_rvalid       (cpu2ddr_s2m_rvalid            ),
     .SOC_M_AXI_rready       (cpu2ddr_m2s_rready            ),
-`elsif CONFIG_USE_XSCORE_CHI
+`elsif CONFIG_FPGA_XSCORE_CHI
     .SOC_M_AXI_awid         (cmn2ddr_awid   ),
     .SOC_M_AXI_awaddr       (cmn2ddr_awaddr_mix),
     .SOC_M_AXI_awlen        (cmn2ddr_awlen  ),
@@ -1531,7 +1531,7 @@ jtag_ddr_subsys_wrapper U_JTAG_DDR_SUBSYS(
     .SOC_M_AXI_rlast        (cmn2ddr_rlast  ),
     .SOC_M_AXI_rvalid       (cmn2ddr_rvalid ),
     .SOC_M_AXI_rready       (cmn2ddr_rready ),
-`endif // CONFIG_USE_XSCORE_AXI
+`endif // CONFIG_FPGA_XSCORE_AXI
 `ifdef CONFIG_HAVE_DDRC_MCU_PERI_AXI
     /* ext peri AXI */
     .M_AXI_DP_araddr        (mcu_axi_dp_araddr  ),
@@ -1575,7 +1575,7 @@ jtag_ddr_subsys_wrapper U_JTAG_DDR_SUBSYS(
     .calib_complete         (init_calib_complete)
 );
 
-`ifdef CONFIG_USE_XSCORE_CHI
+`ifdef CONFIG_FPGA_XSCORE_CHI
 xs_sys_icn u_icn(
     .clock(noc_clk),
     .rstn(sys_rstn),
@@ -1590,7 +1590,7 @@ xs_sys_icn u_icn(
     .io_clintTime_bits  (io_clintTime_bits),
     .io_irq_sources     ({cpu_int_mix[63:15],pcie_int,cpu_int_mix[12:0]}),
     .plic_int           (plic_int),
-`ifdef CONFIG_USE_XSCORE_CHI
+`ifdef CONFIG_FPGA_XSCORE_CHI
     .debug_module_hart              (debug_module_hart),
     .io_hartIsInReset               (io_hartIsInReset),
     .debug_module_ndreset           (debug_module_ndreset),
@@ -1599,7 +1599,7 @@ xs_sys_icn u_icn(
     .io_systemjtag_jtag_TDI         (io_systemjtag_jtag_TDI),
     .io_systemjtag_jtag_TDO_data    (io_systemjtag_jtag_TDO_data),
     .io_systemjtag_jtag_TDO_driven  (io_systemjtag_jtag_TDO_driven),
-`endif /* CONFIG_USE_XSCORE_CHI */
+`endif /* CONFIG_FPGA_XSCORE_CHI */
 `endif /* CONFIG_HAVE_ONCHIP_PERI */
 
 `ifdef CONFIG_ICN_CFG_PORT
@@ -1641,7 +1641,7 @@ xs_sys_icn u_icn(
     .icn_cfg_wvalid  (mcu_axi_dp_wvalid ),
 `endif /* CONFIG_ICN_CFG_PORT */
 
-`ifdef CONFIG_USE_XSCORE_AXI
+`ifdef CONFIG_FPGA_XSCORE_AXI
     /* AXI: with mem/mmio ports */
     .core_axi_awready         (cpu2ddr_s2m_awready),
     .core_axi_awvalid         (cpu2ddr_m2s_awvalid),
@@ -1720,7 +1720,7 @@ xs_sys_icn u_icn(
     .core_mmio_wstrb   (cpu2cfg_m2s_wstrb  ),
     .core_mmio_wvalid  (cpu2cfg_m2s_wvalid ),
 
-`elsif CONFIG_USE_XSCORE_CHI
+`elsif CONFIG_FPGA_XSCORE_CHI
     /* CHI */
     .core_chi_syscoreq        (xstile_chi_syscoreq ),
     .core_chi_syscoack        (xstile_chi_syscoack ),
@@ -2050,7 +2050,7 @@ SimTop_wrapper U_CPU_TOP(
     .io_imsic_rdata                 (xstile_imsic_rdata),
     .io_imsic_rresp                 (xstile_imsic_rresp),
 `endif /* CONFIG_USE_IMSIC */
-`ifdef CONFIG_USE_XSCORE_AXI
+`ifdef CONFIG_FPGA_XSCORE_AXI
     .io_systemjtag_jtag_TCK         (io_systemjtag_jtag_TCK),
     .io_systemjtag_jtag_TMS         (io_systemjtag_jtag_TMS),
     .io_systemjtag_jtag_TDI         (io_systemjtag_jtag_TDI),
@@ -2175,7 +2175,7 @@ SimTop_wrapper U_CPU_TOP(
     .mem_core_rlast                 (cpu2ddr_s2m_rlast),
 
     .io_extIntrs                    (cpu_int_mix)
-`elsif CONFIG_USE_XSCORE_CHI
+`elsif CONFIG_FPGA_XSCORE_CHI
     .noc_clk                        (noc_clk ),
     .noc_rstn                       (cpu_rstn_io),
     .clint_int_0                    (clint_int_0[`CONFIG_XSCORE_NR-1:0]),
