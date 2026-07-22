@@ -94,6 +94,11 @@ set synth_run_dir [file normalize [get_property DIRECTORY $synth_run]]
 set final_dcp [file normalize "$synth_run_dir/${project_top}.dcp"]
 set utilization_rpt [file normalize "$synth_run_dir/${project_top}_utilization_synth.rpt"]
 set utilization_pb [file normalize "$synth_run_dir/${project_top}_utilization_synth.pb"]
+set clocks_rpt [file normalize "$linked_dir/${project_top}_clocks.rpt"]
+set clock_interaction_rpt [file normalize "$linked_dir/${project_top}_clock_interaction.rpt"]
+set cdc_rpt [file normalize "$linked_dir/${project_top}_cdc.rpt"]
+set check_timing_rpt [file normalize "$linked_dir/${project_top}_check_timing.rpt"]
+set timing_summary_rpt [file normalize "$linked_dir/${project_top}_timing_summary_synth.rpt"]
 
 ps_prepare_project_shell $root_module $out_dir
 set_property INCREMENTAL_CHECKPOINT {} $synth_run
@@ -143,6 +148,11 @@ set utilization_rpt_tmp "${utilization_rpt}.partition_linked"
 set utilization_pb_tmp "${utilization_pb}.partition_linked"
 write_checkpoint -force $final_tmp
 report_utilization -file $utilization_rpt_tmp -pb $utilization_pb_tmp
+report_clocks -file $clocks_rpt
+report_clock_interaction -file $clock_interaction_rpt
+report_cdc -file $cdc_rpt
+check_timing -file $check_timing_rpt
+report_timing_summary -file $timing_summary_rpt
 close_design
 file rename -force $final_tmp $final_dcp
 file rename -force $utilization_rpt_tmp $utilization_rpt
@@ -153,5 +163,10 @@ puts $final_marker "project=$project"
 puts $final_marker "top=$project_top"
 puts $final_marker "dcp=$final_dcp"
 puts $final_marker "blackbox_report=$report_file"
+puts $final_marker "clocks_report=$clocks_rpt"
+puts $final_marker "clock_interaction_report=$clock_interaction_rpt"
+puts $final_marker "cdc_report=$cdc_rpt"
+puts $final_marker "check_timing_report=$check_timing_rpt"
+puts $final_marker "timing_summary_report=$timing_summary_rpt"
 close $final_marker
 puts "INFO: project link complete: $final_dcp"
