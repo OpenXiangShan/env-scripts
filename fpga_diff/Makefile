@@ -16,7 +16,6 @@ PARTITION_SYNTH ?= 0
 PARTITION_SYNTH_OUT ?=
 PARTITION_SYNTH_PARALLEL ?= 16
 PARTITION_SYNTH_JOBS ?= 8
-PARTITION_SYNTH_PROJECT_RUNS ?= 1
 export ENABLE_ILA ILA_DEPTH XDMA_LINK_WIDTH VIVADO_JOBS DDR_RANK_WIDTH
 # Supported CPU parameters:
 #   kmh
@@ -43,8 +42,7 @@ ifeq ($(PARTITION_SYNTH),1)
 	tools/partition_synth/run.sh \
 	  --origin-dir . --project "$(PRJ)" \
 	  --parallel "$(PARTITION_SYNTH_PARALLEL)" \
-	  --jobs-per-partition "$(PARTITION_SYNTH_JOBS)" \
-	  $(if $(filter 1,$(PARTITION_SYNTH_PROJECT_RUNS)),--project-runs,) $(if $(strip $(PARTITION_SYNTH_OUT)),--out-dir "$(PARTITION_SYNTH_OUT)",)
+	  --jobs-per-partition "$(PARTITION_SYNTH_JOBS)"$(if $(strip $(PARTITION_SYNTH_OUT)), --out-dir "$(PARTITION_SYNTH_OUT)")
 else
 	vivado -mode batch -source ./tools/gen_synth.tcl -tclargs $(PRJ)
 endif

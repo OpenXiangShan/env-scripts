@@ -1,27 +1,24 @@
 ########################################################################
-# Synthesize the FPGA top shell and link the complete root partition into it.
+# Synthesize the FPGA top shell and insert the linked root partition DCP.
 ########################################################################
 
-source [file normalize [file join [file dirname [info script]] defs.tcl]]
 source [file normalize [file join [file dirname [info script]] sources.tcl]]
 
 proc usage {} {
   puts "Usage:"
-  puts "  vivado -mode batch -source tools/partition_synth/project_link.tcl -tclargs"
+  puts {  vivado -mode batch -source tools/partition_synth/project_link.tcl -tclargs}
   puts {    --project <project.xpr> --out-dir <partition_output_dir> [--jobs <n>]}
-  puts {    [--reuse-shell-dcp <fpga_top.dcp>]}
   exit 1
 }
 
 proc parse_args {} {
-  array set opt {--project "" --out-dir "" --jobs "" --reuse-shell-dcp ""}
+  array set opt {--project "" --out-dir "" --jobs ""}
   for {set i 0} {$i < [llength $::argv]} {incr i} {
     set key [lindex $::argv $i]
     switch -- $key {
       --project -
       --out-dir -
-      --jobs -
-      --reuse-shell-dcp {
+      --jobs {
         incr i
         if {$i >= [llength $::argv]} { usage }
         set opt($key) [lindex $::argv $i]
@@ -50,24 +47,37 @@ proc default_jobs {} {
   return [expr {max(1, int(ceil($threads / 2.0)))}]
 }
 
+proc ps_read_link_marker {path} {
+  set marker [open $path r]
+  array set data {}
+  while {[gets $marker line] >= 0} {
+    if {$line eq ""} {
+      continue
+    }
+    if {![regexp {^([^=]+)=(.*)$} $line -> key value]} {
+      error "invalid link marker entry: $line"
+    }
+    set data($key) $value
+  }
+  close $marker
+  foreach key {partition module dcp} {
+    if {![info exists data($key)] || $data($key) eq ""} {
+      error "link marker is missing '$key': $path"
+    }
+  }
+  return [array get data]
+}
+
 array set opt [parse_args]
 set project [file normalize $opt(--project)]
 set out_dir [file normalize $opt(--out-dir)]
-ps_require_file $project
-if {$opt(--reuse-shell-dcp) ne ""} {
-  set opt(--reuse-shell-dcp) [file normalize $opt(--reuse-shell-dcp)]
-  ps_require_file $opt(--reuse-shell-dcp)
-}
-ps_load_partitions
-
-set root [ps_root_partition]
-set root_module [ps_partition_top $root]
 set linked_dir [file normalize "$out_dir/linked"]
-set project_shell_dir [file normalize "$linked_dir/project_shell"]
-set root_dcp [file normalize "$linked_dir/${root}.dcp"]
-if {![file isfile $root_dcp]} {
-  set root_dcp [file normalize "$out_dir/${root}.dcp"]
-}
+set marker [file normalize "$linked_dir/root.txt"]
+ps_require_file $project
+ps_require_file $marker
+array set root_info [ps_read_link_marker $marker]
+set root_module $root_info(module)
+set root_dcp [file normalize $root_info(dcp)]
 ps_require_file $root_dcp
 
 open_project $project
@@ -85,38 +95,25 @@ set final_dcp [file normalize "$synth_run_dir/${project_top}.dcp"]
 set utilization_rpt [file normalize "$synth_run_dir/${project_top}_utilization_synth.rpt"]
 set utilization_pb [file normalize "$synth_run_dir/${project_top}_utilization_synth.pb"]
 
-if {$opt(--reuse-shell-dcp) eq ""} {
-  ps_prepare_project_shell $root_module $out_dir
-  # Do not reuse a previous monolithic checkpoint for the generated shell.
-  set_property INCREMENTAL_CHECKPOINT {} $synth_run
-  set_property AUTO_INCREMENTAL_CHECKPOINT 0 $synth_run
-  reset_run $synth_run
+ps_prepare_project_shell $root_module $out_dir
+set_property INCREMENTAL_CHECKPOINT {} $synth_run
+set_property AUTO_INCREMENTAL_CHECKPOINT 0 $synth_run
+reset_run $synth_run
 
-  set jobs $opt(--jobs)
-  if {$jobs eq ""} { set jobs [default_jobs] }
-  puts "INFO: launching top shell synth_1 with -jobs $jobs"
-  launch_runs $synth_run -jobs $jobs
-  wait_on_run $synth_run
+set jobs $opt(--jobs)
+if {$jobs eq ""} { set jobs [default_jobs] }
+puts "INFO: launching top shell synth_1 with -jobs $jobs"
+launch_runs $synth_run -jobs $jobs
+wait_on_run $synth_run
 
-  set status [get_property STATUS $synth_run]
-  if {![string match "synth_design Complete*" $status]} {
-    error "top shell synthesis failed with status: $status"
-  }
-  ps_require_file $final_dcp
-} else {
-  puts "INFO: reusing top shell checkpoint $opt(--reuse-shell-dcp)"
+set status [get_property STATUS $synth_run]
+if {![string match "synth_design Complete*" $status]} {
+  error "top shell synthesis failed with status: $status"
 }
-
+ps_require_file $final_dcp
 close_project
 
-file mkdir $project_shell_dir
-if {$opt(--reuse-shell-dcp) eq ""} {
-  set shell_dcp [file normalize "$project_shell_dir/${project_top}.dcp"]
-  file copy -force $final_dcp $shell_dcp
-} else {
-  set shell_dcp $opt(--reuse-shell-dcp)
-}
-open_checkpoint $shell_dcp
+open_checkpoint $final_dcp
 set root_cells [get_cells -hier -quiet -filter "REF_NAME == $root_module && IS_BLACKBOX"]
 if {[llength $root_cells] != 1} {
   error "top shell must contain one $root_module blackbox, found [llength $root_cells]"
@@ -137,8 +134,6 @@ set unresolved_root [get_cells -hier -quiet -filter "REF_NAME == $root_module &&
 if {[llength $unresolved_root] != 0} {
   error "root module $root_module remains a blackbox after project link"
 }
-# Project-managed OOC IPs remain blackboxes in a synthesis DCP. Only the
-# partition root is expected to disappear after the checkpoint is inserted.
 if {[llength $blackboxes] != ($shell_blackbox_count - 1)} {
   error "project link changed the OOC IP blackbox count; see $report_file"
 }
@@ -153,18 +148,10 @@ file rename -force $final_tmp $final_dcp
 file rename -force $utilization_rpt_tmp $utilization_rpt
 file rename -force $utilization_pb_tmp $utilization_pb
 
-open_project $project
-set impl_run [get_runs -quiet impl_1]
-if {[llength $impl_run] > 0} {
-  reset_run $impl_run
-  puts "INFO: reset impl_1 after replacing the synthesis checkpoint"
-}
-close_project
-
-set marker [open [file normalize "$linked_dir/final.txt"] w]
-puts $marker "project=$project"
-puts $marker "top=$project_top"
-puts $marker "dcp=$final_dcp"
-puts $marker "blackbox_report=$report_file"
-close $marker
+set final_marker [open [file normalize "$linked_dir/final.txt"] w]
+puts $final_marker "project=$project"
+puts $final_marker "top=$project_top"
+puts $final_marker "dcp=$final_dcp"
+puts $final_marker "blackbox_report=$report_file"
+close $final_marker
 puts "INFO: project link complete: $final_dcp"

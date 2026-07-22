@@ -1,5 +1,5 @@
 ########################################################################
-# Common helpers for partition synthesis declarations.
+# Common helpers for parallel OOC partition declarations.
 ########################################################################
 
 set ps_dir [file normalize [file dirname [info script]]]
@@ -7,13 +7,11 @@ set ps_partition_file [file normalize "$ps_dir/partitions.tcl"]
 
 proc ps_load_partitions {} {
   global ps_partition_file ps_partition_specs ps_partitions
-  global ps_partition_top ps_partition_blackboxes ps_partition_by_top
-  global ps_partition_children ps_partition_clocks ps_link_order ps_root_partition
+  global ps_partition_top ps_partition_blackboxes ps_partition_clocks
 
   unset -nocomplain ps_partition_specs ps_partition_clock_ports ps_partitions
   unset -nocomplain ps_partition_top ps_partition_blackboxes
-  unset -nocomplain ps_partition_by_top ps_partition_children ps_partition_clocks
-  unset -nocomplain ps_link_order ps_root_partition ps_visit_state
+  unset -nocomplain ps_partition_clocks
 
   source $ps_partition_file
   if {![info exists ps_partition_specs]} {
@@ -21,6 +19,7 @@ proc ps_load_partitions {} {
   }
 
   set ps_partitions {}
+  array set seen_tops {}
   foreach spec $ps_partition_specs {
     if {[llength $spec] == 0} {
       continue
@@ -63,13 +62,13 @@ proc ps_load_partitions {} {
     if {[lsearch -exact $ps_partitions $name] >= 0} {
       error "duplicate partition name '$name'"
     }
-    if {[info exists ps_partition_by_top($top)]} {
+    if {[info exists seen_tops($top)]} {
       error "module '$top' is the top of more than one partition"
     }
 
     lappend ps_partitions $name
     set ps_partition_top($name) $top
-    set ps_partition_by_top($top) $name
+    set seen_tops($top) $name
     if {[llength $blackboxes] > 0} {
       set ps_partition_blackboxes($name) $blackboxes
     }
@@ -114,58 +113,6 @@ proc ps_load_partitions {} {
     }
     set ps_partition_clocks($partition) $clocks
   }
-
-  array set referenced {}
-  foreach partition $ps_partitions {
-    set children {}
-    foreach module [ps_partition_blackboxes $partition] {
-      if {![info exists ps_partition_by_top($module)]} {
-        error "partition '$partition' has no child partition for module '$module'"
-      }
-      set child $ps_partition_by_top($module)
-      if {$child eq $partition} {
-        error "partition '$partition' cannot contain itself"
-      }
-      lappend children $child
-      set referenced($child) 1
-    }
-    set ps_partition_children($partition) $children
-  }
-
-  set roots {}
-  foreach partition $ps_partitions {
-    if {![info exists referenced($partition)]} {
-      lappend roots $partition
-    }
-  }
-  if {[llength $roots] != 1} {
-    error "partition hierarchy must have one root, found: $roots"
-  }
-  set ps_root_partition [lindex $roots 0]
-
-  set ps_link_order {}
-  ps_visit_partition $ps_root_partition
-  if {[llength $ps_link_order] != [llength $ps_partitions]} {
-    error "some partitions are disconnected from root '$ps_root_partition'"
-  }
-}
-
-proc ps_visit_partition {partition} {
-  global ps_partition_children ps_link_order ps_visit_state
-
-  if {[info exists ps_visit_state($partition)]} {
-    if {$ps_visit_state($partition) eq "visiting"} {
-      error "cycle detected at partition '$partition'"
-    }
-    return
-  }
-
-  set ps_visit_state($partition) visiting
-  foreach child $ps_partition_children($partition) {
-    ps_visit_partition $child
-  }
-  set ps_visit_state($partition) done
-  lappend ps_link_order $partition
 }
 
 proc ps_partition_top {partition} {
@@ -181,38 +128,21 @@ proc ps_partition_blackboxes {partition} {
   return {}
 }
 
-proc ps_partition_children {partition} {
-  global ps_partition_children
-  return $ps_partition_children($partition)
-}
-
 proc ps_partition_clocks {partition} {
   global ps_partition_clocks
   return $ps_partition_clocks($partition)
 }
 
-proc ps_root_partition {} {
-  global ps_root_partition
-  return $ps_root_partition
-}
-
-proc ps_link_order {} {
-  global ps_link_order
-  return $ps_link_order
-}
-
 if {[info exists argv0] && [file normalize $argv0] eq [file normalize [info script]]} {
   if {[llength $argv] != 1} {
-    puts "Usage: tclsh defs.tcl partitions|link-order|root"
+    puts "Usage: tclsh defs.tcl partitions"
     exit 1
   }
   ps_load_partitions
   switch -- [lindex $argv 0] {
     partitions { puts [join $ps_partitions ","] }
-    link-order { puts [join [ps_link_order] ","] }
-    root { puts [ps_root_partition] }
     default {
-      puts "Usage: tclsh defs.tcl partitions|link-order|root"
+      puts "Usage: tclsh defs.tcl partitions"
       exit 1
     }
   }

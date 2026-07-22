@@ -1,5 +1,5 @@
 ########################################################################
-# RTL source and project-shell helpers.
+# RTL source helpers for partition synthesis.
 ########################################################################
 
 source [file normalize [file join [file dirname [info script]] header_files.tcl]]
@@ -259,36 +259,41 @@ proc ps_project_source_files {} {
   return $files
 }
 
-proc ps_project_root_stubs {module} {
-  set tail "${module}_partition_blackbox.sv"
+proc ps_project_partition_stubs {} {
   set stubs {}
   foreach file [get_files -quiet -of_objects [get_filesets sources_1]] {
-    if {[file tail $file] eq $tail} {
+    if {[string match "*_partition_blackbox.sv" [file tail $file]]} {
       lappend stubs $file
     }
   }
   return $stubs
 }
 
-proc ps_restore_project_sources {module} {
-  set stubs [ps_project_root_stubs $module]
+proc ps_restore_project_sources {} {
+  set stubs [ps_project_partition_stubs]
   if {[llength $stubs] == 0} {
     return 0
   }
 
+  set source_files [ps_remove_source_files [ps_project_source_files] $stubs]
   remove_files $stubs
-  set source [ps_find_module_source $module [ps_project_source_files]]
-  if {$source eq ""} {
-    error "cannot restore source for root module $module"
+  foreach stub $stubs {
+    set suffix "_partition_blackbox.sv"
+    set tail [file tail $stub]
+    set module [string range $tail 0 [expr {[string length $tail] - [string length $suffix] - 1}]]
+    set source [ps_find_module_source $module $source_files]
+    if {$source eq ""} {
+      error "cannot restore source for partition module $module"
+    }
+    set_property USED_IN_SYNTHESIS true [get_files $source]
   }
-  set_property USED_IN_SYNTHESIS true [get_files $source]
   update_compile_order -fileset sources_1
-  puts "INFO: restored project source for $module: $source"
-  return 1
+  puts "INFO: restored [llength $stubs] partition source(s)"
+  return [llength $stubs]
 }
 
 proc ps_prepare_project_shell {module out_dir} {
-  ps_restore_project_sources $module
+  ps_restore_project_sources
 
   set source [ps_find_module_source $module [ps_project_source_files]]
   if {$source eq ""} {

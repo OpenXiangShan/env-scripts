@@ -6,6 +6,9 @@
 #
 # without accepts one or more immediate child modules. Each child is
 # replaced with an automatically generated blackbox stub for that partition.
+# OOC partitions are independent, so a blackboxed child need not have a
+# separate declaration in this file. link.tcl validates a complete hierarchy
+# only when a top-level synthesis DCP is requested.
 ########################################################################
 
 set ps_partition_specs {

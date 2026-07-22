@@ -8,7 +8,6 @@ partitions=""
 jobs_per_partition=""
 parallel=16
 project=""
-project_runs=0
 dry_run=0
 
 usage() {
@@ -22,8 +21,7 @@ Options:
   --partitions LIST         comma-separated partitions; overrides list expansion
   --jobs-per-partition N    Vivado maxThreads per partition process
   --parallel N              max concurrent Vivado partition processes
-  --project XPR             link partition DCPs into this top-level project
-  --project-runs            create GUI-visible OOC runs in --project
+  --project XPR             create GUI-visible OOC runs and link their DCPs
   --dry-run                 validate file lists without launching synth_design
   --help                    show this help
 EOF
@@ -54,10 +52,6 @@ while [[ $# -gt 0 ]]; do
     --project)
       project="$(realpath "$2")"
       shift 2
-      ;;
-    --project-runs)
-      project_runs=1
-      shift
       ;;
     --dry-run)
       dry_run=1
@@ -92,13 +86,8 @@ if [[ -n "$project" && ! -f "$project" ]]; then
   exit 1
 fi
 
-if [[ "$project_runs" -eq 1 && -z "$project" ]]; then
-  echo "ERROR: --project-runs requires --project" >&2
-  exit 1
-fi
-
-if [[ "$project_runs" -eq 1 && "$dry_run" -eq 1 ]]; then
-  echo "ERROR: --project-runs cannot be used with --dry-run" >&2
+if [[ -n "$project" && "$dry_run" -eq 1 ]]; then
+  echo "ERROR: --project cannot be used with --dry-run" >&2
   exit 1
 fi
 
@@ -131,8 +120,8 @@ fi
 if [[ "$dry_run" -eq 1 ]]; then
   echo "INFO: dry_run=1"
 fi
-if [[ "$project_runs" -eq 1 ]]; then
-  echo "INFO: project_runs=1"
+if [[ -n "$project" ]]; then
+  echo "INFO: project=$project"
 fi
 
 failed=0
@@ -143,7 +132,7 @@ wait_for_slot() {
   done
 }
 
-if [[ "$project_runs" -eq 1 ]]; then
+if [[ -n "$project" ]]; then
   setup_args=(
     -mode batch
     -source "$script_dir/project_runs.tcl"
@@ -223,7 +212,7 @@ if [[ "$failed" -ne 0 ]]; then
   exit 1
 fi
 
-if [[ "$project_runs" -eq 1 ]]; then
+if [[ -n "$project" ]]; then
   for index in "${!project_partitions[@]}"; do
     partition="${project_partitions[$index]}"
     top_module="${project_tops[$index]}"
@@ -240,16 +229,13 @@ if [[ "$project_runs" -eq 1 ]]; then
   if [[ "$failed" -ne 0 ]]; then
     exit 1
   fi
-fi
 
-if [[ -n "$project" && "$dry_run" -eq 0 ]]; then
   link_args=(
     -mode batch
     -source "$script_dir/link.tcl"
     -tclargs
     --out-dir "$out_dir"
   )
-
   echo "INFO: linking partition DCPs"
   (cd "$origin_dir" && vivado "${link_args[@]}") >"$log_dir/link.log" 2>&1
 
@@ -263,8 +249,7 @@ if [[ -n "$project" && "$dry_run" -eq 0 ]]; then
   if [[ -n "$jobs_per_partition" ]]; then
     project_link_args+=(--jobs "$jobs_per_partition")
   fi
-
-  echo "INFO: linking root partition into $project"
+  echo "INFO: writing linked synthesis DCP into $project"
   (cd "$origin_dir" && vivado "${project_link_args[@]}") >"$log_dir/project_link.log" 2>&1
 fi
 
