@@ -1,0 +1,14 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+if [[ $# -ge 2 && ( "$1" == "-fc" || "$1" == "-c" ) ]]; then
+  command_string=$2
+  shift 2
+  if [[ "$command_string" == "limit" ]]; then
+    ulimit -a
+    exit 0
+  fi
+  exec /bin/bash -lc "$command_string"
+fi
+
+exec /bin/bash "$@"

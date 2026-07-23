@@ -4,6 +4,75 @@
 !*.vh
 !*.xdc
 !*.tcl
+.tmp_*.tcl
+tools/write_debug_probes.tcl
+uvhs/assign_pin_native_nutshell_f2.tcl
+uvhs/probe.tcl
+uvhs/uvhs_queue_ddr_workload.sh
 
 fpga_*/
+fpga_diff_uvhs_*/
 src/tcl/cpu_files.tcl
+src/tcl/chi_files.tcl
+
+# Vivado local state and generated projects
+.Xil/
+*.jou
+*.log
+*.str
+*.xpr
+*.cache/
+*.gen/
+*.hw/
+*.ip_user_files/
+*.runs/
+*.sim/
+*.srcs/
+
+# UVHS/HJ generated working trees and exports. The source flow scripts live in
+# uvhs/ and are intentionally not ignored.
+uvhs_*/
+uvhs_export*/
+uvhs_test*/
+runtime_uvhs_*/
+
+# Local UVHS compatibility/tool payloads, not source flow scripts.
+uvhs/setenv.local.sh
+uvhs/*.local.sh
+uvhs/uv_root_compat/
+uvhs/libffi_compat/
+
+# FPGA implementation outputs and intermediate databases
+*.bit
+*.ltx
+*.dcp
+*.edf
+*.edif
+*.fndb
+*.eldb
+*.rtdb
+*.dat
+*.rpt
+*.rpx
+*.ll
+*.ll.gz
+*.bin.hash
+*.bit.hash
+hw.dat/
+
+# Temporary files produced by synthesis/partition experiments
+*.tmp
+*.bak
+*.bak.*
+*.backup
+*.orig
+*.pid
+*.done
+*.ready
+*.finish
+*.start
+*.submit
+*.timingclean
+*.tsodone
+*.backup.jou
+*.backup.log
