@@ -1,17 +1,5 @@
-`ifndef NO_DIFF
 `include "DifftestMacros.svh"
-`endif
 `include "sys_define.vh"
-
-`ifdef NO_DIFF
-`define TOP_NAME XSTop
-`define MEM_PREFIX memory
-`else
-`define TOP_NAME SimTop
-`define MEM_PREFIX difftest_mem
-`endif
-`define MEM_PORT_(prefix, name) .prefix``_``name
-`define MEM_PORT(prefix, name) `MEM_PORT_(prefix, name)
 
 module SimTop_wrapper(
   input           inter_soc_clk,
@@ -195,9 +183,7 @@ module SimTop_wrapper(
   input [3:0]     io_systemjtag_version,
   output          io_debug_reset,
   output          io_riscv_halt_0,
-  output          io_riscv_halt_1
-`ifndef NO_DIFF
-  ,
+  output          io_riscv_halt_1,
   input           difftest_ref_clock,
   input           difftest_ref_reset,
   input           difftest_pcie_clock,
@@ -215,6 +201,7 @@ module SimTop_wrapper(
   output          difftest_hostCtrl_reset,
   output          difftest_hostCtrl_diffEnable,
   output          difftest_hostCtrl_ilaTrigger,
+  output          difftest_hostCtrl_enableSquash,
   input  [31:0]   difftest_cfg_axilite_awaddr,
   input           difftest_cfg_axilite_awvalid,
   output          difftest_cfg_axilite_awready,
@@ -232,7 +219,6 @@ module SimTop_wrapper(
   output [1:0]    difftest_cfg_axilite_rresp,
   output          difftest_cfg_axilite_rvalid,
   input           difftest_cfg_axilite_rready
-`endif
 );
 
   wire          cpu_clock       ;
@@ -265,13 +251,11 @@ wire [149:0] trace_iaddr;
 wire [11:0]  trace_itype;
 wire [20:0]  trace_iretire;
 wire [2:0]   trace_ilastsize;
-`ifndef NO_DIFF
 wire [47:0]  difftest_mem_awaddr_int;
 wire [47:0]  difftest_mem_araddr_int;
 
 assign mem_core_awaddr = difftest_mem_awaddr_int[35:0];
 assign mem_core_araddr = difftest_mem_araddr_int[35:0];
-`endif
 
 `ifndef CONFIG_SIMTOP_HAS_DMA
 assign dma_core_awready = 1'b0;
@@ -287,14 +271,9 @@ assign dma_core_rresp   = '0;
 assign dma_core_rlast   = 1'b0;
 `endif
 
-`TOP_NAME u_XSTop(
-`ifdef NO_DIFF
-  .io_clock                      (inter_soc_clk),
-  .io_reset                      (~sys_rstn_i),
-`else
+SimTop  u_XSTop(
   .clock                         (inter_soc_clk),
   .reset                         (~sys_rstn_i),
-`endif
 
   .nmi_0_0                       (nmi_0_0),
   .nmi_0_1                       (nmi_0_1),
@@ -375,8 +354,10 @@ assign dma_core_rlast   = 1'b0;
   .dma_rresp                     (dma_core_rresp   ),
   .dma_rlast                     (dma_core_rlast   ),
 `endif
-`ifdef UVHS
-  // UVHS does not expose XiangShan's SystemJTAG pins.
+`ifdef UVHS_SOC_ADAPT
+  // The UVHS image does not expose XiangShan's SystemJTAG path. Hold the
+  // unused TAP in reset so asynchronous board pins do not fan out into the
+  // core after partitioning.
   .io_systemjtag_jtag_TCK          (1'b0),
   .io_systemjtag_jtag_TMS          (1'b1),
   .io_systemjtag_jtag_TDI          (1'b0),
@@ -403,11 +384,16 @@ assign dma_core_rlast   = 1'b0;
   .io_pll0_ctrl_4                  (io_pll0_ctrl_4),
   .io_pll0_ctrl_5                  (io_pll0_ctrl_5),
   .io_extIntrs                     (io_extIntrs  ),
+`ifdef UVHS_SOC_ADAPT
+  // Keep SYSCNT in the SoC domain for FPGA DiffTest. This avoids the
+  // FPGA-only TimeAsync CDC without adding a false-path waiver.
+  .io_rtc_clock                    (inter_soc_clk),
+`else
   .io_rtc_clock                    (tmclk),
+`endif
   .io_riscv_rst_vec_0              (48'h0000_1000_0000),
 
 
-`ifndef NO_DIFF
   //difftest
   .difftest_ref_clock              (difftest_ref_clock),
   .difftest_ref_reset              (difftest_ref_reset),
@@ -426,6 +412,7 @@ assign dma_core_rlast   = 1'b0;
   .difftest_hostCtrl_reset         (difftest_hostCtrl_reset),
   .difftest_hostCtrl_diffEnable    (difftest_hostCtrl_diffEnable),
   .difftest_hostCtrl_ilaTrigger    (difftest_hostCtrl_ilaTrigger),
+  .difftest_hostCtrl_enableSquash  (difftest_hostCtrl_enableSquash),
   .difftest_cfg_axilite_awready    (difftest_cfg_axilite_awready),
   .difftest_cfg_axilite_awvalid    (difftest_cfg_axilite_awvalid),
   .difftest_cfg_axilite_awaddr     (difftest_cfg_axilite_awaddr),
@@ -444,64 +431,47 @@ assign dma_core_rlast   = 1'b0;
   .difftest_cfg_axilite_rdata      (difftest_cfg_axilite_rdata),
   .difftest_cfg_axilite_rresp      (difftest_cfg_axilite_rresp),
 
-`endif
-  `MEM_PORT(`MEM_PREFIX, awready) (mem_core_awready ),
-  `MEM_PORT(`MEM_PREFIX, awvalid) (mem_core_awvalid ),
-  `MEM_PORT(`MEM_PREFIX, awid)    (mem_core_awid    ),
-`ifndef NO_DIFF
-  `MEM_PORT(`MEM_PREFIX, awuser)  (),
-`endif
-`ifdef NO_DIFF
-  `MEM_PORT(`MEM_PREFIX, awaddr)  ({12'd0, mem_core_awaddr}),
-`else
-  `MEM_PORT(`MEM_PREFIX, awaddr)  (difftest_mem_awaddr_int),
-`endif
-  `MEM_PORT(`MEM_PREFIX, awlen)   (mem_core_awlen   ),
-  `MEM_PORT(`MEM_PREFIX, awsize)  (mem_core_awsize  ),
-  `MEM_PORT(`MEM_PREFIX, awburst) (mem_core_awburst ),
-  `MEM_PORT(`MEM_PREFIX, awlock)  (mem_core_awlock  ),
-  `MEM_PORT(`MEM_PREFIX, awcache) (mem_core_awcache ),
-  `MEM_PORT(`MEM_PREFIX, awprot)  (mem_core_awprot  ),
-  `MEM_PORT(`MEM_PREFIX, awqos)   (mem_core_awqos   ),
-  `MEM_PORT(`MEM_PREFIX, wready)  (mem_core_wready  ),
-  `MEM_PORT(`MEM_PREFIX, wvalid)  (mem_core_wvalid  ),
-  `MEM_PORT(`MEM_PREFIX, wdata)   (mem_core_wdata   ),
-  `MEM_PORT(`MEM_PREFIX, wstrb)   (mem_core_wstrb   ),
-  `MEM_PORT(`MEM_PREFIX, wlast)   (mem_core_wlast   ),
-  `MEM_PORT(`MEM_PREFIX, bready)  (mem_core_bready  ),
-  `MEM_PORT(`MEM_PREFIX, bvalid)  (mem_core_bvalid  ),
-  `MEM_PORT(`MEM_PREFIX, bid)     (mem_core_bid     ),
-`ifndef NO_DIFF
-  `MEM_PORT(`MEM_PREFIX, buser)   ('b0),
-`endif
-  `MEM_PORT(`MEM_PREFIX, bresp)   (mem_core_bresp   ),
-  `MEM_PORT(`MEM_PREFIX, arready) (mem_core_arready ),
-  `MEM_PORT(`MEM_PREFIX, arvalid) (mem_core_arvalid ),
-  `MEM_PORT(`MEM_PREFIX, arid)    (mem_core_arid    ),
-`ifndef NO_DIFF
-  `MEM_PORT(`MEM_PREFIX, aruser)  (),
-`endif
-`ifdef NO_DIFF
-  `MEM_PORT(`MEM_PREFIX, araddr)  ({12'd0, mem_core_araddr}),
-`else
-  `MEM_PORT(`MEM_PREFIX, araddr)  (difftest_mem_araddr_int),
-`endif
-  `MEM_PORT(`MEM_PREFIX, arlen)   (mem_core_arlen   ),
-  `MEM_PORT(`MEM_PREFIX, arsize)  (mem_core_arsize  ),
-  `MEM_PORT(`MEM_PREFIX, arburst) (mem_core_arburst ),
-  `MEM_PORT(`MEM_PREFIX, arlock)  (mem_core_arlock  ),
-  `MEM_PORT(`MEM_PREFIX, arcache) (mem_core_arcache ),
-  `MEM_PORT(`MEM_PREFIX, arprot)  (mem_core_arprot  ),
-  `MEM_PORT(`MEM_PREFIX, arqos)   (mem_core_arqos   ),
-  `MEM_PORT(`MEM_PREFIX, rready)  (mem_core_rready  ),
-  `MEM_PORT(`MEM_PREFIX, rvalid)  (mem_core_rvalid  ),
-  `MEM_PORT(`MEM_PREFIX, rid)     (mem_core_rid     ),
-`ifndef NO_DIFF
-  `MEM_PORT(`MEM_PREFIX, ruser)   ('b0),
-`endif
-  `MEM_PORT(`MEM_PREFIX, rdata)   (mem_core_rdata   ),
-  `MEM_PORT(`MEM_PREFIX, rresp)   (mem_core_rresp   ),
-  `MEM_PORT(`MEM_PREFIX, rlast)   (mem_core_rlast   ),
+  .difftest_mem_awready          (mem_core_awready ),
+  .difftest_mem_awvalid          (mem_core_awvalid ),
+  .difftest_mem_awid             (mem_core_awid    ),
+  .difftest_mem_awuser           (),
+  .difftest_mem_awaddr           (difftest_mem_awaddr_int),
+  .difftest_mem_awlen            (mem_core_awlen   ),
+  .difftest_mem_awsize           (mem_core_awsize  ),
+  .difftest_mem_awburst          (mem_core_awburst ),
+  .difftest_mem_awlock           (mem_core_awlock  ),
+  .difftest_mem_awcache          (mem_core_awcache ),
+  .difftest_mem_awprot           (mem_core_awprot  ),
+  .difftest_mem_awqos            (mem_core_awqos   ),
+  .difftest_mem_wready           (mem_core_wready  ),
+  .difftest_mem_wvalid           (mem_core_wvalid  ),
+  .difftest_mem_wdata            (mem_core_wdata   ),
+  .difftest_mem_wstrb            (mem_core_wstrb   ),
+  .difftest_mem_wlast            (mem_core_wlast   ),
+  .difftest_mem_bready           (mem_core_bready  ),
+  .difftest_mem_bvalid           (mem_core_bvalid  ),
+  .difftest_mem_bid              (mem_core_bid     ),
+  .difftest_mem_buser            ('b0),
+  .difftest_mem_bresp            (mem_core_bresp   ),
+  .difftest_mem_arready          (mem_core_arready ),
+  .difftest_mem_arvalid          (mem_core_arvalid ),
+  .difftest_mem_arid             (mem_core_arid    ),
+  .difftest_mem_aruser           (),
+  .difftest_mem_araddr           (difftest_mem_araddr_int),
+  .difftest_mem_arlen            (mem_core_arlen   ),
+  .difftest_mem_arsize           (mem_core_arsize  ),
+  .difftest_mem_arburst          (mem_core_arburst ),
+  .difftest_mem_arlock           (mem_core_arlock  ),
+  .difftest_mem_arcache          (mem_core_arcache ),
+  .difftest_mem_arprot           (mem_core_arprot  ),
+  .difftest_mem_arqos            (mem_core_arqos   ),
+  .difftest_mem_rready           (mem_core_rready  ),
+  .difftest_mem_rvalid           (mem_core_rvalid  ),
+  .difftest_mem_rid              (mem_core_rid     ),
+  .difftest_mem_ruser            ('b0),
+  .difftest_mem_rdata            (mem_core_rdata   ),
+  .difftest_mem_rresp            (mem_core_rresp   ),
+  .difftest_mem_rlast            (mem_core_rlast   ),
 
   .io_cacheable_check_req_0_valid    ('b0),
   .io_cacheable_check_req_0_bits_addr('b0),
@@ -534,8 +504,3 @@ assign dma_core_rlast   = 1'b0;
   .io_traceCoreInterface_0_toEncoder_ilastsize(trace_ilastsize)
 );
 endmodule
-
-`undef MEM_PORT
-`undef MEM_PORT_
-`undef MEM_PREFIX
-`undef TOP_NAME

@@ -48,16 +48,28 @@ FPGA_DDR_LOAD_CMD="bash -lc ' \
 ./fpga-host --diff <nemu> -i <workload>.bin
 ```
 
-UVHS Flow
-=========
+HJ/UVHS FPGA Flow
+=================
 
-The Hejian UVHS flow uses separate `uvhs_*` targets and leaves the targets above
-unchanged. Configure the UVHS tool environment in the runtime host shell, then
-invoke:
+The Hejian NutShell source-flow index is [uvhs/README.md](uvhs/README.md);
+the canonical build, signoff, runtime, FPGA-host, and cleanup runbook is
+[uvhs/flow.md](uvhs/flow.md).
+
+A typical build starts with:
 
 ```shell
-make uvhs CPU=<design> CORE_DIR=/path/to/release/build SUFFIX=<tag>
+make uvhs_tools_check
+make uvhs_hejian_pcie_x4_preflight CORE_DIR=/path/to/NutShell
+make uvhs_hejian_pcie_x4_nutshell_all \
+  CORE_DIR=/path/to/NutShell SUFFIX=<unique-tag>
+make uvhs_package_bitstream CPU=nutshell \
+  UVHS_WORK_DIR=/path/to/fpga_diff_uvhs_nutshell-<unique-tag>
 ```
 
-See [`uvhs/README.md`](uvhs/README.md) for the board-template and vendor-DDR
-inputs, build stages, and runtime commands.
+Copy `uvhs/setenv.local.example.sh` to the ignored `setenv.local.sh` for
+machine-specific tools and licenses. The caller supplies `CORE_DIR`, verified
+UVHS DDR/XDMA IP assets, and a unique build suffix. Program the resulting
+`hw.dat` through the vendor runtime using `user_script/hw_run_download.tcl`.
+The normal `fpga-host` path loads workloads through H2C. Use
+`uvhs_tagged_runtime.sh` so runtime sessions and cleanup remain exact-tag
+scoped; keep board-specific debug helpers local.

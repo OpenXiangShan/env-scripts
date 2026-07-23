@@ -2,9 +2,6 @@
 # Vivado Tcl Script for Reporting (No GUI)
 # ----------------------------------------
 
-# Suppress WARNING messages
-catch { set_msg_config -severity {WARNING} -suppress }
-
 # 1) Read required arguments: OUT_FILE and PROJECT(.xpr)
 if {![info exists ::argv] || [llength $::argv] < 2} {
   puts "ERROR: Missing arguments."

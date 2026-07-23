@@ -5,32 +5,68 @@ RTL_INCLUDE ?=
 FPGA_BIT_HOME ?=
 WORKLOAD ?=
 AXI_WIDTH ?= 64
-NO_DIFF ?= 0
+PLATFORM ?= U2.2
 # Host-trigger ILA capture is opt-in. Keep the trigger mark_debug net in RTL,
 # but avoid instantiating the ILA core by default to reduce routing pressure.
 ENABLE_ILA ?= 0
 ILA_DEPTH ?= 16384
 XDMA_LINK_WIDTH ?= X4
+XDMA_ENABLE_PF0_BAR1 ?= 1
+# Expected values for the checked Hejian XDMA EP x4 DCP used by the UVHS flow:
+# BAR0 512 KiB, BAR1 64 KiB, endpoint 10ee:9048. They are carried into the
+# Hejian scripts and host probes; do not treat them as a request to patch the
+# Vivado xdma_ep Tcl source.
+XDMA_AXILITE_MASTER_SCALE ?= Kilobytes
+XDMA_AXILITE_MASTER_SIZE ?= 512
+XDMA_EXPECTED_VENDOR ?= 0x10ee
+XDMA_EXPECTED_DEVICE ?= 0x9048
+XDMA_EXPECTED_BAR0_SIZE ?= 0x80000
+XDMA_EXPECTED_BAR1_SIZE ?= 0x10000
+UVHS_BASE_ASSEMBLE_FILE ?=
+UVHS_BASE_ASSEMBLE_SHA256 ?= 0e44f3ced8e5628a6f9b60a36d15194f03f6eddefcf29d0221a8abf140ecb18b
+UVHS_XDMA_EP_DCP ?=
+UVHS_XDMA_EP_DCP_SHA256 ?= e40002b4ccab73d4d7a1398630f59428add0a64b9f33d284d3789595bb791b32
+UVHS_XDMA_EP_EXPECTED_VIVADO ?= 2024.2
+UVHS_ALLOW_DCP_VIVADO_MISMATCH ?= 0
+UVHS_DESIGN_NAME ?= VU19P_X4
+UVHS_TARGET_BOARD ?= B0
+UVHS_TARGET_PACK ?= $(UVHS_TARGET_BOARD)
+UVHS_TARGET_FPGA ?= F2
+UVHS_TARGET_FPGA_LOWER ?= $(shell printf '%s.%s' '$(UVHS_TARGET_PACK)' '$(UVHS_TARGET_FPGA)' | tr '[:upper:]' '[:lower:]')
+UVHS_FPGA_COUNT ?= 1
+UVHS_CPU_CLK_PERIOD_NS ?= 40
+UVHS_CPU_DEBUG_CLK ?= 1
+UVHS_PNR_STRATEGY ?= Strategy_uv_high_fanout_explore
+UVHS_COMPILE_STRATEGY_NUM ?= 1
+UVHS_COMPILE_STRATEGY0 ?= uv_high_fanout_explore
+UVHS_COMPILE_STRATEGY1 ?=
+UVHS_COMPILE_STRATEGY2 ?=
 VIVADO_JOBS ?=
 DDR_RANK_WIDTH ?= 2
-export ENABLE_ILA ILA_DEPTH XDMA_LINK_WIDTH VIVADO_JOBS DDR_RANK_WIDTH NO_DIFF
+export PLATFORM ENABLE_ILA ILA_DEPTH XDMA_LINK_WIDTH XDMA_ENABLE_PF0_BAR1 XDMA_AXILITE_MASTER_SCALE XDMA_AXILITE_MASTER_SIZE XDMA_EXPECTED_VENDOR XDMA_EXPECTED_DEVICE XDMA_EXPECTED_BAR0_SIZE XDMA_EXPECTED_BAR1_SIZE UVHS_BASE_ASSEMBLE_FILE UVHS_BASE_ASSEMBLE_SHA256 UVHS_XDMA_EP_DCP UVHS_XDMA_EP_DCP_SHA256 UVHS_XDMA_EP_EXPECTED_VIVADO UVHS_ALLOW_DCP_VIVADO_MISMATCH UVHS_DESIGN_NAME UVHS_TARGET_BOARD UVHS_TARGET_PACK UVHS_TARGET_FPGA UVHS_TARGET_FPGA_LOWER UVHS_FPGA_COUNT UVHS_CPU_CLK_PERIOD_NS UVHS_CPU_DEBUG_CLK UVHS_PNR_STRATEGY UVHS_COMPILE_STRATEGY_NUM UVHS_COMPILE_STRATEGY0 UVHS_COMPILE_STRATEGY1 UVHS_COMPILE_STRATEGY2 VIVADO_JOBS DDR_RANK_WIDTH
 # Supported CPU parameters:
 #   kmh
 #   nutshell
 #   nanhu
 CPU ?=
 SUFFIX ?=
-ifeq ($(NO_DIFF),1)
-ifeq ($(filter nodiff nodiff-%,$(SUFFIX)),)
-override SUFFIX := nodiff$(if $(strip $(SUFFIX)),-$(strip $(SUFFIX)),)
-endif
-endif
 PRJ_NAME = fpga_$(CPU)$(if $(strip $(SUFFIX)),-$(strip $(SUFFIX)),)
 PRJ_DIR ?= $(ENV_SCRIPTS_HOME)/$(PRJ_NAME)
 PRJ ?= $(PRJ_DIR)/$(PRJ_NAME).xpr
 
-.PHONY: bitstream vivado dump_ila update_core_flist \
-	write_bitstream halt_soc write_jtag_ddr write_jtag_flash reset_cpu
+UVHS_SUBMAKE = $(MAKE) -f $(CURDIR)/uvhs/Makefile ROOT_DIR="$(CURDIR)"
+
+UVHS_FORWARD_TARGETS := \
+	uvhs_prepare uvhs_export_vivado_ip \
+	uvhs_show_uvw_axi4_to_ddr4 uvhs_filelist uvhs_check_modules \
+	uvhs_tools_check uvhs_frontend uvhs_backend uvhs_all \
+	uvhs_clean uvhs_env uvhs_preflight uvhs_hejian_pcie_x4_env \
+	uvhs_hejian_pcie_x4_preflight uvhs_hejian_pcie_x4_nutshell_all \
+	uvhs_hejian_pcie_x4_xiangshan_all \
+	uvhs_status uvhs_check_timing_clean uvhs_export_ltx \
+	uvhs_package_bitstream
+
+.PHONY: bitstream vivado dump_ila write_jtag_flash update_core_flist $(UVHS_FORWARD_TARGETS)
 
 # Get Vivado version
 VIVADO_VERSION := $(shell vivado -version 2>/dev/null | head -1 | grep -o '[0-9]\{4\}\.[0-9]' || echo "unknown")
@@ -48,7 +84,10 @@ bitstream:
 
 # RTL_INCLUDE accepts RTL files, directories, and .f/.flist/.list file lists.
 update_core_flist:
-	@./tools/update_core_flist.sh vivado "$(CORE_DIR)" -- $(RTL_INCLUDE)
+	@./tools/update_core_flist.sh "$(CORE_DIR)" -- $(RTL_INCLUDE)
+
+$(UVHS_FORWARD_TARGETS):
+	$(UVHS_SUBMAKE) $@
 
 # Launch Vivado with FPGA project configuration
 vivado: check_vivado_version
@@ -60,13 +99,9 @@ check_version:
 
 # Write bitstream to FPGA via PCIe
 write_bitstream:
-ifneq ($(NO_DIFF),1)
 	sh tools/pcie-remove.sh
-endif
 	vivado -mode tcl -source tools/write_bitstream.tcl -tclargs $(FPGA_BIT_HOME)
-ifneq ($(NO_DIFF),1)
 	sh tools/pcie-rescan.sh
-endif
 	vivado -mode tcl -source tools/reset_ddr.tcl -tclargs $(FPGA_BIT_HOME)/fpga_top_debug.ltx
 	$(MAKE) reset_cpu
 
@@ -110,7 +145,3 @@ get_synth_log:
 all:
 	$(MAKE) update_core_flist CORE_DIR="$(CORE_DIR)" RTL_INCLUDE="$(RTL_INCLUDE)"
 	$(MAKE) vivado CPU=$(CPU) SUFFIX="$(SUFFIX)"
-
-# UVHS targets use an explicit uvhs_* namespace and do not replace the normal
-# Vivado/JTAG targets above.
-include uvhs/uvhs.mk
