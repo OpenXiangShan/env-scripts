@@ -201,6 +201,7 @@ module SimTop_wrapper(
   output          difftest_hostCtrl_reset,
   output          difftest_hostCtrl_diffEnable,
   output          difftest_hostCtrl_ilaTrigger,
+  output          difftest_hostCtrl_enableSquash,
   input  [31:0]   difftest_cfg_axilite_awaddr,
   input           difftest_cfg_axilite_awvalid,
   output          difftest_cfg_axilite_awready,
@@ -250,6 +251,11 @@ wire [149:0] trace_iaddr;
 wire [11:0]  trace_itype;
 wire [20:0]  trace_iretire;
 wire [2:0]   trace_ilastsize;
+wire [47:0]  difftest_mem_awaddr_int;
+wire [47:0]  difftest_mem_araddr_int;
+
+assign mem_core_awaddr = difftest_mem_awaddr_int[35:0];
+assign mem_core_araddr = difftest_mem_araddr_int[35:0];
 
 `ifndef CONFIG_SIMTOP_HAS_DMA
 assign dma_core_awready = 1'b0;
@@ -275,7 +281,7 @@ SimTop  u_XSTop(
   .peripheral_awready            (peri_awready  ),
   .peripheral_awvalid            (peri_awvalid  ),
   .peripheral_awid               (peri_awid     ),
-  .peripheral_awaddr             ({16'd0, peri_awaddr}),
+  .peripheral_awaddr             (peri_awaddr  ),
   .peripheral_awlen              (peri_awlen    ),
   .peripheral_awsize             (peri_awsize   ),
   .peripheral_awburst            (peri_awburst  ),
@@ -295,7 +301,7 @@ SimTop  u_XSTop(
   .peripheral_arready            (peri_arready  ),
   .peripheral_arvalid            (peri_arvalid  ),
   .peripheral_arid               (peri_arid     ),
-  .peripheral_araddr             ({16'd0, peri_araddr}),
+  .peripheral_araddr             (peri_araddr  ),
   .peripheral_arlen              (peri_arlen    ),
   .peripheral_arsize             (peri_arsize   ),
   .peripheral_arburst            (peri_arburst  ),
@@ -313,7 +319,7 @@ SimTop  u_XSTop(
   .dma_awready                   (dma_core_awready ),
   .dma_awvalid                   (dma_core_awvalid ),
   .dma_awid                      (dma_core_awid    ),
-  .dma_awaddr                    (dma_core_awaddr[35:0]  ),
+  .dma_awaddr                    ({12'b0, dma_core_awaddr}),
   .dma_awlen                     (dma_core_awlen   ),
   .dma_awsize                    (dma_core_awsize  ),
   .dma_awburst                   (dma_core_awburst ),
@@ -333,7 +339,7 @@ SimTop  u_XSTop(
   .dma_arready                   (dma_core_arready ),
   .dma_arvalid                   (dma_core_arvalid ),
   .dma_arid                      (dma_core_arid    ),
-  .dma_araddr                    (dma_core_araddr[35:0]  ),
+  .dma_araddr                    ({12'b0, dma_core_araddr}),
   .dma_arlen                     (dma_core_arlen   ),
   .dma_arsize                    (dma_core_arsize  ),
   .dma_arburst                   (dma_core_arburst ),
@@ -348,9 +354,18 @@ SimTop  u_XSTop(
   .dma_rresp                     (dma_core_rresp   ),
   .dma_rlast                     (dma_core_rlast   ),
 `endif
+`ifdef UVHS_SOC_ADAPT
+  // The UVHS image does not expose XiangShan's SystemJTAG path. Hold the
+  // unused TAP in reset so asynchronous board pins do not fan out into the
+  // core after partitioning.
+  .io_systemjtag_jtag_TCK          (1'b0),
+  .io_systemjtag_jtag_TMS          (1'b1),
+  .io_systemjtag_jtag_TDI          (1'b0),
+`else
   .io_systemjtag_jtag_TCK          (io_systemjtag_jtag_TCK),
   .io_systemjtag_jtag_TMS          (io_systemjtag_jtag_TMS),
   .io_systemjtag_jtag_TDI          (io_systemjtag_jtag_TDI),
+`endif
   .io_systemjtag_jtag_TDO_data     (io_systemjtag_jtag_TDO_data),
   .io_systemjtag_jtag_TDO_driven   (io_systemjtag_jtag_TDO_driven),
   .io_systemjtag_reset             (io_systemjtag_reset),
@@ -369,8 +384,14 @@ SimTop  u_XSTop(
   .io_pll0_ctrl_4                  (io_pll0_ctrl_4),
   .io_pll0_ctrl_5                  (io_pll0_ctrl_5),
   .io_extIntrs                     (io_extIntrs  ),
+`ifdef UVHS_SOC_ADAPT
+  // Keep SYSCNT in the SoC domain for FPGA DiffTest. This avoids the
+  // FPGA-only TimeAsync CDC without adding a false-path waiver.
+  .io_rtc_clock                    (inter_soc_clk),
+`else
   .io_rtc_clock                    (tmclk),
-  .io_riscv_rst_vec_0              (38'h10000000),
+`endif
+  .io_riscv_rst_vec_0              (48'h0000_1000_0000),
 
 
   //difftest
@@ -391,6 +412,7 @@ SimTop  u_XSTop(
   .difftest_hostCtrl_reset         (difftest_hostCtrl_reset),
   .difftest_hostCtrl_diffEnable    (difftest_hostCtrl_diffEnable),
   .difftest_hostCtrl_ilaTrigger    (difftest_hostCtrl_ilaTrigger),
+  .difftest_hostCtrl_enableSquash  (difftest_hostCtrl_enableSquash),
   .difftest_cfg_axilite_awready    (difftest_cfg_axilite_awready),
   .difftest_cfg_axilite_awvalid    (difftest_cfg_axilite_awvalid),
   .difftest_cfg_axilite_awaddr     (difftest_cfg_axilite_awaddr),
@@ -413,7 +435,7 @@ SimTop  u_XSTop(
   .difftest_mem_awvalid          (mem_core_awvalid ),
   .difftest_mem_awid             (mem_core_awid    ),
   .difftest_mem_awuser           (),
-  .difftest_mem_awaddr           ({12'd0, mem_core_awaddr}),
+  .difftest_mem_awaddr           (difftest_mem_awaddr_int),
   .difftest_mem_awlen            (mem_core_awlen   ),
   .difftest_mem_awsize           (mem_core_awsize  ),
   .difftest_mem_awburst          (mem_core_awburst ),
@@ -435,7 +457,7 @@ SimTop  u_XSTop(
   .difftest_mem_arvalid          (mem_core_arvalid ),
   .difftest_mem_arid             (mem_core_arid    ),
   .difftest_mem_aruser           (),
-  .difftest_mem_araddr           ({12'd0, mem_core_araddr}),
+  .difftest_mem_araddr           (difftest_mem_araddr_int),
   .difftest_mem_arlen            (mem_core_arlen   ),
   .difftest_mem_arsize           (mem_core_arsize  ),
   .difftest_mem_arburst          (mem_core_arburst ),

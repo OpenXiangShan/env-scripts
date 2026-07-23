@@ -4,6 +4,27 @@
 !*.vh
 !*.xdc
 !*.tcl
+.tmp_*.tcl
+tools/write_debug_probes.tcl
+uvhs/assign_pin_native_nutshell_f2.tcl
+uvhs/probe.tcl
+uvhs/setenv.local.sh
 
 fpga_*/
+logs/
 src/tcl/cpu_files.tcl
+src/tcl/chi_files.tcl
+
+# UVHS generated working trees and local configuration
+uvhs_*/
+runtime_uvhs_*/
+uvhs/*.local.sh
+
+# FPGA build outputs
+*.bit
+*.ltx
+*.dcp
+*.rtdb
+*.rpt
+*.rpx
+hw.dat/
