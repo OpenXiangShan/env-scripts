@@ -1,7 +1,7 @@
 ENV_SCRIPTS_HOME ?= $(CURDIR)
 
 CORE_DIR ?=
-CHI_DIR ?=
+RTL_INCLUDE ?=
 FPGA_BIT_HOME ?=
 WORKLOAD ?=
 AXI_WIDTH ?= 64
@@ -23,7 +23,7 @@ PRJ_NAME = fpga_$(CPU)$(if $(strip $(SUFFIX)),-$(strip $(SUFFIX)),)
 PRJ_DIR ?= $(ENV_SCRIPTS_HOME)/$(PRJ_NAME)
 PRJ ?= $(PRJ_DIR)/$(PRJ_NAME).xpr
 
-.PHONY: bitstream vivado dump_ila write_jtag_flash
+.PHONY: bitstream vivado dump_ila write_jtag_flash update_core_flist
 
 # Get Vivado version
 VIVADO_VERSION := $(shell vivado -version 2>/dev/null | head -1 | grep -o '[0-9]\{4\}\.[0-9]' || echo "unknown")
@@ -39,16 +39,9 @@ synth:
 bitstream:
 	vivado -mode batch -source ./tools/gen_bitstream.tcl -tclargs $(PRJ) impl_1 $(VIVADO_JOBS)
 
-# Update file list for core RTL files
+# RTL_INCLUDE accepts RTL files, directories, and .f/.flist/.list file lists.
 update_core_flist:
-	rm -rf $(CORE_DIR)/rtl/verification
-	find "$(CORE_DIR)" -type f \( -name "*.v" -o -name "*.sv" -o -name "*.svh" \) -printf '%p\n' | \
-	awk -f ./core_flist.awk > ./src/tcl/cpu_files.tcl
-
-# Update file list for CHI interface files
-update_chi_flist:
-	find "$(CHI_DIR)" -type f \( -name "*.v" -o -name "*.sv" -o -name "*.svh" \) -printf '%p\n' | \
-	awk -f ./chi_flist.awk > ./src/tcl/chi_files.tcl;
+	@./tools/update_core_flist.sh "$(CORE_DIR)" -- $(RTL_INCLUDE)
 
 # Launch Vivado with FPGA project configuration
 vivado: check_vivado_version
@@ -104,8 +97,5 @@ get_synth_log:
 
 # Build complete FPGA project
 all:
-ifneq ($(strip $(CHI_DIR)),)
-	$(MAKE) update_chi_flist CHI_DIR="$(CHI_DIR)"
-endif
-	$(MAKE) update_core_flist CORE_DIR=$(CORE_DIR)
+	$(MAKE) update_core_flist CORE_DIR="$(CORE_DIR)" RTL_INCLUDE="$(RTL_INCLUDE)"
 	$(MAKE) vivado CPU=$(CPU) SUFFIX="$(SUFFIX)"
