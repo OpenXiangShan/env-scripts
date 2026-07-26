@@ -99,3 +99,7 @@ get_synth_log:
 all:
 	$(MAKE) update_core_flist CORE_DIR="$(CORE_DIR)" RTL_INCLUDE="$(RTL_INCLUDE)"
 	$(MAKE) vivado CPU=$(CPU) SUFFIX="$(SUFFIX)"
+
+ifeq ($(UVHS),1)
+include uvhs/uvhs.mk
+endif

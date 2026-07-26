@@ -54,6 +54,7 @@ module core_def (
       output      [1:0]                          uhs1_drv_sth                   ,
       output                                     uhs1_swvolt_en                 ,
       output                                     sd_led_control                 ,
+`ifndef UVHS_UVW_AXI4_TO_DDR4
       output      [`CONFIG_RANK_WIDTH-1:0]       DDR_CK_T                       ,
       output      [`CONFIG_RANK_WIDTH-1:0]       DDR_CK_C                       ,
       output      [`CONFIG_RANK_WIDTH-1:0]       DDR_CKE                        ,
@@ -68,6 +69,7 @@ module core_def (
       inout           [63:0]                     DDR_DQ                         ,
       inout           [7:0]                      DDR_DQS_T                      ,
       inout           [7:0]                      DDR_DQS_C                      ,
+`endif
 
       //==JTAG
 
@@ -1124,6 +1126,7 @@ wire [7:0]    br2cfg_wstrb;
 wire [0:0]    br2cfg_wvalid;
 
   wire [31:0] XDMA_AXI_LITE_awaddr;
+  wire [2:0]  XDMA_AXI_LITE_awprot;
   wire        XDMA_AXI_LITE_awvalid;
   wire        XDMA_AXI_LITE_awready;
   wire [31:0] XDMA_AXI_LITE_wdata;
@@ -1134,6 +1137,7 @@ wire [0:0]    br2cfg_wvalid;
   wire        XDMA_AXI_LITE_bvalid;
   wire        XDMA_AXI_LITE_bready;
   wire [31:0] XDMA_AXI_LITE_araddr;
+  wire [2:0]  XDMA_AXI_LITE_arprot;
   wire        XDMA_AXI_LITE_arvalid;
   wire        XDMA_AXI_LITE_arready;
   wire [31:0] XDMA_AXI_LITE_rdata;
@@ -1167,20 +1171,12 @@ wire [0:0]    br2cfg_wvalid;
   wire difftest_startup_done_pcie;
   wire cpu_rstn_pcie;
   wire io_host_diff_enable_pcie;
-  wire xdma_link_up_pcie;
   reg [19:0] difftest_startup_wait_pcie;
   reg difftest_stream_enable_pcie;
 
   wire difftest_pcie_clock;
   assign sys_rstn_io = sys_rstn & ~io_host_reset;
   assign cpu_rstn_io = cpu_rstn & ~io_host_reset;
-
-  reg [1:0] pcie_lnk_sync;
-  always @(posedge sys_clk_i) begin
-      if (!sys_rstn) pcie_lnk_sync <= 2'b00;
-      else           pcie_lnk_sync <= {pcie_lnk_sync[0], pcie_ep_lnk_up};
-  end
-  wire xdma_link_up = pcie_lnk_sync[1];
 
   RST_SYNC #(
       .SYNC_STAGES(3),
@@ -1202,17 +1198,9 @@ wire [0:0]    br2cfg_wvalid;
       .sync_out (io_host_diff_enable_pcie)
   );
 
-  RST_SYNC #(
-      .SYNC_STAGES(3),
-      .PIPELINE_STAGES(1),
-      .INIT(1'b0)
-  ) difftest_link_up_pcie_sync (
-      .clk      (difftest_pcie_clock),
-      .async_in (xdma_link_up),
-      .sync_out (xdma_link_up_pcie)
-  );
-
-  assign difftest_startup_ready_pcie = cpu_rstn_pcie & io_host_diff_enable_pcie & xdma_link_up_pcie;
+  // Host enables DiffTest only after XDMA is accessible. Do not feed the
+  // physical XDMA link-status output back into fabric logic.
+  assign difftest_startup_ready_pcie = cpu_rstn_pcie & io_host_diff_enable_pcie;
   assign difftest_startup_done_pcie = &difftest_startup_wait_pcie;
 
   always @(posedge difftest_pcie_clock) begin
@@ -1244,7 +1232,7 @@ wire [0:0]    br2cfg_wvalid;
     .M00_AXIS_0_tvalid    (difftest_from_host_axis_tvalid),
 
     .XDMA_AXI_LITE_awaddr (XDMA_AXI_LITE_awaddr),
-    .XDMA_AXI_LITE_awprot (3'b000),
+    .XDMA_AXI_LITE_awprot (XDMA_AXI_LITE_awprot),
     .XDMA_AXI_LITE_awvalid(XDMA_AXI_LITE_awvalid),
     .XDMA_AXI_LITE_awready(XDMA_AXI_LITE_awready),
     .XDMA_AXI_LITE_wdata  (XDMA_AXI_LITE_wdata),
@@ -1255,7 +1243,7 @@ wire [0:0]    br2cfg_wvalid;
     .XDMA_AXI_LITE_bvalid (XDMA_AXI_LITE_bvalid),
     .XDMA_AXI_LITE_bready (XDMA_AXI_LITE_bready),
     .XDMA_AXI_LITE_araddr (XDMA_AXI_LITE_araddr),
-    .XDMA_AXI_LITE_arprot (3'b000),
+    .XDMA_AXI_LITE_arprot (XDMA_AXI_LITE_arprot),
     .XDMA_AXI_LITE_arvalid(XDMA_AXI_LITE_arvalid),
     .XDMA_AXI_LITE_arready(XDMA_AXI_LITE_arready),
     .XDMA_AXI_LITE_rdata  (XDMA_AXI_LITE_rdata),
@@ -1276,13 +1264,13 @@ wire [0:0]    br2cfg_wvalid;
 
   DifftestClockGate SOC_CLK_CTRL(
       .CK  (sys_clk_i),
-      .E   ((difftest_clock_enable & xdma_link_up ) || ~io_host_diff_enable || ~sys_rstn_io || ~cpu_rstn_io),
+      .E   (difftest_clock_enable || ~io_host_diff_enable || ~sys_rstn_io || ~cpu_rstn_io),
       .Q   (inter_soc_clk)
   );
 
   DifftestClockGate RTC_CLK_CTRL(
       .CK  (tmclk),
-      .E   ((difftest_clock_enable & xdma_link_up) || ~io_host_diff_enable || ~sys_rstn_io || ~cpu_rstn_io ),
+      .E   (difftest_clock_enable || ~io_host_diff_enable || ~sys_rstn_io || ~cpu_rstn_io ),
       .Q   (inter_rtc_clk)
   );
 
@@ -1335,6 +1323,52 @@ mode_ctrl U_MODE_CTRL(
     .scan_mode                      (                              )
 );
 
+`ifdef UVHS_UVW_AXI4_TO_DDR4
+uvhs_ddr4_wrapper U_UVHS_UVW_AXI4_TO_DDR4 (
+    .clk                    (inter_soc_clk),
+    .rstn                   (rstn_sw4),
+    .calib_complete         (init_calib_complete),
+    .s_axi_awid             (cpu2ddr_m2s_awid_mix),
+    .s_axi_awaddr           (cpu2ddr_m2s_awaddr_mix),
+    .s_axi_awlen            (cpu2ddr_m2s_awlen),
+    .s_axi_awsize           (cpu2ddr_m2s_awsize),
+    .s_axi_awburst          (cpu2ddr_m2s_awburst),
+    .s_axi_awlock           (cpu2ddr_m2s_awlock),
+    .s_axi_awcache          (cpu2ddr_m2s_awcache),
+    .s_axi_awprot           (cpu2ddr_m2s_awprot),
+    .s_axi_awqos            (cpu2ddr_m2s_awqos),
+    .s_axi_awregion         (cpu2ddr_m2s_awregion),
+    .s_axi_awvalid          (cpu2ddr_m2s_awvalid),
+    .s_axi_awready          (cpu2ddr_s2m_awready),
+    .s_axi_wdata            (cpu2ddr_m2s_wdata),
+    .s_axi_wstrb            (cpu2ddr_m2s_wstrb),
+    .s_axi_wlast            (cpu2ddr_m2s_wlast),
+    .s_axi_wvalid           (cpu2ddr_m2s_wvalid),
+    .s_axi_wready           (cpu2ddr_s2m_wready),
+    .s_axi_bid              (cpu2ddr_s2m_bid),
+    .s_axi_bresp            (cpu2ddr_s2m_bresp),
+    .s_axi_bvalid           (cpu2ddr_s2m_bvalid),
+    .s_axi_bready           (cpu2ddr_m2s_bready),
+    .s_axi_arid             (cpu2ddr_m2s_arid_mix),
+    .s_axi_araddr           (cpu2ddr_m2s_araddr_mix),
+    .s_axi_arlen            (cpu2ddr_m2s_arlen),
+    .s_axi_arsize           (cpu2ddr_m2s_arsize),
+    .s_axi_arburst          (cpu2ddr_m2s_arburst),
+    .s_axi_arlock           (cpu2ddr_m2s_arlock),
+    .s_axi_arcache          (cpu2ddr_m2s_arcache),
+    .s_axi_arprot           (cpu2ddr_m2s_arprot),
+    .s_axi_arqos            (cpu2ddr_m2s_arqos),
+    .s_axi_arregion         (cpu2ddr_m2s_arregion),
+    .s_axi_arvalid          (cpu2ddr_m2s_arvalid),
+    .s_axi_arready          (cpu2ddr_s2m_arready),
+    .s_axi_rid              (cpu2ddr_s2m_rid),
+    .s_axi_rdata            (cpu2ddr_s2m_rdata),
+    .s_axi_rresp            (cpu2ddr_s2m_rresp),
+    .s_axi_rlast            (cpu2ddr_s2m_rlast),
+    .s_axi_rvalid           (cpu2ddr_s2m_rvalid),
+    .s_axi_rready           (cpu2ddr_m2s_rready)
+);
+`else
 jtag_ddr_subsys_wrapper U_JTAG_DDR_SUBSYS(
     .DDR4_act_n             (DDR_ACT_N),
     .DDR4_adr               (DDR_A),
@@ -1434,6 +1468,7 @@ jtag_ddr_subsys_wrapper U_JTAG_DDR_SUBSYS(
     .soc_rstn               (rstn_sw4),
     .calib_complete         (init_calib_complete)
 );
+`endif
 
 SimTop_wrapper U_CPU_TOP(
     .difftest_pcie_clock             (difftest_pcie_clock),
@@ -1649,6 +1684,9 @@ assign hpm_dig_result = 0;
 
 AXI_bridge CFG_AXI_bridge_i
        (.SYS_INTER_CLK          (inter_soc_clk),
+`ifdef UVHS_SOC_ADAPT
+        .SYS_INTER_ARESETN      (inter_soc_sync_rstn),
+`endif
         .ACLK                   (sys_clk_i),
         .ARESETN                (axi_bclk_sync_rstn),
 

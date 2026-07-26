@@ -34,14 +34,16 @@ module fpga_top_debug
    output                uart2_sout,
    input                 uart2_sin,
 `endif
-   //PCIE 
+   //PCIE
+`ifndef UVHS_SOC_ADAPT
    input                 refclk_p, // pcie 100MHz
    input                 refclk_n,
    output                PERST_N,
-   
+
    input                 refclk2_p, // pcie 100MHz
    input                 refclk2_n,
    output                PERST2_N,
+`endif
 `ifdef XS_XDMA_EP
    input    [`XDMA_PCIE_LANES-1:0] pci_ep_rxn,
    input    [`XDMA_PCIE_LANES-1:0] pci_ep_rxp,
@@ -53,6 +55,7 @@ module fpga_top_debug
    input                 pcie_ep_perstn,
 `endif 
    //DDR
+`ifndef UVHS_UVW_AXI4_TO_DDR4
    output    [`CONFIG_RANK_WIDTH-1:0] DDR0_CK_T,
    output    [`CONFIG_RANK_WIDTH-1:0] DDR0_CK_C,
    output    [`CONFIG_RANK_WIDTH-1:0] DDR0_CKE,
@@ -67,6 +70,7 @@ module fpga_top_debug
    inout     [63:0]      DDR0_DQ,
    inout     [7:0]       DDR0_DQS_T,
    inout     [7:0]       DDR0_DQS_C,
+`endif
    
 `ifdef XS_GMAC
    input                RGMII_RXCLK,
@@ -108,10 +112,20 @@ wire vio_sw4;
 wire sys_rstn;
 wire cpu_setn_buf;
 wire sys_clk_i, dev_clk_i;
+wire sys_rstn_to_core;
+wire cpu_rstn_to_core;
+wire ddr_rstn_to_core;
 wire pcie_rstn;
 (*mark_debug = "true"*) wire cpu_setn_rflag;
 (*mark_debug = "true"*) reg  cpu_rstn;
 
+`ifdef UVHS_SOC_ADAPT
+assign sys_rstn = rstn_sw6;
+assign cpu_setn_buf = rstn_sw5;
+assign sys_rstn_to_core = rstn_sw6;
+assign cpu_rstn_to_core = rstn_sw5;
+assign ddr_rstn_to_core = rstn_sw4;
+`else
 IBUF sys_rstn_ibuf (.O(sys_rstn), .I(rstn_sw6));
 IBUF cpu_rstn_ibuf (.O(cpu_setn_buf), .I(rstn_sw5));
 OBUF pcie_rstn_obuf (.O(PERST_N), .I(vio_sw6));
@@ -133,13 +147,26 @@ always@(posedge sys_clk_i) begin
       cpu_rstn <= cpu_rstn;
 end
 
+assign sys_rstn_to_core = sys_rstn && vio_sw6;
+assign cpu_rstn_to_core = cpu_rstn;
+assign ddr_rstn_to_core = rstn_sw4 && vio_sw4;
+`endif
+
 // Suppose PHY_RESET_B active high.
 // Although 88E1116R pin10 resetn is active low.
 // But this pin is on connector, which might not have current by default?
 assign PHY_RESET_B = cpu_rstn;
 
-wire   tmclk;
 wire   tmclk_buf;
+wire   cqetmclk_buf;
+wire   dbg_clk_buf;
+
+`ifdef UVHS_SOC_ADAPT
+assign tmclk_buf = clk8_p;
+assign cqetmclk_buf = clk6_p;
+assign dbg_clk_buf = clk5_p;
+`else
+wire   tmclk;
 IBUFGDS ibufgds_tmclk_1MHz
 (
 	.I              (clk8_p),
@@ -153,7 +180,6 @@ BUFG bufg_tmclk
 );
 
 wire    cqetmclk;
-wire    cqetmclk_buf;
 IBUFGDS ibufgds_tmclk_200MHz
 (
 	.I              (clk6_p),
@@ -168,7 +194,6 @@ BUFG bufg_cqetmclk
 );
 
 wire    dbg_clk;
-wire    dbg_clk_buf;
 IBUFGDS ibufgds_dbgclk_25MHz
 (
 	.I              (clk5_p),
@@ -181,30 +206,44 @@ BUFG bufg_dbgclk
     .I              (dbg_clk),
     .O              (dbg_clk_buf)
 );
+`endif
 
+`ifndef UVHS_SOC_ADAPT
 wire    pcie_sysclk_gt;
 wire    pcie_sysclk;
 
 
 IBUFDS_GTE4 refclk_ibuf (
-    .O(pcie_sysclk_gt), 
-    .ODIV2(pcie_sysclk), 
-    .I(refclk_p), 
-    .CEB(1'b0), 
+    .O(pcie_sysclk_gt),
+    .ODIV2(pcie_sysclk),
+    .I(refclk_p),
+    .CEB(1'b0),
     .IB(refclk_n)
 );
 
 IBUFDS_GTE4 refclk2_ibuf (
-    .O(pcie2_sysclk_gt), 
-    .ODIV2(pcie2_sysclk), 
-    .I(refclk2_p), 
-    .CEB(1'b0), 
+    .O(pcie2_sysclk_gt),
+    .ODIV2(pcie2_sysclk),
+    .I(refclk2_p),
+    .CEB(1'b0),
     .IB(refclk2_n)
 );
+`endif
 
+`ifdef UVHS_SOC_ADAPT
+`ifdef UVHS_CPU_DEBUG_CLK
 assign        sys_clk_i = dbg_clk_buf;
 assign        dev_clk_i = dbg_clk_buf;
+`else
+assign        sys_clk_i = cqetmclk_buf;
+assign        dev_clk_i = cqetmclk_buf;
+`endif
+`else
+assign        sys_clk_i = dbg_clk_buf;
+assign        dev_clk_i = dbg_clk_buf;
+`endif
 
+`ifndef UVHS_SOC_ADAPT
 vio_0 u_vio(
    .clk        (dbg_clk_buf),
 
@@ -212,6 +251,7 @@ vio_0 u_vio(
    .probe_out1 (vio_sw5),
    .probe_out2 (vio_sw4)
 );
+`endif
 //------------led test------------------
 
 wire                sdmmc_cclk_card;
@@ -332,9 +372,9 @@ core_def core_def
   .cpu_wr_ddr_valid     (led0),
   .sys_clk_i            (sys_clk_i),
   .dev_clk_i            (dev_clk_i),
-  .sys_rstn             (sys_rstn && vio_sw6),
-  .cpu_rstn             (cpu_rstn),
-  .rstn_sw4             (rstn_sw4 && vio_sw4),
+  .sys_rstn             (sys_rstn_to_core),
+  .cpu_rstn             (cpu_rstn_to_core),
+  .rstn_sw4             (ddr_rstn_to_core),
   .dft_lgc_rst_n        (1'b1),
   .dft_se               (1'b0),
   .chip_mode_i          (2'b00), // normal mode
@@ -394,7 +434,14 @@ core_def core_def
   .sd_card_wp_in        (sdmmc_card_write_prot),
   .sd_cmd_in            (sdmmc_sd_cmd_in),
   .sd_dat_in            (sdmmc_sd_dat_in),
-  .sd_led_control       (          ),
+  .sd_led_control       (          )
+`ifdef XS_GMAC
+  ,
+`else
+`ifndef UVHS_UVW_AXI4_TO_DDR4
+  ,
+`endif
+`endif
   
   `ifdef XS_GMAC
   // gmac
@@ -407,10 +454,14 @@ core_def core_def
   .io_gmac_rx_clk  ( io_gmac_rx_clk  ),
   .io_gmac_rxd_vld ( io_gmac_rxd_vld ),
   .io_gmac_rxd     ( io_gmac_rxd     ),
-  .io_gmac_txd     ( io_gmac_txd     ),
-  `endif
+  .io_gmac_txd     ( io_gmac_txd     )
+`ifndef UVHS_UVW_AXI4_TO_DDR4
+  ,
+`endif
+`endif
 
   // ddr
+`ifndef UVHS_UVW_AXI4_TO_DDR4
   .DDR_CK_T             (DDR0_CK_T        ),   
   .DDR_CK_C             (DDR0_CK_C        ),   
   .DDR_CKE              (DDR0_CKE         ),    
@@ -424,7 +475,7 @@ core_def core_def
   .DDR_DM_N             (DDR0_DM          ),     
   .DDR_DQ               (DDR0_DQ          ),     
   .DDR_DQS_T            (DDR0_DQS_T       ),  
-  .DDR_DQS_C            (DDR0_DQS_C       )/*,  
+  .DDR_DQS_C            (DDR0_DQS_C       )/*,
   .DDR_ZQ               (DDR0_ZQ),
   .gmac_gmii_mdc_o(gmac_gmii_mdc_o),
   .gmac_gmii_mdo_o(gmac_gmii_mdo_o),
@@ -448,6 +499,7 @@ core_def core_def
   .jtag_tdo(jtag_tdo), 
   
   */
+`endif
 
 );
 

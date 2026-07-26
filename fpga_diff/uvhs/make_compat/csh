@@ -1,0 +1,9 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+if [[ $# -ge 2 && ( "$1" == "-fc" || "$1" == "-c" ) && "$2" == "limit" ]]; then
+    ulimit -a
+    exit 0
+fi
+
+exec /bin/bash "$@"

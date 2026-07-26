@@ -48,4 +48,16 @@ FPGA_DDR_LOAD_CMD="bash -lc ' \
 ./fpga-host --diff <nemu> -i <workload>.bin
 ```
 
+UVHS Flow
+=========
 
+The Hejian UVHS flow is opt-in and leaves the targets above unchanged. Configure
+the UVHS tool environment in the runtime host shell, then invoke:
+
+```shell
+make UVHS=1 uvhs_preflight CPU=<design>
+make UVHS=1 uvhs_all CPU=<design> CORE_DIR=/path/to/generated/core SUFFIX=<tag>
+```
+
+See [`uvhs/README.md`](uvhs/README.md) for the required environment variables,
+board template and vendor DDR IP inputs, stages, and runtime script.
