@@ -33,6 +33,14 @@ if {[llength $synth_runs] == 0} {
 }
 
 set synth_run [lindex $synth_runs 0]
+
+set partition_dir [file normalize [file join [file dirname [info script]] partition_synth]]
+if {[file isfile "$partition_dir/sources.tcl"]} {
+    source "$partition_dir/sources.tcl"
+    if {[ps_restore_project_sources] > 0} {
+        reset_run $synth_run
+    }
+}
 set status [get_property STATUS $synth_run]
 puts "INFO: synth_1 status: $status"
 
