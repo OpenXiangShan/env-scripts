@@ -20,8 +20,10 @@ required=(
   uvhs/make_compat/make
   uvhs/make_compat/csh
   uvhs/patch_uvsyn_shell.sh
+  uvhs/enqueue_runtime_command.sh
+  uvhs/uv_shell_exec_compat.sh
+  uvhs/runtime_command.tcl
   user_script/hw_run_download.tcl
-  src/rtl/common/uvhs_axi64_to_axi256.sv
   src/rtl/common/uvhs_ddr4_wrapper.sv
   src/tcl/common/AXI_bridge.tcl
   src/tcl/common/xdma_ep.tcl
@@ -39,6 +41,8 @@ bash -n "$root_dir/uvhs/check_flow_tools.sh"
 bash -n "$root_dir/uvhs/make_compat/make"
 bash -n "$root_dir/uvhs/make_compat/csh"
 bash -n "$root_dir/uvhs/patch_uvsyn_shell.sh"
+bash -n "$root_dir/uvhs/enqueue_runtime_command.sh"
+bash -n "$root_dir/uvhs/uv_shell_exec_compat.sh"
 
 if command -v tclsh >/dev/null 2>&1; then
   while IFS= read -r -d '' path; do

@@ -54,7 +54,7 @@ module core_def (
       output      [1:0]                          uhs1_drv_sth                   ,
       output                                     uhs1_swvolt_en                 ,
       output                                     sd_led_control                 ,
-`ifndef UVHS_UVW_AXI4_TO_DDR4
+`ifndef UVHS
       output      [`CONFIG_RANK_WIDTH-1:0]       DDR_CK_T                       ,
       output      [`CONFIG_RANK_WIDTH-1:0]       DDR_CK_C                       ,
       output      [`CONFIG_RANK_WIDTH-1:0]       DDR_CKE                        ,
@@ -1334,7 +1334,7 @@ mode_ctrl U_MODE_CTRL(
     .scan_mode                      (                              )
 );
 
-`ifdef UVHS_UVW_AXI4_TO_DDR4
+`ifdef UVHS
 uvhs_ddr4_wrapper U_UVHS_UVW_AXI4_TO_DDR4 (
     .clk                    (inter_soc_clk),
     .rstn                   (rstn_sw4),
@@ -1695,7 +1695,7 @@ assign hpm_dig_result = 0;
 
 AXI_bridge CFG_AXI_bridge_i
        (.SYS_INTER_CLK          (inter_soc_clk),
-`ifdef UVHS_SOC_ADAPT
+`ifdef UVHS
         .SYS_INTER_ARESETN      (inter_soc_sync_rstn),
 `endif
         .ACLK                   (sys_clk_i),

@@ -4,6 +4,7 @@ PLATFORM ?= U2.2
 UVHS_TEMPLATE_DIR ?=
 UVHS_UVW_AXI4_TO_DDR4_SRC ?=
 UVHS_UVW_AXI4_TO_DDR4_EXPECTED_MD5 ?=
+UVHS_DDR_AXI_WIDTH ?= $(if $(filter nutshell,$(CPU)),64,256)
 UVHS_WORK_DIR ?= $(ENV_SCRIPTS_HOME)/fpga_diff_uvhs_$(CPU)$(if $(strip $(SUFFIX)),-$(strip $(SUFFIX)),)
 UVHS_TOP ?= fpga_top_debug
 UVHS_FILELIST ?= $(UVHS_WORK_DIR)/rtl/filelist.f
@@ -23,7 +24,6 @@ UVHS_ASSIGN_PIN_FILE ?= $(UVHS_ROOT_DIR)/uvhs/assign_pin_u22_f2.tcl
 UVHS_TIMING_FILE ?= $(UVHS_ROOT_DIR)/uvhs/timing_common.tcl
 UVHS_ASSEMBLE_FILE ?= $(UVHS_ROOT_DIR)/uvhs/assemble_uvhs.tcl
 UVHS_CPU_CLK_PERIOD_NS ?= 40
-UVHS_CPU_DEBUG_CLK ?= 1
 UVHS_USE_LSF ?= 0
 UVHS_FRONTEND_THREADS ?= 4
 UVHS_FRONTEND_PROCESSES ?= 16
@@ -54,10 +54,30 @@ UVHS_REQUIRED_DCP_MODULES := blk_mem_gen_0 AXI_bridge data_bridge xdma_ep uvw_ax
 UVHS_REQUIRED_MODULES ?= $(if $(filter nanhu,$(CPU)),XlnFpgaTop,$(if $(filter kmh nutshell,$(CPU)),SimTop,))
 UVHS_DDR_RTL_INST := $(UVHS_TOP).core_def.U_UVHS_UVW_AXI4_TO_DDR4
 UVHS_RUNTIME_LIB_DIR ?= $(UVHS_WORK_DIR)/.uvhs-runtime-lib
+UVHS_RUNTIME_DB ?= $(UVHS_WORK_DIR)/hw.dat
+UVHS_RUNTIME_WORK_DIR ?= $(UVHS_WORK_DIR)/runtime-work
+UVHS_RUNTIME_COMMAND_FILE ?= $(UVHS_RUNTIME_WORK_DIR)/command.tcl
+UVHS_RUNTIME_TMP_DIR ?= $(UVHS_RUNTIME_WORK_DIR)/tmp
+UVHS_RUNTIME_DOWNLOAD_SCRIPT ?= $(UVHS_ROOT_DIR)/user_script/hw_run_download.tcl
+UVHS_RUNTIME_COMMAND_SCRIPT ?= $(UVHS_ROOT_DIR)/uvhs/runtime_command.tcl
+UVHS_RUNTIME_DDR_RTL ?= $(UVHS_DDR_RTL_INST).ddr4_ip
+UVHS_COMPAT_PCRE_LIB ?=
+UVHS_SHELL_EXEC_WRAPPER ?= $(UVHS_ROOT_DIR)/uvhs/uv_shell_exec_compat.sh
 
-UVHS_FLOW_ENV = \
+FPGA_WRITE_BITSTREAM_IMPL := uvhs_download
+FPGA_HALT_SOC_IMPL := uvhs_halt_soc
+FPGA_WRITE_DDR_IMPL := uvhs_write_ddr
+FPGA_WRITE_FLASH_IMPL := uvhs_write_flash
+FPGA_RESET_CPU_IMPL := uvhs_reset_cpu
+
+UVHS_TOOL_ENV = \
 	PATH="$(UVHS_ROOT_DIR)/uvhs/make_compat:$$UV_ROOT/bin:$$UV_ROOT/lib/venv3.8/bin:$$UV_ROOT/lib/gcc10.3/bin:$$PATH" \
 	LD_LIBRARY_PATH="$(UVHS_RUNTIME_LIB_DIR):$${LD_LIBRARY_PATH:-}" \
+	UVHS_RUNTIME_LIB_DIR="$(UVHS_RUNTIME_LIB_DIR)" \
+	UVSHELL_EXEC_NAME="$(UVHS_SHELL_EXEC_WRAPPER)"
+
+UVHS_FLOW_ENV = \
+	$(UVHS_TOOL_ENV) \
 	UVHS_FLOW=1 \
 	PLATFORM="$(PLATFORM)" \
 	XDMA_LINK_WIDTH="$(XDMA_LINK_WIDTH)" \
@@ -70,7 +90,6 @@ UVHS_FLOW_ENV = \
 	UVHS_TARGET_FPGA_LOWER="$(UVHS_TARGET_FPGA_LOWER)" \
 	UVHS_KEEP_FPGAS="$(UVHS_KEEP_FPGAS)" \
 	UVHS_CPU_CLK_PERIOD_NS="$(UVHS_CPU_CLK_PERIOD_NS)" \
-	UVHS_CPU_DEBUG_CLK="$(UVHS_CPU_DEBUG_CLK)" \
 	UVHS_PNR_STRATEGY="$(UVHS_PNR_STRATEGY)" \
 	UVHS_COMPILE_STRATEGY_NUM="$(UVHS_COMPILE_STRATEGY_NUM)" \
 	UVHS_COMPILE_STRATEGY0="$(UVHS_COMPILE_STRATEGY0)" \
@@ -85,7 +104,9 @@ UVHS_BIT_HOME ?= $(UVHS_WORK_DIR)/ready-to-program
 .PHONY: uvhs_preflight uvhs_prepare uvhs_export_vivado_ip \
 	uvhs_sync_uvw_axi4_to_ddr4 uvhs_filelist uvhs_check_modules \
 	uvhs_frontend uvhs_backend uvhs_all uvhs_check_timing \
-	uvhs_package_bitstream uvhs_tools_check uvhs_clean
+	uvhs_package_bitstream uvhs_tools_check uvhs_clean uvhs_download \
+	uvhs_halt_soc uvhs_reset_cpu uvhs_write_ddr uvhs_write_flash \
+	uvhs_runtime_stop
 
 uvhs_preflight:
 	test -n "$$UV_ROOT"
@@ -93,6 +114,8 @@ uvhs_preflight:
 	test -n "$$UV_XILINX_VIVADO"
 	test -x "$$UV_XILINX_VIVADO/bin/vivado"
 	test -n "$$UV_LICENSE"
+	test -x "$$UV_ROOT/bin/uv_shell_exec"
+	test -x "$(UVHS_SHELL_EXEC_WRAPPER)"
 	test -d "$(UVHS_TEMPLATE_DIR)/script"
 	test -f "$(UVHS_TEMPLATE_DIR)/Makefile"
 	test -f "$(UVHS_TEMPLATE_DIR)/script/1B_4F_HGC_assemble.tcl"
@@ -101,7 +124,18 @@ uvhs_preflight:
 	bash -c 'set -euo pipefail; \
 		ffi="$$(ldconfig -p | awk '\''/libffi[.]so[.]6 / { print $$NF; exit } /libffi[.]so[.]8 / { fallback = $$NF } END { if (fallback != "") print fallback }'\'')"; \
 		test -n "$$ffi"; \
-		ln -sfn "$$ffi" "$(UVHS_RUNTIME_LIB_DIR)/libffi.so.6"'
+		ln -sfn "$$ffi" "$(UVHS_RUNTIME_LIB_DIR)/libffi.so.6"; \
+		pcre="$(UVHS_COMPAT_PCRE_LIB)"; \
+		if [ -z "$$pcre" ] && ldd "$$UV_ROOT/bin/uv_shell_exec" 2>/dev/null | grep -q "libpcre[.]so[.]1 => not found"; then \
+			for candidate in "$$UV_ROOT/shlib_install/libpcre.so.1" "$$UV_ROOT/shlib/libpcre.so.1"; do \
+				if [ -f "$$candidate" ]; then pcre="$$candidate"; break; fi; \
+			done; \
+			if [ -z "$$pcre" ]; then \
+				echo "ERROR: uv_shell_exec needs libpcre.so.1; set UVHS_COMPAT_PCRE_LIB" >&2; \
+				exit 1; \
+			fi; \
+		fi; \
+		if [ -n "$$pcre" ]; then test -f "$$pcre"; ln -sfn "$$pcre" "$(UVHS_RUNTIME_LIB_DIR)/libpcre.so.1"; fi'
 
 uvhs_tools_check:
 	bash "$(UVHS_ROOT_DIR)/uvhs/check_flow_tools.sh"
@@ -140,6 +174,11 @@ uvhs_sync_uvw_axi4_to_ddr4: uvhs_prepare
 			if [ -n "$$found" ]; then mkdir -p "$$(dirname "$$dst")"; cp -f "$$found" "$$dst"; fi; \
 		done; \
 		for rel in $(UVHS_UVW_AXI4_TO_DDR4_REQUIRED_FILES); do test -s "$$work/$$rel"; done; \
+		expected_width="$(UVHS_DDR_AXI_WIDTH)"; last_bit="$$((expected_width - 1))"; \
+		stub="$$work/rtl/soc/uvw_axi4_to_ddr4_Stub.v"; \
+		grep -Eq "input[[:space:]]+\\[$$last_bit:0\\][[:space:]]*ddr4ip_dut_axi_wdata" "$$stub"; \
+		grep -Eq "output[[:space:]]+\\[$$last_bit:0\\][[:space:]]*ddr4ip_dut_axi_rdata" "$$stub"; \
+		echo "INFO: verified UVHS DDR DCP AXI data width: $$expected_width"; \
 		if [ -n "$(UVHS_UVW_AXI4_TO_DDR4_EXPECTED_MD5)" ]; then \
 			echo "$(UVHS_UVW_AXI4_TO_DDR4_EXPECTED_MD5)  $$work/rtl/soc/uvw_axi4_to_ddr4.dcp" | md5sum -c -; \
 		fi'
@@ -150,7 +189,7 @@ uvhs_filelist:
 		printf '+define+SYNTHESIS\n+define+XIANGSHAN_FPGA\n'; \
 		printf '+define+RANDOMIZE_GARBAGE_ASSIGN\n+define+RANDOMIZE_REG_INIT\n'; \
 		printf '+define+RANDOMIZE_MEM_INIT\n+define+RANDOMIZE_DELAY=1\n'; \
-		printf '+define+UVHS_SOC_ADAPT\n+define+UVHS_UVW_AXI4_TO_DDR4\n'; \
+		printf '+define+UVHS\n'; \
 		printf '+define+DDR4_16G_X8\n+define+DQ64\n+define+DDR4_2400\n'; \
 		printf '+define+DQ=64\n+define+MICRON_DDR\n+define+DDR4_16Gbx8\n'; \
 		printf '+define+DDR4\n+define+SRAM_SYN\n+define+DATA_VERSION=0\n'; \
@@ -166,7 +205,6 @@ uvhs_filelist:
 				printf '+define+CONFIG_SIMTOP_HAS_DMA\n'; \
 			fi; \
 		fi; \
-		if [ "$(UVHS_CPU_DEBUG_CLK)" = 1 ]; then printf '+define+UVHS_CPU_DEBUG_CLK\n'; fi; \
 		if [ -n "$(CHI_DIR)" ]; then printf '+define+MSI_MODE\n+define+CONFIG_USE_XSCORE_CHI\n'; \
 		else printf '+define+CONFIG_USE_XSCORE_AXI\n'; fi; \
 		if [ -d "$(CORE_DIR)/build" ]; then printf '+incdir+%s/build\n' "$(CORE_DIR)"; fi; \
@@ -235,6 +273,43 @@ uvhs_package_bitstream: uvhs_check_timing
 	mkdir -p "$(UVHS_BIT_HOME)"
 	ln -sf "$(UVHS_BITSTREAM_DIR)/pnr.bit" "$(UVHS_BIT_HOME)/fpga_top_debug.bit"
 	@echo "FPGA_BIT_HOME=$(UVHS_BIT_HOME)"
+
+# Runtime stays in the foreground because uv_shell owns the board session.
+# Use another shell for the command targets below while this target is active.
+uvhs_download:
+	test -d "$(UVHS_RUNTIME_DB)"
+	test -f "$(UVHS_RUNTIME_DOWNLOAD_SCRIPT)"
+	test ! -e "$(UVHS_RUNTIME_COMMAND_FILE)"
+	test ! -e "$(UVHS_RUNTIME_COMMAND_FILE).running"
+	mkdir -p "$(UVHS_RUNTIME_WORK_DIR)" "$(UVHS_RUNTIME_TMP_DIR)"
+	$(UVHS_TOOL_ENV) UVHS_DB_PATH="$(UVHS_RUNTIME_DB)" \
+	UVHS_COMMAND_FILE="$(UVHS_RUNTIME_COMMAND_FILE)" \
+	UVHS_RUNTIME_TMP_DIR="$(UVHS_RUNTIME_TMP_DIR)" \
+	bash "$$UV_ROOT/bin/uv_shell" -rt_shell \
+		-workdir "$(UVHS_RUNTIME_WORK_DIR)" \
+		-script "$(UVHS_RUNTIME_DOWNLOAD_SCRIPT)"
+
+uvhs_halt_soc:
+	bash "$(UVHS_ROOT_DIR)/uvhs/enqueue_runtime_command.sh" \
+		"$(UVHS_RUNTIME_COMMAND_FILE)" "$(UVHS_RUNTIME_COMMAND_SCRIPT)" halt_soc
+
+uvhs_reset_cpu:
+	bash "$(UVHS_ROOT_DIR)/uvhs/enqueue_runtime_command.sh" \
+		"$(UVHS_RUNTIME_COMMAND_FILE)" "$(UVHS_RUNTIME_COMMAND_SCRIPT)" reset_cpu
+
+uvhs_write_ddr:
+	test -f "$(WORKLOAD)"
+	bash "$(UVHS_ROOT_DIR)/uvhs/enqueue_runtime_command.sh" \
+		"$(UVHS_RUNTIME_COMMAND_FILE)" "$(UVHS_RUNTIME_COMMAND_SCRIPT)" \
+		write_ddr "$(WORKLOAD)" "$(UVHS_RUNTIME_DDR_RTL)" "$(UVHS_DDR_AXI_WIDTH)"
+
+uvhs_write_flash:
+	@echo "ERROR: the current UVHS runtime DB does not expose flash as a writable memory" >&2
+	@exit 2
+
+uvhs_runtime_stop:
+	bash "$(UVHS_ROOT_DIR)/uvhs/enqueue_runtime_command.sh" \
+		"$(UVHS_RUNTIME_COMMAND_FILE)" "$(UVHS_RUNTIME_COMMAND_SCRIPT)" stop
 
 uvhs_clean:
 	test -n "$(UVHS_WORK_DIR)"

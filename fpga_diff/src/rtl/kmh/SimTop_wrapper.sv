@@ -353,7 +353,7 @@ SimTop  u_XSTop(
   .dma_rresp                     (dma_core_rresp   ),
   .dma_rlast                     (dma_core_rlast   ),
 `endif
-`ifdef UVHS_SOC_ADAPT
+`ifdef UVHS
   // UVHS does not expose XiangShan's SystemJTAG pins.
   .io_systemjtag_jtag_TCK          (1'b0),
   .io_systemjtag_jtag_TMS          (1'b1),
@@ -381,12 +381,7 @@ SimTop  u_XSTop(
   .io_pll0_ctrl_4                  (io_pll0_ctrl_4),
   .io_pll0_ctrl_5                  (io_pll0_ctrl_5),
   .io_extIntrs                     (io_extIntrs  ),
-`ifdef UVHS_SOC_ADAPT
-  // Keep SYSCNT in the SoC domain and avoid the FPGA-only TimeAsync CDC.
-  .io_rtc_clock                    (inter_soc_clk),
-`else
   .io_rtc_clock                    (tmclk),
-`endif
   .io_riscv_rst_vec_0              (48'h0000_1000_0000),
 
 

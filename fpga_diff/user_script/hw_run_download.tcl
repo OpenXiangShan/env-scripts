@@ -1,5 +1,6 @@
-# UVHS runtime download flow. A release database is sufficient for programming
-# and reset release; host software loads the workload through H2C afterwards.
+# UVHS runtime download flow. A release database is sufficient for programming,
+# reset control, and runtime memory operations. H2C remains available to the
+# host flow after download.
 
 query -user
 query -fpgas -all
@@ -33,8 +34,8 @@ if {[catch {query -clock -default} uvhs_clock_error]} {
 }
 
 # Hold the top-level resets low across download, then release them in the
-# same order used by the checked-in runtime scripts for this design. The host
-# keeps CPU execution stopped later through HOST_IO_RESET while DDR is written.
+# same order used by the checked-in runtime scripts for this design. Runtime
+# memory commands hold rstn_sw5 low while DDR is written.
 reset -name rstn_sw6 -value 0
 reset -name rstn_sw5 -value 0
 reset -name rstn_sw4 -value 0
@@ -61,7 +62,29 @@ after 1000
 query -reset
 query -fpgas -all
 
-# Keep the runtime attached after download. Terminate uv_shell when the board
-# is no longer needed.
+proc uvhs_poll_command_file {} {
+    if {![info exists ::env(UVHS_COMMAND_FILE)] || $::env(UVHS_COMMAND_FILE) eq ""} {
+        after 500 uvhs_poll_command_file
+        return
+    }
+
+    set command_file $::env(UVHS_COMMAND_FILE)
+    if {[file exists $command_file]} {
+        set running_file "${command_file}.running"
+        if {[catch {
+            file rename -force $command_file $running_file
+            puts "INFO: sourcing UVHS runtime command: $running_file"
+            source $running_file
+        } command_error]} {
+            puts stderr "ERROR: UVHS runtime command failed: $command_error"
+        }
+        catch {file delete -force $running_file}
+    }
+    after 500 uvhs_poll_command_file
+}
+
+# Keep the runtime attached after download. Other Make targets enqueue commands
+# through UVHS_COMMAND_FILE; uvhs_runtime_stop ends this session cleanly.
 set ::uvhs_keepalive 0
+uvhs_poll_command_file
 vwait ::uvhs_keepalive

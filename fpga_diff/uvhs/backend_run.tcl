@@ -68,10 +68,6 @@ proc uvhs_cpu_clk_period_ns {} {
     return [env_or_default UVHS_CPU_CLK_PERIOD_NS 40]
 }
 
-proc uvhs_cpu_debug_clk {} {
-    return [expr {[env_or_default UVHS_CPU_DEBUG_CLK 1] eq "1"}]
-}
-
 proc uvhs_xdma_link_width {} {
     set link_width [string toupper [string trim [env_or_default XDMA_LINK_WIDTH X4]]]
     if {$link_width ni {X4 X8}} {
@@ -1254,12 +1250,7 @@ sweep_design
 
 create_clock_if_port_exists TMCLK 1000 clk8_p
 create_clock_if_port_exists ddr_ref_clk 12.5 clk7_p
-if {[uvhs_cpu_debug_clk]} {
-    create_clock_if_port_exists CPU_CLK_IN [uvhs_cpu_clk_period_ns] clk5_p
-} else {
-    create_clock_if_port_exists CPU_CLK_IN [uvhs_cpu_clk_period_ns] clk6_p
-    create_clock_if_port_exists DEBUG_CLK_IN 40 clk5_p
-}
+create_clock_if_port_exists CPU_CLK_IN [uvhs_cpu_clk_period_ns] clk5_p
 create_clock_if_port_exists jtag_vclk 83.333 JTAG_TCK
 create_clock_if_port_exists pcie_ep_refclk 10 pcie_ep_gt_ref_clk_p
 create_generated_clock_if_bufgce_exists SOC_GATED_CLK CPU_CLK_IN {
