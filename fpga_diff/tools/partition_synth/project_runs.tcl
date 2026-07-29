@@ -121,7 +121,7 @@ file mkdir $project_runs_dir
 set manifest_path [file normalize "$project_runs_dir/manifest.tsv"]
 
 open_project $project
-ps_restore_project_sources
+ps_require_clean_project_sources
 set project_part [get_property PART [current_project]]
 if {$project_part eq ""} {
   error "project has no part: $project"

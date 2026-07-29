@@ -160,6 +160,7 @@ proc ps_partition_source_config {origin_dir partition run_dir} {
   source $clock_defs
   set cpu_files_has_rtl_include 0
   set rtl_include_files {}
+  set rtl_include_dirs {}
   source "$tcl_dir/cpu_files.tcl"
 
   set chi_files {}
@@ -174,6 +175,11 @@ proc ps_partition_source_config {origin_dir partition run_dir} {
 
   set partition_files [list {*}$all_source_files]
   set partition_include_dirs [list {*}$include_dirs]
+  foreach include_dir $rtl_include_dirs {
+    if {[lsearch -exact $partition_include_dirs $include_dir] < 0} {
+      lappend partition_include_dirs $include_dir
+    }
+  }
   foreach source_file $all_source_files {
     set source_dir [file normalize [file dirname $source_file]]
     if {[lsearch -exact $partition_include_dirs $source_dir] < 0} {
@@ -259,41 +265,53 @@ proc ps_project_source_files {} {
   return $files
 }
 
-proc ps_project_partition_stubs {} {
+proc ps_project_root_stubs {module} {
+  set tail "${module}_partition_blackbox.sv"
   set stubs {}
   foreach file [get_files -quiet -of_objects [get_filesets sources_1]] {
-    if {[string match "*_partition_blackbox.sv" [file tail $file]]} {
+    if {[file tail $file] eq $tail} {
       lappend stubs $file
     }
   }
   return $stubs
 }
 
-proc ps_restore_project_sources {} {
-  set stubs [ps_project_partition_stubs]
+proc ps_shell_srcset_name {} {
+  return partition_synth_top_shell_srcs
+}
+
+proc ps_detach_project_shell_sources {synth_run} {
+  set shell_srcset_name [ps_shell_srcset_name]
+  set shell_srcset [get_filesets -quiet $shell_srcset_name]
+  if {[llength $shell_srcset] == 0} {
+    return
+  }
+
+  if {[get_property SRCSET $synth_run] eq $shell_srcset_name} {
+    set_property SRCSET sources_1 $synth_run
+  }
+}
+
+proc ps_restore_project_sources {module} {
+  set stubs [ps_project_root_stubs $module]
   if {[llength $stubs] == 0} {
     return 0
   }
 
-  set source_files [ps_remove_source_files [ps_project_source_files] $stubs]
   remove_files $stubs
-  foreach stub $stubs {
-    set suffix "_partition_blackbox.sv"
-    set tail [file tail $stub]
-    set module [string range $tail 0 [expr {[string length $tail] - [string length $suffix] - 1}]]
-    set source [ps_find_module_source $module $source_files]
-    if {$source eq ""} {
-      error "cannot restore source for partition module $module"
-    }
-    set_property USED_IN_SYNTHESIS true [get_files $source]
+  set source [ps_find_module_source $module [ps_project_source_files]]
+  if {$source eq ""} {
+    error "cannot restore source for root module $module"
   }
+  set_property USED_IN_SYNTHESIS true [get_files $source]
   update_compile_order -fileset sources_1
-  puts "INFO: restored [llength $stubs] partition source(s)"
-  return [llength $stubs]
+  puts "INFO: restored project source for $module: $source"
+  return 1
 }
 
-proc ps_prepare_project_shell {module out_dir} {
-  ps_restore_project_sources
+proc ps_prepare_project_shell {module out_dir synth_run} {
+  ps_detach_project_shell_sources $synth_run
+  ps_restore_project_sources $module
 
   set source [ps_find_module_source $module [ps_project_source_files]]
   if {$source eq ""} {

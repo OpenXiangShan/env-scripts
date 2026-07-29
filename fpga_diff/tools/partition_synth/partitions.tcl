@@ -14,9 +14,8 @@
 set ps_partition_specs {
   {module  external_llc_wrapper      ExternalLLCWrapper}
   {without external_llc_shell        ExternalLLC        {ExternalLLCWrapper}}
-  {module  openncb                   OpenNCB}
   {module  memmisc                   MemMisc}
-  {without xstop_shell               XSTop              {XSTile ExternalLLC OpenNCB MemMisc}}
+  {without xstop_shell               XSTop              {XSTile ExternalLLC MemMisc}}
   {without xstile_shell              XSTile             {XSCore L2Top}}
   {without xscore_shell              XSCore             {Frontend Backend MemBlock}}
   {module  frontend                  Frontend}
@@ -31,7 +30,6 @@ set ps_partition_specs {
 set ps_partition_clock_ports {
   external_llc_wrapper {{DEBUG_CLK_IN clock}}
   external_llc_shell   {{DEBUG_CLK_IN clock}}
-  openncb              {{DEBUG_CLK_IN clock}}
   memmisc              {{DEBUG_CLK_IN clock}}
   xstop_shell          {{DEBUG_CLK_IN io_clock}}
   xstile_shell         {{DEBUG_CLK_IN clock}}

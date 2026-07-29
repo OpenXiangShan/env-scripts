@@ -68,6 +68,56 @@ proc ps_read_link_marker {path} {
   return [array get data]
 }
 
+proc ps_restore_top_clock_constraints {} {
+  global fpga_primary_clock_specs
+
+  set clock_defs [file normalize [file join [file dirname [info script]] \
+    ../../src/constr/common/clock_defs.tcl]]
+  ps_require_file $clock_defs
+  source $clock_defs
+
+  set restored {}
+  foreach spec $fpga_primary_clock_specs {
+    lassign $spec clock_name _ port_name
+    if {[llength [get_ports -quiet $port_name]] == 0 ||
+        [llength [get_clocks -quiet $clock_name]] != 0} {
+      continue
+    }
+    fpga_create_top_clock $clock_name
+    lappend restored $clock_name
+  }
+
+  foreach pair {
+    {CPU_CLK_IN TMCLK}
+    {CPU_CLK_IN DEBUG_CLK_IN}
+    {TMCLK DEBUG_CLK_IN}
+    {PCIE_CLK_IN DEBUG_CLK_IN}
+    {PCIE_CLK_IN TMCLK}
+    {PCIE_CLK_IN CPU_CLK_IN}
+    {jtag_vclk CPU_CLK_IN}
+    {jtag_vclk TMCLK}
+    {jtag_vclk DEBUG_CLK_IN}
+    {jtag_vclk PCIE_CLK_IN}
+    {PCIE2_CLK_IN jtag_vclk}
+    {PCIE2_CLK_IN CPU_CLK_IN}
+    {PCIE2_CLK_IN TMCLK}
+    {PCIE2_CLK_IN DEBUG_CLK_IN}
+    {PCIE2_CLK_IN PCIE_CLK_IN}
+  } {
+    lassign $pair first second
+    set first_clocks [get_clocks -quiet -include_generated_clocks $first]
+    set second_clocks [get_clocks -quiet -include_generated_clocks $second]
+    if {[llength $first_clocks] != 0 && [llength $second_clocks] != 0} {
+      set_clock_groups -asynchronous -group $first_clocks -group $second_clocks
+    }
+  }
+
+  if {[llength [get_clocks -quiet *]] == 0} {
+    error "no top-level clocks were restored after partition checkpoint link"
+  }
+  puts "INFO: restored top-level clocks: $restored"
+}
+
 array set opt [parse_args]
 set project [file normalize $opt(--project)]
 set out_dir [file normalize $opt(--out-dir)]
@@ -100,19 +150,28 @@ set cdc_rpt [file normalize "$linked_dir/${project_top}_cdc.rpt"]
 set check_timing_rpt [file normalize "$linked_dir/${project_top}_check_timing.rpt"]
 set timing_summary_rpt [file normalize "$linked_dir/${project_top}_timing_summary_synth.rpt"]
 
-ps_prepare_project_shell $root_module $out_dir
 set_property INCREMENTAL_CHECKPOINT {} $synth_run
 set_property AUTO_INCREMENTAL_CHECKPOINT 0 $synth_run
 reset_run $synth_run
 
-set jobs $opt(--jobs)
-if {$jobs eq ""} { set jobs [default_jobs] }
-puts "INFO: launching top shell synth_1 with -jobs $jobs"
-launch_runs $synth_run -jobs $jobs
-wait_on_run $synth_run
+set shell_result [catch {
+  ps_prepare_project_shell $root_module $out_dir $synth_run
+  set jobs $opt(--jobs)
+  if {$jobs eq ""} { set jobs [default_jobs] }
+  puts "INFO: launching top shell synth_1 with -jobs $jobs"
+  launch_runs $synth_run -jobs $jobs
+  wait_on_run $synth_run
+} shell_error]
+if {$shell_result} {
+  ps_restore_project_sources $root_module
+  close_project
+  error "top shell synthesis failed: $shell_error"
+}
 
 set status [get_property STATUS $synth_run]
+ps_restore_project_sources $root_module
 if {![string match "synth_design Complete*" $status]} {
+  close_project
   error "top shell synthesis failed with status: $status"
 }
 ps_require_file $final_dcp
@@ -126,6 +185,7 @@ if {[llength $root_cells] != 1} {
 set shell_blackbox_count [llength [get_cells -hier -quiet -filter {IS_BLACKBOX}]]
 puts "INFO: linking root checkpoint $root_dcp at [lindex $root_cells 0]"
 read_checkpoint -cell [lindex $root_cells 0] $root_dcp
+ps_restore_top_clock_constraints
 
 set report_file [file normalize "$linked_dir/${project_top}_blackboxes.rpt"]
 set report [open $report_file w]
