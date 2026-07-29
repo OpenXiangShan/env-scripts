@@ -8,6 +8,86 @@ proc uvhs_temp_dir {} {
     return $path
 }
 
+proc uvhs_parse_integer {name value} {
+    if {![string is wideinteger -strict $value]} {
+        error "$name is not an integer: $value"
+    }
+    return [expr {$value + 0}]
+}
+
+proc uvhs_read_binary {path} {
+    set input [open $path rb]
+    fconfigure $input -translation binary -encoding binary
+    set data [read $input]
+    close $input
+    return $data
+}
+
+proc uvhs_write_binary {path data} {
+    set output [open $path wb]
+    fconfigure $output -translation binary -encoding binary
+    puts -nonewline $output $data
+    close $output
+}
+
+proc uvhs_write_flash_gbus {input_file board fpga port channel base capacity} {
+    if {![file exists $input_file]} {
+        error "flash image not found: $input_file"
+    }
+
+    if {[regexp -nocase {^b([0-9]+)$} $board -> board_index]} {
+        set board $board_index
+    }
+    if {![string is integer -strict $board]} {
+        error "generalBus board must be an index or B<index>: $board"
+    }
+    if {![regexp -nocase {^f([0-9]+)$} $fpga -> fpga_index]} {
+        error "generalBus FPGA must be F<index>: $fpga"
+    }
+    set fpga f$fpga_index
+    set port [uvhs_parse_integer "generalBus port" $port]
+    set channel [uvhs_parse_integer "generalBus channel" $channel]
+    set base [uvhs_parse_integer "flash base" $base]
+    set capacity [uvhs_parse_integer "flash capacity" $capacity]
+    set payload [uvhs_read_binary $input_file]
+    set payload_size [string length $payload]
+    if {$payload_size == 0} {
+        error "flash image is empty: $input_file"
+    }
+    if {$payload_size > $capacity} {
+        error "flash image is $payload_size bytes, capacity is $capacity bytes"
+    }
+
+    set transfer_size [expr {($payload_size + 7) & ~7}]
+    if {$transfer_size > $capacity} {
+        error "8-byte-aligned flash transfer exceeds capacity: $transfer_size > $capacity"
+    }
+    append payload [string repeat "\x00" [expr {$transfer_size - $payload_size}]]
+
+    set temp_dir [uvhs_temp_dir]
+    set write_file [file join $temp_dir [format "flash-write-%d.bin" [pid]]]
+    set read_file [file join $temp_dir [format "flash-read-%d.bin" [pid]]]
+    uvhs_write_binary $write_file $payload
+    file delete -force $read_file
+
+    puts [format "INFO: generalBus flash write 0x%llx, %d bytes" $base $transfer_size]
+    set status [catch {
+        gbus_dma_write -board $board -fpga $fpga -port $port \
+            -addr $base -size $transfer_size -channel $channel -file $write_file
+        gbus_dma_read -board $board -fpga $fpga -port $port \
+            -addr $base -size $transfer_size -channel $channel -file $read_file
+        set readback [uvhs_read_binary $read_file]
+        if {![string equal $payload $readback]} {
+            error "generalBus flash readback mismatch"
+        }
+    } message options]
+    file delete -force $write_file $read_file
+    if {$status != 0} {
+        return -options $options $message
+    }
+    puts "INFO: generalBus flash full readback passed: $input_file"
+}
+
 proc uvhs_write_ddr_pairs {input_file rtl_path data_width} {
     if {![file exists $input_file]} {
         error "DDR workload not found: $input_file"
@@ -101,6 +181,17 @@ switch -- $uvhs_command {
         reset -name rstn_sw5 -value 0
         after 100
         uvhs_write_ddr_pairs [lindex $argv 1] [lindex $argv 2] [lindex $argv 3]
+    }
+    write_flash {
+        if {[llength $argv] < 8} {
+            error "write_flash expects 7 arguments"
+        }
+        reset -name rstn_sw5 -value 0
+        after 100
+        uvhs_write_flash_gbus {*}[lrange $argv 1 7]
+        reset -name rstn_sw5 -value 1
+        after 500
+        query -reset
     }
     stop {
         set ::uvhs_keepalive 1

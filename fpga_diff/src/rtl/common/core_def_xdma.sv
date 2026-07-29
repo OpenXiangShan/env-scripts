@@ -1000,6 +1000,93 @@ wire [1 : 0]                rom_axi_rresp    ;
 (*mark_debug = "true"*) wire                        rom_axi_rvalid   ;
 (*mark_debug = "true"*) wire                        rom_axi_rlast    ;
 (*mark_debug = "true"*) wire                        rom_axi_rready   ;
+
+`ifdef UVHS
+wire [7:0]  uvhs_flash_axi_awid;
+wire [31:0] uvhs_flash_axi_awaddr;
+wire [3:0]  uvhs_flash_axi_awlen;
+wire [2:0]  uvhs_flash_axi_awsize;
+wire [1:0]  uvhs_flash_axi_awburst;
+wire [1:0]  uvhs_flash_axi_awlock;
+wire [3:0]  uvhs_flash_axi_awcache;
+wire [2:0]  uvhs_flash_axi_awprot;
+wire [3:0]  uvhs_flash_axi_awqos;
+wire        uvhs_flash_axi_awvalid;
+wire        uvhs_flash_axi_awready;
+wire [7:0]  uvhs_flash_axi_wid;
+wire [63:0] uvhs_flash_axi_wdata;
+wire [7:0]  uvhs_flash_axi_wstrb;
+wire        uvhs_flash_axi_wlast;
+wire        uvhs_flash_axi_wvalid;
+wire        uvhs_flash_axi_wready;
+wire [7:0]  uvhs_flash_axi_bid;
+wire [1:0]  uvhs_flash_axi_bresp;
+wire        uvhs_flash_axi_bvalid;
+wire        uvhs_flash_axi_bready;
+wire [7:0]  uvhs_flash_axi_arid;
+wire [31:0] uvhs_flash_axi_araddr;
+wire [3:0]  uvhs_flash_axi_arlen;
+wire [2:0]  uvhs_flash_axi_arsize;
+wire [1:0]  uvhs_flash_axi_arburst;
+wire [1:0]  uvhs_flash_axi_arlock;
+wire [3:0]  uvhs_flash_axi_arcache;
+wire [2:0]  uvhs_flash_axi_arprot;
+wire [3:0]  uvhs_flash_axi_arqos;
+wire        uvhs_flash_axi_arvalid;
+wire        uvhs_flash_axi_arready;
+wire [7:0]  uvhs_flash_axi_rid;
+wire [63:0] uvhs_flash_axi_rdata;
+wire [1:0]  uvhs_flash_axi_rresp;
+wire        uvhs_flash_axi_rlast;
+wire        uvhs_flash_axi_rvalid;
+wire        uvhs_flash_axi_rready;
+
+uvw_general_bus U_UVHS_FLASH_GBUS (
+    .dut_axi_aclk      (sys_clk_i),
+    .dut_axi_aclk_en   (1'b1),
+    .dut_axi_aresetn   (axi_bclk_sync_rstn),
+    .dut_axi_awid      (uvhs_flash_axi_awid),
+    .dut_axi_awaddr    (uvhs_flash_axi_awaddr),
+    .dut_axi_awlen     (uvhs_flash_axi_awlen),
+    .dut_axi_awsize    (uvhs_flash_axi_awsize),
+    .dut_axi_awburst   (uvhs_flash_axi_awburst),
+    .dut_axi_awlock    (uvhs_flash_axi_awlock),
+    .dut_axi_awcache   (uvhs_flash_axi_awcache),
+    .dut_axi_awprot    (uvhs_flash_axi_awprot),
+    .dut_axi_awqos     (uvhs_flash_axi_awqos),
+    .dut_axi_awvalid   (uvhs_flash_axi_awvalid),
+    .dut_axi_awready   (uvhs_flash_axi_awready),
+    .dut_axi_wid       (uvhs_flash_axi_wid),
+    .dut_axi_wdata     (uvhs_flash_axi_wdata),
+    .dut_axi_wstrb     (uvhs_flash_axi_wstrb),
+    .dut_axi_wlast     (uvhs_flash_axi_wlast),
+    .dut_axi_wvalid    (uvhs_flash_axi_wvalid),
+    .dut_axi_wready    (uvhs_flash_axi_wready),
+    .dut_axi_bid       (uvhs_flash_axi_bid),
+    .dut_axi_bresp     (uvhs_flash_axi_bresp),
+    .dut_axi_bvalid    (uvhs_flash_axi_bvalid),
+    .dut_axi_bready    (uvhs_flash_axi_bready),
+    .dut_axi_arid      (uvhs_flash_axi_arid),
+    .dut_axi_araddr    (uvhs_flash_axi_araddr),
+    .dut_axi_arlen     (uvhs_flash_axi_arlen),
+    .dut_axi_arsize    (uvhs_flash_axi_arsize),
+    .dut_axi_arburst   (uvhs_flash_axi_arburst),
+    .dut_axi_arlock    (uvhs_flash_axi_arlock),
+    .dut_axi_arcache   (uvhs_flash_axi_arcache),
+    .dut_axi_arprot    (uvhs_flash_axi_arprot),
+    .dut_axi_arqos     (uvhs_flash_axi_arqos),
+    .dut_axi_arvalid   (uvhs_flash_axi_arvalid),
+    .dut_axi_arready   (uvhs_flash_axi_arready),
+    .dut_axi_rid       (uvhs_flash_axi_rid),
+    .dut_axi_rdata     (uvhs_flash_axi_rdata),
+    .dut_axi_rresp     (uvhs_flash_axi_rresp),
+    .dut_axi_rlast     (uvhs_flash_axi_rlast),
+    .dut_axi_rvalid    (uvhs_flash_axi_rvalid),
+    .dut_axi_rready    (uvhs_flash_axi_rready),
+    .sysbus_ghbd_o     (),
+    .sysbus_ghbd_i     ()
+);
+`endif
 `endif
 
 `ifdef  XS_QSPI2ROM
@@ -1738,6 +1825,47 @@ AXI_bridge CFG_AXI_bridge_i
         .S00_AXI_wready         (cpu2cfg_s2m_wready),
         .S00_AXI_wstrb          (cpu2cfg_m2s_wstrb),
         .S00_AXI_wvalid         (cpu2cfg_m2s_wvalid),
+
+`ifdef UVHS
+        .UVHS_FLASH_AXI_araddr  (uvhs_flash_axi_araddr),
+        .UVHS_FLASH_AXI_arburst (uvhs_flash_axi_arburst),
+        .UVHS_FLASH_AXI_arcache (uvhs_flash_axi_arcache),
+        .UVHS_FLASH_AXI_arid    (uvhs_flash_axi_arid),
+        .UVHS_FLASH_AXI_arlen   (uvhs_flash_axi_arlen),
+        .UVHS_FLASH_AXI_arlock  (uvhs_flash_axi_arlock),
+        .UVHS_FLASH_AXI_arprot  (uvhs_flash_axi_arprot),
+        .UVHS_FLASH_AXI_arqos   (uvhs_flash_axi_arqos),
+        .UVHS_FLASH_AXI_arready (uvhs_flash_axi_arready),
+        .UVHS_FLASH_AXI_arsize  (uvhs_flash_axi_arsize),
+        .UVHS_FLASH_AXI_arvalid (uvhs_flash_axi_arvalid),
+        .UVHS_FLASH_AXI_awaddr  (uvhs_flash_axi_awaddr),
+        .UVHS_FLASH_AXI_awburst (uvhs_flash_axi_awburst),
+        .UVHS_FLASH_AXI_awcache (uvhs_flash_axi_awcache),
+        .UVHS_FLASH_AXI_awid    (uvhs_flash_axi_awid),
+        .UVHS_FLASH_AXI_awlen   (uvhs_flash_axi_awlen),
+        .UVHS_FLASH_AXI_awlock  (uvhs_flash_axi_awlock),
+        .UVHS_FLASH_AXI_awprot  (uvhs_flash_axi_awprot),
+        .UVHS_FLASH_AXI_awqos   (uvhs_flash_axi_awqos),
+        .UVHS_FLASH_AXI_awready (uvhs_flash_axi_awready),
+        .UVHS_FLASH_AXI_awsize  (uvhs_flash_axi_awsize),
+        .UVHS_FLASH_AXI_awvalid (uvhs_flash_axi_awvalid),
+        .UVHS_FLASH_AXI_bid     (uvhs_flash_axi_bid),
+        .UVHS_FLASH_AXI_bready  (uvhs_flash_axi_bready),
+        .UVHS_FLASH_AXI_bresp   (uvhs_flash_axi_bresp),
+        .UVHS_FLASH_AXI_bvalid  (uvhs_flash_axi_bvalid),
+        .UVHS_FLASH_AXI_rdata   (uvhs_flash_axi_rdata),
+        .UVHS_FLASH_AXI_rid     (uvhs_flash_axi_rid),
+        .UVHS_FLASH_AXI_rlast   (uvhs_flash_axi_rlast),
+        .UVHS_FLASH_AXI_rready  (uvhs_flash_axi_rready),
+        .UVHS_FLASH_AXI_rresp   (uvhs_flash_axi_rresp),
+        .UVHS_FLASH_AXI_rvalid  (uvhs_flash_axi_rvalid),
+        .UVHS_FLASH_AXI_wdata   (uvhs_flash_axi_wdata),
+        .UVHS_FLASH_AXI_wid     (uvhs_flash_axi_wid),
+        .UVHS_FLASH_AXI_wlast   (uvhs_flash_axi_wlast),
+        .UVHS_FLASH_AXI_wready  (uvhs_flash_axi_wready),
+        .UVHS_FLASH_AXI_wstrb   (uvhs_flash_axi_wstrb),
+        .UVHS_FLASH_AXI_wvalid  (uvhs_flash_axi_wvalid),
+`endif
 
         .SYS_CFG_APB_paddr      (syscfg_paddr_mix),
         .SYS_CFG_APB_penable    (syscfg_penable),

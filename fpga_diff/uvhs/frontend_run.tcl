@@ -19,7 +19,7 @@ proc split_words {value} {
     return $out
 }
 
-set required_dcp_modules [split_words [env_or_default UVHS_REQUIRED_DCP_MODULES {blk_mem_gen_0 AXI_bridge data_bridge xdma_ep uvw_axi4_to_ddr4}]]
+set required_dcp_modules [split_words [env_or_default UVHS_REQUIRED_DCP_MODULES {blk_mem_gen_0 AXI_bridge data_bridge xdma_ep uvw_axi4_to_ddr4 uvw_general_bus}]]
 
 proc dcp_module_is_required {module} {
     return [expr {[lsearch -exact $::required_dcp_modules $module] >= 0}]
@@ -217,6 +217,9 @@ set_blackbox_if_exists blk_mem_gen_0 ./rtl/soc/blk_mem_gen_0.dcp
 set_blackbox_if_exists AXI_bridge ./rtl/soc/AXI_bridge.dcp
 set_blackbox_if_exists data_bridge ./rtl/soc/data_bridge.dcp
 set_blackbox_if_exists xdma_ep ./rtl/device/pcie/xdma_ep.dcp
+set_blackbox_if_exists uvw_general_bus \
+    ./rtl/soc/uvw_general_bus/uvw_general_bus.dcp \
+    -clock_enable_pairs {dut_axi_aclk dut_axi_aclk_en 1}
 require_file_for_uvhs_ip DCP ./rtl/soc/uvw_axi4_to_ddr4.dcp
 require_file_for_uvhs_ip stub ./rtl/soc/uvw_axi4_to_ddr4_Stub.v
 require_file_for_uvhs_ip pblock ./script/uvw_axi4_to_ddr4_pblock.tcl

@@ -71,14 +71,27 @@ proc uvhs_poll_command_file {} {
     set command_file $::env(UVHS_COMMAND_FILE)
     if {[file exists $command_file]} {
         set running_file "${command_file}.running"
-        if {[catch {
+        set uvhs_result_file ""
+        set command_status [catch {
             file rename -force $command_file $running_file
             puts "INFO: sourcing UVHS runtime command: $running_file"
             source $running_file
-        } command_error]} {
-            puts stderr "ERROR: UVHS runtime command failed: $command_error"
+        } command_message]
+        if {$command_status != 0} {
+            set command_message "UVHS runtime command failed: $command_message"
         }
         catch {file delete -force $running_file}
+        if {$uvhs_result_file ne ""} {
+            set result_tmp "${uvhs_result_file}.tmp.[pid]"
+            set result [open $result_tmp w]
+            puts $result $command_status
+            puts -nonewline $result $command_message
+            close $result
+            file rename -force $result_tmp $uvhs_result_file
+        }
+        if {$command_status != 0} {
+            puts stderr "ERROR: $command_message"
+        }
     }
     after 500 uvhs_poll_command_file
 }

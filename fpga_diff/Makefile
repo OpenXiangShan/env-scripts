@@ -23,20 +23,8 @@ PRJ_NAME = fpga_$(CPU)$(if $(strip $(SUFFIX)),-$(strip $(SUFFIX)),)
 PRJ_DIR ?= $(ENV_SCRIPTS_HOME)/$(PRJ_NAME)
 PRJ ?= $(PRJ_DIR)/$(PRJ_NAME).xpr
 
-FPGA_WRITE_BITSTREAM_IMPL ?= vivado_write_bitstream
-FPGA_HALT_SOC_IMPL ?= vivado_halt_soc
-FPGA_WRITE_DDR_IMPL ?= vivado_write_jtag_ddr
-FPGA_WRITE_FLASH_IMPL ?= vivado_write_jtag_flash
-FPGA_RESET_CPU_IMPL ?= vivado_reset_cpu
-
-ifeq ($(UVHS),1)
-include uvhs/uvhs.mk
-endif
-
 .PHONY: bitstream vivado dump_ila update_core_flist \
-	write_bitstream halt_soc write_jtag_ddr write_jtag_flash reset_cpu \
-	vivado_write_bitstream vivado_halt_soc vivado_write_jtag_ddr \
-	vivado_write_jtag_flash vivado_reset_cpu
+	write_bitstream halt_soc write_jtag_ddr write_jtag_flash reset_cpu
 
 # Get Vivado version
 VIVADO_VERSION := $(shell vivado -version 2>/dev/null | head -1 | grep -o '[0-9]\{4\}\.[0-9]' || echo "unknown")
@@ -64,38 +52,28 @@ vivado: check_vivado_version
 check_version:
 	vivado -mode batch -source src/tcl/common/check_version.tcl -tclargs --vivado_version $(VIVADO_VERSION) --cpu $(CPU) --project_name $(PRJ_NAME)
 
-# Program the selected FPGA backend.
-write_bitstream: $(FPGA_WRITE_BITSTREAM_IMPL)
-
-vivado_write_bitstream:
+# Write bitstream to FPGA via PCIe
+write_bitstream:
 	sh tools/pcie-remove.sh
 	vivado -mode tcl -source tools/write_bitstream.tcl -tclargs $(FPGA_BIT_HOME)
 	sh tools/pcie-rescan.sh
 	vivado -mode tcl -source tools/reset_ddr.tcl -tclargs $(FPGA_BIT_HOME)/fpga_top_debug.ltx
-	$(MAKE) vivado_reset_cpu
+	$(MAKE) reset_cpu
 
-# Halt the FPGA SoC before loading memory.
-halt_soc: $(FPGA_HALT_SOC_IMPL)
-
-vivado_halt_soc:
+# Halt the FPGA SoC (for Write Jtag DDR)
+halt_soc:
 	vivado -mode tcl -source tools/halt_soc.tcl -tclargs $(FPGA_BIT_HOME)/fpga_top_debug.ltx
 
-# Load a workload into FPGA DDR.
-write_jtag_ddr: $(FPGA_WRITE_DDR_IMPL)
-
-vivado_write_jtag_ddr:
+# Write workload to FPGA DDR via JTAG
+write_jtag_ddr:
 	vivado -mode tcl -source tools/jtag_write_ddr.tcl -tclargs $(WORKLOAD) $(AXI_WIDTH)
 
-# Load a raw binary image into the BRAM-backed flash.
-write_jtag_flash: $(FPGA_WRITE_FLASH_IMPL)
-
-vivado_write_jtag_flash:
+# Write a raw binary image to the BRAM-backed flash via the flash-only JTAG AXI
+write_jtag_flash:
 	vivado -mode tcl -source tools/jtag_write_flash.tcl -tclargs $(WORKLOAD)
 
-# Reset the CPU on the selected FPGA backend.
-reset_cpu: $(FPGA_RESET_CPU_IMPL)
-
-vivado_reset_cpu:
+# Reset CPU on FPGA
+reset_cpu:
 	vivado -mode tcl -source tools/reset_cpu.tcl -tclargs $(FPGA_BIT_HOME)/fpga_top_debug.ltx
 
 ILA_OUT ?= $(ENV_SCRIPTS_HOME)/ila-dump
@@ -122,3 +100,7 @@ get_synth_log:
 all:
 	$(MAKE) update_core_flist CORE_DIR="$(CORE_DIR)" RTL_INCLUDE="$(RTL_INCLUDE)"
 	$(MAKE) vivado CPU=$(CPU) SUFFIX="$(SUFFIX)"
+
+# UVHS targets use an explicit uvhs_* namespace and do not replace the normal
+# Vivado/JTAG targets above.
+include uvhs/uvhs.mk

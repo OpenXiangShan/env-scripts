@@ -14,6 +14,10 @@ UVHS_EXPORT_IP_JOBS ?= 8
 UVHS_EXPORT_IP_VIVADO_VERSION ?=
 UVHS_EXPORT_IP_ONLY ?=
 UVHS_SKIP_VIVADO_EXPORT ?= vio_0 jtag_ddr_subsys
+UVHS_GBUS_IP_DIR ?= $(UV_ROOT)/platform/$(PLATFORM)/Prototype/ips/uvw_gbus.3.1
+UVHS_GBUS_GENERATOR ?= $(UVHS_GBUS_IP_DIR)/gen_generalbus_ip.py
+UVHS_GBUS_JSON ?= $(UVHS_GBUS_IP_DIR)/uvw_axi3_generalbus.json
+UVHS_GBUS_GEN_DIR ?= $(UVHS_WORK_DIR)/ip-gen/generalbus
 
 UVHS_DESIGN_NAME ?= VU19P_X4
 UVHS_TARGET_PACK ?= B0
@@ -50,7 +54,8 @@ UVHS_UVW_AXI4_TO_DDR4_REQUIRED_FILES := \
 	rtl/soc/uvw_axi4_to_ddr4.dcp \
 	rtl/soc/uvw_axi4_to_ddr4_Stub.v \
 	script/uvw_axi4_to_ddr4_pblock.tcl
-UVHS_REQUIRED_DCP_MODULES := blk_mem_gen_0 AXI_bridge data_bridge xdma_ep uvw_axi4_to_ddr4
+UVHS_REQUIRED_DCP_MODULES := blk_mem_gen_0 AXI_bridge data_bridge xdma_ep \
+	uvw_axi4_to_ddr4 uvw_general_bus
 UVHS_REQUIRED_MODULES ?= $(if $(filter nanhu,$(CPU)),XlnFpgaTop,$(if $(filter kmh nutshell,$(CPU)),SimTop,))
 UVHS_DDR_RTL_INST := $(UVHS_TOP).core_def.U_UVHS_UVW_AXI4_TO_DDR4
 UVHS_RUNTIME_LIB_DIR ?= $(UVHS_WORK_DIR)/.uvhs-runtime-lib
@@ -61,14 +66,15 @@ UVHS_RUNTIME_TMP_DIR ?= $(UVHS_RUNTIME_WORK_DIR)/tmp
 UVHS_RUNTIME_DOWNLOAD_SCRIPT ?= $(UVHS_ROOT_DIR)/user_script/hw_run_download.tcl
 UVHS_RUNTIME_COMMAND_SCRIPT ?= $(UVHS_ROOT_DIR)/uvhs/runtime_command.tcl
 UVHS_RUNTIME_DDR_RTL ?= $(UVHS_DDR_RTL_INST).ddr4_ip
+UVHS_RUNTIME_COMMAND_TIMEOUT ?= 600
+UVHS_GBUS_BOARD ?= $(UVHS_TARGET_PACK)
+UVHS_GBUS_FPGA ?= $(UVHS_TARGET_FPGA)
+UVHS_GBUS_PORT ?= 0
+UVHS_GBUS_CHANNEL ?= 0
+UVHS_FLASH_BASE ?= 0x10000000
+UVHS_FLASH_SIZE ?= 0x8000
 UVHS_COMPAT_PCRE_LIB ?=
 UVHS_SHELL_EXEC_WRAPPER ?= $(UVHS_ROOT_DIR)/uvhs/uv_shell_exec_compat.sh
-
-FPGA_WRITE_BITSTREAM_IMPL := uvhs_download
-FPGA_HALT_SOC_IMPL := uvhs_halt_soc
-FPGA_WRITE_DDR_IMPL := uvhs_write_ddr
-FPGA_WRITE_FLASH_IMPL := uvhs_write_flash
-FPGA_RESET_CPU_IMPL := uvhs_reset_cpu
 
 UVHS_TOOL_ENV = \
 	PATH="$(UVHS_ROOT_DIR)/uvhs/make_compat:$$UV_ROOT/bin:$$UV_ROOT/lib/venv3.8/bin:$$UV_ROOT/lib/gcc10.3/bin:$$PATH" \
@@ -102,9 +108,10 @@ UVHS_BITSTREAM_DIR ?= $(UVHS_PNR_DIR)/bitstream
 UVHS_BIT_HOME ?= $(UVHS_WORK_DIR)/ready-to-program
 
 .PHONY: uvhs_preflight uvhs_prepare uvhs_export_vivado_ip \
+	uvhs_export_generalbus \
 	uvhs_sync_uvw_axi4_to_ddr4 uvhs_filelist uvhs_check_modules \
 	uvhs_frontend uvhs_backend uvhs_all uvhs_check_timing \
-	uvhs_package_bitstream uvhs_tools_check uvhs_clean uvhs_download \
+	uvhs_package_bitstream uvhs_tools_check uvhs_clean uvhs_write_bitstream \
 	uvhs_halt_soc uvhs_reset_cpu uvhs_write_ddr uvhs_write_flash \
 	uvhs_runtime_stop
 
@@ -116,6 +123,10 @@ uvhs_preflight:
 	test -n "$$UV_LICENSE"
 	test -x "$$UV_ROOT/bin/uv_shell_exec"
 	test -x "$(UVHS_SHELL_EXEC_WRAPPER)"
+	test -f "$(UVHS_GBUS_GENERATOR)"
+	test -f "$(UVHS_GBUS_JSON)"
+	command -v python3 >/dev/null
+	command -v gzip >/dev/null
 	test -d "$(UVHS_TEMPLATE_DIR)/script"
 	test -f "$(UVHS_TEMPLATE_DIR)/Makefile"
 	test -f "$(UVHS_TEMPLATE_DIR)/script/1B_4F_HGC_assemble.tcl"
@@ -162,6 +173,52 @@ uvhs_export_vivado_ip: uvhs_prepare
 		$(foreach ip,$(UVHS_SKIP_VIVADO_EXPORT),--skip "$(ip)") \
 		$(if $(filter 1,$(UVHS_EXPORT_IP_FORCE)),--force,)'
 
+# The vendor generator assumes tcsh and starts an asynchronous DCP copy before
+# deleting its project. Patch only the private work-directory copy.
+uvhs_export_generalbus: uvhs_prepare
+	bash -c 'set -euo pipefail; \
+		source_ip_dir="$(UVHS_GBUS_IP_DIR)"; generator="$(UVHS_GBUS_GENERATOR)"; \
+		gen_dir="$(UVHS_GBUS_GEN_DIR)"; release="$$gen_dir/uvw_general_bus"; \
+		test -f "$$generator"; test -f "$(UVHS_GBUS_JSON)"; \
+		if [ "$(UVHS_EXPORT_IP_FORCE)" = 1 ] || \
+		   [ ! -s "$$release/uvw_general_bus.dcp" ] || \
+		   [ ! -s "$$release/uvw_general_bus_Stub.v" ] || \
+		   ! grep -Eq "output[[:space:]]+\\[63:0\\][[:space:]]*dut_axi_wdata" \
+		     "$$release/uvw_general_bus_Stub.v" || \
+		   ! grep -Eq "input[[:space:]]+\\[63:0\\][[:space:]]*dut_axi_rdata" \
+		     "$$release/uvw_general_bus_Stub.v"; then \
+			rm -rf "$$gen_dir"; mkdir -p "$$gen_dir"; \
+			ip_dir="$$gen_dir/ip-src"; \
+			cp -a "$$source_ip_dir" "$$ip_dir"; \
+			gen_script="$$ip_dir/gen_generalbus_ip.py"; \
+			sed -i "s|#!/bin/tcsh|#!/usr/bin/env bash|" "$$gen_script"; \
+			sed -i "/os[.]popen.*f_dcp_in.*f_dcp_out/c\\    shutil.copy2(f_dcp_in, f_dcp_out)" \
+			  "$$gen_script"; \
+			grep -Fq "#!/usr/bin/env bash" "$$gen_script"; \
+			grep -Fq "shutil.copy2(f_dcp_in, f_dcp_out)" "$$gen_script"; \
+			json="$$gen_dir/uvw_axi3_generalbus.json"; \
+			cp -f "$(UVHS_GBUS_JSON)" "$$json"; \
+			sed -i -E \
+			  "s|(\"IP_LOCATION\"[[:space:]]*:[[:space:]]*)\"[^\"]*\"|\1\"$$ip_dir\"|; \
+			   s|(\"DATA_WIDTH\"[[:space:]]*:[[:space:]]*)\"[^\"]*\"|\1\"64\"|" \
+			  "$$json"; \
+			export VIVADO_HOME="$$UV_XILINX_VIVADO" XILINX_VIVADO="$$UV_XILINX_VIVADO"; \
+			cd "$$gen_dir"; \
+			PATH="$$UV_XILINX_VIVADO/bin:$$PATH" python3 "$$gen_script" -j "$$json"; \
+		fi; \
+		test -s "$$release/uvw_general_bus.dcp"; \
+		test -s "$$release/uvw_general_bus_Stub.v"; \
+		rm -rf "$(UVHS_WORK_DIR)/rtl/soc/uvw_general_bus"; \
+		mkdir -p "$(UVHS_WORK_DIR)/rtl/soc" "$(UVHS_WORK_DIR)/rtl/stubs"; \
+		cp -a "$$release" "$(UVHS_WORK_DIR)/rtl/soc/uvw_general_bus"; \
+		cp -f "$$release/uvw_general_bus_Stub.v" \
+		  "$(UVHS_WORK_DIR)/rtl/stubs/uvw_general_bus.v"; \
+		grep -Eq "output[[:space:]]+\\[63:0\\][[:space:]]*dut_axi_wdata" \
+		  "$(UVHS_WORK_DIR)/rtl/stubs/uvw_general_bus.v"; \
+		grep -Eq "input[[:space:]]+\\[63:0\\][[:space:]]*dut_axi_rdata" \
+		  "$(UVHS_WORK_DIR)/rtl/stubs/uvw_general_bus.v"; \
+		echo "INFO: prepared 64-bit UVHS generalBus DCP"'
+
 uvhs_sync_uvw_axi4_to_ddr4: uvhs_prepare
 	bash -c 'set -euo pipefail; \
 		src="$(UVHS_UVW_AXI4_TO_DDR4_SRC)"; work="$(UVHS_WORK_DIR)"; \
@@ -176,6 +233,10 @@ uvhs_sync_uvw_axi4_to_ddr4: uvhs_prepare
 		for rel in $(UVHS_UVW_AXI4_TO_DDR4_REQUIRED_FILES); do test -s "$$work/$$rel"; done; \
 		expected_width="$(UVHS_DDR_AXI_WIDTH)"; last_bit="$$((expected_width - 1))"; \
 		stub="$$work/rtl/soc/uvw_axi4_to_ddr4_Stub.v"; \
+		if gzip -t "$$stub" 2>/dev/null; then \
+			gzip -dc "$$stub" > "$$stub.decompressed"; \
+			mv -f "$$stub.decompressed" "$$stub"; \
+		fi; \
 		grep -Eq "input[[:space:]]+\\[$$last_bit:0\\][[:space:]]*ddr4ip_dut_axi_wdata" "$$stub"; \
 		grep -Eq "output[[:space:]]+\\[$$last_bit:0\\][[:space:]]*ddr4ip_dut_axi_rdata" "$$stub"; \
 		echo "INFO: verified UVHS DDR DCP AXI data width: $$expected_width"; \
@@ -183,7 +244,7 @@ uvhs_sync_uvw_axi4_to_ddr4: uvhs_prepare
 			echo "$(UVHS_UVW_AXI4_TO_DDR4_EXPECTED_MD5)  $$work/rtl/soc/uvw_axi4_to_ddr4.dcp" | md5sum -c -; \
 		fi'
 
-uvhs_filelist:
+uvhs_filelist: uvhs_export_generalbus
 	mkdir -p "$(dir $(UVHS_FILELIST))"
 	{ \
 		printf '+define+SYNTHESIS\n+define+XIANGSHAN_FPGA\n'; \
@@ -240,7 +301,8 @@ uvhs_filelist:
 uvhs_check_modules: uvhs_filelist
 	bash "$(UVHS_ROOT_DIR)/uvhs/check_modules.sh" "$(UVHS_FILELIST)" "$(UVHS_REQUIRED_MODULES)"
 
-uvhs_frontend: uvhs_export_vivado_ip uvhs_sync_uvw_axi4_to_ddr4 uvhs_check_modules
+uvhs_frontend: uvhs_export_vivado_ip uvhs_export_generalbus \
+	uvhs_sync_uvw_axi4_to_ddr4 uvhs_check_modules
 	bash -c 'set -euo pipefail; cd "$(UVHS_WORK_DIR)"; \
 		$(UVHS_FLOW_ENV) UVHS_TOP="$(UVHS_TOP)" UVHS_FILELIST=./rtl/filelist.f \
 		UVHS_REQUIRED_DCP_MODULES="$(UVHS_REQUIRED_DCP_MODULES)" \
@@ -276,7 +338,7 @@ uvhs_package_bitstream: uvhs_check_timing
 
 # Runtime stays in the foreground because uv_shell owns the board session.
 # Use another shell for the command targets below while this target is active.
-uvhs_download:
+uvhs_write_bitstream:
 	test -d "$(UVHS_RUNTIME_DB)"
 	test -f "$(UVHS_RUNTIME_DOWNLOAD_SCRIPT)"
 	test ! -e "$(UVHS_RUNTIME_COMMAND_FILE)"
@@ -290,24 +352,33 @@ uvhs_download:
 		-script "$(UVHS_RUNTIME_DOWNLOAD_SCRIPT)"
 
 uvhs_halt_soc:
+	UVHS_RUNTIME_COMMAND_TIMEOUT="$(UVHS_RUNTIME_COMMAND_TIMEOUT)" \
 	bash "$(UVHS_ROOT_DIR)/uvhs/enqueue_runtime_command.sh" \
 		"$(UVHS_RUNTIME_COMMAND_FILE)" "$(UVHS_RUNTIME_COMMAND_SCRIPT)" halt_soc
 
 uvhs_reset_cpu:
+	UVHS_RUNTIME_COMMAND_TIMEOUT="$(UVHS_RUNTIME_COMMAND_TIMEOUT)" \
 	bash "$(UVHS_ROOT_DIR)/uvhs/enqueue_runtime_command.sh" \
 		"$(UVHS_RUNTIME_COMMAND_FILE)" "$(UVHS_RUNTIME_COMMAND_SCRIPT)" reset_cpu
 
 uvhs_write_ddr:
 	test -f "$(WORKLOAD)"
+	UVHS_RUNTIME_COMMAND_TIMEOUT="$(UVHS_RUNTIME_COMMAND_TIMEOUT)" \
 	bash "$(UVHS_ROOT_DIR)/uvhs/enqueue_runtime_command.sh" \
 		"$(UVHS_RUNTIME_COMMAND_FILE)" "$(UVHS_RUNTIME_COMMAND_SCRIPT)" \
 		write_ddr "$(WORKLOAD)" "$(UVHS_RUNTIME_DDR_RTL)" "$(UVHS_DDR_AXI_WIDTH)"
 
 uvhs_write_flash:
-	@echo "ERROR: the current UVHS runtime DB does not expose flash as a writable memory" >&2
-	@exit 2
+	test -f "$(WORKLOAD)"
+	UVHS_RUNTIME_COMMAND_TIMEOUT="$(UVHS_RUNTIME_COMMAND_TIMEOUT)" \
+	bash "$(UVHS_ROOT_DIR)/uvhs/enqueue_runtime_command.sh" \
+		"$(UVHS_RUNTIME_COMMAND_FILE)" "$(UVHS_RUNTIME_COMMAND_SCRIPT)" \
+		write_flash "$(WORKLOAD)" "$(UVHS_GBUS_BOARD)" "$(UVHS_GBUS_FPGA)" \
+		"$(UVHS_GBUS_PORT)" "$(UVHS_GBUS_CHANNEL)" \
+		"$(UVHS_FLASH_BASE)" "$(UVHS_FLASH_SIZE)"
 
 uvhs_runtime_stop:
+	UVHS_RUNTIME_COMMAND_TIMEOUT="$(UVHS_RUNTIME_COMMAND_TIMEOUT)" \
 	bash "$(UVHS_ROOT_DIR)/uvhs/enqueue_runtime_command.sh" \
 		"$(UVHS_RUNTIME_COMMAND_FILE)" "$(UVHS_RUNTIME_COMMAND_SCRIPT)" stop
 

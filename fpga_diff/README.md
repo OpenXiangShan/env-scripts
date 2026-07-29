@@ -51,12 +51,13 @@ FPGA_DDR_LOAD_CMD="bash -lc ' \
 UVHS Flow
 =========
 
-The Hejian UVHS flow is opt-in and leaves the targets above unchanged. Configure
-the UVHS tool environment in the runtime host shell, then invoke:
+The Hejian UVHS flow uses separate `uvhs_*` targets and leaves the targets above
+unchanged. Configure the UVHS tool environment in the runtime host shell, then
+invoke:
 
 ```shell
-make UVHS=1 uvhs_preflight CPU=<design>
-make UVHS=1 uvhs_all CPU=<design> CORE_DIR=/path/to/generated/core SUFFIX=<tag>
+make uvhs_preflight CPU=<design>
+make uvhs_all CPU=<design> CORE_DIR=/path/to/generated/core SUFFIX=<tag>
 ```
 
 See [`uvhs/README.md`](uvhs/README.md) for the required environment variables,

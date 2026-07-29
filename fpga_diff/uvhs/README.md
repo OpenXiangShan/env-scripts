@@ -1,13 +1,14 @@
 # UVHS FPGA-Diff Flow
 
 This directory contains the UVHS implementation flow for FPGA-Diff designs on
-the U2.2 B0/F2 target. It is selected explicitly with `UVHS=1`; the top-level
-Makefile otherwise retains the normal Vivado flow unchanged.
+the U2.2 B0/F2 target. Its targets use the `uvhs_*` prefix; the normal Vivado,
+PCIe, and JTAG targets retain their original names and recipes.
 
 ## Environment
 
-Configure the runtime host shell before invoking `make`. The following values
-are the validated Hejian runtime installation; `UVHS_TEMPLATE_DIR` and
+Configure the runtime host shell before invoking `make`, for example directly
+in `.bashrc`. The following values are the validated Hejian runtime
+installation; `UVHS_TEMPLATE_DIR` and
 `UVHS_UVW_AXI4_TO_DDR4_SRC` identify the locally installed base project and
 vendor DDR IP and therefore remain site-specific.
 
@@ -37,11 +38,11 @@ starts.
 ## Build
 
 ```sh
-make UVHS=1 uvhs_tools_check
-make UVHS=1 uvhs_preflight CPU=<design>
-make UVHS=1 uvhs_frontend CPU=<design> CORE_DIR=/path/to/generated/core SUFFIX=<tag>
-make UVHS=1 uvhs_backend CPU=<design> SUFFIX=<tag>
-make UVHS=1 uvhs_package_bitstream CPU=<design> SUFFIX=<tag>
+make uvhs_tools_check
+make uvhs_preflight CPU=<design>
+make uvhs_frontend CPU=<design> CORE_DIR=/path/to/generated/core SUFFIX=<tag>
+make uvhs_backend CPU=<design> SUFFIX=<tag>
+make uvhs_package_bitstream CPU=<design> SUFFIX=<tag>
 ```
 
 `uvhs_frontend` creates `hw.dat`, imports the generated Vivado IP DCPs and the
@@ -64,7 +65,7 @@ work directory. `uvhs_clean` removes only the explicitly selected
 Use the same entry points with `CPU=kmh` and an AXI-based XiangShan RTL tree:
 
 ```sh
-make UVHS=1 uvhs_all CPU=kmh CORE_DIR=/path/to/XiangShan SUFFIX=<tag>
+make uvhs_all CPU=kmh CORE_DIR=/path/to/XiangShan SUFFIX=<tag>
 ```
 
 The file-list step detects whether `SimTop` exposes DMA and enables the H2C
@@ -73,45 +74,51 @@ LUT and 30% LUT6 fill limits and disabling the hold-expansion route bailout.
 
 ## Runtime
 
-The public programming targets retain the same names in both flows. With
-`UVHS=1`, Make selects the UVHS runtime Tcl instead of Vivado LabTools:
+UVHS runtime targets are separate from the normal Vivado LabTools targets:
 
 ```sh
 # Keep this foreground process attached to the board.
-make UVHS=1 CPU=<design> SUFFIX=<tag> write_bitstream
+make uvhs_write_bitstream CPU=<design> SUFFIX=<tag>
 
 # Run these from another shell with the same CPU/SUFFIX or UVHS_WORK_DIR.
-make UVHS=1 CPU=<design> SUFFIX=<tag> halt_soc
-make UVHS=1 CPU=<design> SUFFIX=<tag> write_jtag_ddr WORKLOAD=/path/to/image.txt
-make UVHS=1 CPU=<design> SUFFIX=<tag> reset_cpu
-make UVHS=1 CPU=<design> SUFFIX=<tag> uvhs_runtime_stop
+make uvhs_halt_soc CPU=<design> SUFFIX=<tag>
+make uvhs_write_ddr CPU=<design> SUFFIX=<tag> WORKLOAD=/path/to/image.txt
+make uvhs_write_flash CPU=<design> SUFFIX=<tag> WORKLOAD=/path/to/image.bin
+make uvhs_reset_cpu CPU=<design> SUFFIX=<tag>
+make uvhs_runtime_stop CPU=<design> SUFFIX=<tag>
 ```
 
-`write_bitstream` loads the completed `hw.dat`, configures the connector and
+`uvhs_write_bitstream` loads the completed `hw.dat`, configures the connector and
 clocks, holds `rstn_sw6/rstn_sw5/rstn_sw4` low across `download`, calls
 `initialize`, then releases system/DDR reset before CPU reset. The process
-polls an atomic command file while it owns the runtime session. `halt_soc` and
-`reset_cpu` control `rstn_sw5`; the other two reset names remain reserved for
-the system and external DDR IP.
+polls an atomic command file while it owns the runtime session. The other
+runtime targets wait for command completion and propagate errors to Make.
+`uvhs_halt_soc` and `uvhs_reset_cpu` control `rstn_sw5`; the other two reset
+names remain reserved for the system and external DDR IP.
 
-`write_jtag_ddr` keeps the legacy target name but uses UVHS `writemem` in this
-flow. It accepts the same address/data-pair text file as the Vivado Tcl,
+`uvhs_write_ddr` accepts the same address/data-pair text file as the Vivado Tcl,
 converts each segment to the selected DCP word width, and writes the DDR IP
-through its runtime backdoor. H2C remains available for the normal FPGA-Diff
-host workflow and is independent of this loader.
+through the UVHS `writemem` runtime backdoor. It holds CPU reset low after the
+write; run `uvhs_reset_cpu` when the image is ready. H2C remains available for
+the normal FPGA-Diff host workflow and is independent of this loader.
 
-The current runtime database exposes only the vendor DDR IP in
-`query -memory`; the BRAM-backed flash DCP is not a runtime memory object.
-Therefore `write_jtag_flash` is unsupported with `UVHS=1` and fails explicitly.
-The normal Vivado flow continues to write that flash through its dedicated
-32-bit JTAG AXI without any interface change.
+The BRAM-backed flash is inside an imported Vivado DCP and is not exposed as a
+UVHS runtime memory. The flow therefore generates a 64-bit UVHS generalBus IP
+and connects it to the existing 32-bit flash path through `AXI_bridge`'s width
+converter. `uvhs_write_flash` holds CPU reset, pads the raw binary to the
+generalBus 8-byte transfer alignment, writes at `0x10000000`, reads the entire
+transfer back, and releases CPU reset only after a byte-for-byte match. The
+maximum image size is the flash BRAM capacity, 32 KiB. The normal
+`write_jtag_flash` target continues to use its dedicated 32-bit JTAG AXI. A
+database built before this generalBus path was added cannot use
+`uvhs_write_flash` and must be rebuilt.
 
 ## Files
 
 | File | Role |
 | --- | --- |
 | `uvhs.mk` | UVHS-only Make targets, prerequisites, DCP export, and stage invocation. |
-| `export_vivado_ip.tcl` | Regenerates repository-owned Vivado IP/BD DCPs. |
+| `export_vivado_ip.tcl` | Regenerates repository-owned Vivado IP/BD DCPs; `uvhs.mk` separately invokes the vendor generalBus generator. |
 | `frontend_run.tcl` | Creates the UVHS database, imports DCPs, reads RTL, and runs frontend. |
 | `backend_run.tcl` | Applies implementation-stage clock/constraint compatibility patches and runs P&R. |
 | `assemble_uvhs.tcl` | Adapts the template assembly to the selected B0/F2 board instance and DDR IP. |
