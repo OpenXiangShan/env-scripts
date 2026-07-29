@@ -47,6 +47,19 @@ source-generated Vivado DCPs; the default reuses an existing DCP in the chosen
 work directory. `uvhs_clean` removes only the explicitly selected
 `UVHS_WORK_DIR`.
 
+### XiangShan
+
+Use the same entry points with `CPU=kmh` and an AXI-based XiangShan RTL tree:
+
+```sh
+make UVHS=1 uvhs_all CPU=kmh CORE_DIR=/path/to/XiangShan SUFFIX=<tag>
+```
+
+The file-list step detects whether `SimTop` exposes DMA and enables the H2C
+path accordingly. XiangShan keeps the B0/F2, x4, and 25 MHz defaults, while
+using 80% LUT and 30% LUT6 fill limits and disabling the hold-expansion route
+bailout. Each value remains independently overrideable on the command line.
+
 ## Runtime
 
 Use `user_script/hw_run_download.tcl` with the completed `hw.dat` database.

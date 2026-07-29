@@ -40,6 +40,30 @@ proc uvhs_config_probe_group_resource {} {
         [list config_hw -set_resource $probe_group_resource -type Probe-Group]
 }
 
+proc uvhs_config_fill_rates {} {
+    set lut_fill_rate [env_or_default UVHS_LUT_FILL_RATE none]
+    set lut6_fill_rate [env_or_default UVHS_LUT6_FILL_RATE none]
+    set args {}
+
+    foreach {option value} [list -lut $lut_fill_rate -lut6 $lut6_fill_rate] {
+        if {$value eq "none" || $value eq ""} {
+            continue
+        }
+        if {![string is double -strict $value] || $value <= 0 || $value > 100} {
+            error "$option fill rate must be in (0, 100], got '$value'"
+        }
+        lappend args $option $value
+    }
+
+    if {![llength $args]} {
+        puts "INFO: keep platform default LUT fill rates"
+        return
+    }
+
+    puts "INFO: set UVHS fill rates: $args"
+    set_fill_rate {*}$args
+}
+
 proc uvhs_cpu_clk_period_ns {} {
     return [env_or_default UVHS_CPU_CLK_PERIOD_NS 40]
 }
@@ -347,6 +371,21 @@ proc ::uvhs_patch_xdma_preopt_xdc {uvhs_xdc_file} {
 
     if {[string match *pnr_timing_constraints_preopt.xdc $uvhs_xdc_file] || \
         [string match *pnr_timing_constraints.xdc $uvhs_xdc_file]} {
+        # localize_design can serialize a replicated high-fanout clock as an
+        # unrelated primary clock. Restore its original CPU_CLK_IN relation.
+        set uvhs_lines {}
+        foreach uvhs_line [split $uvhs_patched "\n"] {
+            if {[string first {-name SOC_GATED_CLK} $uvhs_line] >= 0 && \
+                [regexp {^create_clock[^\n]*\[get_pins[[:space:]]+([^]]+)/O\]} \
+                    $uvhs_line -> uvhs_soc_bufg]} {
+                set uvhs_line [format {create_generated_clock -name SOC_GATED_CLK -source [get_pins %%s/I] -divide_by 1 -add -master_clock [get_clocks CPU_CLK_IN] [get_pins %%s/O]} \
+                    $uvhs_soc_bufg $uvhs_soc_bufg]
+                puts "INFO: UVHS patch: restore replicated SOC_GATED_CLK as CPU_CLK_IN generated clock on $uvhs_soc_bufg"
+            }
+            lappend uvhs_lines $uvhs_line
+        }
+        set uvhs_patched [join $uvhs_lines "\n"]
+
         regsub -all {create_generated_clock[^\n]*-name[^\n]*core_def_xdma_ep_i_TO_DIFFTEST_PCIE_CLK_infer[^\n]*TO_DIFFTEST_PCIE_CLK[^\n]*} \
             $uvhs_patched {create_clock -period __UVHS_XDMA_AXI_CLK_PERIOD_NS__ -name XDMA_AXI_ACLK -waveform [list 0 [expr __UVHS_XDMA_AXI_CLK_PERIOD_NS__ / 2.0]] -add [get_pins part_2/core_def/xdma_ep_i/TO_DIFFTEST_PCIE_CLK]} uvhs_patched
         regsub -all {core_def_xdma_ep_i_TO_DIFFTEST_PCIE_CLK_infer} $uvhs_patched {XDMA_AXI_ACLK} uvhs_patched
@@ -793,6 +832,14 @@ if {[llength $uvhs_xdma_mmcms]} {
     puts "INFO: UVHS patch: XDMA clk_wiz MMCM cell not found before route; current x4 DCP exposes TO_DIFFTEST_PCIE_CLK directly"
 }
 }]
+    set hold_expn_bailout [env_or_default UVHS_ROUTE_ENABLE_HOLD_EXPN_BAILOUT ""]
+    if {$hold_expn_bailout ne ""} {
+        if {$hold_expn_bailout ni {0 1}} {
+            error "UVHS_ROUTE_ENABLE_HOLD_EXPN_BAILOUT must be empty, 0, or 1; got '$hold_expn_bailout'"
+        }
+        append script "\nputs \"INFO: UVHS patch: set route.enableHoldExpnBailout=$hold_expn_bailout before route\"\n"
+        append script "set_param route.enableHoldExpnBailout $hold_expn_bailout\n"
+    }
     append script [uvhs_async_clock_patch_script]
     foreach pnr_dir [glob -nocomplain hw.dat/Compile/PnR/*/*] {
         set before_route [file join $pnr_dir before_route.tcl]
@@ -1216,11 +1263,11 @@ if {[uvhs_cpu_debug_clk]} {
 create_clock_if_port_exists jtag_vclk 83.333 JTAG_TCK
 create_clock_if_port_exists pcie_ep_refclk 10 pcie_ep_gt_ref_clk_p
 create_generated_clock_if_bufgce_exists SOC_GATED_CLK CPU_CLK_IN {
-    *SOC_CLK_CTRL*u_bufgce
+    *SOC_CLK_CTRL*bufgce*
     *inter_soc_clk*
 }
 create_generated_clock_if_bufgce_exists RTC_GATED_CLK TMCLK {
-    *RTC_CLK_CTRL*u_bufgce
+    *RTC_CLK_CTRL*bufgce*
     *inter_rtc_clk*
 }
 create_blackbox_output_clock_if_pin_exists XDMA_AXI_ACLK [uvhs_xdma_axi_clk_period_ns] core_def/xdma_ep_i/TO_DIFFTEST_PCIE_CLK
@@ -1231,8 +1278,9 @@ run_or_warn "report_clock -inferred" {report_clock -inferred}
 source_if_exists [file normalize [file join [file dirname [info script]] async_clocks.tcl]]
 run_or_warn "transform_clock" {transform_clock}
 source_if_exists [file normalize [file join [file dirname [info script]] async_clocks.tcl]]
-trigger_probe -group
+uvhs_config_fill_rates
 uvhs_config_probe_group_resource
+trigger_probe -group
 sweep_design -remap
 report_clock
 

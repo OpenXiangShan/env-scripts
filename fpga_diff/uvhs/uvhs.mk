@@ -32,6 +32,9 @@ UVHS_FPGA_PROCESSES ?= 8
 UVHS_PNR_STRATEGY ?= Strategy_uv_high_fanout_explore
 UVHS_COMPILE_STRATEGY_NUM ?= 1
 UVHS_COMPILE_STRATEGY0 ?= uv_high_fanout_explore
+UVHS_LUT_FILL_RATE ?= $(if $(filter kmh,$(CPU)),80,)
+UVHS_LUT6_FILL_RATE ?= $(if $(filter kmh,$(CPU)),30,)
+UVHS_ROUTE_ENABLE_HOLD_EXPN_BAILOUT ?= $(if $(filter kmh,$(CPU)),0,)
 
 XDMA_LINK_WIDTH ?= X4
 XDMA_ENABLE_PF0_BAR1 ?= 1
@@ -70,7 +73,10 @@ UVHS_FLOW_ENV = \
 	UVHS_CPU_DEBUG_CLK="$(UVHS_CPU_DEBUG_CLK)" \
 	UVHS_PNR_STRATEGY="$(UVHS_PNR_STRATEGY)" \
 	UVHS_COMPILE_STRATEGY_NUM="$(UVHS_COMPILE_STRATEGY_NUM)" \
-	UVHS_COMPILE_STRATEGY0="$(UVHS_COMPILE_STRATEGY0)"
+	UVHS_COMPILE_STRATEGY0="$(UVHS_COMPILE_STRATEGY0)" \
+	UVHS_LUT_FILL_RATE="$(UVHS_LUT_FILL_RATE)" \
+	UVHS_LUT6_FILL_RATE="$(UVHS_LUT6_FILL_RATE)" \
+	UVHS_ROUTE_ENABLE_HOLD_EXPN_BAILOUT="$(UVHS_ROUTE_ENABLE_HOLD_EXPN_BAILOUT)"
 
 UVHS_PNR_DIR ?= $(UVHS_WORK_DIR)/hw.dat/Compile/PnR/$(UVHS_TARGET_PACK)/$(UVHS_TARGET_FPGA)/vivado/Rundir/$(UVHS_PNR_STRATEGY)
 UVHS_BITSTREAM_DIR ?= $(UVHS_PNR_DIR)/bitstream
@@ -149,6 +155,17 @@ uvhs_filelist:
 		printf '+define+DQ=64\n+define+MICRON_DDR\n+define+DDR4_16Gbx8\n'; \
 		printf '+define+DDR4\n+define+SRAM_SYN\n+define+DATA_VERSION=0\n'; \
 		if [ "$(CPU)" = nutshell ]; then printf '+define+CPU_NUTSHELL\n'; fi; \
+		if [ "$(CPU)" = kmh ]; then \
+			simtop=""; \
+			for candidate in "$(CORE_DIR)/build/rtl/SimTop.sv" \
+				"$(CORE_DIR)/rtl/SimTop.sv" "$(CORE_DIR)/SimTop.sv"; do \
+				if [ -f "$$candidate" ]; then simtop="$$candidate"; break; fi; \
+			done; \
+			if [ -n "$$simtop" ] && \
+				grep -Eq '^[[:space:]]*(input|output)[[:space:]].*dma_awready' "$$simtop"; then \
+				printf '+define+CONFIG_SIMTOP_HAS_DMA\n'; \
+			fi; \
+		fi; \
 		if [ "$(UVHS_CPU_DEBUG_CLK)" = 1 ]; then printf '+define+UVHS_CPU_DEBUG_CLK\n'; fi; \
 		if [ -n "$(CHI_DIR)" ]; then printf '+define+MSI_MODE\n+define+CONFIG_USE_XSCORE_CHI\n'; \
 		else printf '+define+CONFIG_USE_XSCORE_AXI\n'; fi; \
