@@ -1159,6 +1159,7 @@ wire [0:0]    br2cfg_wvalid;
   wire        difftest_from_host_axis_tlast;
   wire        difftest_clock_enable;
   wire        inter_soc_clk;
+  wire        inter_soc_sync_rstn;
   wire        inter_rtc_clk;
 
   wire io_host_reset;
@@ -1266,6 +1267,16 @@ wire [0:0]    br2cfg_wvalid;
       .CK  (sys_clk_i),
       .E   (difftest_clock_enable || ~io_host_diff_enable || ~sys_rstn_io || ~cpu_rstn_io),
       .Q   (inter_soc_clk)
+  );
+
+  RST_SYNC #(
+      .SYNC_STAGES(3),
+      .PIPELINE_STAGES(1),
+      .INIT(1'b0)
+  ) inter_soc_rstn_sync (
+      .clk      (inter_soc_clk),
+      .async_in (cpu_rstn_io),
+      .sync_out (inter_soc_sync_rstn)
   );
 
   DifftestClockGate RTC_CLK_CTRL(
