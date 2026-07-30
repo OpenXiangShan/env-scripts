@@ -65,7 +65,7 @@ UVHS_RUNTIME_COMMAND_FILE ?= $(UVHS_RUNTIME_WORK_DIR)/command.tcl
 UVHS_RUNTIME_TMP_DIR ?= $(UVHS_RUNTIME_WORK_DIR)/tmp
 UVHS_RUNTIME_DOWNLOAD_SCRIPT ?= $(UVHS_ROOT_DIR)/user_script/hw_run_download.tcl
 UVHS_RUNTIME_COMMAND_SCRIPT ?= $(UVHS_ROOT_DIR)/uvhs/runtime_command.tcl
-UVHS_RUNTIME_DDR_RTL ?= $(UVHS_DDR_RTL_INST).ddr4_ip
+UVHS_RUNTIME_DDR_RTL ?= $(UVHS_DDR_RTL_INST)
 UVHS_RUNTIME_COMMAND_TIMEOUT ?= 600
 UVHS_GBUS_BOARD ?= $(UVHS_TARGET_PACK)
 UVHS_GBUS_FPGA ?= $(UVHS_TARGET_FPGA)
@@ -296,7 +296,7 @@ uvhs_filelist: uvhs_export_generalbus
 			if [ -d "$$item" ]; then find "$$item" -type f \( -name '*.v' -o -name '*.sv' -o -name '*.vh' -o -name '*.svh' \) -print | sort; \
 			elif [ -f "$$item" ]; then case "$$item" in *.f|*.flist|*.list) cat "$$item";; *) printf '%s\n' "$$item";; esac; fi; \
 		done; \
-	} | awk -f "$(UVHS_ROOT_DIR)/uvhs/filelist.awk" > "$(UVHS_FILELIST)"
+	} | awk 'NF' > "$(UVHS_FILELIST)"
 
 uvhs_check_modules: uvhs_filelist
 	bash "$(UVHS_ROOT_DIR)/uvhs/check_modules.sh" "$(UVHS_FILELIST)" "$(UVHS_REQUIRED_MODULES)"
@@ -309,7 +309,7 @@ uvhs_frontend: uvhs_export_vivado_ip uvhs_export_generalbus \
 		UVHS_DDR_RTL_INST="$(UVHS_DDR_RTL_INST)" UVHS_UVW_AXI4_TO_DDR4_USE_SET_IP=1 \
 		UVHS_ASSIGN_PIN_FILE="$(UVHS_ASSIGN_PIN_FILE)" UVHS_TIMING_FILE="$(UVHS_TIMING_FILE)" \
 		UVHS_PARTITION_FILE=none UVHS_PROBE_FILE=none UVHS_ASSEMBLE_FILE="$(UVHS_ASSEMBLE_FILE)" \
-		UVHS_MEM_ARRAY_DC=none UVHS_AUX_DDR_DC=none UVHS_USE_LSF="$(UVHS_USE_LSF)" \
+		UVHS_USE_LSF="$(UVHS_USE_LSF)" \
 		UVHS_FRONTEND_THREADS="$(UVHS_FRONTEND_THREADS)" UVHS_FRONTEND_PROCESSES="$(UVHS_FRONTEND_PROCESSES)" \
 		UVHS_FPGA_THREADS="$(UVHS_FPGA_THREADS)" UVHS_FPGA_PROCESSES="$(UVHS_FPGA_PROCESSES)" \
 		bash "$$UV_ROOT/bin/uv_shell" -bypass_vivado_version_check \
@@ -319,7 +319,7 @@ uvhs_backend:
 	bash -c 'set -euo pipefail; cd "$(UVHS_WORK_DIR)"; \
 		$(UVHS_FLOW_ENV) UVHS_TOP="$(UVHS_TOP)" UVHS_UVW_AXI4_TO_DDR4_USE_SET_IP=1 \
 		UVHS_ASSIGN_PIN_FILE="$(UVHS_ASSIGN_PIN_FILE)" UVHS_ASSEMBLE_FILE="$(UVHS_ASSEMBLE_FILE)" \
-		UVHS_MEM_ARRAY_DC=none UVHS_AUX_DDR_DC=none UVHS_USE_LSF="$(UVHS_USE_LSF)" \
+		UVHS_USE_LSF="$(UVHS_USE_LSF)" \
 		UVHS_FPGA_THREADS="$(UVHS_FPGA_THREADS)" UVHS_FPGA_PROCESSES="$(UVHS_FPGA_PROCESSES)" \
 		bash "$$UV_ROOT/bin/uv_shell" -bypass_vivado_version_check \
 		-s "$(UVHS_ROOT_DIR)/uvhs/backend_run.tcl" |& tee backend_run.log'

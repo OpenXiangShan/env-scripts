@@ -1422,49 +1422,88 @@ mode_ctrl U_MODE_CTRL(
 );
 
 `ifdef UVHS
-uvhs_ddr4_wrapper U_UVHS_UVW_AXI4_TO_DDR4 (
-    .clk                    (inter_soc_clk),
-    .rstn                   (rstn_sw4),
-    .calib_complete         (init_calib_complete),
-    .s_axi_awid             (cpu2ddr_m2s_awid_mix),
-    .s_axi_awaddr           (cpu2ddr_m2s_awaddr_mix),
-    .s_axi_awlen            (cpu2ddr_m2s_awlen),
-    .s_axi_awsize           (cpu2ddr_m2s_awsize),
-    .s_axi_awburst          (cpu2ddr_m2s_awburst),
-    .s_axi_awlock           (cpu2ddr_m2s_awlock),
-    .s_axi_awcache          (cpu2ddr_m2s_awcache),
-    .s_axi_awprot           (cpu2ddr_m2s_awprot),
-    .s_axi_awqos            (cpu2ddr_m2s_awqos),
-    .s_axi_awregion         (cpu2ddr_m2s_awregion),
-    .s_axi_awvalid          (cpu2ddr_m2s_awvalid),
-    .s_axi_awready          (cpu2ddr_s2m_awready),
-    .s_axi_wdata            (cpu2ddr_m2s_wdata),
-    .s_axi_wstrb            (cpu2ddr_m2s_wstrb),
-    .s_axi_wlast            (cpu2ddr_m2s_wlast),
-    .s_axi_wvalid           (cpu2ddr_m2s_wvalid),
-    .s_axi_wready           (cpu2ddr_s2m_wready),
-    .s_axi_bid              (cpu2ddr_s2m_bid),
-    .s_axi_bresp            (cpu2ddr_s2m_bresp),
-    .s_axi_bvalid           (cpu2ddr_s2m_bvalid),
-    .s_axi_bready           (cpu2ddr_m2s_bready),
-    .s_axi_arid             (cpu2ddr_m2s_arid_mix),
-    .s_axi_araddr           (cpu2ddr_m2s_araddr_mix),
-    .s_axi_arlen            (cpu2ddr_m2s_arlen),
-    .s_axi_arsize           (cpu2ddr_m2s_arsize),
-    .s_axi_arburst          (cpu2ddr_m2s_arburst),
-    .s_axi_arlock           (cpu2ddr_m2s_arlock),
-    .s_axi_arcache          (cpu2ddr_m2s_arcache),
-    .s_axi_arprot           (cpu2ddr_m2s_arprot),
-    .s_axi_arqos            (cpu2ddr_m2s_arqos),
-    .s_axi_arregion         (cpu2ddr_m2s_arregion),
-    .s_axi_arvalid          (cpu2ddr_m2s_arvalid),
-    .s_axi_arready          (cpu2ddr_s2m_arready),
-    .s_axi_rid              (cpu2ddr_s2m_rid),
-    .s_axi_rdata            (cpu2ddr_s2m_rdata),
-    .s_axi_rresp            (cpu2ddr_s2m_rresp),
-    .s_axi_rlast            (cpu2ddr_s2m_rlast),
-    .s_axi_rvalid           (cpu2ddr_s2m_rvalid),
-    .s_axi_rready           (cpu2ddr_m2s_rready)
+// The vendor DDR IP uses 34-bit addresses and 14-bit IDs. Keep those narrow
+// adaptations local while preserving the common fpga_diff AXI interface.
+wire [33:0] uvhs_ddr_awaddr;
+wire [33:0] uvhs_ddr_araddr;
+wire [13:0] uvhs_ddr_bid;
+wire [13:0] uvhs_ddr_rid;
+wire        uvhs_ddr_user_rst;
+
+`ifdef CPU_NUTSHELL
+assign uvhs_ddr_awaddr = {1'b0, cpu2ddr_m2s_awaddr_mix};
+assign uvhs_ddr_araddr = {1'b0, cpu2ddr_m2s_araddr_mix};
+`else
+assign uvhs_ddr_awaddr = cpu2ddr_m2s_awaddr_mix[33:0];
+assign uvhs_ddr_araddr = cpu2ddr_m2s_araddr_mix[33:0];
+`endif
+assign cpu2ddr_s2m_bid = {4'b0, uvhs_ddr_bid};
+assign cpu2ddr_s2m_rid = {4'b0, uvhs_ddr_rid};
+assign init_calib_complete = rstn_sw4 & ~uvhs_ddr_user_rst;
+
+uvw_axi4_to_ddr4 U_UVHS_UVW_AXI4_TO_DDR4 (
+    .ddr4ip_dut_axi_aclk       (inter_soc_clk),
+    .ddr4ip_dut_axi_aresetn    (rstn_sw4),
+    .ddr4ip_dut_axi_awaddr     (uvhs_ddr_awaddr),
+    .ddr4ip_dut_axi_awburst    (cpu2ddr_m2s_awburst),
+    .ddr4ip_dut_axi_awcache    (cpu2ddr_m2s_awcache),
+    .ddr4ip_dut_axi_awid       (cpu2ddr_m2s_awid_mix[13:0]),
+    .ddr4ip_dut_axi_awlen      (cpu2ddr_m2s_awlen),
+    .ddr4ip_dut_axi_awlock     (cpu2ddr_m2s_awlock),
+    .ddr4ip_dut_axi_awprot     (cpu2ddr_m2s_awprot),
+    .ddr4ip_dut_axi_awqos      (cpu2ddr_m2s_awqos),
+    .ddr4ip_dut_axi_awready    (cpu2ddr_s2m_awready),
+    .ddr4ip_dut_axi_awregion   (cpu2ddr_m2s_awregion),
+    .ddr4ip_dut_axi_awsize     (cpu2ddr_m2s_awsize),
+    .ddr4ip_dut_axi_awvalid    (cpu2ddr_m2s_awvalid),
+    .ddr4ip_dut_axi_wdata      (cpu2ddr_m2s_wdata),
+    .ddr4ip_dut_axi_wlast      (cpu2ddr_m2s_wlast),
+    .ddr4ip_dut_axi_wready     (cpu2ddr_s2m_wready),
+    .ddr4ip_dut_axi_wstrb      (cpu2ddr_m2s_wstrb),
+    .ddr4ip_dut_axi_wvalid     (cpu2ddr_m2s_wvalid),
+    .ddr4ip_dut_axi_bid        (uvhs_ddr_bid),
+    .ddr4ip_dut_axi_bready     (cpu2ddr_m2s_bready),
+    .ddr4ip_dut_axi_bresp      (cpu2ddr_s2m_bresp),
+    .ddr4ip_dut_axi_bvalid     (cpu2ddr_s2m_bvalid),
+    .ddr4ip_dut_axi_araddr     (uvhs_ddr_araddr),
+    .ddr4ip_dut_axi_arburst    (cpu2ddr_m2s_arburst),
+    .ddr4ip_dut_axi_arcache    (cpu2ddr_m2s_arcache),
+    .ddr4ip_dut_axi_arid       (cpu2ddr_m2s_arid_mix[13:0]),
+    .ddr4ip_dut_axi_arlen      (cpu2ddr_m2s_arlen),
+    .ddr4ip_dut_axi_arlock     (cpu2ddr_m2s_arlock),
+    .ddr4ip_dut_axi_arprot     (cpu2ddr_m2s_arprot),
+    .ddr4ip_dut_axi_arqos      (cpu2ddr_m2s_arqos),
+    .ddr4ip_dut_axi_arready    (cpu2ddr_s2m_arready),
+    .ddr4ip_dut_axi_arregion   (cpu2ddr_m2s_arregion),
+    .ddr4ip_dut_axi_arsize     (cpu2ddr_m2s_arsize),
+    .ddr4ip_dut_axi_arvalid    (cpu2ddr_m2s_arvalid),
+    .ddr4ip_dut_axi_rdata      (cpu2ddr_s2m_rdata),
+    .ddr4ip_dut_axi_rid        (uvhs_ddr_rid),
+    .ddr4ip_dut_axi_rlast      (cpu2ddr_s2m_rlast),
+    .ddr4ip_dut_axi_rready     (cpu2ddr_m2s_rready),
+    .ddr4ip_dut_axi_rresp      (cpu2ddr_s2m_rresp),
+    .ddr4ip_dut_axi_rvalid     (cpu2ddr_s2m_rvalid),
+    .ddr4ip_dut_axi_aclk_en    (1'b1),
+    .ddr4ip_ddr4_user_clk      (),
+    .ddr4ip_ddr4_user_rst      (uvhs_ddr_user_rst),
+    .sysbus_ghbd_i             (256'b0),
+    .sysbus_ghbd_o             (),
+    .FP_CLK_200M_P             (),
+    .FP_CLK_200M_N             (),
+    .DDR4_DIMM_ACT_N           (),
+    .DDR4_DIMM_A               (),
+    .DDR4_DIMM_BA              (),
+    .DDR4_DIMM_BG              (),
+    .DDR4_DIMM_CK_N            (),
+    .DDR4_DIMM_CK_P            (),
+    .DDR4_DIMM_CKE             (),
+    .DDR4_DIMM_CS_N            (),
+    .DDR4_DIMM_ODT             (),
+    .DDR4_DIMM_RST_B           (),
+    .DDR4_DIMM_DM              (),
+    .DDR4_DIMM_DQ              (),
+    .DDR4_DIMM_DQS_N           (),
+    .DDR4_DIMM_DQS_P           ()
 );
 `else
 jtag_ddr_subsys_wrapper U_JTAG_DDR_SUBSYS(

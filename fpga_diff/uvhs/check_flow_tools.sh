@@ -16,7 +16,6 @@ required=(
   uvhs/timing_common.tcl
   uvhs/export_vivado_ip.tcl
   uvhs/check_modules.sh
-  uvhs/filelist.awk
   uvhs/make_compat/make
   uvhs/make_compat/csh
   uvhs/patch_uvsyn_shell.sh
@@ -24,7 +23,6 @@ required=(
   uvhs/uv_shell_exec_compat.sh
   uvhs/runtime_command.tcl
   user_script/hw_run_download.tcl
-  src/rtl/common/uvhs_ddr4_wrapper.sv
   src/tcl/common/AXI_bridge.tcl
   src/tcl/common/xdma_ep.tcl
 )

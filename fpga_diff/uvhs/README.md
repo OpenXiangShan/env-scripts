@@ -121,13 +121,13 @@ database built before this generalBus path was added cannot use
 | `export_vivado_ip.tcl` | Regenerates repository-owned Vivado IP/BD DCPs; `uvhs.mk` separately invokes the vendor generalBus generator. |
 | `frontend_run.tcl` | Creates the UVHS database, imports DCPs, reads RTL, and runs frontend. |
 | `backend_run.tcl` | Applies implementation-stage clock/constraint compatibility patches and runs P&R. |
-| `assemble_uvhs.tcl` | Adapts the template assembly to the selected B0/F2 board instance and DDR IP. |
-| `assign_pin_u22_f2.tcl` | Assigns target-board clocks, PCIe, UART, and reset-visible top ports. |
+| `assemble_uvhs.tcl` | Reduces the four-FPGA vendor template to the selected FPGA and its daughter cards. |
+| `assign_pin_u22_f2.tcl` | Assigns target-board clocks, PCIe, UART, and low-speed I/O; DDR pins remain owned by the vendor IP. |
 | `timing_common.tcl`, `async_clocks.tcl` | Declare clocks and asynchronous clock-domain relationships. |
-| `check_modules.sh`, `filelist.awk`, `check_flow_tools.sh` | Validate the generated RTL file list and checked-in flow sources. |
+| `check_modules.sh`, `check_flow_tools.sh` | Validate the generated RTL file list and checked-in flow sources. |
 | `make_compat/` | Supplies the Bash-compatible commands required by UVHS-generated Makefiles and its `csh -fc limit` probe. |
 | `patch_uvsyn_shell.sh` | Patches the generated worker Makefile to run the vendor `uv_shell` script through Bash. |
 | `enqueue_runtime_command.sh`, `runtime_command.tcl` | Atomically submit reset and memory operations to the attached runtime process. |
 | `uv_shell_exec_compat.sh` | Restores staged compatibility libraries after the vendor launcher sanitizes `LD_LIBRARY_PATH`. |
-| `uvhs_ddr4_wrapper.sv` | Isolates the vendor DDR AXI wiring from the common FPGA-Diff top-level RTL. |
+| `../src/rtl/common/core_def_xdma.sv` | Instantiates the width-matched vendor DDR IP directly for UVHS builds. |
 | `../user_script/hw_run_download.tcl` | Downloads and initializes a completed UVHS database, then services runtime commands. |
