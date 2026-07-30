@@ -1,3 +1,8 @@
+if {[llength [info commands uvhs_reset_cpu]] == 0} {
+    set uvhs_script_dir [file dirname [file normalize [info script]]]
+    source [file join $uvhs_script_dir runtime_control.tcl]
+}
+
 proc uvhs_temp_dir {} {
     if {[info exists ::env(UVHS_RUNTIME_TMP_DIR)] && $::env(UVHS_RUNTIME_TMP_DIR) ne ""} {
         set path $::env(UVHS_RUNTIME_TMP_DIR)
@@ -164,34 +169,25 @@ set uvhs_command [lindex $argv 0]
 puts "INFO: executing UVHS runtime command: $uvhs_command"
 switch -- $uvhs_command {
     halt_soc {
-        reset -name rstn_sw5 -value 0
-        query -reset
+        uvhs_halt_soc
     }
     reset_cpu {
-        reset -name rstn_sw5 -value 0
-        after 500
-        reset -name rstn_sw5 -value 1
-        after 500
-        query -reset
+        uvhs_reset_cpu
     }
     write_ddr {
         if {[llength $argv] < 4} {
             error "write_ddr expects 3 arguments"
         }
-        reset -name rstn_sw5 -value 0
-        after 100
+        uvhs_hold_cpu_for_memory
         uvhs_write_ddr_pairs [lindex $argv 1] [lindex $argv 2] [lindex $argv 3]
     }
     write_flash {
         if {[llength $argv] < 8} {
             error "write_flash expects 7 arguments"
         }
-        reset -name rstn_sw5 -value 0
-        after 100
+        uvhs_hold_cpu_for_memory
         uvhs_write_flash_gbus {*}[lrange $argv 1 7]
-        reset -name rstn_sw5 -value 1
-        after 500
-        query -reset
+        uvhs_release_cpu_after_memory
     }
     stop {
         set ::uvhs_keepalive 1

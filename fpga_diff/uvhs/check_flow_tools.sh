@@ -20,7 +20,9 @@ required=(
   uvhs/make_compat/csh
   uvhs/patch_uvsyn_shell.sh
   uvhs/enqueue_runtime_command.sh
+  uvhs/runtime_session.sh
   uvhs/uv_shell_exec_compat.sh
+  uvhs/runtime_control.tcl
   uvhs/runtime_command.tcl
   user_script/hw_run_download.tcl
   src/tcl/common/AXI_bridge.tcl
@@ -40,6 +42,7 @@ bash -n "$root_dir/uvhs/make_compat/make"
 bash -n "$root_dir/uvhs/make_compat/csh"
 bash -n "$root_dir/uvhs/patch_uvsyn_shell.sh"
 bash -n "$root_dir/uvhs/enqueue_runtime_command.sh"
+bash -n "$root_dir/uvhs/runtime_session.sh"
 bash -n "$root_dir/uvhs/uv_shell_exec_compat.sh"
 
 if command -v tclsh >/dev/null 2>&1; then

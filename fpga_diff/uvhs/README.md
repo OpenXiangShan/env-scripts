@@ -77,10 +77,11 @@ LUT and 30% LUT6 fill limits and disabling the hold-expansion route bailout.
 UVHS runtime targets are separate from the normal Vivado LabTools targets:
 
 ```sh
-# Keep this foreground process attached to the board.
+# Program the FPGA and return after the detached runtime is ready.
 make uvhs_write_bitstream CPU=<design> SUFFIX=<tag>
 
-# Run these from another shell with the same CPU/SUFFIX or UVHS_WORK_DIR.
+# Use the same CPU/SUFFIX or UVHS_WORK_DIR for later commands.
+make uvhs_runtime_status CPU=<design> SUFFIX=<tag>
 make uvhs_halt_soc CPU=<design> SUFFIX=<tag>
 make uvhs_write_ddr CPU=<design> SUFFIX=<tag> WORKLOAD=/path/to/image.txt
 make uvhs_write_flash CPU=<design> SUFFIX=<tag> WORKLOAD=/path/to/image.bin
@@ -90,11 +91,15 @@ make uvhs_runtime_stop CPU=<design> SUFFIX=<tag>
 
 `uvhs_write_bitstream` loads the completed `hw.dat`, configures the connector and
 clocks, holds `rstn_sw6/rstn_sw5/rstn_sw4` low across `download`, calls
-`initialize`, then releases system/DDR reset before CPU reset. The process
-polls an atomic command file while it owns the runtime session. The other
-runtime targets wait for command completion and propagate errors to Make.
+`initialize`, then releases system/DDR reset before CPU reset. It leaves the
+required UVHS runtime session detached, waits until its command service is
+ready, and then returns. Session state and `uv_shell.log` live under
+`runtime-work`; `uvhs_runtime_status` checks the PID and ready marker. The other
+runtime targets fail immediately without a live session, wait for command
+completion, and propagate errors to Make. Run `uvhs_runtime_stop` when finished.
 `uvhs_halt_soc` and `uvhs_reset_cpu` control `rstn_sw5`; the other two reset
-names remain reserved for the system and external DDR IP.
+names remain reserved for the system and external DDR IP. Download and runtime
+commands share the reset sequences defined in `runtime_control.tcl`.
 
 `uvhs_write_ddr` accepts the same address/data-pair text file as the Vivado Tcl,
 converts each segment to the selected DCP word width, and writes the DDR IP
@@ -127,7 +132,9 @@ database built before this generalBus path was added cannot use
 | `check_modules.sh`, `check_flow_tools.sh` | Validate the generated RTL file list and checked-in flow sources. |
 | `make_compat/` | Supplies the Bash-compatible commands required by UVHS-generated Makefiles and its `csh -fc limit` probe. |
 | `patch_uvsyn_shell.sh` | Patches the generated worker Makefile to run the vendor `uv_shell` script through Bash. |
-| `enqueue_runtime_command.sh`, `runtime_command.tcl` | Atomically submit reset and memory operations to the attached runtime process. |
+| `runtime_session.sh` | Starts, checks, and stops the detached UVHS runtime session. |
+| `runtime_control.tcl` | Owns reset sequencing, readiness, and command servicing. |
+| `enqueue_runtime_command.sh`, `runtime_command.tcl` | Atomically submit reset and memory operations to the runtime session. |
 | `uv_shell_exec_compat.sh` | Restores staged compatibility libraries after the vendor launcher sanitizes `LD_LIBRARY_PATH`. |
 | `../src/rtl/common/core_def_xdma.sv` | Instantiates the width-matched vendor DDR IP directly for UVHS builds. |
 | `../user_script/hw_run_download.tcl` | Downloads and initializes a completed UVHS database, then services runtime commands. |

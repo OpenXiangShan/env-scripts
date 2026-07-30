@@ -63,9 +63,15 @@ UVHS_RUNTIME_DB ?= $(UVHS_WORK_DIR)/hw.dat
 UVHS_RUNTIME_WORK_DIR ?= $(UVHS_WORK_DIR)/runtime-work
 UVHS_RUNTIME_COMMAND_FILE ?= $(UVHS_RUNTIME_WORK_DIR)/command.tcl
 UVHS_RUNTIME_TMP_DIR ?= $(UVHS_RUNTIME_WORK_DIR)/tmp
+UVHS_RUNTIME_PID_FILE ?= $(UVHS_RUNTIME_WORK_DIR)/uv_shell.pid
+UVHS_RUNTIME_READY_FILE ?= $(UVHS_RUNTIME_WORK_DIR)/uv_shell.ready
+UVHS_RUNTIME_LOG ?= $(UVHS_RUNTIME_WORK_DIR)/uv_shell.log
 UVHS_RUNTIME_DOWNLOAD_SCRIPT ?= $(UVHS_ROOT_DIR)/user_script/hw_run_download.tcl
+UVHS_RUNTIME_CONTROL_SCRIPT ?= $(UVHS_ROOT_DIR)/uvhs/runtime_control.tcl
 UVHS_RUNTIME_COMMAND_SCRIPT ?= $(UVHS_ROOT_DIR)/uvhs/runtime_command.tcl
+UVHS_RUNTIME_SESSION_SCRIPT ?= $(UVHS_ROOT_DIR)/uvhs/runtime_session.sh
 UVHS_RUNTIME_DDR_RTL ?= $(UVHS_DDR_RTL_INST)
+UVHS_RUNTIME_START_TIMEOUT ?= 600
 UVHS_RUNTIME_COMMAND_TIMEOUT ?= 600
 UVHS_GBUS_BOARD ?= $(UVHS_TARGET_PACK)
 UVHS_GBUS_FPGA ?= $(UVHS_TARGET_FPGA)
@@ -113,7 +119,7 @@ UVHS_BIT_HOME ?= $(UVHS_WORK_DIR)/ready-to-program
 	uvhs_frontend uvhs_backend uvhs_all uvhs_check_timing \
 	uvhs_package_bitstream uvhs_tools_check uvhs_clean uvhs_write_bitstream \
 	uvhs_halt_soc uvhs_reset_cpu uvhs_write_ddr uvhs_write_flash \
-	uvhs_runtime_stop
+	uvhs_runtime_status uvhs_runtime_check uvhs_runtime_stop
 
 uvhs_preflight:
 	test -n "$$UV_ROOT"
@@ -336,39 +342,52 @@ uvhs_package_bitstream: uvhs_check_timing
 	ln -sf "$(UVHS_BITSTREAM_DIR)/pnr.bit" "$(UVHS_BIT_HOME)/fpga_top_debug.bit"
 	@echo "FPGA_BIT_HOME=$(UVHS_BIT_HOME)"
 
-# Runtime stays in the foreground because uv_shell owns the board session.
-# Use another shell for the command targets below while this target is active.
+# The UVHS API requires one session to retain ownership of the downloaded
+# database. Detach that session after programming and track it in runtime-work.
 uvhs_write_bitstream:
 	test -d "$(UVHS_RUNTIME_DB)"
 	test -f "$(UVHS_RUNTIME_DOWNLOAD_SCRIPT)"
-	test ! -e "$(UVHS_RUNTIME_COMMAND_FILE)"
-	test ! -e "$(UVHS_RUNTIME_COMMAND_FILE).running"
+	test -f "$(UVHS_RUNTIME_CONTROL_SCRIPT)"
+	test -x "$(UVHS_RUNTIME_SESSION_SCRIPT)"
 	mkdir -p "$(UVHS_RUNTIME_WORK_DIR)" "$(UVHS_RUNTIME_TMP_DIR)"
 	$(UVHS_TOOL_ENV) UVHS_DB_PATH="$(UVHS_RUNTIME_DB)" \
 	UVHS_COMMAND_FILE="$(UVHS_RUNTIME_COMMAND_FILE)" \
+	UVHS_RUNTIME_READY_FILE="$(UVHS_RUNTIME_READY_FILE)" \
 	UVHS_RUNTIME_TMP_DIR="$(UVHS_RUNTIME_TMP_DIR)" \
-	bash "$$UV_ROOT/bin/uv_shell" -rt_shell \
+	UVHS_RUNTIME_CONTROL_SCRIPT="$(UVHS_RUNTIME_CONTROL_SCRIPT)" \
+	bash "$(UVHS_RUNTIME_SESSION_SCRIPT)" start \
+		"$(UVHS_RUNTIME_PID_FILE)" "$(UVHS_RUNTIME_READY_FILE)" \
+		"$(UVHS_RUNTIME_LOG)" "$(UVHS_RUNTIME_COMMAND_FILE)" \
+		"$(UVHS_RUNTIME_START_TIMEOUT)" \
+		bash "$$UV_ROOT/bin/uv_shell" -rt_shell \
 		-workdir "$(UVHS_RUNTIME_WORK_DIR)" \
 		-script "$(UVHS_RUNTIME_DOWNLOAD_SCRIPT)"
 
-uvhs_halt_soc:
+uvhs_runtime_check:
+	bash "$(UVHS_RUNTIME_SESSION_SCRIPT)" check \
+		"$(UVHS_RUNTIME_PID_FILE)" "$(UVHS_RUNTIME_READY_FILE)"
+
+uvhs_runtime_status: uvhs_runtime_check
+	@echo "UVHS_RUNTIME_LOG=$(UVHS_RUNTIME_LOG)"
+
+uvhs_halt_soc: uvhs_runtime_check
 	UVHS_RUNTIME_COMMAND_TIMEOUT="$(UVHS_RUNTIME_COMMAND_TIMEOUT)" \
 	bash "$(UVHS_ROOT_DIR)/uvhs/enqueue_runtime_command.sh" \
 		"$(UVHS_RUNTIME_COMMAND_FILE)" "$(UVHS_RUNTIME_COMMAND_SCRIPT)" halt_soc
 
-uvhs_reset_cpu:
+uvhs_reset_cpu: uvhs_runtime_check
 	UVHS_RUNTIME_COMMAND_TIMEOUT="$(UVHS_RUNTIME_COMMAND_TIMEOUT)" \
 	bash "$(UVHS_ROOT_DIR)/uvhs/enqueue_runtime_command.sh" \
 		"$(UVHS_RUNTIME_COMMAND_FILE)" "$(UVHS_RUNTIME_COMMAND_SCRIPT)" reset_cpu
 
-uvhs_write_ddr:
+uvhs_write_ddr: uvhs_runtime_check
 	test -f "$(WORKLOAD)"
 	UVHS_RUNTIME_COMMAND_TIMEOUT="$(UVHS_RUNTIME_COMMAND_TIMEOUT)" \
 	bash "$(UVHS_ROOT_DIR)/uvhs/enqueue_runtime_command.sh" \
 		"$(UVHS_RUNTIME_COMMAND_FILE)" "$(UVHS_RUNTIME_COMMAND_SCRIPT)" \
 		write_ddr "$(WORKLOAD)" "$(UVHS_RUNTIME_DDR_RTL)" "$(UVHS_DDR_AXI_WIDTH)"
 
-uvhs_write_flash:
+uvhs_write_flash: uvhs_runtime_check
 	test -f "$(WORKLOAD)"
 	UVHS_RUNTIME_COMMAND_TIMEOUT="$(UVHS_RUNTIME_COMMAND_TIMEOUT)" \
 	bash "$(UVHS_ROOT_DIR)/uvhs/enqueue_runtime_command.sh" \
@@ -377,11 +396,17 @@ uvhs_write_flash:
 		"$(UVHS_GBUS_PORT)" "$(UVHS_GBUS_CHANNEL)" \
 		"$(UVHS_FLASH_BASE)" "$(UVHS_FLASH_SIZE)"
 
-uvhs_runtime_stop:
+uvhs_runtime_stop: uvhs_runtime_check
 	UVHS_RUNTIME_COMMAND_TIMEOUT="$(UVHS_RUNTIME_COMMAND_TIMEOUT)" \
 	bash "$(UVHS_ROOT_DIR)/uvhs/enqueue_runtime_command.sh" \
 		"$(UVHS_RUNTIME_COMMAND_FILE)" "$(UVHS_RUNTIME_COMMAND_SCRIPT)" stop
+	bash "$(UVHS_RUNTIME_SESSION_SCRIPT)" wait \
+		"$(UVHS_RUNTIME_PID_FILE)" "$(UVHS_RUNTIME_READY_FILE)" \
+		"$(UVHS_RUNTIME_COMMAND_FILE)" "$(UVHS_RUNTIME_COMMAND_TIMEOUT)"
 
 uvhs_clean:
+	@! bash "$(UVHS_RUNTIME_SESSION_SCRIPT)" active \
+		"$(UVHS_RUNTIME_PID_FILE)" >/dev/null 2>&1 || \
+		{ echo "ERROR: stop the UVHS runtime before cleaning" >&2; exit 1; }
 	test -n "$(UVHS_WORK_DIR)"
 	rm -rf "$(UVHS_WORK_DIR)"
