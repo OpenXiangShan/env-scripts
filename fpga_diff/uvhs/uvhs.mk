@@ -79,7 +79,7 @@ UVHS_PNR_DIR := $(UVHS_WORK_DIR)/hw.dat/Compile/PnR/$(UVHS_TARGET_PACK)/$(UVHS_T
 UVHS_BITSTREAM_DIR := $(UVHS_PNR_DIR)/bitstream
 UVHS_BIT_HOME ?= $(UVHS_WORK_DIR)/ready-to-program
 
-.PHONY: uvhs_preflight uvhs_prepare \
+.PHONY: uvhs uvhs_bitstream uvhs_preflight uvhs_prepare \
 	uvhs_export_vivado_ip uvhs_export_generalbus \
 	uvhs_sync_uvw_axi4_to_ddr4 uvhs_filelist \
 	uvhs_frontend uvhs_backend uvhs_all uvhs_check_timing \
@@ -224,6 +224,9 @@ uvhs_frontend: uvhs_sync_uvw_axi4_to_ddr4 uvhs_filelist
 		-s "$(UVHS_ROOT_DIR)/uvhs/frontend_run.tcl" |& tee frontend_run.log; \
 		grep -Fxq UVHS_FRONTEND_SUCCESS frontend_run.log'
 
+# Stable frontend entry point, analogous to the normal `all` project setup.
+uvhs: uvhs_frontend
+
 uvhs_backend:
 	bash -c 'set -euo pipefail; cd "$(UVHS_WORK_DIR)"; \
 		$(UVHS_FLOW_ENV) \
@@ -232,7 +235,9 @@ uvhs_backend:
 		-s "$(UVHS_ROOT_DIR)/uvhs/backend_run.tcl" |& tee backend_run.log; \
 		grep -Fxq UVHS_BACKEND_SUCCESS backend_run.log'
 
-uvhs_all: uvhs_frontend uvhs_backend
+# Keep the compatibility target serial even when the caller enables make -j.
+uvhs_all: uvhs
+	$(MAKE) uvhs_backend
 
 uvhs_check_timing:
 	test -f "$(UVHS_BITSTREAM_DIR)/after_xtalk_fix_timing_summary.txt"
@@ -243,6 +248,10 @@ uvhs_package_bitstream: uvhs_check_timing
 	mkdir -p "$(UVHS_BIT_HOME)"
 	ln -sf "$(UVHS_BITSTREAM_DIR)/pnr.bit" "$(UVHS_BIT_HOME)/fpga_top_debug.bit"
 	@echo "FPGA_BIT_HOME=$(UVHS_BIT_HOME)"
+
+# Stable implementation entry point, analogous to the normal `bitstream` target.
+uvhs_bitstream: uvhs_backend
+	$(MAKE) uvhs_package_bitstream
 
 # The UVHS API requires one session to retain ownership of the downloaded
 # database. Detach that session after programming and track it in runtime-work.

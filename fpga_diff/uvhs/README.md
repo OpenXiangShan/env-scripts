@@ -22,17 +22,28 @@ them. Both build flows use `tools/rtl_filelist_lib.sh` for that parsing. The
 normal Vivado wrapper generates `cpu_files.tcl`; the UVHS generator combines
 the parsed additions with release RTL and FPGA-Diff wrappers in `filelist.f`.
 
+| File-list stage | Vivado | UVHS |
+| --- | --- | --- |
+| Shared input | `CORE_DIR` and optional `RTL_INCLUDE` | `CORE_DIR` and optional `RTL_INCLUDE` |
+| Core files | Scans the complete release build, excluding `rtl/verification` | Reads release `rtl/` and optional `generated-src/` headers |
+| Board wrappers and IP | Added later by `xs_uart.tcl` from Tcl lists | Written directly into the complete UVHS `filelist.f` |
+| Output | Tcl variables in `src/tcl/cpu_files.tcl` | Flat uvsyn input in `<work>/rtl/filelist.f` |
+| Consumer | Vivado project creation | UVHS `read_verilog -f` |
+
 ## Build
 
 ```sh
 make uvhs_tools_check
-make uvhs_frontend CPU=<design> CORE_DIR=/path/to/release/build \
+make uvhs CPU=<design> CORE_DIR=/path/to/release/build \
   RTL_INCLUDE=/path/to/extra.f SUFFIX=<tag>
-make uvhs_backend CPU=<design> SUFFIX=<tag>
-make uvhs_package_bitstream CPU=<design> SUFFIX=<tag>
+make uvhs_bitstream CPU=<design> SUFFIX=<tag>
 ```
 
-`RTL_INCLUDE` is optional. `uvhs_all` runs frontend and backend in sequence.
+`RTL_INCLUDE` is optional. These are the two stable build entry points intended
+for an upper-level build system: `uvhs` prepares and synthesizes the UVHS
+database, while `uvhs_bitstream` runs backend implementation, checks timing,
+and publishes `fpga_top_debug.bit`. The lower-level `uvhs_frontend` and
+`uvhs_backend` targets remain available for stage reuse and debugging.
 
 `uvhs_frontend` performs these steps:
 
