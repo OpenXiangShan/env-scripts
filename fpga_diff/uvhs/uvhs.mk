@@ -4,7 +4,7 @@ UVHS_RUNTIME_DIR := $(UVHS_ROOT_DIR)/uvhs/runtime
 
 UVHS_TEMPLATE_DIR ?=
 UVHS_UVW_AXI4_TO_DDR4_SRC ?=
-UVHS_PROBE_TCL ?=
+UVHS_PROBE_TCL ?= $(UVHS_COMPILATION_DIR)/probe_ila.tcl
 UVHS_PROBE_PATH := $(if $(strip $(UVHS_PROBE_TCL)),$(abspath $(UVHS_PROBE_TCL)),)
 UVHS_DDR_AXI_WIDTH := $(if $(filter nutshell,$(CPU)),64,256)
 UVHS_WORK_DIR := $(ENV_SCRIPTS_HOME)/fpga_diff_uvhs_$(CPU)$(if $(strip $(SUFFIX)),-$(strip $(SUFFIX)),)
@@ -50,7 +50,7 @@ UVHS_FLOW_ENV = \
 .PHONY: uvhs uvhs_preflight uvhs_prepare \
 	uvhs_frontend uvhs_backend uvhs_clean uvhs_write_bitstream \
 	uvhs_halt_soc uvhs_reset_cpu uvhs_write_ddr uvhs_write_flash \
-	uvhs_capture uvhs_runtime_status uvhs_runtime_stop
+	uvhs_capture uvhs_capture_clear uvhs_runtime_status uvhs_runtime_stop
 
 # Validate host tools and external inputs before starting a multi-hour build.
 uvhs_preflight:
@@ -170,6 +170,9 @@ uvhs_capture:
 	test -s "$(UVHS_CAPTURE_VCD)"
 	@echo "UVHS_CAPTURE_USDB=$(UVHS_CAPTURE_USDB)"
 	@echo "UVHS_CAPTURE_VCD=$(UVHS_CAPTURE_VCD)"
+
+uvhs_capture_clear:
+	$(call uvhs_runtime_command,capture_clear)
 
 uvhs_runtime_stop:
 	$(call uvhs_runtime_command,stop)

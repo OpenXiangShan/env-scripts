@@ -141,8 +141,11 @@ from the server's global Tcl scope.
 ## UVHS Waveform Capture
 
 The reference probe scripts describe compile-time instrumentation, not a
-runtime dump. A probe file contains `probe_net` signals to sample and
-`trigger_net` signals that may participate in a trigger condition:
+runtime dump. The frontend sources `compilation/probe_ila.tcl` by default. It
+is intentionally empty until stable design-specific signals are selected. Set
+`UVHS_PROBE_TCL` to use another file instead. A probe file contains `probe_net`
+signals to sample and `trigger_net` signals that may participate in a trigger
+condition:
 
 ```tcl
 probe_net -clock fpga_top_debug.core_def.inter_soc_clk -add {
@@ -155,8 +158,14 @@ trigger_net -add -group boot -clock \
 }
 ```
 
-Signal hierarchy must match the selected generated RTL. Build a new database
-and bitstream with the file supplied explicitly:
+Signal hierarchy must match the selected generated RTL. After adding probes to
+the default file, build a new database and bitstream normally:
+
+```sh
+make uvhs CPU=<design> CORE_DIR=/path/to/release/build SUFFIX=probe
+```
+
+An external probe file can be selected without changing the repository:
 
 ```sh
 make uvhs CPU=<design> CORE_DIR=/path/to/release/build SUFFIX=probe \
@@ -190,6 +199,22 @@ selected build directory:
 runtime-work/UHD/uvhs_capture/UvData.usdb
 runtime-work/UHD/uvhs_capture/UvData.vcd
 ```
+
+Capture hardware is armed only by `uvhs_capture`. Clear a timed-out or
+unwanted capture explicitly with:
+
+```sh
+make uvhs_capture_clear CPU=<design> SUFFIX=<tag>
+```
+
+This runs `trigger -clear`, which clears the trigger configuration and disables
+both trigger and capture. Omitting probes at compile time avoids their resource
+and timing cost entirely; leaving compiled probes idle avoids capture and
+upload traffic but does not recover those implementation resources. In HSP,
+capture runs in hardware without stopping the DUT clock. The upload, waveform
+generation, and USDB-to-VCD conversion increase debug-command latency rather
+than DUT cycle time. A large probe set can still lower the achievable clock
+frequency indirectly by adding routing and timing pressure during compilation.
 
 The USDB-to-VCD step is equivalent to:
 

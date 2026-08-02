@@ -246,6 +246,11 @@ proc uvhs_capture_ila {trigger_file output_name timeout depth} {
     puts "INFO: UVHS waveform database generated: $usdb"
 }
 
+proc uvhs_capture_clear {} {
+    trigger -clear
+    puts "INFO: UVHS trigger conditions and capture are disabled"
+}
+
 proc uvhs_execute_command {args} {
     if {[llength $args] == 0} {
         error "missing UVHS runtime command"
@@ -275,6 +280,10 @@ proc uvhs_execute_command {args} {
         capture_ila {
             if {[llength $args] != 5} { error "capture_ila expects 4 arguments" }
             uvhs_capture_ila {*}[lrange $args 1 4]
+        }
+        capture_clear {
+            if {[llength $args] != 1} { error "capture_clear expects no arguments" }
+            uvhs_capture_clear
         }
         stop {
             if {[llength $args] != 1} { error "stop expects no arguments" }
