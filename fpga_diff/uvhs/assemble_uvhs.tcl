@@ -10,7 +10,9 @@ proc uvhs_env_or_default {name default} {
 }
 
 set uvhs_base_assemble ./script/1B_4F_HGC_assemble.tcl
-set uvhs_target_fpga [string tolower [uvhs_env_or_default UVHS_TARGET_FPGA_LOWER b0.f2]]
+set uvhs_target_pack [uvhs_env_or_default UVHS_TARGET_PACK B0]
+set uvhs_target_name [uvhs_env_or_default UVHS_TARGET_FPGA F2]
+set uvhs_target_fpga [string tolower "$uvhs_target_pack.$uvhs_target_name"]
 set uvhs_known_fpgas {b0.f0 b0.f1 b0.f2 b0.f3}
 set uvhs_keep_fpgas {}
 foreach uvhs_fpga [split [uvhs_env_or_default UVHS_KEEP_FPGAS $uvhs_target_fpga]] {

@@ -7,15 +7,12 @@ set out_dir "./uvhs_ip"
 set vivado_version ""
 set force 0
 set jobs 8
-set cpu "kmh"
 set core_dir ""
-set only ""
-set skip_exports [list]
 
 proc print_help {} {
     puts "Usage:"
     puts "  vivado -mode batch -source uvhs/export_vivado_ip.tcl -tclargs \\"
-    puts "    --origin_dir <fpga_diff> --out_dir <uvhs_work_dir> \[--vivado_version <ver>\] \[--cpu <name>\] \[--core_dir <dir>\] \[--only <ip>\] \[--skip <ip>\] \[--force\] \[--jobs N\]"
+    puts "    --origin_dir <fpga_diff> --out_dir <uvhs_work_dir> \[--vivado_version <ver>\] \[--core_dir <dir>\] \[--force\] \[--jobs N\]"
     exit 0
 }
 
@@ -25,10 +22,7 @@ for {set i 0} {$i < $::argc} {incr i} {
         "--origin_dir"     { incr i; set origin_dir [lindex $::argv $i] }
         "--out_dir"        { incr i; set out_dir [lindex $::argv $i] }
         "--vivado_version" { incr i; set vivado_version [lindex $::argv $i] }
-        "--cpu"            { incr i; set cpu [lindex $::argv $i] }
         "--core_dir"       { incr i; set core_dir [lindex $::argv $i] }
-        "--only"           { incr i; set only [lindex $::argv $i] }
-        "--skip"           { incr i; lappend skip_exports [lindex $::argv $i] }
         "--force"          { set force 1 }
         "--jobs"           { incr i; set jobs [lindex $::argv $i] }
         "--help"           { print_help }
@@ -52,7 +46,6 @@ if {$vivado_version eq ""} {
     set vivado_version [version -short]
 }
 set ::vivado_version $vivado_version
-set ::cpu $cpu
 set ::core_dir $core_dir
 
 if {$force && [file exists $export_project_dir]} {
@@ -78,9 +71,7 @@ proc add_core_generated_headers {core_dir} {
     }
 
     set header_candidates [list \
-        [file join $core_dir build generated-src DifftestMacros.svh] \
         [file join $core_dir generated-src DifftestMacros.svh] \
-        [file join $core_dir build rtl DifftestMacros.svh] \
         [file join $core_dir rtl DifftestMacros.svh] \
     ]
     foreach hdr $header_candidates {
@@ -105,17 +96,10 @@ add_core_generated_headers $core_dir
 
 proc source_ip_tcl {script} {
     if {![file exists $script]} {
-        puts "WARNING: missing IP script $script"
-        return 0
+        error "missing IP script $script"
     }
     puts "INFO: source $script"
-    set rc [catch {uplevel #0 [list source $script]} err opts]
-    if {$rc != 0} {
-        puts "ERROR: failed to source $script"
-        puts $err
-        return -options $opts $err
-    }
-    return 1
+    uplevel #0 [list source $script]
 }
 
 proc run_and_copy_dcp {run_name out_file jobs force} {
@@ -180,7 +164,7 @@ proc run_and_write_opened_dcp {run_name out_file jobs force} {
     puts "INFO: exported stitched checkpoint $out_file"
 }
 
-proc copy_generated_stub {kind name out_file} {
+proc copy_generated_stub {kind name} {
     global export_project_dir out_dir
 
     if {$kind eq "xci"} {
@@ -304,7 +288,7 @@ proc export_xci_ip {name script out_file jobs force} {
     generate_target all $ip
     catch {create_ip_run $ip}
     run_and_copy_dcp ${name}_synth_1 $out_file $jobs $force
-    copy_generated_stub xci $name $out_file
+    copy_generated_stub xci $name
     verify_checkpoint "IP $name" $out_file
 }
 
@@ -324,7 +308,7 @@ proc export_bd_ip {name script out_file jobs force} {
     save_bd_design
     generate_target all $bd
     catch {make_wrapper -files $bd -top}
-    copy_generated_stub bd $name $out_file
+    copy_generated_stub bd $name
 
     if {[file exists $out_file] && !$force} {
         puts "INFO: reuse existing $out_file"
@@ -346,22 +330,12 @@ set exports [list \
     [list xci blk_mem_gen_0 [file join $tcl_dir blk_mem_gen_0.tcl] [file join $out_dir rtl soc blk_mem_gen_0.dcp]] \
     [list bd  AXI_bridge    [file join $tcl_dir AXI_bridge.tcl]    [file join $out_dir rtl soc AXI_bridge.dcp]] \
     [list bd  data_bridge   [file join $tcl_dir data_bridge.tcl]   [file join $out_dir rtl soc data_bridge.dcp]] \
-    [list xci vio_0         [file join $tcl_dir vio_0.tcl]         [file join $out_dir rtl soc vio_0.dcp]] \
     [list bd  xdma_ep       [file join $tcl_dir xdma_ep.tcl]       [file join $out_dir rtl device pcie xdma_ep.dcp]] \
-    [list bd  jtag_ddr_subsys [file join $tcl_dir jtag_ddr_subsys.tcl] [file join $out_dir rtl soc jtag_ddr_subsys.dcp]] \
 ]
 
 set failed_exports [list]
 foreach item $exports {
     lassign $item kind name script out_file
-    if {$only ne "" && $name ne $only} {
-        puts "INFO: skip $name because --only $only is set"
-        continue
-    }
-    if {[lsearch -exact $skip_exports $name] >= 0} {
-        puts "INFO: skip $name because --skip requested"
-        continue
-    }
     puts "INFO: exporting $kind $name"
     set rc [catch {
         if {$kind eq "xci"} {

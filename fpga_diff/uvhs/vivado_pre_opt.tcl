@@ -81,9 +81,4 @@ foreach {label patterns} {
 }
 puts "INFO: XDMA CDC total ASYNC_REG count=[llength $fpga_diff_xdma_cdc_cells]"
 
-if {![info exists ::env(UVHS_ASYNC_CLOCK_FILE)] ||
-    $::env(UVHS_ASYNC_CLOCK_FILE) eq "" ||
-    ![file exists $::env(UVHS_ASYNC_CLOCK_FILE)]} {
-    error "UVHS_ASYNC_CLOCK_FILE is missing in Vivado pre-opt"
-}
-source $::env(UVHS_ASYNC_CLOCK_FILE)
+source [file join [file dirname [file normalize [info script]]] async_clocks.tcl]

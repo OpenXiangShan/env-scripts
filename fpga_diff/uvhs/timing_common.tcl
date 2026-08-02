@@ -5,9 +5,6 @@
 ################################################################################
 
 set fpga_diff_top fpga_top_debug
-if {[info exists ::env(UVHS_TOP)] && $::env(UVHS_TOP) ne ""} {
-    set fpga_diff_top $::env(UVHS_TOP)
-}
 proc fpga_diff_top_port {name} {
     return "${::fpga_diff_top}.${name}"
 }

@@ -8,7 +8,7 @@ fail() {
 }
 
 usage() {
-  echo "Usage: $0 CORE_DIR [--external-only] [--output-filelist FILE] [--] [RTL_INCLUDE ...]" >&2
+  echo "Usage: $0 CORE_DIR [--output-filelist FILE] [--] [RTL_INCLUDE ...]" >&2
   exit 2
 }
 
@@ -21,14 +21,9 @@ fpga_diff_dir=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)
 awk_script="$fpga_diff_dir/core_flist.awk"
 output_tcl="$fpga_diff_dir/src/tcl/cpu_files.tcl"
 output_filelist=""
-external_only=0
 
 while (($#)); do
   case $1 in
-    --external-only)
-      external_only=1
-      shift
-      ;;
     --output-filelist)
       [[ $# -ge 2 ]] || usage
       output_filelist=$2
@@ -45,9 +40,6 @@ while (($#)); do
 done
 
 [[ -d $core_dir ]] || fail "CORE_DIR is not a directory: $core_dir"
-if [[ $external_only == 1 && -z $output_filelist ]]; then
-  fail "--external-only requires --output-filelist"
-fi
 
 tmp_dir=$(mktemp -d)
 trap 'rm -rf "$tmp_dir"' EXIT
@@ -202,7 +194,7 @@ for rtl_include in "$@"; do
   fi
 done
 
-if [[ $external_only == 0 ]]; then
+if [[ -z $output_filelist ]]; then
   core_dir=$(realpath -e -- "$core_dir")
   find "$core_dir" -path "$core_dir/rtl/verification" -prune -o \
     -type f \( -name '*.v' -o -name '*.sv' -o -name '*.vh' -o -name '*.svh' \) \
@@ -241,7 +233,7 @@ if [[ -n $output_filelist ]]; then
   mv -- "$tmp_output" "$output_filelist"
 fi
 
-if [[ $external_only == 0 ]]; then
+if [[ -z $output_filelist ]]; then
   echo "INFO: generated $output_tcl with ${#rtl_files[@]} external RTL files"
 fi
 if [[ -n $output_filelist ]]; then

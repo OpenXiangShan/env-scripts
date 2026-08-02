@@ -3,51 +3,31 @@ UVHS_ROOT_DIR := $(abspath $(dir $(lastword $(MAKEFILE_LIST)))/..)
 PLATFORM ?= U2.2
 UVHS_TEMPLATE_DIR ?=
 UVHS_UVW_AXI4_TO_DDR4_SRC ?=
-UVHS_UVW_AXI4_TO_DDR4_EXPECTED_MD5 ?=
-UVHS_DDR_AXI_WIDTH ?= $(if $(filter nutshell,$(CPU)),64,256)
+UVHS_DDR_AXI_WIDTH := $(if $(filter nutshell,$(CPU)),64,256)
 UVHS_WORK_DIR ?= $(ENV_SCRIPTS_HOME)/fpga_diff_uvhs_$(CPU)$(if $(strip $(SUFFIX)),-$(strip $(SUFFIX)),)
-UVHS_TOP ?= fpga_top_debug
-UVHS_FILELIST ?= $(UVHS_WORK_DIR)/rtl/filelist.f
-UVHS_RTL_INCLUDE_FILELIST ?= $(UVHS_WORK_DIR)/rtl/rtl_include.f
-UVHS_CORE_RELEASE_DIR ?= $(UVHS_WORK_DIR)/core-release
-UVHS_CORE_RELEASE_PACKAGE_DIR ?= $(UVHS_WORK_DIR)/core-release-package
-UVHS_CORE_RELEASE_SUFFIX ?= uvhs$(if $(strip $(SUFFIX)),-$(strip $(SUFFIX)),)
-UVHS_USE_FPGA_RELEASE ?= $(if $(filter kmh,$(CPU)),1,0)
-UVHS_CORE_BUILD_DIR ?= $(if $(filter 1,$(UVHS_USE_FPGA_RELEASE)),$(UVHS_CORE_RELEASE_DIR)/build,$(CORE_DIR)/build)
-UVHS_CORE_RTL_DIR ?= $(UVHS_CORE_BUILD_DIR)/rtl
-UVHS_CORE_GENERATED_SRC_DIR ?= $(UVHS_CORE_BUILD_DIR)/generated-src
+UVHS_FILELIST := $(UVHS_WORK_DIR)/rtl/filelist.f
+UVHS_RTL_INCLUDE_FILELIST := $(UVHS_WORK_DIR)/rtl/rtl_include.f
+UVHS_CORE_RTL_DIR := $(CORE_DIR)/rtl
+UVHS_CORE_GENERATED_SRC_DIR := $(CORE_DIR)/generated-src
 
 UVHS_EXPORT_IP_FORCE ?= 0
-UVHS_EXPORT_IP_JOBS ?= 8
-UVHS_EXPORT_IP_VIVADO_VERSION ?=
-UVHS_EXPORT_IP_ONLY ?=
-UVHS_SKIP_VIVADO_EXPORT ?= vio_0 jtag_ddr_subsys
-UVHS_GBUS_IP_DIR ?= $(UV_ROOT)/platform/$(PLATFORM)/Prototype/ips/uvw_gbus.3.1
-UVHS_GBUS_GENERATOR ?= $(UVHS_GBUS_IP_DIR)/gen_generalbus_ip.py
-UVHS_GBUS_JSON ?= $(UVHS_GBUS_IP_DIR)/uvw_axi3_generalbus.json
-UVHS_GBUS_GEN_DIR ?= $(UVHS_WORK_DIR)/ip-gen/generalbus
+UVHS_EXPORT_IP_JOBS := $(if $(strip $(VIVADO_JOBS)),$(VIVADO_JOBS),8)
+UVHS_GBUS_IP_DIR := $(UV_ROOT)/platform/$(PLATFORM)/Prototype/ips/uvw_gbus.3.1
+UVHS_GBUS_GENERATOR := $(UVHS_GBUS_IP_DIR)/gen_generalbus_ip.py
+UVHS_GBUS_JSON := $(UVHS_GBUS_IP_DIR)/uvw_axi3_generalbus.json
+UVHS_GBUS_GEN_DIR := $(UVHS_WORK_DIR)/ip-gen/generalbus
 
-UVHS_DESIGN_NAME ?= VU19P_X4
 UVHS_TARGET_PACK ?= B0
 UVHS_TARGET_FPGA ?= F2
-UVHS_TARGET_FPGA_LOWER ?= b0.f2
-UVHS_KEEP_FPGAS ?= $(UVHS_TARGET_FPGA_LOWER)
-UVHS_ASSIGN_PIN_FILE ?= $(UVHS_ROOT_DIR)/uvhs/assign_pin_u22_f2.tcl
-UVHS_TIMING_FILE ?= $(UVHS_ROOT_DIR)/uvhs/timing_common.tcl
-UVHS_ASSEMBLE_FILE ?= $(UVHS_ROOT_DIR)/uvhs/assemble_uvhs.tcl
+UVHS_KEEP_FPGAS ?=
 UVHS_CPU_CLK_PERIOD_NS ?= 40
-UVHS_USE_LSF ?= 0
 UVHS_FRONTEND_THREADS ?= 4
 UVHS_FRONTEND_PROCESSES ?= 16
 UVHS_FPGA_THREADS ?= 4
 UVHS_FPGA_PROCESSES ?= 8
-UVHS_PNR_STRATEGY ?= Strategy_uv_high_fanout_explore
 UVHS_COMPILE_STRATEGY ?= uv_high_fanout_explore
 UVHS_LUT_FILL_RATE ?= $(if $(filter kmh,$(CPU)),80,)
 UVHS_LUT6_FILL_RATE ?= $(if $(filter kmh,$(CPU)),30,)
-UVHS_VIVADO_PRE_OPT_FILE ?= $(UVHS_ROOT_DIR)/uvhs/vivado_pre_opt.tcl
-UVHS_ASYNC_CLOCK_FILE ?= $(UVHS_WORK_DIR)/script/fpga_diff_async_clocks.tcl
-UVHS_SHELL_COMPAT_SCRIPT ?= $(UVHS_ROOT_DIR)/uvhs/shell_compat.sh
 
 XDMA_LINK_WIDTH ?= X4
 XDMA_ENABLE_PF0_BAR1 ?= 1
@@ -63,37 +43,25 @@ UVHS_UVW_AXI4_TO_DDR4_REQUIRED_FILES := \
 	rtl/soc/uvw_axi4_to_ddr4.dcp \
 	rtl/soc/uvw_axi4_to_ddr4_Stub.v \
 	script/uvw_axi4_to_ddr4_pblock.tcl
-UVHS_REQUIRED_MODULES ?= $(if $(filter nanhu,$(CPU)),XlnFpgaTop,$(if $(filter kmh nutshell,$(CPU)),SimTop,))
-UVHS_DDR_RTL_INST := $(UVHS_TOP).core_def.U_UVHS_UVW_AXI4_TO_DDR4
-UVHS_RUNTIME_LIB_DIR ?= $(UVHS_WORK_DIR)/.uvhs-runtime-lib
-UVHS_RUNTIME_DB ?= $(UVHS_WORK_DIR)/hw.dat
-UVHS_RUNTIME_WORK_DIR ?= $(UVHS_WORK_DIR)/runtime-work
-UVHS_RUNTIME_COMMAND_FILE ?= $(UVHS_RUNTIME_WORK_DIR)/command.tcl
-UVHS_RUNTIME_TMP_DIR ?= $(UVHS_RUNTIME_WORK_DIR)/tmp
-UVHS_RUNTIME_PID_FILE ?= $(UVHS_RUNTIME_WORK_DIR)/uv_shell.pid
-UVHS_RUNTIME_READY_FILE ?= $(UVHS_RUNTIME_WORK_DIR)/uv_shell.ready
-UVHS_RUNTIME_LOG ?= $(UVHS_RUNTIME_WORK_DIR)/uv_shell.log
-UVHS_RUNTIME_DOWNLOAD_SCRIPT ?= $(UVHS_ROOT_DIR)/uvhs/hw_run_download.tcl
-UVHS_RUNTIME_CONTROL_SCRIPT ?= $(UVHS_ROOT_DIR)/uvhs/runtime_control.tcl
-UVHS_RUNTIME_COMMAND_SCRIPT ?= $(UVHS_ROOT_DIR)/uvhs/runtime_command.tcl
-UVHS_RUNTIME_SESSION_SCRIPT ?= $(UVHS_ROOT_DIR)/uvhs/runtime_session.sh
-UVHS_RUNTIME_DDR_RTL ?= $(UVHS_DDR_RTL_INST)
-UVHS_RUNTIME_START_TIMEOUT ?= 600
-UVHS_RUNTIME_COMMAND_TIMEOUT ?= 600
-UVHS_GBUS_BOARD ?= $(UVHS_TARGET_PACK)
-UVHS_GBUS_FPGA ?= $(UVHS_TARGET_FPGA)
-UVHS_GBUS_PORT ?= 0
-UVHS_GBUS_CHANNEL ?= 0
-UVHS_FLASH_BASE ?= 0x0
-UVHS_FLASH_SIZE ?= 0x8000
+UVHS_REQUIRED_MODULES := $(if $(filter nanhu,$(CPU)),XlnFpgaTop,$(if $(filter kmh nutshell,$(CPU)),SimTop,))
+UVHS_DDR_RTL_INST := fpga_top_debug.core_def.U_UVHS_UVW_AXI4_TO_DDR4
+UVHS_RUNTIME_LIB_DIR := $(UVHS_WORK_DIR)/.uvhs-runtime-lib
+UVHS_RUNTIME_DB := $(UVHS_WORK_DIR)/hw.dat
+UVHS_RUNTIME_WORK_DIR := $(UVHS_WORK_DIR)/runtime-work
+UVHS_RUNTIME_COMMAND_FILE := $(UVHS_RUNTIME_WORK_DIR)/command.tcl
+UVHS_RUNTIME_TMP_DIR := $(UVHS_RUNTIME_WORK_DIR)/tmp
+UVHS_RUNTIME_PID_FILE := $(UVHS_RUNTIME_WORK_DIR)/uv_shell.pid
+UVHS_RUNTIME_READY_FILE := $(UVHS_RUNTIME_WORK_DIR)/uv_shell.ready
+UVHS_RUNTIME_LOG := $(UVHS_RUNTIME_WORK_DIR)/uv_shell.log
+UVHS_RUNTIME_TIMEOUT ?= 600
 UVHS_COMPAT_PCRE_LIB ?=
-UVHS_SHELL_EXEC_WRAPPER ?= $(UVHS_ROOT_DIR)/uvhs/uv_shell_exec_compat.sh
 
 UVHS_TOOL_ENV = \
-	PATH="$(UVHS_ROOT_DIR)/uvhs/make_compat:$$UV_ROOT/bin:$$UV_ROOT/lib/venv3.8/bin:$$UV_ROOT/lib/gcc10.3/bin:$$PATH" \
+	PATH="$$UV_ROOT/bin:$$UV_ROOT/lib/venv3.8/bin:$$UV_ROOT/lib/gcc10.3/bin:$$PATH" \
+	MAKEFLAGS="$${MAKEFLAGS:+$$MAKEFLAGS }SHELL=/bin/bash" \
 	LD_LIBRARY_PATH="$(UVHS_RUNTIME_LIB_DIR):$${LD_LIBRARY_PATH:-}" \
 	UVHS_RUNTIME_LIB_DIR="$(UVHS_RUNTIME_LIB_DIR)" \
-	UVSHELL_EXEC_NAME="$(UVHS_SHELL_EXEC_WRAPPER)"
+	UVSHELL_EXEC_NAME="$(UVHS_ROOT_DIR)/uvhs/uv_shell_exec_compat.sh"
 
 UVHS_FLOW_ENV = \
 	$(UVHS_TOOL_ENV) \
@@ -103,25 +71,19 @@ UVHS_FLOW_ENV = \
 	XDMA_ENABLE_PF0_BAR1="$(XDMA_ENABLE_PF0_BAR1)" \
 	XDMA_AXILITE_MASTER_SCALE="$(XDMA_AXILITE_MASTER_SCALE)" \
 	XDMA_AXILITE_MASTER_SIZE="$(XDMA_AXILITE_MASTER_SIZE)" \
-	UVHS_DESIGN_NAME="$(UVHS_DESIGN_NAME)" \
 	UVHS_TARGET_PACK="$(UVHS_TARGET_PACK)" \
 	UVHS_TARGET_FPGA="$(UVHS_TARGET_FPGA)" \
-	UVHS_TARGET_FPGA_LOWER="$(UVHS_TARGET_FPGA_LOWER)" \
 	UVHS_KEEP_FPGAS="$(UVHS_KEEP_FPGAS)" \
 	UVHS_CPU_CLK_PERIOD_NS="$(UVHS_CPU_CLK_PERIOD_NS)" \
-	UVHS_PNR_STRATEGY="$(UVHS_PNR_STRATEGY)" \
 	UVHS_COMPILE_STRATEGY="$(UVHS_COMPILE_STRATEGY)" \
 	UVHS_LUT_FILL_RATE="$(UVHS_LUT_FILL_RATE)" \
-	UVHS_LUT6_FILL_RATE="$(UVHS_LUT6_FILL_RATE)" \
-	UVHS_VIVADO_PRE_OPT_FILE="$(UVHS_VIVADO_PRE_OPT_FILE)" \
-	UVHS_ASYNC_CLOCK_FILE="$(UVHS_ASYNC_CLOCK_FILE)" \
-	UVHS_SHELL_COMPAT_SCRIPT="$(UVHS_SHELL_COMPAT_SCRIPT)"
+	UVHS_LUT6_FILL_RATE="$(UVHS_LUT6_FILL_RATE)"
 
-UVHS_PNR_DIR ?= $(UVHS_WORK_DIR)/hw.dat/Compile/PnR/$(UVHS_TARGET_PACK)/$(UVHS_TARGET_FPGA)/vivado/Rundir/$(UVHS_PNR_STRATEGY)
-UVHS_BITSTREAM_DIR ?= $(UVHS_PNR_DIR)/bitstream
+UVHS_PNR_DIR := $(UVHS_WORK_DIR)/hw.dat/Compile/PnR/$(UVHS_TARGET_PACK)/$(UVHS_TARGET_FPGA)/vivado/Rundir/Strategy_$(UVHS_COMPILE_STRATEGY)
+UVHS_BITSTREAM_DIR := $(UVHS_PNR_DIR)/bitstream
 UVHS_BIT_HOME ?= $(UVHS_WORK_DIR)/ready-to-program
 
-.PHONY: uvhs_preflight uvhs_prepare uvhs_prepare_core_rtl \
+.PHONY: uvhs_preflight uvhs_prepare \
 	uvhs_export_vivado_ip uvhs_export_generalbus uvhs_normalize_rtl_include \
 	uvhs_sync_uvw_axi4_to_ddr4 uvhs_filelist uvhs_check_modules \
 	uvhs_frontend uvhs_backend uvhs_all uvhs_check_timing \
@@ -136,9 +98,9 @@ uvhs_preflight:
 	test -x "$$UV_XILINX_VIVADO/bin/vivado"
 	test -n "$$UV_LICENSE"
 	test -x "$$UV_ROOT/bin/uv_shell_exec"
-	test -x "$(UVHS_SHELL_EXEC_WRAPPER)"
-	test -x "$(UVHS_SHELL_COMPAT_SCRIPT)"
-	test -f "$(UVHS_VIVADO_PRE_OPT_FILE)"
+	test -x "$(UVHS_ROOT_DIR)/uvhs/uv_shell_exec_compat.sh"
+	test -x "$(UVHS_ROOT_DIR)/uvhs/shell_compat.sh"
+	test -f "$(UVHS_ROOT_DIR)/uvhs/vivado_pre_opt.tcl"
 	test -f "$(UVHS_GBUS_GENERATOR)"
 	test -f "$(UVHS_GBUS_JSON)"
 	command -v python3 >/dev/null
@@ -173,46 +135,18 @@ uvhs_prepare: uvhs_preflight
 	mkdir -p "$(UVHS_WORK_DIR)"
 	cp -a "$(UVHS_TEMPLATE_DIR)/script" "$(UVHS_WORK_DIR)/"
 	cp -f "$(UVHS_TEMPLATE_DIR)/Makefile" "$(UVHS_WORK_DIR)/Makefile"
-	cp -f "$(UVHS_ROOT_DIR)/uvhs/async_clocks.tcl" "$(UVHS_ASYNC_CLOCK_FILE)"
 	mkdir -p "$(UVHS_WORK_DIR)/rtl/soc" "$(UVHS_WORK_DIR)/rtl/device/pcie"
-
-# XiangShan's upstream release step removes FPGA clock gates and assigns large
-# generated arrays to URAM. Synthesize that released RTL rather than build/rtl.
-uvhs_prepare_core_rtl:
-ifeq ($(filter 1,$(UVHS_USE_FPGA_RELEASE)),1)
-	bash -c 'set -euo pipefail; \
-		core="$(CORE_DIR)"; package="$(UVHS_CORE_RELEASE_PACKAGE_DIR)"; release="$(UVHS_CORE_RELEASE_DIR)"; \
-		test -f "$$core/build/rtl/SimTop.sv"; \
-		test -f "$$core/build/generated-src/difftest_profile.json"; \
-		test -f "$$core/difftest/scripts/fpga/release.sh"; \
-		rm -rf "$$package" "$$release"; \
-		mkdir -p "$$package" "$$release"; \
-		$(MAKE) -C "$$core/difftest" fpga-release NOOP_HOME="$$core" \
-			RELEASE_DIR="$$package" RELEASE_SUFFIX="$(UVHS_CORE_RELEASE_SUFFIX)"; \
-		archive="$$(find "$$package" -maxdepth 1 -type f -name "*.tar.gz" -print -quit)"; \
-		test -n "$$archive"; \
-		tar -xzf "$$archive" -C "$$release" --strip-components=1; \
-		test -f "$$release/build/rtl/SimTop.sv"; \
-		test -f "$$release/build/rtl/DifftestClockGate.v"; \
-		grep -Fq "assign Q = CK;" "$$release/build/rtl/ClockGate.sv"; \
-		grep -Fq "ram_style = \"ultra\"" "$$release/build/rtl"/array_*.v; \
-		echo "INFO: prepared XiangShan FPGA release RTL at $$release/build/rtl"'
-else
-	test -d "$(UVHS_CORE_RTL_DIR)"
-endif
 
 uvhs_export_vivado_ip: uvhs_prepare
 	bash -c 'set -euo pipefail; \
 		export VIVADO_HOME="$$UV_XILINX_VIVADO" XILINX_VIVADO="$$UV_XILINX_VIVADO"; \
-		version="$(UVHS_EXPORT_IP_VIVADO_VERSION)"; \
-		if [ -z "$$version" ]; then version="$$("$$UV_XILINX_VIVADO/bin/vivado" -version | sed -n "s/^Vivado v\\([^ ]*\\).*/\\1/p" | head -n 1)"; fi; \
+		version="$$("$$UV_XILINX_VIVADO/bin/vivado" -version | sed -n "s/^Vivado v\\([^ ]*\\).*/\\1/p" | head -n 1)"; \
+		test -n "$$version"; \
 		$(UVHS_FLOW_ENV) "$$UV_XILINX_VIVADO/bin/vivado" -mode batch \
 		-source "$(UVHS_ROOT_DIR)/uvhs/export_vivado_ip.tcl" -tclargs \
 		--origin_dir "$(UVHS_ROOT_DIR)" --out_dir "$(UVHS_WORK_DIR)" \
-		--vivado_version "$$version" --cpu "$(CPU)" --core_dir "$(CORE_DIR)" \
+		--vivado_version "$$version" --core_dir "$(CORE_DIR)" \
 		--jobs "$(UVHS_EXPORT_IP_JOBS)" \
-		$(if $(strip $(UVHS_EXPORT_IP_ONLY)),--only "$(UVHS_EXPORT_IP_ONLY)",) \
-		$(foreach ip,$(UVHS_SKIP_VIVADO_EXPORT),--skip "$(ip)") \
 		$(if $(filter 1,$(UVHS_EXPORT_IP_FORCE)),--force,)'
 
 # The vendor generator starts an asynchronous DCP copy before deleting its
@@ -262,7 +196,7 @@ uvhs_export_generalbus: uvhs_prepare
 uvhs_normalize_rtl_include: uvhs_prepare
 	mkdir -p "$(dir $(UVHS_RTL_INCLUDE_FILELIST))"
 	bash "$(UVHS_ROOT_DIR)/tools/update_core_flist.sh" "$(CORE_DIR)" \
-		--external-only --output-filelist "$(UVHS_RTL_INCLUDE_FILELIST)" \
+		--output-filelist "$(UVHS_RTL_INCLUDE_FILELIST)" \
 		-- $(RTL_INCLUDE)
 
 uvhs_sync_uvw_axi4_to_ddr4: uvhs_prepare
@@ -285,13 +219,10 @@ uvhs_sync_uvw_axi4_to_ddr4: uvhs_prepare
 		fi; \
 		grep -Eq "input[[:space:]]+\\[$$last_bit:0\\][[:space:]]*ddr4ip_dut_axi_wdata" "$$stub"; \
 		grep -Eq "output[[:space:]]+\\[$$last_bit:0\\][[:space:]]*ddr4ip_dut_axi_rdata" "$$stub"; \
-		echo "INFO: verified UVHS DDR DCP AXI data width: $$expected_width"; \
-		if [ -n "$(UVHS_UVW_AXI4_TO_DDR4_EXPECTED_MD5)" ]; then \
-			echo "$(UVHS_UVW_AXI4_TO_DDR4_EXPECTED_MD5)  $$work/rtl/soc/uvw_axi4_to_ddr4.dcp" | md5sum -c -; \
-		fi'
+		echo "INFO: verified UVHS DDR DCP AXI data width: $$expected_width"'
 
-uvhs_filelist: uvhs_export_generalbus uvhs_normalize_rtl_include \
-	uvhs_prepare_core_rtl
+uvhs_filelist: uvhs_export_generalbus uvhs_normalize_rtl_include
+	test -d "$(UVHS_CORE_RTL_DIR)"
 	mkdir -p "$(dir $(UVHS_FILELIST))"
 	{ \
 		printf '+define+SYNTHESIS\n+define+XIANGSHAN_FPGA\n'; \
@@ -302,8 +233,7 @@ uvhs_filelist: uvhs_export_generalbus uvhs_normalize_rtl_include \
 		if [ "$(CPU)" = nutshell ]; then printf '+define+CPU_NUTSHELL\n'; fi; \
 		if [ "$(CPU)" = kmh ]; then \
 			simtop=""; \
-			for candidate in "$(UVHS_CORE_RTL_DIR)/SimTop.sv" \
-				"$(CORE_DIR)/rtl/SimTop.sv" "$(CORE_DIR)/SimTop.sv"; do \
+			for candidate in "$(UVHS_CORE_RTL_DIR)/SimTop.sv"; do \
 				if [ -f "$$candidate" ]; then simtop="$$candidate"; break; fi; \
 			done; \
 			if [ -n "$$simtop" ] && \
@@ -311,7 +241,7 @@ uvhs_filelist: uvhs_export_generalbus uvhs_normalize_rtl_include \
 				printf '+define+CONFIG_SIMTOP_HAS_DMA\n'; \
 			fi; \
 		fi; \
-		if [ -d "$(UVHS_CORE_BUILD_DIR)" ]; then printf '+incdir+%s\n' "$(UVHS_CORE_BUILD_DIR)"; fi; \
+		printf '+incdir+%s\n' "$(CORE_DIR)"; \
 		if [ -d "$(UVHS_CORE_RTL_DIR)" ]; then printf '+incdir+%s\n' "$(UVHS_CORE_RTL_DIR)"; fi; \
 		if [ -d "$(UVHS_CORE_GENERATED_SRC_DIR)" ]; then printf '+incdir+%s\n' "$(UVHS_CORE_GENERATED_SRC_DIR)"; fi; \
 		printf '+incdir+%s/src/rtl/common\n' "$(UVHS_ROOT_DIR)"; \
@@ -323,16 +253,8 @@ uvhs_filelist: uvhs_export_generalbus uvhs_normalize_rtl_include \
 		test ! -d "$(UVHS_ROOT_DIR)/src/rtl/$(CPU)" || \
 			find "$(UVHS_ROOT_DIR)/src/rtl/$(CPU)" -type f \
 			\( -name '*.v' -o -name '*.sv' -o -name '*.vh' -o -name '*.svh' \) -print | sort; \
-		if [ -d "$(UVHS_CORE_RTL_DIR)" ]; then \
-			find "$(UVHS_CORE_RTL_DIR)" -type f \
-				\( -name '*.v' -o -name '*.sv' -o -name '*.vh' -o -name '*.svh' \) -print | sort; \
-		elif [ -n "$(CORE_DIR)" ] && [ -d "$(CORE_DIR)" ]; then \
-			find "$(CORE_DIR)" \( -path '*/rtl/verification' -o -path '*/out' \) -prune -o \
-				-type f \( -name '*.v' -o -name '*.sv' -o -name '*.vh' -o -name '*.svh' \) -print | sort; \
-		fi; \
-		if [ "$(CPU)" != kmh ]; then test ! -f "$(CORE_DIR)/difftest/src/test/vsrc/common/DifftestClockGate.v" || \
-			printf '%s\n' "$(CORE_DIR)/difftest/src/test/vsrc/common/DifftestClockGate.v"; \
-		fi; \
+		find "$(UVHS_CORE_RTL_DIR)" -type f \
+			\( -name '*.v' -o -name '*.sv' -o -name '*.vh' -o -name '*.svh' \) -print | sort; \
 		test ! -f "$(UVHS_RTL_INCLUDE_FILELIST)" || cat "$(UVHS_RTL_INCLUDE_FILELIST)"; \
 	} | awk 'NF' > "$(UVHS_FILELIST)"
 
@@ -342,22 +264,15 @@ uvhs_check_modules: uvhs_filelist
 uvhs_frontend: uvhs_export_vivado_ip uvhs_export_generalbus \
 	uvhs_sync_uvw_axi4_to_ddr4 uvhs_check_modules
 	bash -c 'set -euo pipefail; cd "$(UVHS_WORK_DIR)"; \
-		$(UVHS_FLOW_ENV) UVHS_TOP="$(UVHS_TOP)" UVHS_FILELIST=./rtl/filelist.f \
-		UVHS_DDR_RTL_INST="$(UVHS_DDR_RTL_INST)" \
-		UVHS_ASSIGN_PIN_FILE="$(UVHS_ASSIGN_PIN_FILE)" UVHS_TIMING_FILE="$(UVHS_TIMING_FILE)" \
-		UVHS_ASSEMBLE_FILE="$(UVHS_ASSEMBLE_FILE)" \
-		UVHS_USE_LSF="$(UVHS_USE_LSF)" \
+		$(UVHS_FLOW_ENV) \
 		UVHS_FRONTEND_THREADS="$(UVHS_FRONTEND_THREADS)" UVHS_FRONTEND_PROCESSES="$(UVHS_FRONTEND_PROCESSES)" \
-		UVHS_FPGA_THREADS="$(UVHS_FPGA_THREADS)" UVHS_FPGA_PROCESSES="$(UVHS_FPGA_PROCESSES)" \
 		bash "$$UV_ROOT/bin/uv_shell" -bypass_vivado_version_check \
 		-s "$(UVHS_ROOT_DIR)/uvhs/frontend_run.tcl" |& tee frontend_run.log; \
 		grep -Fxq UVHS_FRONTEND_SUCCESS frontend_run.log'
 
 uvhs_backend:
 	bash -c 'set -euo pipefail; cd "$(UVHS_WORK_DIR)"; \
-		$(UVHS_FLOW_ENV) UVHS_TOP="$(UVHS_TOP)" \
-		UVHS_ASSIGN_PIN_FILE="$(UVHS_ASSIGN_PIN_FILE)" UVHS_ASSEMBLE_FILE="$(UVHS_ASSEMBLE_FILE)" \
-		UVHS_USE_LSF="$(UVHS_USE_LSF)" \
+		$(UVHS_FLOW_ENV) \
 		UVHS_FPGA_THREADS="$(UVHS_FPGA_THREADS)" UVHS_FPGA_PROCESSES="$(UVHS_FPGA_PROCESSES)" \
 		bash "$$UV_ROOT/bin/uv_shell" -bypass_vivado_version_check \
 		-s "$(UVHS_ROOT_DIR)/uvhs/backend_run.tcl" |& tee backend_run.log; \
@@ -379,66 +294,57 @@ uvhs_package_bitstream: uvhs_check_timing
 # database. Detach that session after programming and track it in runtime-work.
 uvhs_write_bitstream:
 	test -d "$(UVHS_RUNTIME_DB)"
-	test -f "$(UVHS_RUNTIME_DOWNLOAD_SCRIPT)"
-	test -f "$(UVHS_RUNTIME_CONTROL_SCRIPT)"
-	test -x "$(UVHS_RUNTIME_SESSION_SCRIPT)"
+	test -f "$(UVHS_ROOT_DIR)/uvhs/hw_run_download.tcl"
+	test -f "$(UVHS_ROOT_DIR)/uvhs/runtime_control.tcl"
+	test -x "$(UVHS_ROOT_DIR)/uvhs/runtime_session.sh"
 	mkdir -p "$(UVHS_RUNTIME_WORK_DIR)" "$(UVHS_RUNTIME_TMP_DIR)"
 	$(UVHS_TOOL_ENV) UVHS_DB_PATH="$(UVHS_RUNTIME_DB)" \
 	UVHS_COMMAND_FILE="$(UVHS_RUNTIME_COMMAND_FILE)" \
 	UVHS_RUNTIME_READY_FILE="$(UVHS_RUNTIME_READY_FILE)" \
 	UVHS_RUNTIME_TMP_DIR="$(UVHS_RUNTIME_TMP_DIR)" \
-	UVHS_RUNTIME_CONTROL_SCRIPT="$(UVHS_RUNTIME_CONTROL_SCRIPT)" \
-	bash "$(UVHS_RUNTIME_SESSION_SCRIPT)" start \
+	bash "$(UVHS_ROOT_DIR)/uvhs/runtime_session.sh" start \
 		"$(UVHS_RUNTIME_PID_FILE)" "$(UVHS_RUNTIME_READY_FILE)" \
 		"$(UVHS_RUNTIME_LOG)" "$(UVHS_RUNTIME_COMMAND_FILE)" \
-		"$(UVHS_RUNTIME_START_TIMEOUT)" \
+		"$(UVHS_RUNTIME_TIMEOUT)" \
 		bash "$$UV_ROOT/bin/uv_shell" -rt_shell \
 		-workdir "$(UVHS_RUNTIME_WORK_DIR)" \
-		-script "$(UVHS_RUNTIME_DOWNLOAD_SCRIPT)"
+		-script "$(UVHS_ROOT_DIR)/uvhs/hw_run_download.tcl"
 
 uvhs_runtime_check:
-	bash "$(UVHS_RUNTIME_SESSION_SCRIPT)" check \
+	bash "$(UVHS_ROOT_DIR)/uvhs/runtime_session.sh" check \
 		"$(UVHS_RUNTIME_PID_FILE)" "$(UVHS_RUNTIME_READY_FILE)"
 
 uvhs_runtime_status: uvhs_runtime_check
 	@echo "UVHS_RUNTIME_LOG=$(UVHS_RUNTIME_LOG)"
 
-uvhs_halt_soc: uvhs_runtime_check
-	UVHS_RUNTIME_COMMAND_TIMEOUT="$(UVHS_RUNTIME_COMMAND_TIMEOUT)" \
+define uvhs_runtime_command
+	UVHS_RUNTIME_COMMAND_TIMEOUT="$(UVHS_RUNTIME_TIMEOUT)" \
 	bash "$(UVHS_ROOT_DIR)/uvhs/enqueue_runtime_command.sh" \
-		"$(UVHS_RUNTIME_COMMAND_FILE)" "$(UVHS_RUNTIME_COMMAND_SCRIPT)" halt_soc
+		"$(UVHS_RUNTIME_COMMAND_FILE)" "$(UVHS_ROOT_DIR)/uvhs/runtime_command.tcl" $(1)
+endef
+
+uvhs_halt_soc: uvhs_runtime_check
+	$(call uvhs_runtime_command,halt_soc)
 
 uvhs_reset_cpu: uvhs_runtime_check
-	UVHS_RUNTIME_COMMAND_TIMEOUT="$(UVHS_RUNTIME_COMMAND_TIMEOUT)" \
-	bash "$(UVHS_ROOT_DIR)/uvhs/enqueue_runtime_command.sh" \
-		"$(UVHS_RUNTIME_COMMAND_FILE)" "$(UVHS_RUNTIME_COMMAND_SCRIPT)" reset_cpu
+	$(call uvhs_runtime_command,reset_cpu)
 
 uvhs_write_ddr: uvhs_runtime_check
 	test -f "$(WORKLOAD)"
-	UVHS_RUNTIME_COMMAND_TIMEOUT="$(UVHS_RUNTIME_COMMAND_TIMEOUT)" \
-	bash "$(UVHS_ROOT_DIR)/uvhs/enqueue_runtime_command.sh" \
-		"$(UVHS_RUNTIME_COMMAND_FILE)" "$(UVHS_RUNTIME_COMMAND_SCRIPT)" \
-		write_ddr "$(WORKLOAD)" "$(UVHS_RUNTIME_DDR_RTL)" "$(UVHS_DDR_AXI_WIDTH)"
+	$(call uvhs_runtime_command,write_ddr "$(WORKLOAD)" "$(UVHS_DDR_RTL_INST)" "$(UVHS_DDR_AXI_WIDTH)")
 
 uvhs_write_flash: uvhs_runtime_check
 	test -f "$(WORKLOAD)"
-	UVHS_RUNTIME_COMMAND_TIMEOUT="$(UVHS_RUNTIME_COMMAND_TIMEOUT)" \
-	bash "$(UVHS_ROOT_DIR)/uvhs/enqueue_runtime_command.sh" \
-		"$(UVHS_RUNTIME_COMMAND_FILE)" "$(UVHS_RUNTIME_COMMAND_SCRIPT)" \
-		write_flash "$(WORKLOAD)" "$(UVHS_GBUS_BOARD)" "$(UVHS_GBUS_FPGA)" \
-		"$(UVHS_GBUS_PORT)" "$(UVHS_GBUS_CHANNEL)" \
-		"$(UVHS_FLASH_BASE)" "$(UVHS_FLASH_SIZE)"
+	$(call uvhs_runtime_command,write_flash "$(WORKLOAD)" "$(UVHS_TARGET_PACK)" "$(UVHS_TARGET_FPGA)" 0 0 0x0 0x8000)
 
 uvhs_runtime_stop: uvhs_runtime_check
-	UVHS_RUNTIME_COMMAND_TIMEOUT="$(UVHS_RUNTIME_COMMAND_TIMEOUT)" \
-	bash "$(UVHS_ROOT_DIR)/uvhs/enqueue_runtime_command.sh" \
-		"$(UVHS_RUNTIME_COMMAND_FILE)" "$(UVHS_RUNTIME_COMMAND_SCRIPT)" stop
-	bash "$(UVHS_RUNTIME_SESSION_SCRIPT)" wait \
+	$(call uvhs_runtime_command,stop)
+	bash "$(UVHS_ROOT_DIR)/uvhs/runtime_session.sh" wait \
 		"$(UVHS_RUNTIME_PID_FILE)" "$(UVHS_RUNTIME_READY_FILE)" \
-		"$(UVHS_RUNTIME_COMMAND_FILE)" "$(UVHS_RUNTIME_COMMAND_TIMEOUT)"
+		"$(UVHS_RUNTIME_COMMAND_FILE)" "$(UVHS_RUNTIME_TIMEOUT)"
 
 uvhs_clean:
-	@! bash "$(UVHS_RUNTIME_SESSION_SCRIPT)" active \
+	@! bash "$(UVHS_ROOT_DIR)/uvhs/runtime_session.sh" active \
 		"$(UVHS_RUNTIME_PID_FILE)" >/dev/null 2>&1 || \
 		{ echo "ERROR: stop the UVHS runtime before cleaning" >&2; exit 1; }
 	test -n "$(UVHS_WORK_DIR)"

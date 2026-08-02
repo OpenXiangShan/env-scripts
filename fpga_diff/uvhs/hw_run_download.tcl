@@ -2,12 +2,7 @@
 # reset and memory commands.
 
 set uvhs_script_dir [file dirname [file normalize [info script]]]
-if {[info exists ::env(UVHS_RUNTIME_CONTROL_SCRIPT)] &&
-    $::env(UVHS_RUNTIME_CONTROL_SCRIPT) ne ""} {
-    set uvhs_control_script $::env(UVHS_RUNTIME_CONTROL_SCRIPT)
-} else {
-    set uvhs_control_script [file join $uvhs_script_dir runtime_control.tcl]
-}
+set uvhs_control_script [file join $uvhs_script_dir runtime_control.tcl]
 if {![file exists $uvhs_control_script]} {
     error "UVHS runtime control script not found: $uvhs_control_script"
 }

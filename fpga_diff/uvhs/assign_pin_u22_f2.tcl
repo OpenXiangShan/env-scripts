@@ -12,7 +12,7 @@ proc pin_name {top port} {
     return "${top}.${port}"
 }
 
-set top [env_or_default UVHS_ASSIGN_PIN_TOP [env_or_default UVHS_TOP fpga_top_debug]]
+set top [env_or_default UVHS_ASSIGN_PIN_TOP fpga_top_debug]
 set xdma_link_width [string toupper [string trim [env_or_default XDMA_LINK_WIDTH X4]]]
 if {$xdma_link_width ni {X4 X8}} {
     error "XDMA_LINK_WIDTH must be one of X4/X8, got '$xdma_link_width'"

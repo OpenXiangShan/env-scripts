@@ -17,8 +17,6 @@ required=(
   uvhs/vivado_pre_opt.tcl
   uvhs/export_vivado_ip.tcl
   uvhs/check_modules.sh
-  uvhs/make_compat/make
-  uvhs/make_compat/csh
   uvhs/shell_compat.sh
   uvhs/enqueue_runtime_command.sh
   uvhs/runtime_session.sh
@@ -39,8 +37,6 @@ done
 
 bash -n "$root_dir/uvhs/check_modules.sh"
 bash -n "$root_dir/uvhs/check_flow_tools.sh"
-bash -n "$root_dir/uvhs/make_compat/make"
-bash -n "$root_dir/uvhs/make_compat/csh"
 bash -n "$root_dir/uvhs/shell_compat.sh"
 bash -n "$root_dir/uvhs/enqueue_runtime_command.sh"
 bash -n "$root_dir/uvhs/runtime_session.sh"

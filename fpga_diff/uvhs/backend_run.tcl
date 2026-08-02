@@ -38,19 +38,13 @@ proc configure_fill_rates {} {
     }
 }
 
+set uvhs_script_dir [file dirname [file normalize [info script]]]
 set_working_space hw.dat
 
 set fpga_threads [env_or_default UVHS_FPGA_THREADS 8]
 set fpga_processes [env_or_default UVHS_FPGA_PROCESSES 16]
-if {[env_or_default UVHS_USE_LSF 0]} {
-    set_parallel_option -max_threads $fpga_threads \
-        -max_processes $fpga_processes \
-        -submit_command {bsub -R "rusage[mem=80000]"} \
-        -terminate_command bkill -label fpga
-} else {
-    set_parallel_option -max_threads $fpga_threads \
-        -max_processes $fpga_processes -label fpga
-}
+set_parallel_option -max_threads $fpga_threads \
+    -max_processes $fpga_processes -label fpga
 
 set_option time.auto_clock_config true
 set_option clock.transform_clock.multi_iteration true
@@ -59,14 +53,12 @@ set_option clock.async_control.force_accept true
 set_option time.enable_sign_off true
 set_option time.incremental_sign_off true
 
-set design_name [env_or_default UVHS_DESIGN_NAME VU19P_X4]
 set platform [env_or_default PLATFORM U2.2]
-create_system_design -name $design_name -platform $platform
-source_required [env_or_default UVHS_ASSEMBLE_FILE ./script/1B_4F_HGC_assemble.tcl]
+create_system_design -name VU19P_X4 -platform $platform
+source_required [file join $uvhs_script_dir assemble_uvhs.tcl]
 
-set assign_pin_file [env_or_default UVHS_ASSIGN_PIN_FILE ./script/assign_pin.tcl]
 set ::env(UVHS_ASSIGN_PIN_TOP) none
-source_required $assign_pin_file
+source_required [file join $uvhs_script_dir assign_pin_u22_f2.tcl]
 unset ::env(UVHS_ASSIGN_PIN_TOP)
 
 create_design -name test
@@ -84,7 +76,7 @@ sweep_design
 infer_clock
 report_clock -inferred
 transform_clock
-source_required [env_or_default UVHS_ASYNC_CLOCK_FILE ./script/fpga_diff_async_clocks.tcl]
+source_required [file join $uvhs_script_dir async_clocks.tcl]
 configure_fill_rates
 trigger_probe -group
 sweep_design -remap
@@ -117,14 +109,10 @@ set_option compile.strategyNum 1
 set_option compile.strategy0 \
     [env_or_default UVHS_COMPILE_STRATEGY uv_high_fanout_explore]
 set_option compile.stage.preOpt \
-    [env_or_default UVHS_VIVADO_PRE_OPT_FILE ./script/vivado_pre_opt.tcl]
+    [file join $uvhs_script_dir vivado_pre_opt.tcl]
 
 compile_fpga -parallel_option fpga -genScriptOnly -explore
-set shell_helper [env_or_default UVHS_SHELL_COMPAT_SCRIPT ""]
-if {$shell_helper eq ""} {
-    error "UVHS_SHELL_COMPAT_SCRIPT is not set"
-}
-set shell_helper [file normalize $shell_helper]
+set shell_helper [file join $uvhs_script_dir shell_compat.sh]
 if {![file isfile $shell_helper]} {
     error "UVHS shell compatibility helper not found: $shell_helper"
 }

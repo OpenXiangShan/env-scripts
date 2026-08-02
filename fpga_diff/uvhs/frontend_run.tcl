@@ -9,16 +9,6 @@ proc env_or_default {name default} {
     return $default
 }
 
-proc split_words {value} {
-    set words {}
-    foreach word $value {
-        if {$word ne ""} {
-            lappend words $word
-        }
-    }
-    return $words
-}
-
 proc source_required {file} {
     if {![file exists $file]} {
         error "required UVHS flow file not found: $file"
@@ -85,11 +75,7 @@ proc register_runtime_memory {working_space inst_path} {
 }
 
 proc start_frontend_shell_compat {} {
-    set helper [env_or_default UVHS_SHELL_COMPAT_SCRIPT ""]
-    if {$helper eq ""} {
-        error "UVHS_SHELL_COMPAT_SCRIPT is not set"
-    }
-    set helper [file normalize $helper]
+    set helper [file join $::uvhs_script_dir shell_compat.sh]
     if {![file isfile $helper]} {
         error "UVHS shell compatibility helper not found: $helper"
     }
@@ -98,32 +84,19 @@ proc start_frontend_shell_compat {} {
     puts "INFO: started UVHS frontend shell compatibility helper"
 }
 
+set ::uvhs_script_dir [file dirname [file normalize [info script]]]
 create_working_space hw.dat
 set_option syn.computeFeCheckSum true
 
 set frontend_threads [env_or_default UVHS_FRONTEND_THREADS 16]
 set frontend_processes [env_or_default UVHS_FRONTEND_PROCESSES 64]
-set fpga_threads [env_or_default UVHS_FPGA_THREADS 8]
-set fpga_processes [env_or_default UVHS_FPGA_PROCESSES 32]
-if {[env_or_default UVHS_USE_LSF 0]} {
-    set_parallel_option -max_threads $frontend_threads \
-        -max_processes $frontend_processes -submit_command bsub \
-        -terminate_command bkill -label frontend
-    set_parallel_option -max_threads $fpga_threads \
-        -max_processes $fpga_processes \
-        -submit_command {bsub -R "rusage[mem=80000]"} \
-        -terminate_command bkill -label fpga
-} else {
-    set_parallel_option -max_threads $frontend_threads \
-        -max_processes $frontend_processes -label frontend
-    set_parallel_option -max_threads $fpga_threads \
-        -max_processes $fpga_processes -label fpga
-}
+set_parallel_option -max_threads $frontend_threads \
+    -max_processes $frontend_processes -label frontend
 
 set_option global.log.label MEMORY
 set_option syn.checkMultiDriver false
 set_option syn.multipleDriverConflict WOR
-set_option syn.logicFillingRateThreshold 0.001
+set_option syn.engine uvsyn
 set_option time.auto_clock_config true
 set_option clock.transform_clock.multi_iteration true
 set_option clock.glitch.force_transform true
@@ -132,23 +105,15 @@ set_option time.enable_sign_off true
 set_option time.incremental_sign_off true
 set_option signal.uhd.sampling_clock.allow_local_clock true
 
-set design_name [env_or_default UVHS_DESIGN_NAME VU19P_X4]
 set platform [env_or_default PLATFORM U2.2]
-set design_top [env_or_default UVHS_TOP fpga_top_debug]
-set ddr_inst_path [env_or_default UVHS_DDR_RTL_INST \
-    ${design_top}.core_def.U_UVHS_UVW_AXI4_TO_DDR4]
-create_system_design -name $design_name -platform $platform
+set design_top fpga_top_debug
+set ddr_inst_path ${design_top}.core_def.U_UVHS_UVW_AXI4_TO_DDR4
+create_system_design -name VU19P_X4 -platform $platform
 
-source_required [env_or_default UVHS_ASSEMBLE_FILE ./script/1B_4F_HGC_assemble.tcl]
-source_required [env_or_default UVHS_ASSIGN_PIN_FILE ./script/assign_pin.tcl]
-set timing_file [env_or_default UVHS_TIMING_FILE ./script/timing.tcl]
-if {![file exists $timing_file]} {
-    error "required UVHS timing constraints not found: $timing_file"
-}
-set_constraint_files $timing_file
-foreach reset_port [split_words [env_or_default UVHS_RESET_PORTS {
-    rstn_sw6 rstn_sw5 rstn_sw4
-}]] {
+source_required [file join $::uvhs_script_dir assemble_uvhs.tcl]
+source_required [file join $::uvhs_script_dir assign_pin_u22_f2.tcl]
+set_constraint_files [file join $::uvhs_script_dir timing_common.tcl]
+foreach reset_port {rstn_sw6 rstn_sw5 rstn_sw4} {
     create_reset -port ${design_top}.${reset_port} -active 0
 }
 
@@ -164,7 +129,7 @@ import_ip uvw_axi4_to_ddr4 ./rtl/soc/uvw_axi4_to_ddr4.dcp \
     -clock_enable_pairs {ddr4ip_dut_axi_aclk ddr4ip_dut_axi_aclk_en 1} \
     -script_file {prePlace ./script/uvw_axi4_to_ddr4_pblock.tcl}
 
-set filelist [env_or_default UVHS_FILELIST ./rtl/filelist.f]
+set filelist ./rtl/filelist.f
 if {![file exists $filelist]} {
     error "required UVHS RTL file list not found: $filelist"
 }
