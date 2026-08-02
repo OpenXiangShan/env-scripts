@@ -6,9 +6,6 @@ UVHS_UVW_AXI4_TO_DDR4_SRC ?=
 UVHS_DDR_AXI_WIDTH := $(if $(filter nutshell,$(CPU)),64,256)
 UVHS_WORK_DIR ?= $(ENV_SCRIPTS_HOME)/fpga_diff_uvhs_$(CPU)$(if $(strip $(SUFFIX)),-$(strip $(SUFFIX)),)
 UVHS_FILELIST := $(UVHS_WORK_DIR)/rtl/filelist.f
-UVHS_RTL_INCLUDE_FILELIST := $(UVHS_WORK_DIR)/rtl/rtl_include.f
-UVHS_CORE_RTL_DIR := $(CORE_DIR)/rtl
-UVHS_CORE_GENERATED_SRC_DIR := $(CORE_DIR)/generated-src
 
 UVHS_EXPORT_IP_FORCE ?= 0
 UVHS_EXPORT_IP_JOBS := $(if $(strip $(VIVADO_JOBS)),$(VIVADO_JOBS),8)
@@ -43,7 +40,6 @@ UVHS_UVW_AXI4_TO_DDR4_REQUIRED_FILES := \
 	rtl/soc/uvw_axi4_to_ddr4.dcp \
 	rtl/soc/uvw_axi4_to_ddr4_Stub.v \
 	script/uvw_axi4_to_ddr4_pblock.tcl
-UVHS_REQUIRED_MODULES := $(if $(filter nanhu,$(CPU)),XlnFpgaTop,$(if $(filter kmh nutshell,$(CPU)),SimTop,))
 UVHS_DDR_RTL_INST := fpga_top_debug.core_def.U_UVHS_UVW_AXI4_TO_DDR4
 UVHS_RUNTIME_LIB_DIR := $(UVHS_WORK_DIR)/.uvhs-runtime-lib
 UVHS_RUNTIME_DB := $(UVHS_WORK_DIR)/hw.dat
@@ -84,8 +80,8 @@ UVHS_BITSTREAM_DIR := $(UVHS_PNR_DIR)/bitstream
 UVHS_BIT_HOME ?= $(UVHS_WORK_DIR)/ready-to-program
 
 .PHONY: uvhs_preflight uvhs_prepare \
-	uvhs_export_vivado_ip uvhs_export_generalbus uvhs_normalize_rtl_include \
-	uvhs_sync_uvw_axi4_to_ddr4 uvhs_filelist uvhs_check_modules \
+	uvhs_export_vivado_ip uvhs_export_generalbus \
+	uvhs_sync_uvw_axi4_to_ddr4 uvhs_filelist \
 	uvhs_frontend uvhs_backend uvhs_all uvhs_check_timing \
 	uvhs_package_bitstream uvhs_tools_check uvhs_clean uvhs_write_bitstream \
 	uvhs_halt_soc uvhs_reset_cpu uvhs_write_ddr uvhs_write_flash \
@@ -193,12 +189,6 @@ uvhs_export_generalbus: uvhs_prepare
 		  "$(UVHS_WORK_DIR)/rtl/stubs/uvw_general_bus.v"; \
 		echo "INFO: prepared 64-bit UVHS generalBus DCP"'
 
-uvhs_normalize_rtl_include: uvhs_prepare
-	mkdir -p "$(dir $(UVHS_RTL_INCLUDE_FILELIST))"
-	bash "$(UVHS_ROOT_DIR)/tools/update_core_flist.sh" "$(CORE_DIR)" \
-		--output-filelist "$(UVHS_RTL_INCLUDE_FILELIST)" \
-		-- $(RTL_INCLUDE)
-
 uvhs_sync_uvw_axi4_to_ddr4: uvhs_prepare
 	bash -c 'set -euo pipefail; \
 		src="$(UVHS_UVW_AXI4_TO_DDR4_SRC)"; work="$(UVHS_WORK_DIR)"; \
@@ -221,48 +211,12 @@ uvhs_sync_uvw_axi4_to_ddr4: uvhs_prepare
 		grep -Eq "output[[:space:]]+\\[$$last_bit:0\\][[:space:]]*ddr4ip_dut_axi_rdata" "$$stub"; \
 		echo "INFO: verified UVHS DDR DCP AXI data width: $$expected_width"'
 
-uvhs_filelist: uvhs_export_generalbus uvhs_normalize_rtl_include
-	test -d "$(UVHS_CORE_RTL_DIR)"
-	mkdir -p "$(dir $(UVHS_FILELIST))"
-	{ \
-		printf '+define+SYNTHESIS\n+define+XIANGSHAN_FPGA\n'; \
-		printf '+define+UVHS\n'; \
-		printf '+define+DDR4_16G_X8\n+define+DQ64\n+define+DDR4_2400\n'; \
-		printf '+define+DQ=64\n+define+MICRON_DDR\n+define+DDR4_16Gbx8\n'; \
-		printf '+define+DDR4\n+define+SRAM_SYN\n+define+DATA_VERSION=0\n'; \
-		if [ "$(CPU)" = nutshell ]; then printf '+define+CPU_NUTSHELL\n'; fi; \
-		if [ "$(CPU)" = kmh ]; then \
-			simtop=""; \
-			for candidate in "$(UVHS_CORE_RTL_DIR)/SimTop.sv"; do \
-				if [ -f "$$candidate" ]; then simtop="$$candidate"; break; fi; \
-			done; \
-			if [ -n "$$simtop" ] && \
-				grep -Eq '^[[:space:]]*(input|output)[[:space:]].*dma_awready' "$$simtop"; then \
-				printf '+define+CONFIG_SIMTOP_HAS_DMA\n'; \
-			fi; \
-		fi; \
-		printf '+incdir+%s\n' "$(CORE_DIR)"; \
-		if [ -d "$(UVHS_CORE_RTL_DIR)" ]; then printf '+incdir+%s\n' "$(UVHS_CORE_RTL_DIR)"; fi; \
-		if [ -d "$(UVHS_CORE_GENERATED_SRC_DIR)" ]; then printf '+incdir+%s\n' "$(UVHS_CORE_GENERATED_SRC_DIR)"; fi; \
-		printf '+incdir+%s/src/rtl/common\n' "$(UVHS_ROOT_DIR)"; \
-		find "$(UVHS_ROOT_DIR)/src/rtl/common" -type f \
-			\( -name '*.v' -o -name '*.sv' -o -name '*.vh' -o -name '*.svh' \) \
-			! -name 'u0_xdma.v' -print | sort; \
-		test ! -d "$(UVHS_WORK_DIR)/rtl/stubs" || \
-			find "$(UVHS_WORK_DIR)/rtl/stubs" -type f -name '*.v' -print | sort; \
-		test ! -d "$(UVHS_ROOT_DIR)/src/rtl/$(CPU)" || \
-			find "$(UVHS_ROOT_DIR)/src/rtl/$(CPU)" -type f \
-			\( -name '*.v' -o -name '*.sv' -o -name '*.vh' -o -name '*.svh' \) -print | sort; \
-		find "$(UVHS_CORE_RTL_DIR)" -type f \
-			\( -name '*.v' -o -name '*.sv' -o -name '*.vh' -o -name '*.svh' \) -print | sort; \
-		test ! -f "$(UVHS_RTL_INCLUDE_FILELIST)" || cat "$(UVHS_RTL_INCLUDE_FILELIST)"; \
-	} | awk 'NF' > "$(UVHS_FILELIST)"
+uvhs_filelist: uvhs_export_vivado_ip uvhs_export_generalbus
+	bash "$(UVHS_ROOT_DIR)/uvhs/generate_filelist.sh" \
+		"$(CORE_DIR)" "$(UVHS_WORK_DIR)" "$(CPU)" "$(UVHS_FILELIST)" \
+		-- $(RTL_INCLUDE)
 
-uvhs_check_modules: uvhs_filelist
-	bash "$(UVHS_ROOT_DIR)/uvhs/check_modules.sh" "$(UVHS_FILELIST)" "$(UVHS_REQUIRED_MODULES)"
-
-uvhs_frontend: uvhs_export_vivado_ip uvhs_export_generalbus \
-	uvhs_sync_uvw_axi4_to_ddr4 uvhs_check_modules
+uvhs_frontend: uvhs_sync_uvw_axi4_to_ddr4 uvhs_filelist
 	bash -c 'set -euo pipefail; cd "$(UVHS_WORK_DIR)"; \
 		$(UVHS_FLOW_ENV) \
 		UVHS_FRONTEND_THREADS="$(UVHS_FRONTEND_THREADS)" UVHS_FRONTEND_PROCESSES="$(UVHS_FRONTEND_PROCESSES)" \

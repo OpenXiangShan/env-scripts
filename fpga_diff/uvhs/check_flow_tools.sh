@@ -6,17 +6,20 @@ root_dir="$(cd "$script_dir/.." && pwd)"
 
 required=(
   Makefile
+  tools/rtl_filelist_lib.sh
   uvhs/uvhs.mk
   uvhs/README.md
+  uvhs/flow_common.tcl
   uvhs/frontend_run.tcl
   uvhs/backend_run.tcl
+  uvhs/partition.tcl
   uvhs/assemble_uvhs.tcl
   uvhs/assign_pin_u22_f2.tcl
   uvhs/async_clocks.tcl
   uvhs/timing_common.tcl
   uvhs/vivado_pre_opt.tcl
   uvhs/export_vivado_ip.tcl
-  uvhs/check_modules.sh
+  uvhs/generate_filelist.sh
   uvhs/shell_compat.sh
   uvhs/enqueue_runtime_command.sh
   uvhs/runtime_session.sh
@@ -35,8 +38,9 @@ for path in "${required[@]}"; do
   }
 done
 
-bash -n "$root_dir/uvhs/check_modules.sh"
 bash -n "$root_dir/uvhs/check_flow_tools.sh"
+bash -n "$root_dir/tools/rtl_filelist_lib.sh"
+bash -n "$root_dir/uvhs/generate_filelist.sh"
 bash -n "$root_dir/uvhs/shell_compat.sh"
 bash -n "$root_dir/uvhs/enqueue_runtime_command.sh"
 bash -n "$root_dir/uvhs/runtime_session.sh"

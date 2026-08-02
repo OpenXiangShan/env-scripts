@@ -18,9 +18,9 @@ conversion. The UVHS flow only consumes that result.
 
 `RTL_INCLUDE` accepts RTL files, directories, and nested `.f`, `.flist`, or
 `.list` files. Relative entries are resolved from the file list that contains
-them. The common `tools/update_core_flist.sh` parser writes an absolute flat
-file list for UVHS while the normal Vivado flow continues to generate
-`cpu_files.tcl`.
+them. Both build flows use `tools/rtl_filelist_lib.sh` for that parsing. The
+normal Vivado wrapper generates `cpu_files.tcl`; the UVHS generator combines
+the parsed additions with release RTL and FPGA-Diff wrappers in `filelist.f`.
 
 ## Build
 
@@ -39,13 +39,14 @@ make uvhs_package_bitstream CPU=<design> SUFFIX=<tag>
 1. Copies the vendor board template into an isolated work directory.
 2. Prepares repository-owned Vivado IP and the 64-bit generalBus DCP.
 3. Imports the selected DDR DCP and validates its AXI width.
-4. Builds the complete RTL file list and checks the expected design module.
+4. Builds the complete RTL file list and checks the expected top module.
 5. Elaborates and synthesizes the design with uvsyn.
 6. Registers the DDR instance used by runtime `writemem`.
 
 `uvhs_backend` follows the vendor implementation sequence: clock inference and
 transformation, remap, partition, localization, system routing, FPGA PnR,
-timing signoff, bitstream generation, and runtime database commit.
+timing signoff, bitstream generation, and runtime database commit. Fill-rate
+configuration and automatic partitioning are isolated in `partition.tcl`.
 
 The default XiangShan partition limits are 80% LUT and 30% LUT6. They can be
 changed with `UVHS_LUT_FILL_RATE` and `UVHS_LUT6_FILL_RATE` for placement
@@ -100,15 +101,17 @@ or DDR pins.
 | File | Role |
 | --- | --- |
 | `uvhs.mk` | Build, packaging, and runtime targets. |
+| `generate_filelist.sh` | Complete UVHS RTL file list generation and top check. |
+| `flow_common.tcl` | Shared UVHS path, environment, and source helpers. |
 | `frontend_run.tcl` | RTL/IP import, elaboration, and uvsyn frontend. |
 | `backend_run.tcl` | Partition, routing, FPGA PnR, and runtime database commit. |
+| `partition.tcl` | Fill-rate validation and automatic partitioning. |
 | `assemble_uvhs.tcl` | Selects the FPGA set from the vendor board assembly. |
 | `assign_pin_u22_f2.tcl` | B0/F2 clock, PCIe, UART, JTAG, SD, and control pins. |
 | `timing_common.tcl` | External clock constraints. |
 | `async_clocks.tcl` | Asynchronous clock groups used by backend and Vivado PnR. |
 | `vivado_pre_opt.tcl` | XDMA refclock and CDC constraints. |
 | `export_vivado_ip.tcl` | Repository-owned Vivado IP export. |
-| `check_modules.sh` | Final RTL module check. |
 | `check_flow_tools.sh` | Shell/Tcl/source validation. |
 | `shell_compat.sh` | Generated launcher shell correction. |
 | `uv_shell_exec_compat.sh` | Runtime library wrapper. |

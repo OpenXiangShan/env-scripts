@@ -2,22 +2,9 @@
 # UVHS frontend flow for fpga_diff.
 ################################################################################
 
-proc env_or_default {name default} {
-    if {[info exists ::env($name)] && $::env($name) ne ""} {
-        return $::env($name)
-    }
-    return $default
-}
+source [file join [file dirname [file normalize [info script]]] flow_common.tcl]
 
-proc source_required {file} {
-    if {![file exists $file]} {
-        error "required UVHS flow file not found: $file"
-    }
-    puts "INFO: source $file"
-    uplevel #0 [list source $file]
-}
-
-proc import_blackbox {module dcp args} {
+proc uvhs::import_blackbox {module dcp args} {
     if {![file exists $dcp] || [file size $dcp] == 0} {
         error "required blackbox DCP missing or empty for $module: $dcp"
     }
@@ -26,7 +13,7 @@ proc import_blackbox {module dcp args} {
     uplevel #0 [concat [list set_blackbox -module $module -source_file $dcp] $args]
 }
 
-proc import_ip {module dcp stub args} {
+proc uvhs::import_ip {module dcp stub args} {
     foreach {kind file} [list DCP $dcp stub $stub] {
         if {![file exists $file] || [file size $file] == 0} {
             error "required $module $kind missing or empty: $file"
@@ -39,7 +26,7 @@ proc import_ip {module dcp stub args} {
     read_verilog $stub
 }
 
-proc append_option_once {file line} {
+proc uvhs::append_option_once {file line} {
     set data ""
     if {[file exists $file]} {
         set input [open $file r]
@@ -62,7 +49,7 @@ proc append_option_once {file line} {
 
 # UVHS runtime writemem discovers backdoor instances from these database files;
 # the installed release does not expose an equivalent frontend Tcl command.
-proc register_runtime_memory {working_space inst_path} {
+proc uvhs::register_runtime_memory {working_space inst_path} {
     if {$inst_path eq "" || $inst_path eq "none"} {
         return
     }
@@ -74,8 +61,8 @@ proc register_runtime_memory {working_space inst_path} {
     puts "INFO: registered UVHS runtime memory instance $inst_path"
 }
 
-proc start_frontend_shell_compat {} {
-    set helper [file join $::uvhs_script_dir shell_compat.sh]
+proc uvhs::start_frontend_shell_compat {} {
+    set helper [uvhs::path shell_compat.sh]
     if {![file isfile $helper]} {
         error "UVHS shell compatibility helper not found: $helper"
     }
@@ -84,12 +71,11 @@ proc start_frontend_shell_compat {} {
     puts "INFO: started UVHS frontend shell compatibility helper"
 }
 
-set ::uvhs_script_dir [file dirname [file normalize [info script]]]
 create_working_space hw.dat
 set_option syn.computeFeCheckSum true
 
-set frontend_threads [env_or_default UVHS_FRONTEND_THREADS 16]
-set frontend_processes [env_or_default UVHS_FRONTEND_PROCESSES 64]
+set frontend_threads [uvhs::env_or_default UVHS_FRONTEND_THREADS 16]
+set frontend_processes [uvhs::env_or_default UVHS_FRONTEND_PROCESSES 64]
 set_parallel_option -max_threads $frontend_threads \
     -max_processes $frontend_processes -label frontend
 
@@ -105,26 +91,26 @@ set_option time.enable_sign_off true
 set_option time.incremental_sign_off true
 set_option signal.uhd.sampling_clock.allow_local_clock true
 
-set platform [env_or_default PLATFORM U2.2]
+set platform [uvhs::env_or_default PLATFORM U2.2]
 set design_top fpga_top_debug
 set ddr_inst_path ${design_top}.core_def.U_UVHS_UVW_AXI4_TO_DDR4
 create_system_design -name VU19P_X4 -platform $platform
 
-source_required [file join $::uvhs_script_dir assemble_uvhs.tcl]
-source_required [file join $::uvhs_script_dir assign_pin_u22_f2.tcl]
-set_constraint_files [file join $::uvhs_script_dir timing_common.tcl]
+uvhs::source_required assemble_uvhs.tcl
+uvhs::source_required assign_pin_u22_f2.tcl
+set_constraint_files [uvhs::path timing_common.tcl]
 foreach reset_port {rstn_sw6 rstn_sw5 rstn_sw4} {
     create_reset -port ${design_top}.${reset_port} -active 0
 }
 
-import_blackbox blk_mem_gen_0 ./rtl/soc/blk_mem_gen_0.dcp
-import_blackbox AXI_bridge ./rtl/soc/AXI_bridge.dcp
-import_blackbox data_bridge ./rtl/soc/data_bridge.dcp
-import_blackbox xdma_ep ./rtl/device/pcie/xdma_ep.dcp
-import_blackbox uvw_general_bus \
+uvhs::import_blackbox blk_mem_gen_0 ./rtl/soc/blk_mem_gen_0.dcp
+uvhs::import_blackbox AXI_bridge ./rtl/soc/AXI_bridge.dcp
+uvhs::import_blackbox data_bridge ./rtl/soc/data_bridge.dcp
+uvhs::import_blackbox xdma_ep ./rtl/device/pcie/xdma_ep.dcp
+uvhs::import_blackbox uvw_general_bus \
     ./rtl/soc/uvw_general_bus/uvw_general_bus.dcp \
     -clock_enable_pairs {dut_axi_aclk dut_axi_aclk_en 1}
-import_ip uvw_axi4_to_ddr4 ./rtl/soc/uvw_axi4_to_ddr4.dcp \
+uvhs::import_ip uvw_axi4_to_ddr4 ./rtl/soc/uvw_axi4_to_ddr4.dcp \
     ./rtl/soc/uvw_axi4_to_ddr4_Stub.v \
     -clock_enable_pairs {ddr4ip_dut_axi_aclk ddr4ip_dut_axi_aclk_en 1} \
     -script_file {prePlace ./script/uvw_axi4_to_ddr4_pblock.tcl}
@@ -135,9 +121,9 @@ if {![file exists $filelist]} {
 }
 read_verilog -f $filelist -mfcu
 elaborate_design $design_top
-start_frontend_shell_compat
+uvhs::start_frontend_shell_compat
 synthesize_design -parallel_option frontend
 save_working_space
-register_runtime_memory hw.dat $ddr_inst_path
+uvhs::register_runtime_memory hw.dat $ddr_inst_path
 puts "UVHS_FRONTEND_SUCCESS"
 exit

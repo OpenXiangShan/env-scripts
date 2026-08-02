@@ -2,20 +2,13 @@
 # Reduce the vendor four-FPGA assembly template to the selected UVHS FPGA.
 ################################################################################
 
-proc uvhs_env_or_default {name default} {
-    if {[info exists ::env($name)] && $::env($name) ne ""} {
-        return $::env($name)
-    }
-    return $default
-}
-
 set uvhs_base_assemble ./script/1B_4F_HGC_assemble.tcl
-set uvhs_target_pack [uvhs_env_or_default UVHS_TARGET_PACK B0]
-set uvhs_target_name [uvhs_env_or_default UVHS_TARGET_FPGA F2]
+set uvhs_target_pack [uvhs::env_or_default UVHS_TARGET_PACK B0]
+set uvhs_target_name [uvhs::env_or_default UVHS_TARGET_FPGA F2]
 set uvhs_target_fpga [string tolower "$uvhs_target_pack.$uvhs_target_name"]
 set uvhs_known_fpgas {b0.f0 b0.f1 b0.f2 b0.f3}
 set uvhs_keep_fpgas {}
-foreach uvhs_fpga [split [uvhs_env_or_default UVHS_KEEP_FPGAS $uvhs_target_fpga]] {
+foreach uvhs_fpga [split [uvhs::env_or_default UVHS_KEEP_FPGAS $uvhs_target_fpga]] {
     set uvhs_fpga [string tolower [string trim $uvhs_fpga]]
     if {$uvhs_fpga ne "" && [lsearch -exact $uvhs_keep_fpgas $uvhs_fpga] < 0} {
         lappend uvhs_keep_fpgas $uvhs_fpga
@@ -63,12 +56,9 @@ foreach uvhs_line [split $uvhs_base_data "\n"] {
         puts "INFO: UVHS selected-FPGA overlay: remove unused daughter-card instance: $uvhs_trimmed_line"
         continue
     }
-    if {[regexp {^config_hw[ \t]+-unplug_fpga[ \t]+([^ \t]+)} $uvhs_trimmed_line -> uvhs_unplug_fpga]} {
-        set uvhs_unplug_fpga [string tolower $uvhs_unplug_fpga]
-        if {[lsearch -exact $uvhs_keep_fpgas $uvhs_unplug_fpga] >= 0} {
-            puts "INFO: UVHS selected-FPGA overlay: ignore base unplug for kept FPGA $uvhs_unplug_fpga"
-            continue
-        }
+    if {[regexp {^config_hw[ \t]+-unplug_fpga[ \t]+} $uvhs_trimmed_line]} {
+        puts "INFO: UVHS selected-FPGA overlay: replace base unplug: $uvhs_trimmed_line"
+        continue
     }
     if {[regexp {^config_hw[ \t]+-connect_daughter_card[ \t]+\{([^ \t]+)[ \t]+([^ \t]+)\.FMC\}} $uvhs_trimmed_line -> uvhs_connector uvhs_instance]} {
         set uvhs_lower_connector [string tolower $uvhs_connector]
@@ -119,8 +109,7 @@ foreach uvhs_fpga $uvhs_known_fpgas {
 set uvhs_create_board_replacements [regsub -line {^(config_hw[ \t]+-create_board_instance[ \t]+1[ \t]*)$} \
     $uvhs_base_data "\\1\n$uvhs_unplug_overlay" uvhs_base_data]
 if {$uvhs_create_board_replacements != 1} {
-    puts "WARN: UVHS selected-FPGA overlay: failed to insert unplug commands after create_board_instance; prepend overlay"
-    set uvhs_base_data "$uvhs_unplug_overlay\n$uvhs_base_data"
+    error "unexpected UVHS assembly template: create_board_instance marker not found"
 }
 
 set uvhs_overlay_file [file join [pwd] script .uvhs_assemble.tcl]
