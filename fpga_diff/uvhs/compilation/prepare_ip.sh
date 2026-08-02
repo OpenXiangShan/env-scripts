@@ -56,7 +56,9 @@ if [[ $force == 1 || ! -s $gbus_release/uvw_general_bus.dcp ||
   generator=$gbus_gen/ip-src/gen_generalbus_ip.py
   sed -i '/os[.]popen.*f_dcp_in.*f_dcp_out/c\    shutil.copy2(f_dcp_in, f_dcp_out)' \
     "$generator"
+  sed -i 's|#!/bin/tcsh|#!/usr/bin/env bash|' "$generator"
   grep -Fq 'shutil.copy2(f_dcp_in, f_dcp_out)' "$generator"
+  grep -Fq '#!/usr/bin/env bash' "$generator"
   json=$gbus_gen/uvw_axi3_generalbus.json
   cp -f "$gbus_source/uvw_axi3_generalbus.json" "$json"
   sed -i -E \
