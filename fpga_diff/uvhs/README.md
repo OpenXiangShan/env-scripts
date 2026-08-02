@@ -60,10 +60,10 @@ timing signoff, bitstream generation, and runtime database commit. Fill-rate
 validation and automatic partitioning are kept next to that sequence in
 `compilation/backend_run.tcl`.
 
-`compilation/timing.tcl` supplies the external clocks to the frontend. The
-asynchronous groups are applied from `compilation/async_clocks.tcl` after UVHS
-has inferred and transformed clocks, then applied again to each linked FPGA
-netlist before Vivado optimization.
+`compilation/timing.tcl` supplies the external clocks and asynchronous groups
+to the frontend. The groups are applied again after UVHS has inferred and
+transformed clocks, then once more to each linked FPGA netlist before Vivado
+optimization.
 
 The default XiangShan partition limits are 70% LUT and 35% LUT6. They can be
 changed with `UVHS_LUT_FILL_RATE` and `UVHS_LUT6_FILL_RATE` for placement
@@ -134,7 +134,7 @@ or DDR pins.
 | `compilation/topology.tcl` | Selects the FPGA set from the vendor board assembly. |
 | `compilation/assign_pin.tcl` | B0/F2 clock, PCIe, UART, JTAG, SD, and control pins. |
 | `compilation/timing.tcl` | External clock constraints registered by the frontend. |
-| `compilation/async_clocks.tcl` | Asynchronous groups applied after clock transformation. |
+| `compilation/async_clocks.tcl` | Shared asynchronous groups for frontend, backend, and PnR. |
 | `compilation/vivado_pre_opt.tcl` | XDMA refclock and CDC constraints. |
 | `compilation/prepare_ip.sh` | Vivado IP export plus generalBus and DDR DCP preparation. |
 | `compilation/export_vivado_ip.tcl` | Repository-owned Vivado IP export. |

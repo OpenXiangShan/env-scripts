@@ -1,8 +1,8 @@
 ################################################################################
 # UVHS asynchronous clock constraints.
 #
-# backend_run.tcl and the Vivado pre-opt stage load this after generated clocks
-# are available.
+# timing.tcl establishes the frontend relation. The backend and Vivado pre-opt
+# stages load this again after transformed or linked clocks are available.
 ################################################################################
 
 set fpga_diff_async_groups [list]
