@@ -50,4 +50,12 @@ if [[ -n ${LD_LIBRARY_PATH:-} ]]; then
 fi
 export LD_LIBRARY_PATH=$runtime_library_path
 
-exec "$UV_ROOT/bin/uv_shell_exec" "$@"
+if [[ -n ${UVHS_COMPAT_BIN:-} ]]; then
+  export PATH=$UVHS_COMPAT_BIN:$PATH
+fi
+
+executable="$UV_ROOT/bin/uv_shell_exec"
+case ${0##*/} in
+  python|python3) executable="$UV_ROOT/lib/venv3.8/bin/${0##*/}" ;;
+esac
+exec "$executable" "$@"

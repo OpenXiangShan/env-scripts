@@ -292,6 +292,6 @@ or DDR pins.
 | `compilation/prepare_ip.sh` | Coordinates Vivado, generalBus, and external DDR IP preparation. |
 | `compilation/export_vivado_ip.tcl` | Runs repository-owned XCI/BD exports inside Vivado. |
 | `compilation/shell_compat.sh` | Generated launcher shell correction. |
-| `runtime/uv_shell_exec_compat.sh` | Runtime library wrapper used by build and runtime shells. |
+| `runtime/uv_shell_exec_compat.sh` | Runtime library wrapper for UVHS shells and generated Python workers. |
 | `runtime/runtime_server.tcl` | Download, reset, DDR, flash, capture, and command service. |
 | `runtime/runtime_session.sh` | Process lifecycle and atomic command/result transport. |

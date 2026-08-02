@@ -18,6 +18,7 @@ UVHS_LUT6_FILL_RATE ?= $(if $(filter kmh,$(CPU)),35,)
 
 UVHS_DDR_RTL_INST := fpga_top_debug.core_def.U_UVHS_UVW_AXI4_TO_DDR4
 UVHS_RUNTIME_LIB_DIR := $(UVHS_WORK_DIR)/.uvhs-runtime-lib
+UVHS_COMPAT_BIN := $(UVHS_WORK_DIR)/.uvhs-compat-bin
 UVHS_RUNTIME_DB := $(UVHS_WORK_DIR)/hw.dat
 UVHS_RUNTIME_WORK_DIR := $(UVHS_WORK_DIR)/runtime-work
 UVHS_RUNTIME_COMMAND_FILE := $(UVHS_RUNTIME_WORK_DIR)/command.tcl
@@ -38,6 +39,7 @@ UVHS_TOOL_ENV = \
 	PATH="$$UV_ROOT/bin:$$UV_ROOT/lib/venv3.8/bin:$$UV_ROOT/lib/gcc10.3/bin:$$PATH" \
 	MAKEFLAGS="$${MAKEFLAGS:+$$MAKEFLAGS }SHELL=/bin/bash" \
 	UVHS_RUNTIME_LIB_DIR="$(UVHS_RUNTIME_LIB_DIR)" \
+	UVHS_COMPAT_BIN="$(UVHS_COMPAT_BIN)" \
 	UVSHELL_EXEC_NAME="$(UVHS_RUNTIME_DIR)/uv_shell_exec_compat.sh"
 
 UVHS_FLOW_ENV = \
@@ -90,6 +92,11 @@ uvhs_prepare: uvhs_preflight
 	test -n "$(UVHS_WORK_DIR)"
 	rm -rf "$(UVHS_WORK_DIR)/script"
 	mkdir -p "$(UVHS_WORK_DIR)"
+	mkdir -p "$(UVHS_COMPAT_BIN)"
+	ln -sfn "$(UVHS_RUNTIME_DIR)/uv_shell_exec_compat.sh" \
+		"$(UVHS_COMPAT_BIN)/python"
+	ln -sfn "$(UVHS_RUNTIME_DIR)/uv_shell_exec_compat.sh" \
+		"$(UVHS_COMPAT_BIN)/python3"
 	cp -a "$(UVHS_TEMPLATE_DIR)/script" "$(UVHS_WORK_DIR)/"
 	cp -f "$(UVHS_TEMPLATE_DIR)/Makefile" "$(UVHS_WORK_DIR)/Makefile"
 	mkdir -p "$(UVHS_WORK_DIR)/rtl/soc" "$(UVHS_WORK_DIR)/rtl/device/pcie"
