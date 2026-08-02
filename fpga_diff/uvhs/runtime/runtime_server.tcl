@@ -210,7 +210,7 @@ proc uvhs_write_ddr_pairs {input_file rtl_path data_width} {
     puts "INFO: DDR backdoor write completed: $input_file"
 }
 
-proc uvhs_capture_ila {trigger_file output_name timeout depth} {
+proc uvhs_ila {trigger_file output_name timeout depth position clock} {
     if {![file isfile $trigger_file]} {
         error "trigger condition file not found: $trigger_file"
     }
@@ -219,16 +219,20 @@ proc uvhs_capture_ila {trigger_file output_name timeout depth} {
     }
     set timeout [uvhs_parse_integer "capture timeout" $timeout]
     set depth [uvhs_parse_integer "capture depth" $depth]
+    set position [uvhs_parse_integer "capture position" $position]
     if {$timeout <= 0 || $depth <= 0} {
         error "capture timeout and depth must be positive"
+    }
+    if {$position < 0 || $position > 100} {
+        error "capture position must be between 0 and 100: $position"
     }
 
     set output_dir [file join [pwd] UHD $output_name]
     file delete -force $output_dir
     query -trigger
     trigger -ini_check $trigger_file
+    trigger -set -condition $trigger_file -position $position
     capture -enable
-    trigger -set -condition $trigger_file -position 5
     trigger -enable
 
     # The default capture observes boot from CPU reset release. External traffic
@@ -236,7 +240,12 @@ proc uvhs_capture_ila {trigger_file output_name timeout depth} {
     uvhs_reset_cpu
     set trigger_status [trigger -status -wait 1 -timeout $timeout -tclobj]
     puts "INFO: UVHS trigger status: $trigger_status"
-    upload_uhd -depth $depth -out $output_name
+    set upload_options [list -depth $depth -position $position]
+    if {$clock ne ""} {
+        lappend upload_options -clock $clock
+    }
+    lappend upload_options -out $output_name
+    upload_uhd {*}$upload_options
     wavegen -bindir [file join UHD $output_name]
 
     set usdb [file join $output_dir UvData.usdb]
@@ -246,7 +255,7 @@ proc uvhs_capture_ila {trigger_file output_name timeout depth} {
     puts "INFO: UVHS waveform database generated: $usdb"
 }
 
-proc uvhs_capture_clear {} {
+proc uvhs_ila_clear {} {
     trigger -clear
     puts "INFO: UVHS trigger conditions and capture are disabled"
 }
@@ -277,13 +286,13 @@ proc uvhs_execute_command {args} {
             uvhs_write_flash_gbus {*}[lrange $args 1 7]
             uvhs_release_cpu_after_memory
         }
-        capture_ila {
-            if {[llength $args] != 5} { error "capture_ila expects 4 arguments" }
-            uvhs_capture_ila {*}[lrange $args 1 4]
+        ila {
+            if {[llength $args] != 7} { error "ila expects 6 arguments" }
+            uvhs_ila {*}[lrange $args 1 6]
         }
-        capture_clear {
-            if {[llength $args] != 1} { error "capture_clear expects no arguments" }
-            uvhs_capture_clear
+        ila_clear {
+            if {[llength $args] != 1} { error "ila_clear expects no arguments" }
+            uvhs_ila_clear
         }
         stop {
             if {[llength $args] != 1} { error "stop expects no arguments" }

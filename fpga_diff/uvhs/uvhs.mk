@@ -26,11 +26,13 @@ UVHS_RUNTIME_READY_FILE := $(UVHS_RUNTIME_WORK_DIR)/uv_shell.ready
 UVHS_RUNTIME_LOG := $(UVHS_RUNTIME_WORK_DIR)/uv_shell.log
 UVHS_RUNTIME_TIMEOUT ?= 600
 
-UVHS_CAPTURE_TIMEOUT ?= 60
-UVHS_CAPTURE_DEPTH ?= 1000000
-UVHS_CAPTURE_DIR := $(UVHS_RUNTIME_WORK_DIR)/UHD/uvhs_capture
-UVHS_CAPTURE_USDB := $(UVHS_CAPTURE_DIR)/UvData.usdb
-UVHS_CAPTURE_VCD := $(UVHS_CAPTURE_DIR)/UvData.vcd
+UVHS_ILA_TIMEOUT ?= 60
+UVHS_ILA_DEPTH ?= 1000000
+UVHS_ILA_POSITION ?= 50
+UVHS_ILA_CLOCK ?=
+UVHS_ILA_DIR := $(UVHS_RUNTIME_WORK_DIR)/UHD/uvhs_ila
+UVHS_ILA_USDB := $(UVHS_ILA_DIR)/UvData.usdb
+UVHS_ILA_VCD := $(UVHS_ILA_DIR)/UvData.vcd
 
 UVHS_TOOL_ENV = \
 	PATH="$$UV_ROOT/bin:$$UV_ROOT/lib/venv3.8/bin:$$UV_ROOT/lib/gcc10.3/bin:$$PATH" \
@@ -50,7 +52,7 @@ UVHS_FLOW_ENV = \
 .PHONY: uvhs uvhs_preflight uvhs_prepare \
 	uvhs_frontend uvhs_backend uvhs_clean uvhs_write_bitstream \
 	uvhs_halt_soc uvhs_reset_cpu uvhs_write_ddr uvhs_write_flash \
-	uvhs_capture uvhs_capture_clear uvhs_runtime_status uvhs_runtime_stop
+	uvhs_ila uvhs_ila_clear uvhs_runtime_status uvhs_runtime_stop
 
 # Validate host tools and external inputs before starting a multi-hour build.
 uvhs_preflight:
@@ -160,19 +162,22 @@ uvhs_write_flash:
 	test -f "$(WORKLOAD)"
 	$(call uvhs_runtime_command,write_flash "$(abspath $(WORKLOAD))" B0 F2 0 0 0x0 0x8000)
 
-uvhs_capture:
+uvhs_ila:
 	test -f "$(TRIGGER)"
 	test -x "$$UV_ROOT/uvd/uvs/bin/usdb2vcd"
-	$(call uvhs_runtime_command,capture_ila "$(abspath $(TRIGGER))" uvhs_capture "$(UVHS_CAPTURE_TIMEOUT)" "$(UVHS_CAPTURE_DEPTH)")
-	test -s "$(UVHS_CAPTURE_USDB)"
+	$(call uvhs_runtime_command,ila \
+		"$(abspath $(TRIGGER))" uvhs_ila \
+		"$(UVHS_ILA_TIMEOUT)" "$(UVHS_ILA_DEPTH)" \
+		"$(UVHS_ILA_POSITION)" "$(UVHS_ILA_CLOCK)")
+	test -s "$(UVHS_ILA_USDB)"
 	$(UVHS_TOOL_ENV) "$$UV_ROOT/uvd/uvs/bin/usdb2vcd" \
-		-i "$(UVHS_CAPTURE_USDB)" -o "$(UVHS_CAPTURE_VCD)"
-	test -s "$(UVHS_CAPTURE_VCD)"
-	@echo "UVHS_CAPTURE_USDB=$(UVHS_CAPTURE_USDB)"
-	@echo "UVHS_CAPTURE_VCD=$(UVHS_CAPTURE_VCD)"
+		-i "$(UVHS_ILA_USDB)" -o "$(UVHS_ILA_VCD)"
+	test -s "$(UVHS_ILA_VCD)"
+	@echo "UVHS_ILA_USDB=$(UVHS_ILA_USDB)"
+	@echo "UVHS_ILA_VCD=$(UVHS_ILA_VCD)"
 
-uvhs_capture_clear:
-	$(call uvhs_runtime_command,capture_clear)
+uvhs_ila_clear:
+	$(call uvhs_runtime_command,ila_clear)
 
 uvhs_runtime_stop:
 	$(call uvhs_runtime_command,stop)
