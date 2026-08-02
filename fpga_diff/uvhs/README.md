@@ -194,10 +194,10 @@ LOGIC = OR
 uvhs_ila
 ```
 
-After `uvhs_write_bitstream`, `uvhs_ila` checks the condition file, enables
-capture and trigger logic, resets the CPU, waits for the trigger, uploads the
-UHD data, and reconstructs the waveform. It creates both files below the
-selected build directory:
+After `uvhs_write_bitstream`, `uvhs_ila` is the one-shot capture start command.
+It checks the condition file, enables capture and trigger logic, resets the
+CPU, waits for the trigger, uploads the UHD data, and reconstructs the
+waveform. It creates both files below the selected build directory:
 
 ```text
 runtime-work/UHD/uvhs_ila/UvData.usdb
@@ -215,21 +215,22 @@ trigger -status -wait 1 -timeout 60
 upload_uhd -depth 1000000 -position 70 -out uvhs_ila
 ```
 
-Capture hardware is armed only by `uvhs_ila`. Clear a timed-out or
-unwanted capture explicitly with:
+Capture hardware is armed only by `uvhs_ila`. Clear the trigger configuration
+after a timed-out or unwanted capture with:
 
 ```sh
 make uvhs_ila_clear CPU=<design> SUFFIX=<tag>
 ```
 
-This runs `trigger -clear`, which clears the trigger configuration and disables
-both trigger and capture. Omitting probes at compile time avoids their resource
-and timing cost entirely; leaving compiled probes idle avoids capture and
-upload traffic but does not recover those implementation resources. In HSP,
-capture runs in hardware without stopping the DUT clock. The upload, waveform
-generation, and USDB-to-VCD conversion increase debug-command latency rather
-than DUT cycle time. A large probe set can still lower the achievable clock
-frequency indirectly by adding routing and timing pressure during compilation.
+This runs the prototyping command `trigger -clear`; it removes the configured
+conditions so the trigger is no longer armed. Omitting probes at compile time
+avoids their resource and timing cost entirely; leaving compiled probes idle
+avoids capture and upload traffic but does not recover those implementation
+resources. In HSP, capture runs in hardware without stopping the DUT clock.
+The upload, waveform generation, and USDB-to-VCD conversion increase
+debug-command latency rather than DUT cycle time. A large probe set can still
+lower the achievable clock frequency indirectly by adding routing and timing
+pressure during compilation.
 The runtime command service is serial, so `uvhs_ila_clear` is handled after an
 in-flight `uvhs_ila` reaches its trigger or timeout; it is not an asynchronous
 interrupt for the current wait.
@@ -251,11 +252,20 @@ make uvhs_ila CPU=<design> SUFFIX=<tag> TRIGGER=/path/to/trigger.ini \
 
 `UVHS_ILA_DEPTH` is the total uploaded sample count. `UVHS_ILA_POSITION` is the
 percentage after the trigger, from 0 through 100; the example uploads roughly
-300,000 samples before the trigger and 700,000 after it. `UVHS_ILA_CLOCK` can
-select the depth-counting clock by a runtime-database global clock name or a
-frequency; when empty, the tool uses its 200 MHz TS clock. `UVHS_ILA_TIMEOUT`
-defaults to 60 seconds. This is the UVHS UHD path; the normal Vivado flow
-continues to use `make dump_ila` and a `.ltx` file.
+300,000 samples before the trigger and 700,000 after it. Position 0 keeps the
+window before the trigger, 50 centers it, and 100 keeps the window after the
+trigger. `UVHS_ILA_CLOCK` can select the depth-counting clock by a
+runtime-database global clock name or a frequency; when empty, the tool uses
+its 200 MHz TS clock. `UVHS_ILA_TIMEOUT` defaults to 60 seconds. This is the
+UVHS UHD path; the normal Vivado flow continues to use `make dump_ila` and a
+`.ltx` file.
+
+UHD capture inserts its own external DDR wrapper on every FPGA containing a
+probe group. On the current single-F2 NutShell topology, that capture memory
+and the DUT DDR IP both require the F2 PDDR4DME/FMC3 resource, so a probe-enabled
+build fails `bind_system` with `BND-026`. Keep the template empty for the normal
+single-F2 bitstream. A probe-enabled build requires a topology that provides a
+separate compatible UHD capture-memory resource.
 
 ## Compatibility Boundary
 
