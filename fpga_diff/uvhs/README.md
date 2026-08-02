@@ -36,14 +36,12 @@ FPGA-Diff wrappers in `filelist.f`.
 ```sh
 make uvhs CPU=<design> CORE_DIR=/path/to/release/build \
   RTL_INCLUDE=/path/to/extra.f SUFFIX=<tag>
-make uvhs_bitstream CPU=<design> SUFFIX=<tag>
 ```
 
-`RTL_INCLUDE` is optional. These are the two stable build entry points intended
-for an upper-level build system: `uvhs` prepares and synthesizes the UVHS
-database, while `uvhs_bitstream` runs backend implementation, checks timing,
-and publishes `fpga_top_debug.bit`. The lower-level `uvhs_frontend` and
-`uvhs_backend` targets remain available for stage reuse and debugging.
+`RTL_INCLUDE` is optional. `uvhs` is the stable build entry point: it runs the
+frontend and backend in order, generates the per-FPGA bitstreams, and commits
+the runtime database. The lower-level `uvhs_frontend` and `uvhs_backend`
+targets remain available for stage reuse and debugging.
 
 `uvhs_frontend` performs these steps:
 

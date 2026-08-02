@@ -52,15 +52,10 @@ UVHS_FLOW_ENV = \
 	UVHS_LUT_FILL_RATE="$(UVHS_LUT_FILL_RATE)" \
 	UVHS_LUT6_FILL_RATE="$(UVHS_LUT6_FILL_RATE)"
 
-UVHS_PNR_DIR := $(UVHS_WORK_DIR)/hw.dat/Compile/PnR/B0/F2/vivado/Rundir/Strategy_uv_high_fanout_explore
-UVHS_BITSTREAM_DIR := $(UVHS_PNR_DIR)/bitstream
-UVHS_BIT_HOME := $(UVHS_WORK_DIR)/ready-to-program
-
-.PHONY: uvhs uvhs_bitstream uvhs_preflight uvhs_prepare \
+.PHONY: uvhs uvhs_preflight uvhs_prepare \
 	uvhs_export_vivado_ip uvhs_export_generalbus \
 	uvhs_sync_uvw_axi4_to_ddr4 uvhs_filelist \
-	uvhs_frontend uvhs_backend uvhs_check_timing \
-	uvhs_package_bitstream uvhs_clean uvhs_write_bitstream \
+	uvhs_frontend uvhs_backend uvhs_clean uvhs_write_bitstream \
 	uvhs_halt_soc uvhs_reset_cpu uvhs_write_ddr uvhs_write_flash \
 	uvhs_runtime_status uvhs_runtime_check uvhs_runtime_stop
 
@@ -196,8 +191,9 @@ uvhs_frontend: uvhs_sync_uvw_axi4_to_ddr4 uvhs_filelist
 		-s "$(UVHS_ROOT_DIR)/uvhs/frontend_run.tcl" |& tee frontend_run.log; \
 		grep -Fxq UVHS_FRONTEND_SUCCESS frontend_run.log'
 
-# Stable frontend entry point, analogous to the normal `all` project setup.
+# Stable build entry point. Keep the stages serialized even under parallel make.
 uvhs: uvhs_frontend
+	$(MAKE) uvhs_backend
 
 uvhs_backend:
 	bash -c 'set -euo pipefail; cd "$(UVHS_WORK_DIR)"; \
@@ -205,20 +201,6 @@ uvhs_backend:
 		bash "$$UV_ROOT/bin/uv_shell" -bypass_vivado_version_check \
 		-s "$(UVHS_ROOT_DIR)/uvhs/backend_run.tcl" |& tee backend_run.log; \
 		grep -Fxq UVHS_BACKEND_SUCCESS backend_run.log'
-
-uvhs_check_timing:
-	test -f "$(UVHS_BITSTREAM_DIR)/after_xtalk_fix_timing_summary.txt"
-	! grep -q 'Timing constraints are not met' "$(UVHS_BITSTREAM_DIR)/after_xtalk_fix_timing_summary.txt"
-
-uvhs_package_bitstream: uvhs_check_timing
-	test -f "$(UVHS_BITSTREAM_DIR)/pnr.bit"
-	mkdir -p "$(UVHS_BIT_HOME)"
-	ln -sf "$(UVHS_BITSTREAM_DIR)/pnr.bit" "$(UVHS_BIT_HOME)/fpga_top_debug.bit"
-	@echo "FPGA_BIT_HOME=$(UVHS_BIT_HOME)"
-
-# Stable implementation entry point, analogous to the normal `bitstream` target.
-uvhs_bitstream: uvhs_backend
-	$(MAKE) uvhs_package_bitstream
 
 # The UVHS API requires one session to retain ownership of the downloaded
 # database. Detach that session after programming and track it in runtime-work.

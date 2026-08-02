@@ -57,7 +57,6 @@ invoke:
 
 ```shell
 make uvhs CPU=<design> CORE_DIR=/path/to/release/build SUFFIX=<tag>
-make uvhs_bitstream CPU=<design> SUFFIX=<tag>
 ```
 
 See [`uvhs/README.md`](uvhs/README.md) for the board-template and vendor-DDR
