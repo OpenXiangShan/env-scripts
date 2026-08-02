@@ -8,24 +8,11 @@ UVHS_FILELIST := $(UVHS_WORK_DIR)/rtl/filelist.f
 
 UVHS_EXPORT_IP_FORCE ?= 0
 UVHS_EXPORT_IP_JOBS := $(if $(strip $(VIVADO_JOBS)),$(VIVADO_JOBS),8)
-UVHS_GBUS_IP_DIR := $(UV_ROOT)/platform/U2.2/Prototype/ips/uvw_gbus.3.1
-UVHS_GBUS_GENERATOR := $(UVHS_GBUS_IP_DIR)/gen_generalbus_ip.py
-UVHS_GBUS_JSON := $(UVHS_GBUS_IP_DIR)/uvw_axi3_generalbus.json
-UVHS_GBUS_GEN_DIR := $(UVHS_WORK_DIR)/ip-gen/generalbus
 
 UVHS_KEEP_FPGAS ?= $(if $(filter kmh,$(CPU)),b0.f0 b0.f1 b0.f2 b0.f3,)
 UVHS_LUT_FILL_RATE ?= $(if $(filter kmh,$(CPU)),70,)
 UVHS_LUT6_FILL_RATE ?= $(if $(filter kmh,$(CPU)),35,)
 
-UVHS_UVW_AXI4_TO_DDR4_FILES := \
-	rtl/soc/uvw_axi4_to_ddr4.dcp \
-	rtl/soc/uvw_axi4_to_ddr4_Stub.v \
-	script/uvw_axi4_to_ddr4_pblock.tcl \
-	script/custom_parts_ddr4_KSM26SES8_2666.csv
-UVHS_UVW_AXI4_TO_DDR4_REQUIRED_FILES := \
-	rtl/soc/uvw_axi4_to_ddr4.dcp \
-	rtl/soc/uvw_axi4_to_ddr4_Stub.v \
-	script/uvw_axi4_to_ddr4_pblock.tcl
 UVHS_DDR_RTL_INST := fpga_top_debug.core_def.U_UVHS_UVW_AXI4_TO_DDR4
 UVHS_RUNTIME_LIB_DIR := $(UVHS_WORK_DIR)/.uvhs-runtime-lib
 UVHS_RUNTIME_DB := $(UVHS_WORK_DIR)/hw.dat
@@ -53,8 +40,7 @@ UVHS_FLOW_ENV = \
 	UVHS_LUT6_FILL_RATE="$(UVHS_LUT6_FILL_RATE)"
 
 .PHONY: uvhs uvhs_preflight uvhs_prepare \
-	uvhs_export_vivado_ip uvhs_export_generalbus \
-	uvhs_sync_uvw_axi4_to_ddr4 uvhs_filelist \
+	uvhs_prepare_ip uvhs_filelist \
 	uvhs_frontend uvhs_backend uvhs_clean uvhs_write_bitstream \
 	uvhs_halt_soc uvhs_reset_cpu uvhs_write_ddr uvhs_write_flash \
 	uvhs_runtime_status uvhs_runtime_check uvhs_runtime_stop
@@ -68,12 +54,9 @@ uvhs_preflight:
 	test -x "$$UV_ROOT/bin/uv_shell_exec"
 	test -x "$(UVHS_ROOT_DIR)/uvhs/uv_shell_exec_compat.sh"
 	test -x "$(UVHS_ROOT_DIR)/uvhs/shell_compat.sh"
+	test -x "$(UVHS_ROOT_DIR)/uvhs/prepare_ip.sh"
 	test -x "$(UVHS_ROOT_DIR)/tools/update_core_flist.sh"
 	test -f "$(UVHS_ROOT_DIR)/uvhs/vivado_pre_opt.tcl"
-	test -f "$(UVHS_GBUS_GENERATOR)"
-	test -f "$(UVHS_GBUS_JSON)"
-	command -v python3 >/dev/null
-	command -v gzip >/dev/null
 	test -d "$(UVHS_TEMPLATE_DIR)/script"
 	test -f "$(UVHS_TEMPLATE_DIR)/Makefile"
 	test -f "$(UVHS_TEMPLATE_DIR)/script/1B_4F_HGC_assemble.tcl"
@@ -103,88 +86,18 @@ uvhs_prepare: uvhs_preflight
 	cp -f "$(UVHS_TEMPLATE_DIR)/Makefile" "$(UVHS_WORK_DIR)/Makefile"
 	mkdir -p "$(UVHS_WORK_DIR)/rtl/soc" "$(UVHS_WORK_DIR)/rtl/device/pcie"
 
-uvhs_export_vivado_ip: uvhs_prepare
-	bash -c 'set -euo pipefail; \
-		export VIVADO_HOME="$$UV_XILINX_VIVADO" XILINX_VIVADO="$$UV_XILINX_VIVADO"; \
-		version="$$("$$UV_XILINX_VIVADO/bin/vivado" -version | sed -n "s/^Vivado v\\([^ ]*\\).*/\\1/p" | head -n 1)"; \
-		test -n "$$version"; \
-		$(UVHS_FLOW_ENV) "$$UV_XILINX_VIVADO/bin/vivado" -mode batch \
-		-source "$(UVHS_ROOT_DIR)/uvhs/export_vivado_ip.tcl" -tclargs \
-		--origin_dir "$(UVHS_ROOT_DIR)" --out_dir "$(UVHS_WORK_DIR)" \
-		--vivado_version "$$version" --core_dir "$(CORE_DIR)" \
-		--jobs "$(UVHS_EXPORT_IP_JOBS)" \
-		$(if $(filter 1,$(UVHS_EXPORT_IP_FORCE)),--force,)'
+uvhs_prepare_ip: uvhs_prepare
+	$(UVHS_FLOW_ENV) bash "$(UVHS_ROOT_DIR)/uvhs/prepare_ip.sh" \
+		"$(UVHS_ROOT_DIR)" "$(UVHS_WORK_DIR)" "$(CORE_DIR)" \
+		"$(UVHS_EXPORT_IP_JOBS)" "$(UVHS_EXPORT_IP_FORCE)" \
+		"$(UVHS_UVW_AXI4_TO_DDR4_SRC)" "$(UVHS_DDR_AXI_WIDTH)"
 
-# The vendor generator starts an asynchronous DCP copy before deleting its
-# project. Make that copy synchronous in the private work-directory copy.
-uvhs_export_generalbus: uvhs_prepare
-	bash -c 'set -euo pipefail; \
-		source_ip_dir="$(UVHS_GBUS_IP_DIR)"; generator="$(UVHS_GBUS_GENERATOR)"; \
-		gen_dir="$(UVHS_GBUS_GEN_DIR)"; release="$$gen_dir/uvw_general_bus"; \
-		gbus_stub_is_64() { \
-			grep -Eq "output[[:space:]]+\\[63:0\\][[:space:]]*dut_axi_wdata" "$$1" && \
-			grep -Eq "input[[:space:]]+\\[63:0\\][[:space:]]*dut_axi_rdata" "$$1"; \
-		}; \
-		test -f "$$generator"; test -f "$(UVHS_GBUS_JSON)"; \
-		if [ "$(UVHS_EXPORT_IP_FORCE)" = 1 ] || \
-		   [ ! -s "$$release/uvw_general_bus.dcp" ] || \
-		   [ ! -s "$$release/uvw_general_bus_Stub.v" ] || \
-		   ! gbus_stub_is_64 "$$release/uvw_general_bus_Stub.v"; then \
-			rm -rf "$$gen_dir"; mkdir -p "$$gen_dir"; \
-			ip_dir="$$gen_dir/ip-src"; \
-			cp -a "$$source_ip_dir" "$$ip_dir"; \
-			gen_script="$$ip_dir/gen_generalbus_ip.py"; \
-			sed -i "/os[.]popen.*f_dcp_in.*f_dcp_out/c\\    shutil.copy2(f_dcp_in, f_dcp_out)" \
-			  "$$gen_script"; \
-			grep -Fq "shutil.copy2(f_dcp_in, f_dcp_out)" "$$gen_script"; \
-			json="$$gen_dir/uvw_axi3_generalbus.json"; \
-			cp -f "$(UVHS_GBUS_JSON)" "$$json"; \
-			sed -i -E \
-			  "s|(\"IP_LOCATION\"[[:space:]]*:[[:space:]]*)\"[^\"]*\"|\1\"$$ip_dir\"|; \
-			   s|(\"DATA_WIDTH\"[[:space:]]*:[[:space:]]*)\"[^\"]*\"|\1\"64\"|" \
-			  "$$json"; \
-			export VIVADO_HOME="$$UV_XILINX_VIVADO" XILINX_VIVADO="$$UV_XILINX_VIVADO"; \
-			cd "$$gen_dir"; \
-			PATH="$$UV_XILINX_VIVADO/bin:$$PATH" python3 "$$gen_script" -j "$$json"; \
-		fi; \
-		test -s "$$release/uvw_general_bus.dcp"; \
-		test -s "$$release/uvw_general_bus_Stub.v"; \
-		gbus_stub_is_64 "$$release/uvw_general_bus_Stub.v"; \
-		rm -rf "$(UVHS_WORK_DIR)/rtl/soc/uvw_general_bus"; \
-		mkdir -p "$(UVHS_WORK_DIR)/rtl/soc" "$(UVHS_WORK_DIR)/rtl/stubs"; \
-		cp -a "$$release" "$(UVHS_WORK_DIR)/rtl/soc/uvw_general_bus"; \
-		cp -f "$$release/uvw_general_bus_Stub.v" \
-		  "$(UVHS_WORK_DIR)/rtl/stubs/uvw_general_bus.v"; \
-		echo "INFO: prepared 64-bit UVHS generalBus DCP"'
-
-uvhs_sync_uvw_axi4_to_ddr4: uvhs_prepare
-	bash -c 'set -euo pipefail; \
-		src="$(UVHS_UVW_AXI4_TO_DDR4_SRC)"; work="$(UVHS_WORK_DIR)"; \
-		for rel in $(UVHS_UVW_AXI4_TO_DDR4_FILES); do \
-			base="$${rel##*/}"; dst="$$work/$$rel"; found=""; \
-			for candidate in "$$src/$$rel" "$$src/$$base"; do \
-				if [ -f "$$candidate" ]; then found="$$candidate"; break; fi; \
-			done; \
-			if [ -z "$$found" ]; then found="$$(find "$$src" -type f -name "$$base" -size +0c -print -quit)"; fi; \
-			if [ -n "$$found" ]; then mkdir -p "$$(dirname "$$dst")"; cp -f "$$found" "$$dst"; fi; \
-		done; \
-		for rel in $(UVHS_UVW_AXI4_TO_DDR4_REQUIRED_FILES); do test -s "$$work/$$rel"; done; \
-		expected_width="$(UVHS_DDR_AXI_WIDTH)"; last_bit="$$((expected_width - 1))"; \
-		stub="$$work/rtl/soc/uvw_axi4_to_ddr4_Stub.v"; \
-		if gzip -t "$$stub" 2>/dev/null; then \
-			gzip -dc "$$stub" > "$$stub.decompressed"; \
-			mv -f "$$stub.decompressed" "$$stub"; \
-		fi; \
-		grep -Eq "input[[:space:]]+\\[$$last_bit:0\\][[:space:]]*ddr4ip_dut_axi_wdata" "$$stub"; \
-		grep -Eq "output[[:space:]]+\\[$$last_bit:0\\][[:space:]]*ddr4ip_dut_axi_rdata" "$$stub"; \
-		echo "INFO: verified UVHS DDR DCP AXI data width: $$expected_width"'
-
-uvhs_filelist: uvhs_export_vivado_ip uvhs_export_generalbus
+uvhs_filelist: uvhs_prepare_ip
 	bash "$(UVHS_ROOT_DIR)/tools/update_core_flist.sh" uvhs \
 		"$(CORE_DIR)" "$(UVHS_WORK_DIR)" "$(CPU)" "$(UVHS_FILELIST)" \
 		-- $(RTL_INCLUDE)
 
-uvhs_frontend: uvhs_sync_uvw_axi4_to_ddr4 uvhs_filelist
+uvhs_frontend: uvhs_filelist
 	bash -c 'set -euo pipefail; cd "$(UVHS_WORK_DIR)"; \
 		$(UVHS_FLOW_ENV) \
 		bash "$$UV_ROOT/bin/uv_shell" -bypass_vivado_version_check \
@@ -206,7 +119,7 @@ uvhs_backend:
 # database. Detach that session after programming and track it in runtime-work.
 uvhs_write_bitstream:
 	test -d "$(UVHS_RUNTIME_DB)"
-	test -f "$(UVHS_ROOT_DIR)/uvhs/hw_run_download.tcl"
+	test -f "$(UVHS_ROOT_DIR)/uvhs/runtime_server.tcl"
 	test -x "$(UVHS_ROOT_DIR)/uvhs/runtime_session.sh"
 	mkdir -p "$(UVHS_RUNTIME_WORK_DIR)" "$(UVHS_RUNTIME_TMP_DIR)"
 	$(UVHS_TOOL_ENV) UVHS_DB_PATH="$(UVHS_RUNTIME_DB)" \
@@ -219,7 +132,7 @@ uvhs_write_bitstream:
 		"$(UVHS_RUNTIME_TIMEOUT)" \
 		bash "$$UV_ROOT/bin/uv_shell" -rt_shell \
 		-workdir "$(UVHS_RUNTIME_WORK_DIR)" \
-		-script "$(UVHS_ROOT_DIR)/uvhs/hw_run_download.tcl"
+		-script "$(UVHS_ROOT_DIR)/uvhs/runtime_server.tcl"
 
 uvhs_runtime_check:
 	bash "$(UVHS_ROOT_DIR)/uvhs/runtime_session.sh" check \

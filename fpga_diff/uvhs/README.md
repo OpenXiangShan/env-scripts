@@ -41,7 +41,9 @@ make uvhs CPU=<design> CORE_DIR=/path/to/release/build \
 `RTL_INCLUDE` is optional. `uvhs` is the stable build entry point: it runs the
 frontend and backend in order, generates the per-FPGA bitstreams, and commits
 the runtime database. The lower-level `uvhs_frontend` and `uvhs_backend`
-targets remain available for stage reuse and debugging.
+targets remain available for stage reuse and debugging. `ENV_SCRIPTS_HOME`
+defaults to the current `fpga_diff` directory; it only needs to be overridden
+when build outputs should live elsewhere.
 
 `uvhs_frontend` performs these steps:
 
@@ -82,7 +84,8 @@ make uvhs_runtime_stop CPU=<design> SUFFIX=<tag>
 `uvhs_write_bitstream` downloads the completed runtime database, initializes
 the hardware, and keeps a detached UVHS session alive. Later reset and memory
 commands must use that same session. Its PID, command files, and log are stored
-under `runtime-work` in the selected build directory.
+under `runtime-work` in the selected build directory. The session has no idle
+timeout; use `uvhs_runtime_stop` after testing to release it cleanly.
 
 `uvhs_write_ddr` converts the Vivado address/data-pair format to the DDR DCP
 word width and calls `writemem -rtl`. It leaves the CPU halted until
@@ -113,7 +116,7 @@ or DDR pins.
 
 | File | Role |
 | --- | --- |
-| `uvhs.mk` | Build, packaging, and runtime targets. |
+| `uvhs.mk` | Build and runtime target wiring. |
 | `../tools/update_core_flist.sh` | Shared Vivado/UVHS RTL file-list entry point. |
 | `../tools/rtl_filelist_lib.sh` | Nested file-list parsing and path resolution. |
 | `flow_common.tcl` | Shared UVHS path, environment, and source helpers. |
@@ -124,9 +127,10 @@ or DDR pins.
 | `timing_common.tcl` | External clock constraints. |
 | `async_clocks.tcl` | Asynchronous clock groups used by backend and Vivado PnR. |
 | `vivado_pre_opt.tcl` | XDMA refclock and CDC constraints. |
+| `prepare_ip.sh` | Vivado IP export plus generalBus and DDR DCP preparation. |
 | `export_vivado_ip.tcl` | Repository-owned Vivado IP export. |
 | `shell_compat.sh` | Generated launcher shell correction. |
 | `uv_shell_exec_compat.sh` | Runtime library wrapper. |
-| `hw_run_download.tcl` | Download, reset sequencing, and command service. |
+| `runtime_server.tcl` | Download, reset sequencing, and command service. |
 | `runtime_command.tcl` | Reset, DDR, and flash operations. |
 | `runtime_session.sh` | Runtime lifecycle, command submission, and status. |
