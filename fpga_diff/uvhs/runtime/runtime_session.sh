@@ -6,9 +6,8 @@ usage() {
 usage:
   runtime_session.sh start <pid-file> <ready-file> <log-file> <command-file> \
     <timeout> <command> [argument ...]
-  runtime_session.sh active <pid-file>
-  runtime_session.sh check <pid-file> <ready-file>
-  runtime_session.sh enqueue <command-file> <tcl-script> <timeout> [argument ...]
+  runtime_session.sh check <pid-file> [ready-file]
+  runtime_session.sh enqueue <command-file> <timeout> <command> [argument ...]
   runtime_session.sh wait <pid-file> <ready-file> <command-file> <timeout>
 EOF
   exit 64
@@ -25,6 +24,14 @@ read_pid() {
 
 process_is_alive() {
   kill -0 "$1" 2>/dev/null
+}
+
+write_pid() {
+  local pid_file=$1
+  local pid=$2
+  local temp_file="${pid_file}.tmp.$$"
+  printf '%s\n' "$pid" >"$temp_file"
+  mv -f "$temp_file" "$pid_file"
 }
 
 validate_timeout() {
@@ -79,9 +86,7 @@ case $action in
 
     nohup "$@" </dev/null >"$log_file" 2>&1 &
     pid=$!
-    pid_temp="${pid_file}.tmp.$$"
-    printf '%s\n' "$pid" >"$pid_temp"
-    mv -f "$pid_temp" "$pid_file"
+    write_pid "$pid_file" "$pid"
 
     deadline=$((SECONDS + timeout))
     while [[ ! -f $ready_file ]]; do
@@ -112,50 +117,38 @@ case $action in
       echo "ERROR: UVHS runtime published an invalid ready PID" >&2
       exit 5
     fi
-    pid_temp="${pid_file}.tmp.$$"
-    printf '%s\n' "$runtime_pid" >"$pid_temp"
-    mv -f "$pid_temp" "$pid_file"
+    write_pid "$pid_file" "$runtime_pid"
     echo "INFO: UVHS runtime ready (PID $runtime_pid); log: $log_file"
     ;;
-  active)
-    (( $# == 1 )) || usage
-    pid_file=$1
-    if pid=$(read_pid "$pid_file") && process_is_alive "$pid"; then
-      echo "INFO: UVHS runtime process is active (PID $pid)"
-      exit 0
-    fi
-    rm -f "$pid_file"
-    exit 1
-    ;;
   check)
-    (( $# == 2 )) || usage
+    (( $# == 1 || $# == 2 )) || usage
     pid_file=$1
-    ready_file=$2
     if ! pid=$(read_pid "$pid_file") || ! process_is_alive "$pid"; then
-      rm -f "$pid_file" "$ready_file"
+      rm -f "$pid_file"
+      (( $# != 2 )) || rm -f "$2"
       echo "ERROR: UVHS runtime is not active; run make uvhs_write_bitstream first" >&2
       exit 6
     fi
-    if ! ready_pid=$(read_pid "$ready_file") || [[ $ready_pid != "$pid" ]]; then
-      echo "ERROR: UVHS runtime PID $pid has no matching ready marker" >&2
-      exit 7
+    if (( $# == 2 )); then
+      ready_file=$2
+      if ! ready_pid=$(read_pid "$ready_file") || [[ $ready_pid != "$pid" ]]; then
+        echo "ERROR: UVHS runtime PID $pid has no matching ready marker" >&2
+        exit 7
+      fi
+      echo "INFO: UVHS runtime is ready (PID $pid)"
+    else
+      echo "INFO: UVHS runtime process is active (PID $pid)"
     fi
-    echo "INFO: UVHS runtime is ready (PID $pid)"
     ;;
   enqueue)
     (( $# >= 3 )) || usage
     command_file=$1
-    tcl_script=$2
-    timeout=$3
-    shift 3
+    timeout=$2
+    shift 2
     validate_timeout "$timeout"
-    [[ -f $tcl_script ]] || {
-      echo "ERROR: runtime Tcl script not found: $tcl_script" >&2
-      exit 9
-    }
     if [[ -e $command_file || -e $command_file.running ]]; then
       echo "ERROR: a UVHS runtime command is already pending" >&2
-      exit 10
+      exit 9
     fi
 
     result_file="${command_file}.result.$$"
@@ -170,14 +163,12 @@ case $action in
         printf ' '
         tcl_quote "$argument"
       done
-      printf ']\nsource '
-      tcl_quote "$tcl_script"
-      printf '\n'
+      printf ']\nuvhs_execute_command {*}$argv\n'
     } >"$temp_file"
     mv -n "$temp_file" "$command_file"
     [[ ! -e $temp_file ]] || {
       echo "ERROR: command file appeared while enqueueing: $command_file" >&2
-      exit 11
+      exit 10
     }
     echo "INFO: enqueued UVHS runtime command: $command_file"
 
@@ -185,7 +176,7 @@ case $action in
     while [[ ! -f $result_file ]]; do
       if (( SECONDS >= deadline )); then
         echo "ERROR: timed out waiting for UVHS runtime command after ${timeout}s" >&2
-        exit 12
+        exit 11
       fi
       sleep 0.2
     done
@@ -194,7 +185,7 @@ case $action in
     rm -f "$result_file"
     if [[ $status != 0 ]]; then
       echo "ERROR: UVHS runtime command failed: $message" >&2
-      exit 13
+      exit 12
     fi
     [[ -z $message ]] || echo "INFO: $message"
     ;;

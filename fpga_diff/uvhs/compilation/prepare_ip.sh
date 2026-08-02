@@ -31,14 +31,9 @@ generalbus_stub_is_64() {
 
 # Export the Vivado IP owned by this repository.
 vivado=$UV_XILINX_VIVADO/bin/vivado
-version=$("$vivado" -version | awk '/^Vivado v/ { sub(/^Vivado v/, ""); sub(/ .*/, ""); print; exit }')
-[[ -n $version ]] || {
-  echo "ERROR: unable to determine Vivado version from $vivado" >&2
-  exit 1
-}
 vivado_args=(
   --origin_dir "$origin_dir" --out_dir "$work_dir"
-  --vivado_version "$version" --core_dir "$core_dir" --jobs "$jobs"
+  --core_dir "$core_dir" --jobs "$jobs"
 )
 [[ $force != 1 ]] || vivado_args+=(--force)
 export VIVADO_HOME=$UV_XILINX_VIVADO XILINX_VIVADO=$UV_XILINX_VIVADO

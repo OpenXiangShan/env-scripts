@@ -4,7 +4,6 @@
 
 set origin_dir "."
 set out_dir "./uvhs_ip"
-set vivado_version ""
 set force 0
 set jobs 8
 set core_dir ""
@@ -12,7 +11,7 @@ set core_dir ""
 proc print_help {} {
     puts "Usage:"
     puts "  vivado -mode batch -source uvhs/compilation/export_vivado_ip.tcl -tclargs \\"
-    puts "    --origin_dir <fpga_diff> --out_dir <uvhs_work_dir> \[--vivado_version <ver>\] \[--core_dir <dir>\] \[--force\] \[--jobs N\]"
+    puts "    --origin_dir <fpga_diff> --out_dir <uvhs_work_dir> \[--core_dir <dir>\] \[--force\] \[--jobs N\]"
     exit 0
 }
 
@@ -21,7 +20,6 @@ for {set i 0} {$i < $::argc} {incr i} {
     switch -- $option {
         "--origin_dir"     { incr i; set origin_dir [lindex $::argv $i] }
         "--out_dir"        { incr i; set out_dir [lindex $::argv $i] }
-        "--vivado_version" { incr i; set vivado_version [lindex $::argv $i] }
         "--core_dir"       { incr i; set core_dir [lindex $::argv $i] }
         "--force"          { set force 1 }
         "--jobs"           { incr i; set jobs [lindex $::argv $i] }
@@ -42,10 +40,7 @@ set tcl_dir [file join $origin_dir src tcl common]
 set export_project_dir [file join $out_dir vivado_ip_export]
 set export_project [file join $export_project_dir vivado_ip_export.xpr]
 
-if {$vivado_version eq ""} {
-    set vivado_version [version -short]
-}
-set ::vivado_version $vivado_version
+set ::vivado_version [version -short]
 set ::core_dir $core_dir
 
 if {$force && [file exists $export_project_dir]} {
@@ -102,45 +97,7 @@ proc source_ip_tcl {script} {
     uplevel #0 [list source $script]
 }
 
-proc run_and_copy_dcp {run_name out_file jobs force} {
-    if {[file exists $out_file] && !$force} {
-        puts "INFO: reuse existing $out_file"
-        return
-    }
-
-    set run [get_runs -quiet $run_name]
-    if {[llength $run] == 0} {
-        error "run $run_name not found"
-    }
-
-    reset_run $run
-    clear_auto_incremental_imports $run_name
-    launch_runs $run -jobs $jobs
-    wait_on_run $run
-
-    set status [get_property STATUS $run]
-    puts "INFO: $run_name status: $status"
-
-    set run_dir [get_property DIRECTORY $run]
-    set dcps [glob -nocomplain [file join $run_dir *.dcp]]
-    if {[llength $dcps] == 0} {
-        if {![string match "*Complete*" $status]} {
-            error "$run_name did not complete: $status"
-        }
-        error "no DCP generated in $run_dir"
-    }
-
-    file mkdir [file dirname $out_file]
-    file copy -force [lindex $dcps 0] $out_file
-    puts "INFO: exported $out_file"
-}
-
-proc run_and_write_opened_dcp {run_name out_file jobs force} {
-    if {[file exists $out_file] && !$force} {
-        puts "INFO: reuse existing $out_file"
-        return
-    }
-
+proc run_synthesis {run_name jobs} {
     set run [get_runs -quiet $run_name]
     if {[llength $run] == 0} {
         error "run $run_name not found"
@@ -156,6 +113,35 @@ proc run_and_write_opened_dcp {run_name out_file jobs force} {
     if {![string match "*Complete*" $status]} {
         error "$run_name did not complete: $status"
     }
+    return $run
+}
+
+proc run_and_copy_dcp {run_name out_file jobs force} {
+    if {[file exists $out_file] && !$force} {
+        puts "INFO: reuse existing $out_file"
+        return
+    }
+
+    set run [run_synthesis $run_name $jobs]
+
+    set run_dir [get_property DIRECTORY $run]
+    set dcps [glob -nocomplain [file join $run_dir *.dcp]]
+    if {[llength $dcps] == 0} {
+        error "no DCP generated in $run_dir"
+    }
+
+    file mkdir [file dirname $out_file]
+    file copy -force [lindex $dcps 0] $out_file
+    puts "INFO: exported $out_file"
+}
+
+proc run_and_write_opened_dcp {run_name out_file jobs force} {
+    if {[file exists $out_file] && !$force} {
+        puts "INFO: reuse existing $out_file"
+        return
+    }
+
+    run_synthesis $run_name $jobs
 
     catch {close_design}
     open_run $run_name

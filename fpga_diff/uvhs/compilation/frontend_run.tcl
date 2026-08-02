@@ -75,6 +75,7 @@ create_working_space hw.dat
 set_option syn.computeFeCheckSum true
 
 set_parallel_option -max_threads 4 -max_processes 16 -label frontend
+set_parallel_option -max_threads 16 -label runtime
 
 set_option global.log.label MEMORY
 set_option syn.checkMultiDriver false
@@ -94,6 +95,15 @@ create_system_design -name VU19P_X4 -platform U2.2
 
 uvhs::source_required topology.tcl
 uvhs::source_required assign_pin.tcl
+set probe_script [uvhs::env_or_default UVHS_PROBE_TCL ""]
+if {$probe_script ne ""} {
+    set probe_script [file normalize $probe_script]
+    if {![file isfile $probe_script]} {
+        error "UVHS probe script not found: $probe_script"
+    }
+    puts "INFO: source UVHS probe script $probe_script"
+    source $probe_script
+}
 set_constraint_files [uvhs::path timing.tcl]
 foreach reset_port {rstn_sw6 rstn_sw5 rstn_sw4} {
     create_reset -port ${design_top}.${reset_port} -active 0
