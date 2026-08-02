@@ -13,7 +13,7 @@ UVHS_GBUS_GENERATOR := $(UVHS_GBUS_IP_DIR)/gen_generalbus_ip.py
 UVHS_GBUS_JSON := $(UVHS_GBUS_IP_DIR)/uvw_axi3_generalbus.json
 UVHS_GBUS_GEN_DIR := $(UVHS_WORK_DIR)/ip-gen/generalbus
 
-UVHS_KEEP_FPGAS ?=
+UVHS_KEEP_FPGAS ?= $(if $(filter kmh,$(CPU)),b0.f0 b0.f1 b0.f2 b0.f3,)
 UVHS_LUT_FILL_RATE ?= $(if $(filter kmh,$(CPU)),70,)
 UVHS_LUT6_FILL_RATE ?= $(if $(filter kmh,$(CPU)),35,)
 

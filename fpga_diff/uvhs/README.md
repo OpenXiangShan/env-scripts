@@ -66,6 +66,9 @@ experiments. `UVHS_EXPORT_IP_FORCE=1` regenerates cached Vivado and generalBus
 IP. `uvhs_clean` removes only the selected work directory and refuses to run
 while its runtime session is active.
 
+XiangShan leaves all four B0 FPGAs available to the automatic partitioner;
+the validated 70/35 result used F2 and F3. NutShell keeps the single F2 FPGA.
+
 ## Runtime
 
 ```sh
