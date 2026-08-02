@@ -36,7 +36,7 @@ sweep_design
 infer_clock
 report_clock -inferred
 transform_clock
-uvhs::source_required async_clocks.tcl
+fpga_diff_set_async_clock_groups
 set fill_rate_args {}
 foreach {option variable} {
     -lut UVHS_LUT_FILL_RATE

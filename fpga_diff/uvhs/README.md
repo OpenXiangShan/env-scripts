@@ -286,8 +286,7 @@ or DDR pins.
 | `compilation/backend_run.tcl` | Fill-rate setup, partition, routing, PnR, and database commit. |
 | `compilation/topology.tcl` | Selects the FPGA set from the vendor board assembly. |
 | `compilation/assign_pin.tcl` | B0/F2 clock, PCIe, UART, JTAG, SD, and control pins. |
-| `compilation/timing.tcl` | External clock constraints registered by the frontend. |
-| `compilation/async_clocks.tcl` | Shared asynchronous groups for frontend, backend, and PnR. |
+| `compilation/timing.tcl` | External clock and asynchronous-group constraints. |
 | `compilation/vivado_pre_opt.tcl` | XDMA refclock and CDC constraints. |
 | `compilation/prepare_ip.sh` | Coordinates Vivado, generalBus, and external DDR IP preparation. |
 | `compilation/export_vivado_ip.tcl` | Runs repository-owned XCI/BD exports inside Vivado. |

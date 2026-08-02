@@ -81,4 +81,9 @@ foreach {label patterns} {
 }
 puts "INFO: XDMA CDC total ASYNC_REG count=[llength $fpga_diff_xdma_cdc_cells]"
 
-source [file join [file dirname [file normalize [info script]]] async_clocks.tcl]
+set fpga_diff_async_groups [list]
+foreach fpga_diff_clock {TMCLK ddr_ref_clk CPU_CLK_IN jtag_vclk pcie_ep_refclk} {
+    lappend fpga_diff_async_groups -group \
+        [get_clocks -include_generated_clocks $fpga_diff_clock]
+}
+set_clock_groups -asynchronous {*}$fpga_diff_async_groups
