@@ -426,7 +426,7 @@ proc create_root_design { parentCell } {
   exclude_bd_addr_seg -target_address_space [get_bd_addr_spaces jtag_axi_flash/Data] [get_bd_addr_segs axi_uart16550_0/S_AXI/Reg]
   exclude_bd_addr_seg -target_address_space [get_bd_addr_spaces jtag_axi_flash/Data] [get_bd_addr_segs extllc_bram_ctrl/S_AXI/Mem0]
   if {$uvhs_flow} {
-    assign_bd_address -offset 0x10000000 -range 0x00100000 -target_address_space [get_bd_addr_spaces UVHS_FLASH_AXI] [get_bd_addr_segs rom_axi/Reg] -force
+    assign_bd_address -offset 0x00000000 -range 0x00100000 -target_address_space [get_bd_addr_spaces UVHS_FLASH_AXI] [get_bd_addr_segs rom_axi/Reg] -force
     exclude_bd_addr_seg -target_address_space [get_bd_addr_spaces UVHS_FLASH_AXI] [get_bd_addr_segs SYS_CFG_APB/Reg]
     exclude_bd_addr_seg -target_address_space [get_bd_addr_spaces UVHS_FLASH_AXI] [get_bd_addr_segs axi_uart16550_0/S_AXI/Reg]
     exclude_bd_addr_seg -target_address_space [get_bd_addr_spaces UVHS_FLASH_AXI] [get_bd_addr_segs extllc_bram_ctrl/S_AXI/Mem0]
