@@ -18,9 +18,10 @@ conversion. The UVHS flow only consumes that result.
 
 `RTL_INCLUDE` accepts RTL files, directories, and nested `.f`, `.flist`, or
 `.list` files. Relative entries are resolved from the file list that contains
-them. Both build flows use `tools/rtl_filelist_lib.sh` for that parsing. The
-normal Vivado wrapper generates `cpu_files.tcl`; the UVHS generator combines
-the parsed additions with release RTL and FPGA-Diff wrappers in `filelist.f`.
+them. Both build flows call `tools/generate_rtl_filelist.sh`, which uses
+`tools/rtl_filelist_lib.sh` for parsing. Vivado mode generates
+`cpu_files.tcl`; UVHS mode combines the parsed additions with release RTL and
+FPGA-Diff wrappers in `filelist.f`.
 
 | File-list stage | Vivado | UVHS |
 | --- | --- | --- |
@@ -33,7 +34,6 @@ the parsed additions with release RTL and FPGA-Diff wrappers in `filelist.f`.
 ## Build
 
 ```sh
-make uvhs_tools_check
 make uvhs CPU=<design> CORE_DIR=/path/to/release/build \
   RTL_INCLUDE=/path/to/extra.f SUFFIX=<tag>
 make uvhs_bitstream CPU=<design> SUFFIX=<tag>
@@ -57,7 +57,8 @@ and publishes `fpga_top_debug.bit`. The lower-level `uvhs_frontend` and
 `uvhs_backend` follows the vendor implementation sequence: clock inference and
 transformation, remap, partition, localization, system routing, FPGA PnR,
 timing signoff, bitstream generation, and runtime database commit. Fill-rate
-configuration and automatic partitioning are isolated in `partition.tcl`.
+validation and automatic partitioning are kept next to that sequence in
+`backend_run.tcl`.
 
 The default XiangShan partition limits are 80% LUT and 30% LUT6. They can be
 changed with `UVHS_LUT_FILL_RATE` and `UVHS_LUT6_FILL_RATE` for placement
@@ -112,22 +113,19 @@ or DDR pins.
 | File | Role |
 | --- | --- |
 | `uvhs.mk` | Build, packaging, and runtime targets. |
-| `generate_filelist.sh` | Complete UVHS RTL file list generation and top check. |
+| `../tools/generate_rtl_filelist.sh` | Shared Vivado/UVHS RTL file-list entry point. |
+| `../tools/rtl_filelist_lib.sh` | Nested file-list parsing and path resolution. |
 | `flow_common.tcl` | Shared UVHS path, environment, and source helpers. |
 | `frontend_run.tcl` | RTL/IP import, elaboration, and uvsyn frontend. |
-| `backend_run.tcl` | Partition, routing, FPGA PnR, and runtime database commit. |
-| `partition.tcl` | Fill-rate validation and automatic partitioning. |
-| `assemble_uvhs.tcl` | Selects the FPGA set from the vendor board assembly. |
-| `assign_pin_u22_f2.tcl` | B0/F2 clock, PCIe, UART, JTAG, SD, and control pins. |
+| `backend_run.tcl` | Fill-rate setup, partition, routing, PnR, and database commit. |
+| `topology.tcl` | Selects the FPGA set from the vendor board assembly. |
+| `assign_pin.tcl` | B0/F2 clock, PCIe, UART, JTAG, SD, and control pins. |
 | `timing_common.tcl` | External clock constraints. |
 | `async_clocks.tcl` | Asynchronous clock groups used by backend and Vivado PnR. |
 | `vivado_pre_opt.tcl` | XDMA refclock and CDC constraints. |
 | `export_vivado_ip.tcl` | Repository-owned Vivado IP export. |
-| `check_flow_tools.sh` | Shell/Tcl/source validation. |
 | `shell_compat.sh` | Generated launcher shell correction. |
 | `uv_shell_exec_compat.sh` | Runtime library wrapper. |
-| `hw_run_download.tcl` | Download and command-service entry point. |
-| `runtime_control.tcl` | Reset sequencing and command polling. |
+| `hw_run_download.tcl` | Download, reset sequencing, and command service. |
 | `runtime_command.tcl` | Reset, DDR, and flash operations. |
-| `runtime_session.sh` | Detached runtime session lifecycle. |
-| `enqueue_runtime_command.sh` | Runtime command submission and status. |
+| `runtime_session.sh` | Runtime lifecycle, command submission, and status. |

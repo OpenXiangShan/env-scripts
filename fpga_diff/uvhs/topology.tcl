@@ -1,11 +1,9 @@
 ################################################################################
-# Reduce the vendor four-FPGA assembly template to the selected UVHS FPGA.
+# Select the active FPGA topology from the vendor four-FPGA board template.
 ################################################################################
 
 set uvhs_base_assemble ./script/1B_4F_HGC_assemble.tcl
-set uvhs_target_pack [uvhs::env_or_default UVHS_TARGET_PACK B0]
-set uvhs_target_name [uvhs::env_or_default UVHS_TARGET_FPGA F2]
-set uvhs_target_fpga [string tolower "$uvhs_target_pack.$uvhs_target_name"]
+set uvhs_target_fpga b0.f2
 set uvhs_known_fpgas {b0.f0 b0.f1 b0.f2 b0.f3}
 set uvhs_keep_fpgas {}
 foreach uvhs_fpga [split [uvhs::env_or_default UVHS_KEEP_FPGAS $uvhs_target_fpga]] {

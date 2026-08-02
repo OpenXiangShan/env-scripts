@@ -56,9 +56,9 @@ unchanged. Configure the UVHS tool environment in the runtime host shell, then
 invoke:
 
 ```shell
-make uvhs_preflight CPU=<design>
-make uvhs_all CPU=<design> CORE_DIR=/path/to/generated/core SUFFIX=<tag>
+make uvhs CPU=<design> CORE_DIR=/path/to/release/build SUFFIX=<tag>
+make uvhs_bitstream CPU=<design> SUFFIX=<tag>
 ```
 
-See [`uvhs/README.md`](uvhs/README.md) for the required environment variables,
-board template and vendor DDR IP inputs, stages, and runtime script.
+See [`uvhs/README.md`](uvhs/README.md) for the board-template and vendor-DDR
+inputs, build stages, and runtime commands.

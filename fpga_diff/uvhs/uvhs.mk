@@ -1,35 +1,21 @@
 UVHS_ROOT_DIR := $(abspath $(dir $(lastword $(MAKEFILE_LIST)))/..)
 
-PLATFORM ?= U2.2
 UVHS_TEMPLATE_DIR ?=
 UVHS_UVW_AXI4_TO_DDR4_SRC ?=
 UVHS_DDR_AXI_WIDTH := $(if $(filter nutshell,$(CPU)),64,256)
-UVHS_WORK_DIR ?= $(ENV_SCRIPTS_HOME)/fpga_diff_uvhs_$(CPU)$(if $(strip $(SUFFIX)),-$(strip $(SUFFIX)),)
+UVHS_WORK_DIR := $(ENV_SCRIPTS_HOME)/fpga_diff_uvhs_$(CPU)$(if $(strip $(SUFFIX)),-$(strip $(SUFFIX)),)
 UVHS_FILELIST := $(UVHS_WORK_DIR)/rtl/filelist.f
 
 UVHS_EXPORT_IP_FORCE ?= 0
 UVHS_EXPORT_IP_JOBS := $(if $(strip $(VIVADO_JOBS)),$(VIVADO_JOBS),8)
-UVHS_GBUS_IP_DIR := $(UV_ROOT)/platform/$(PLATFORM)/Prototype/ips/uvw_gbus.3.1
+UVHS_GBUS_IP_DIR := $(UV_ROOT)/platform/U2.2/Prototype/ips/uvw_gbus.3.1
 UVHS_GBUS_GENERATOR := $(UVHS_GBUS_IP_DIR)/gen_generalbus_ip.py
 UVHS_GBUS_JSON := $(UVHS_GBUS_IP_DIR)/uvw_axi3_generalbus.json
 UVHS_GBUS_GEN_DIR := $(UVHS_WORK_DIR)/ip-gen/generalbus
 
-UVHS_TARGET_PACK ?= B0
-UVHS_TARGET_FPGA ?= F2
 UVHS_KEEP_FPGAS ?=
-UVHS_CPU_CLK_PERIOD_NS ?= 40
-UVHS_FRONTEND_THREADS ?= 4
-UVHS_FRONTEND_PROCESSES ?= 16
-UVHS_FPGA_THREADS ?= 4
-UVHS_FPGA_PROCESSES ?= 8
-UVHS_COMPILE_STRATEGY ?= uv_high_fanout_explore
 UVHS_LUT_FILL_RATE ?= $(if $(filter kmh,$(CPU)),80,)
 UVHS_LUT6_FILL_RATE ?= $(if $(filter kmh,$(CPU)),30,)
-
-XDMA_LINK_WIDTH ?= X4
-XDMA_ENABLE_PF0_BAR1 ?= 1
-XDMA_AXILITE_MASTER_SCALE ?= Kilobytes
-XDMA_AXILITE_MASTER_SIZE ?= 512
 
 UVHS_UVW_AXI4_TO_DDR4_FILES := \
 	rtl/soc/uvw_axi4_to_ddr4.dcp \
@@ -49,8 +35,7 @@ UVHS_RUNTIME_TMP_DIR := $(UVHS_RUNTIME_WORK_DIR)/tmp
 UVHS_RUNTIME_PID_FILE := $(UVHS_RUNTIME_WORK_DIR)/uv_shell.pid
 UVHS_RUNTIME_READY_FILE := $(UVHS_RUNTIME_WORK_DIR)/uv_shell.ready
 UVHS_RUNTIME_LOG := $(UVHS_RUNTIME_WORK_DIR)/uv_shell.log
-UVHS_RUNTIME_TIMEOUT ?= 600
-UVHS_COMPAT_PCRE_LIB ?=
+UVHS_RUNTIME_TIMEOUT := 600
 
 UVHS_TOOL_ENV = \
 	PATH="$$UV_ROOT/bin:$$UV_ROOT/lib/venv3.8/bin:$$UV_ROOT/lib/gcc10.3/bin:$$PATH" \
@@ -62,28 +47,20 @@ UVHS_TOOL_ENV = \
 UVHS_FLOW_ENV = \
 	$(UVHS_TOOL_ENV) \
 	UVHS_FLOW=1 \
-	PLATFORM="$(PLATFORM)" \
 	XDMA_LINK_WIDTH="$(XDMA_LINK_WIDTH)" \
-	XDMA_ENABLE_PF0_BAR1="$(XDMA_ENABLE_PF0_BAR1)" \
-	XDMA_AXILITE_MASTER_SCALE="$(XDMA_AXILITE_MASTER_SCALE)" \
-	XDMA_AXILITE_MASTER_SIZE="$(XDMA_AXILITE_MASTER_SIZE)" \
-	UVHS_TARGET_PACK="$(UVHS_TARGET_PACK)" \
-	UVHS_TARGET_FPGA="$(UVHS_TARGET_FPGA)" \
 	UVHS_KEEP_FPGAS="$(UVHS_KEEP_FPGAS)" \
-	UVHS_CPU_CLK_PERIOD_NS="$(UVHS_CPU_CLK_PERIOD_NS)" \
-	UVHS_COMPILE_STRATEGY="$(UVHS_COMPILE_STRATEGY)" \
 	UVHS_LUT_FILL_RATE="$(UVHS_LUT_FILL_RATE)" \
 	UVHS_LUT6_FILL_RATE="$(UVHS_LUT6_FILL_RATE)"
 
-UVHS_PNR_DIR := $(UVHS_WORK_DIR)/hw.dat/Compile/PnR/$(UVHS_TARGET_PACK)/$(UVHS_TARGET_FPGA)/vivado/Rundir/Strategy_$(UVHS_COMPILE_STRATEGY)
+UVHS_PNR_DIR := $(UVHS_WORK_DIR)/hw.dat/Compile/PnR/B0/F2/vivado/Rundir/Strategy_uv_high_fanout_explore
 UVHS_BITSTREAM_DIR := $(UVHS_PNR_DIR)/bitstream
-UVHS_BIT_HOME ?= $(UVHS_WORK_DIR)/ready-to-program
+UVHS_BIT_HOME := $(UVHS_WORK_DIR)/ready-to-program
 
 .PHONY: uvhs uvhs_bitstream uvhs_preflight uvhs_prepare \
 	uvhs_export_vivado_ip uvhs_export_generalbus \
 	uvhs_sync_uvw_axi4_to_ddr4 uvhs_filelist \
-	uvhs_frontend uvhs_backend uvhs_all uvhs_check_timing \
-	uvhs_package_bitstream uvhs_tools_check uvhs_clean uvhs_write_bitstream \
+	uvhs_frontend uvhs_backend uvhs_check_timing \
+	uvhs_package_bitstream uvhs_clean uvhs_write_bitstream \
 	uvhs_halt_soc uvhs_reset_cpu uvhs_write_ddr uvhs_write_flash \
 	uvhs_runtime_status uvhs_runtime_check uvhs_runtime_stop
 
@@ -96,6 +73,7 @@ uvhs_preflight:
 	test -x "$$UV_ROOT/bin/uv_shell_exec"
 	test -x "$(UVHS_ROOT_DIR)/uvhs/uv_shell_exec_compat.sh"
 	test -x "$(UVHS_ROOT_DIR)/uvhs/shell_compat.sh"
+	test -x "$(UVHS_ROOT_DIR)/tools/generate_rtl_filelist.sh"
 	test -f "$(UVHS_ROOT_DIR)/uvhs/vivado_pre_opt.tcl"
 	test -f "$(UVHS_GBUS_GENERATOR)"
 	test -f "$(UVHS_GBUS_JSON)"
@@ -110,20 +88,17 @@ uvhs_preflight:
 		ffi="$$(ldconfig -p | awk '\''/libffi[.]so[.]6 / { print $$NF; exit } /libffi[.]so[.]8 / { fallback = $$NF } END { if (fallback != "") print fallback }'\'')"; \
 		test -n "$$ffi"; \
 		ln -sfn "$$ffi" "$(UVHS_RUNTIME_LIB_DIR)/libffi.so.6"; \
-		pcre="$(UVHS_COMPAT_PCRE_LIB)"; \
-		if [ -z "$$pcre" ] && ldd "$$UV_ROOT/bin/uv_shell_exec" 2>/dev/null | grep -q "libpcre[.]so[.]1 => not found"; then \
+		pcre=""; \
+		if ldd "$$UV_ROOT/bin/uv_shell_exec" 2>/dev/null | grep -q "libpcre[.]so[.]1 => not found"; then \
 			for candidate in "$$UV_ROOT/shlib_install/libpcre.so.1" "$$UV_ROOT/shlib/libpcre.so.1"; do \
 				if [ -f "$$candidate" ]; then pcre="$$candidate"; break; fi; \
 			done; \
 			if [ -z "$$pcre" ]; then \
-				echo "ERROR: uv_shell_exec needs libpcre.so.1; set UVHS_COMPAT_PCRE_LIB" >&2; \
+				echo "ERROR: uv_shell_exec needs libpcre.so.1 under UV_ROOT" >&2; \
 				exit 1; \
 			fi; \
 		fi; \
 		if [ -n "$$pcre" ]; then test -f "$$pcre"; ln -sfn "$$pcre" "$(UVHS_RUNTIME_LIB_DIR)/libpcre.so.1"; fi'
-
-uvhs_tools_check:
-	bash "$(UVHS_ROOT_DIR)/uvhs/check_flow_tools.sh"
 
 uvhs_prepare: uvhs_preflight
 	test -n "$(UVHS_WORK_DIR)"
@@ -212,14 +187,13 @@ uvhs_sync_uvw_axi4_to_ddr4: uvhs_prepare
 		echo "INFO: verified UVHS DDR DCP AXI data width: $$expected_width"'
 
 uvhs_filelist: uvhs_export_vivado_ip uvhs_export_generalbus
-	bash "$(UVHS_ROOT_DIR)/uvhs/generate_filelist.sh" \
+	bash "$(UVHS_ROOT_DIR)/tools/generate_rtl_filelist.sh" uvhs \
 		"$(CORE_DIR)" "$(UVHS_WORK_DIR)" "$(CPU)" "$(UVHS_FILELIST)" \
 		-- $(RTL_INCLUDE)
 
 uvhs_frontend: uvhs_sync_uvw_axi4_to_ddr4 uvhs_filelist
 	bash -c 'set -euo pipefail; cd "$(UVHS_WORK_DIR)"; \
 		$(UVHS_FLOW_ENV) \
-		UVHS_FRONTEND_THREADS="$(UVHS_FRONTEND_THREADS)" UVHS_FRONTEND_PROCESSES="$(UVHS_FRONTEND_PROCESSES)" \
 		bash "$$UV_ROOT/bin/uv_shell" -bypass_vivado_version_check \
 		-s "$(UVHS_ROOT_DIR)/uvhs/frontend_run.tcl" |& tee frontend_run.log; \
 		grep -Fxq UVHS_FRONTEND_SUCCESS frontend_run.log'
@@ -230,14 +204,9 @@ uvhs: uvhs_frontend
 uvhs_backend:
 	bash -c 'set -euo pipefail; cd "$(UVHS_WORK_DIR)"; \
 		$(UVHS_FLOW_ENV) \
-		UVHS_FPGA_THREADS="$(UVHS_FPGA_THREADS)" UVHS_FPGA_PROCESSES="$(UVHS_FPGA_PROCESSES)" \
 		bash "$$UV_ROOT/bin/uv_shell" -bypass_vivado_version_check \
 		-s "$(UVHS_ROOT_DIR)/uvhs/backend_run.tcl" |& tee backend_run.log; \
 		grep -Fxq UVHS_BACKEND_SUCCESS backend_run.log'
-
-# Keep the compatibility target serial even when the caller enables make -j.
-uvhs_all: uvhs
-	$(MAKE) uvhs_backend
 
 uvhs_check_timing:
 	test -f "$(UVHS_BITSTREAM_DIR)/after_xtalk_fix_timing_summary.txt"
@@ -258,7 +227,6 @@ uvhs_bitstream: uvhs_backend
 uvhs_write_bitstream:
 	test -d "$(UVHS_RUNTIME_DB)"
 	test -f "$(UVHS_ROOT_DIR)/uvhs/hw_run_download.tcl"
-	test -f "$(UVHS_ROOT_DIR)/uvhs/runtime_control.tcl"
 	test -x "$(UVHS_ROOT_DIR)/uvhs/runtime_session.sh"
 	mkdir -p "$(UVHS_RUNTIME_WORK_DIR)" "$(UVHS_RUNTIME_TMP_DIR)"
 	$(UVHS_TOOL_ENV) UVHS_DB_PATH="$(UVHS_RUNTIME_DB)" \
@@ -281,9 +249,9 @@ uvhs_runtime_status: uvhs_runtime_check
 	@echo "UVHS_RUNTIME_LOG=$(UVHS_RUNTIME_LOG)"
 
 define uvhs_runtime_command
-	UVHS_RUNTIME_COMMAND_TIMEOUT="$(UVHS_RUNTIME_TIMEOUT)" \
-	bash "$(UVHS_ROOT_DIR)/uvhs/enqueue_runtime_command.sh" \
-		"$(UVHS_RUNTIME_COMMAND_FILE)" "$(UVHS_ROOT_DIR)/uvhs/runtime_command.tcl" $(1)
+	bash "$(UVHS_ROOT_DIR)/uvhs/runtime_session.sh" enqueue \
+		"$(UVHS_RUNTIME_COMMAND_FILE)" "$(UVHS_ROOT_DIR)/uvhs/runtime_command.tcl" \
+		"$(UVHS_RUNTIME_TIMEOUT)" $(1)
 endef
 
 uvhs_halt_soc: uvhs_runtime_check
@@ -298,7 +266,7 @@ uvhs_write_ddr: uvhs_runtime_check
 
 uvhs_write_flash: uvhs_runtime_check
 	test -f "$(WORKLOAD)"
-	$(call uvhs_runtime_command,write_flash "$(WORKLOAD)" "$(UVHS_TARGET_PACK)" "$(UVHS_TARGET_FPGA)" 0 0 0x0 0x8000)
+	$(call uvhs_runtime_command,write_flash "$(WORKLOAD)" B0 F2 0 0 0x0 0x8000)
 
 uvhs_runtime_stop: uvhs_runtime_check
 	$(call uvhs_runtime_command,stop)

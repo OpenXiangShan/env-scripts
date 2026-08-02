@@ -42,7 +42,7 @@ bitstream:
 
 # RTL_INCLUDE accepts RTL files, directories, and .f/.flist/.list file lists.
 update_core_flist:
-	@./tools/update_core_flist.sh "$(CORE_DIR)" -- $(RTL_INCLUDE)
+	@./tools/generate_rtl_filelist.sh vivado "$(CORE_DIR)" -- $(RTL_INCLUDE)
 
 # Launch Vivado with FPGA project configuration
 vivado: check_vivado_version

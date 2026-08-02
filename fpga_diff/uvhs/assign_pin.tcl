@@ -1,5 +1,5 @@
 ################################################################################
-# Pin assignment for fpga_diff on a single U2.2 VU19P FPGA (b0.f2).
+# Pin assignment for fpga_diff on a U2.2 VU19P FPGA (b0.f2).
 #
 # This file targets the single-FPGA b0.f2 configuration. All user-visible top
 # ports bind to b0.F2_* connectors instead of the mixed F0/F1/F2 template.

@@ -1,8 +1,3 @@
-if {[llength [info commands uvhs_reset_cpu]] == 0} {
-    set uvhs_script_dir [file dirname [file normalize [info script]]]
-    source [file join $uvhs_script_dir runtime_control.tcl]
-}
-
 proc uvhs_temp_dir {} {
     if {[info exists ::env(UVHS_RUNTIME_TMP_DIR)] && $::env(UVHS_RUNTIME_TMP_DIR) ne ""} {
         set path $::env(UVHS_RUNTIME_TMP_DIR)

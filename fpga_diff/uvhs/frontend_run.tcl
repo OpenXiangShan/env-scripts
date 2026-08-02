@@ -74,10 +74,7 @@ proc uvhs::start_frontend_shell_compat {} {
 create_working_space hw.dat
 set_option syn.computeFeCheckSum true
 
-set frontend_threads [uvhs::env_or_default UVHS_FRONTEND_THREADS 16]
-set frontend_processes [uvhs::env_or_default UVHS_FRONTEND_PROCESSES 64]
-set_parallel_option -max_threads $frontend_threads \
-    -max_processes $frontend_processes -label frontend
+set_parallel_option -max_threads 4 -max_processes 16 -label frontend
 
 set_option global.log.label MEMORY
 set_option syn.checkMultiDriver false
@@ -96,8 +93,8 @@ set design_top fpga_top_debug
 set ddr_inst_path ${design_top}.core_def.U_UVHS_UVW_AXI4_TO_DDR4
 create_system_design -name VU19P_X4 -platform $platform
 
-uvhs::source_required assemble_uvhs.tcl
-uvhs::source_required assign_pin_u22_f2.tcl
+uvhs::source_required topology.tcl
+uvhs::source_required assign_pin.tcl
 set_constraint_files [uvhs::path timing_common.tcl]
 foreach reset_port {rstn_sw6 rstn_sw5 rstn_sw4} {
     create_reset -port ${design_top}.${reset_port} -active 0

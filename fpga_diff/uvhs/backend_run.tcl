@@ -5,10 +5,7 @@
 source [file join [file dirname [file normalize [info script]]] flow_common.tcl]
 set_working_space hw.dat
 
-set fpga_threads [uvhs::env_or_default UVHS_FPGA_THREADS 8]
-set fpga_processes [uvhs::env_or_default UVHS_FPGA_PROCESSES 16]
-set_parallel_option -max_threads $fpga_threads \
-    -max_processes $fpga_processes -label fpga
+set_parallel_option -max_threads 4 -max_processes 8 -label fpga
 
 set_option time.auto_clock_config true
 set_option clock.transform_clock.multi_iteration true
@@ -19,10 +16,10 @@ set_option time.incremental_sign_off true
 
 set platform [uvhs::env_or_default PLATFORM U2.2]
 create_system_design -name VU19P_X4 -platform $platform
-uvhs::source_required assemble_uvhs.tcl
+uvhs::source_required topology.tcl
 
 set ::env(UVHS_ASSIGN_PIN_TOP) none
-uvhs::source_required assign_pin_u22_f2.tcl
+uvhs::source_required assign_pin.tcl
 unset ::env(UVHS_ASSIGN_PIN_TOP)
 
 create_design -name test
@@ -41,13 +38,34 @@ infer_clock
 report_clock -inferred
 transform_clock
 uvhs::source_required async_clocks.tcl
-uvhs::source_required partition.tcl
-uvhs::configure_fill_rates
+set fill_rate_args {}
+foreach {option variable} {
+    -lut UVHS_LUT_FILL_RATE
+    -lut6 UVHS_LUT6_FILL_RATE
+} {
+    set value [uvhs::env_or_default $variable ""]
+    if {$value eq ""} {
+        continue
+    }
+    if {![string is double -strict $value] || $value <= 0 || $value > 100} {
+        error "$variable must be in (0, 100], got '$value'"
+    }
+    lappend fill_rate_args $option $value
+}
+if {[llength $fill_rate_args]} {
+    puts "INFO: set UVHS fill rates: $fill_rate_args"
+    set_fill_rate {*}$fill_rate_args
+}
 trigger_probe -group
 sweep_design -remap
 report_clock
 
-uvhs::run_partition
+check_design
+report_resource -depth 4
+report_system_resource
+list_partition_constraints -all
+partition_design -tdc -tdss true
+report_resource -depth 4
 
 instrument_design
 localize_design -replicate_cell -clock -self_check
@@ -66,8 +84,7 @@ save_runtime_data
 
 set_option compile.resourceUsageLimit 100
 set_option compile.strategyNum 1
-set_option compile.strategy0 \
-    [uvhs::env_or_default UVHS_COMPILE_STRATEGY uv_high_fanout_explore]
+set_option compile.strategy0 uv_high_fanout_explore
 set_option compile.stage.preOpt \
     [uvhs::path vivado_pre_opt.tcl]
 

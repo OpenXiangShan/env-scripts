@@ -8,6 +8,7 @@ usage:
     <timeout> <command> [argument ...]
   runtime_session.sh active <pid-file>
   runtime_session.sh check <pid-file> <ready-file>
+  runtime_session.sh enqueue <command-file> <tcl-script> <timeout> [argument ...]
   runtime_session.sh wait <pid-file> <ready-file> <command-file> <timeout>
 EOF
   exit 64
@@ -39,6 +40,16 @@ show_log_tail() {
     echo "----- UVHS runtime log tail: $log_file -----" >&2
     tail -40 "$log_file" >&2
   fi
+}
+
+tcl_quote() {
+  local value=$1
+  value=${value//\\/\\\\}
+  value=${value//\"/\\\"}
+  value=${value//\$/\\\$}
+  value=${value//\[/\\[}
+  value=${value//\]/\\]}
+  printf '"%s"' "$value"
 }
 
 action=${1:-}
@@ -130,6 +141,62 @@ case $action in
       exit 7
     fi
     echo "INFO: UVHS runtime is ready (PID $pid)"
+    ;;
+  enqueue)
+    (( $# >= 3 )) || usage
+    command_file=$1
+    tcl_script=$2
+    timeout=$3
+    shift 3
+    validate_timeout "$timeout"
+    [[ -f $tcl_script ]] || {
+      echo "ERROR: runtime Tcl script not found: $tcl_script" >&2
+      exit 9
+    }
+    if [[ -e $command_file || -e $command_file.running ]]; then
+      echo "ERROR: a UVHS runtime command is already pending" >&2
+      exit 10
+    fi
+
+    result_file="${command_file}.result.$$"
+    temp_file="${command_file}.tmp.$$"
+    mkdir -p "$(dirname "$command_file")"
+    trap 'rm -f "$temp_file" "$result_file"' EXIT
+    {
+      printf 'set uvhs_result_file '
+      tcl_quote "$result_file"
+      printf '\nset argv [list'
+      for argument in "$@"; do
+        printf ' '
+        tcl_quote "$argument"
+      done
+      printf ']\nsource '
+      tcl_quote "$tcl_script"
+      printf '\n'
+    } >"$temp_file"
+    mv -n "$temp_file" "$command_file"
+    [[ ! -e $temp_file ]] || {
+      echo "ERROR: command file appeared while enqueueing: $command_file" >&2
+      exit 11
+    }
+    echo "INFO: enqueued UVHS runtime command: $command_file"
+
+    deadline=$((SECONDS + timeout))
+    while [[ ! -f $result_file ]]; do
+      if (( SECONDS >= deadline )); then
+        echo "ERROR: timed out waiting for UVHS runtime command after ${timeout}s" >&2
+        exit 12
+      fi
+      sleep 0.2
+    done
+    status=$(sed -n '1p' "$result_file")
+    message=$(sed -n '2,$p' "$result_file")
+    rm -f "$result_file"
+    if [[ $status != 0 ]]; then
+      echo "ERROR: UVHS runtime command failed: $message" >&2
+      exit 13
+    fi
+    [[ -z $message ]] || echo "INFO: $message"
     ;;
   wait)
     (( $# == 4 )) || usage
