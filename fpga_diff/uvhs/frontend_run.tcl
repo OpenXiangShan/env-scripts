@@ -88,10 +88,9 @@ set_option time.enable_sign_off true
 set_option time.incremental_sign_off true
 set_option signal.uhd.sampling_clock.allow_local_clock true
 
-set platform [uvhs::env_or_default PLATFORM U2.2]
 set design_top fpga_top_debug
 set ddr_inst_path ${design_top}.core_def.U_UVHS_UVW_AXI4_TO_DDR4
-create_system_design -name VU19P_X4 -platform $platform
+create_system_design -name VU19P_X4 -platform U2.2
 
 uvhs::source_required topology.tcl
 uvhs::source_required assign_pin.tcl

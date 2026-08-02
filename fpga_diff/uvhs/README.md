@@ -18,7 +18,7 @@ conversion. The UVHS flow only consumes that result.
 
 `RTL_INCLUDE` accepts RTL files, directories, and nested `.f`, `.flist`, or
 `.list` files. Relative entries are resolved from the file list that contains
-them. Both build flows call `tools/generate_rtl_filelist.sh`, which uses
+them. Both build flows call `tools/update_core_flist.sh`, which uses
 `tools/rtl_filelist_lib.sh` for parsing. Vivado mode generates
 `cpu_files.tcl`; UVHS mode combines the parsed additions with release RTL and
 FPGA-Diff wrappers in `filelist.f`.
@@ -60,7 +60,7 @@ timing signoff, bitstream generation, and runtime database commit. Fill-rate
 validation and automatic partitioning are kept next to that sequence in
 `backend_run.tcl`.
 
-The default XiangShan partition limits are 80% LUT and 30% LUT6. They can be
+The default XiangShan partition limits are 70% LUT and 35% LUT6. They can be
 changed with `UVHS_LUT_FILL_RATE` and `UVHS_LUT6_FILL_RATE` for placement
 experiments. `UVHS_EXPORT_IP_FORCE=1` regenerates cached Vivado and generalBus
 IP. `uvhs_clean` removes only the selected work directory and refuses to run
@@ -113,7 +113,7 @@ or DDR pins.
 | File | Role |
 | --- | --- |
 | `uvhs.mk` | Build, packaging, and runtime targets. |
-| `../tools/generate_rtl_filelist.sh` | Shared Vivado/UVHS RTL file-list entry point. |
+| `../tools/update_core_flist.sh` | Shared Vivado/UVHS RTL file-list entry point. |
 | `../tools/rtl_filelist_lib.sh` | Nested file-list parsing and path resolution. |
 | `flow_common.tcl` | Shared UVHS path, environment, and source helpers. |
 | `frontend_run.tcl` | RTL/IP import, elaboration, and uvsyn frontend. |

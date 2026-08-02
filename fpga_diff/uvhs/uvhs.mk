@@ -14,8 +14,8 @@ UVHS_GBUS_JSON := $(UVHS_GBUS_IP_DIR)/uvw_axi3_generalbus.json
 UVHS_GBUS_GEN_DIR := $(UVHS_WORK_DIR)/ip-gen/generalbus
 
 UVHS_KEEP_FPGAS ?=
-UVHS_LUT_FILL_RATE ?= $(if $(filter kmh,$(CPU)),80,)
-UVHS_LUT6_FILL_RATE ?= $(if $(filter kmh,$(CPU)),30,)
+UVHS_LUT_FILL_RATE ?= $(if $(filter kmh,$(CPU)),70,)
+UVHS_LUT6_FILL_RATE ?= $(if $(filter kmh,$(CPU)),35,)
 
 UVHS_UVW_AXI4_TO_DDR4_FILES := \
 	rtl/soc/uvw_axi4_to_ddr4.dcp \
@@ -73,7 +73,7 @@ uvhs_preflight:
 	test -x "$$UV_ROOT/bin/uv_shell_exec"
 	test -x "$(UVHS_ROOT_DIR)/uvhs/uv_shell_exec_compat.sh"
 	test -x "$(UVHS_ROOT_DIR)/uvhs/shell_compat.sh"
-	test -x "$(UVHS_ROOT_DIR)/tools/generate_rtl_filelist.sh"
+	test -x "$(UVHS_ROOT_DIR)/tools/update_core_flist.sh"
 	test -f "$(UVHS_ROOT_DIR)/uvhs/vivado_pre_opt.tcl"
 	test -f "$(UVHS_GBUS_GENERATOR)"
 	test -f "$(UVHS_GBUS_JSON)"
@@ -126,14 +126,15 @@ uvhs_export_generalbus: uvhs_prepare
 	bash -c 'set -euo pipefail; \
 		source_ip_dir="$(UVHS_GBUS_IP_DIR)"; generator="$(UVHS_GBUS_GENERATOR)"; \
 		gen_dir="$(UVHS_GBUS_GEN_DIR)"; release="$$gen_dir/uvw_general_bus"; \
+		gbus_stub_is_64() { \
+			grep -Eq "output[[:space:]]+\\[63:0\\][[:space:]]*dut_axi_wdata" "$$1" && \
+			grep -Eq "input[[:space:]]+\\[63:0\\][[:space:]]*dut_axi_rdata" "$$1"; \
+		}; \
 		test -f "$$generator"; test -f "$(UVHS_GBUS_JSON)"; \
 		if [ "$(UVHS_EXPORT_IP_FORCE)" = 1 ] || \
 		   [ ! -s "$$release/uvw_general_bus.dcp" ] || \
 		   [ ! -s "$$release/uvw_general_bus_Stub.v" ] || \
-		   ! grep -Eq "output[[:space:]]+\\[63:0\\][[:space:]]*dut_axi_wdata" \
-		     "$$release/uvw_general_bus_Stub.v" || \
-		   ! grep -Eq "input[[:space:]]+\\[63:0\\][[:space:]]*dut_axi_rdata" \
-		     "$$release/uvw_general_bus_Stub.v"; then \
+		   ! gbus_stub_is_64 "$$release/uvw_general_bus_Stub.v"; then \
 			rm -rf "$$gen_dir"; mkdir -p "$$gen_dir"; \
 			ip_dir="$$gen_dir/ip-src"; \
 			cp -a "$$source_ip_dir" "$$ip_dir"; \
@@ -153,14 +154,11 @@ uvhs_export_generalbus: uvhs_prepare
 		fi; \
 		test -s "$$release/uvw_general_bus.dcp"; \
 		test -s "$$release/uvw_general_bus_Stub.v"; \
+		gbus_stub_is_64 "$$release/uvw_general_bus_Stub.v"; \
 		rm -rf "$(UVHS_WORK_DIR)/rtl/soc/uvw_general_bus"; \
 		mkdir -p "$(UVHS_WORK_DIR)/rtl/soc" "$(UVHS_WORK_DIR)/rtl/stubs"; \
 		cp -a "$$release" "$(UVHS_WORK_DIR)/rtl/soc/uvw_general_bus"; \
 		cp -f "$$release/uvw_general_bus_Stub.v" \
-		  "$(UVHS_WORK_DIR)/rtl/stubs/uvw_general_bus.v"; \
-		grep -Eq "output[[:space:]]+\\[63:0\\][[:space:]]*dut_axi_wdata" \
-		  "$(UVHS_WORK_DIR)/rtl/stubs/uvw_general_bus.v"; \
-		grep -Eq "input[[:space:]]+\\[63:0\\][[:space:]]*dut_axi_rdata" \
 		  "$(UVHS_WORK_DIR)/rtl/stubs/uvw_general_bus.v"; \
 		echo "INFO: prepared 64-bit UVHS generalBus DCP"'
 
@@ -187,7 +185,7 @@ uvhs_sync_uvw_axi4_to_ddr4: uvhs_prepare
 		echo "INFO: verified UVHS DDR DCP AXI data width: $$expected_width"'
 
 uvhs_filelist: uvhs_export_vivado_ip uvhs_export_generalbus
-	bash "$(UVHS_ROOT_DIR)/tools/generate_rtl_filelist.sh" uvhs \
+	bash "$(UVHS_ROOT_DIR)/tools/update_core_flist.sh" uvhs \
 		"$(CORE_DIR)" "$(UVHS_WORK_DIR)" "$(CPU)" "$(UVHS_FILELIST)" \
 		-- $(RTL_INCLUDE)
 

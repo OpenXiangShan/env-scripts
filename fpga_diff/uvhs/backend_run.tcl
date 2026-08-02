@@ -14,8 +14,7 @@ set_option clock.async_control.force_accept true
 set_option time.enable_sign_off true
 set_option time.incremental_sign_off true
 
-set platform [uvhs::env_or_default PLATFORM U2.2]
-create_system_design -name VU19P_X4 -platform $platform
+create_system_design -name VU19P_X4 -platform U2.2
 uvhs::source_required topology.tcl
 
 set ::env(UVHS_ASSIGN_PIN_TOP) none

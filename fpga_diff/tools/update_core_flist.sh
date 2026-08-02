@@ -5,8 +5,8 @@ set -euo pipefail
 usage() {
   cat >&2 <<'EOF'
 Usage:
-  generate_rtl_filelist.sh vivado CORE_DIR [--] [RTL_INCLUDE ...]
-  generate_rtl_filelist.sh uvhs CORE_DIR WORK_DIR CPU OUTPUT [--] [RTL_INCLUDE ...]
+  update_core_flist.sh vivado CORE_DIR [--] [RTL_INCLUDE ...]
+  update_core_flist.sh uvhs CORE_DIR WORK_DIR CPU OUTPUT [--] [RTL_INCLUDE ...]
 EOF
   exit 2
 }
