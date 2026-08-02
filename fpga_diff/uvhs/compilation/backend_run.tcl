@@ -33,6 +33,18 @@ init_runtime_data
 trigger_probe -check
 sweep_design
 
+set xdma_axi_clock_pin \
+    [get_pins -quiet core_def/xdma_ep_i/TO_DIFFTEST_PCIE_CLK]
+if {[llength $xdma_axi_clock_pin] != 1} {
+    error "required XDMA AXI clock pin not found"
+}
+set xdma_axi_clock_period [expr {
+    [string equal -nocase [uvhs::env_or_default XDMA_LINK_WIDTH X4] X8]
+        ? 4.0 : 8.0
+}]
+create_clock -name XDMA_AXI_ACLK -period $xdma_axi_clock_period \
+    $xdma_axi_clock_pin
+
 infer_clock
 report_clock -inferred
 transform_clock
