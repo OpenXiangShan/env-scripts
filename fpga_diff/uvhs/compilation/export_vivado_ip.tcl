@@ -11,7 +11,7 @@ set core_dir ""
 
 proc print_help {} {
     puts "Usage:"
-    puts "  vivado -mode batch -source uvhs/export_vivado_ip.tcl -tclargs \\"
+    puts "  vivado -mode batch -source uvhs/compilation/export_vivado_ip.tcl -tclargs \\"
     puts "    --origin_dir <fpga_diff> --out_dir <uvhs_work_dir> \[--vivado_version <ver>\] \[--core_dir <dir>\] \[--force\] \[--jobs N\]"
     exit 0
 }

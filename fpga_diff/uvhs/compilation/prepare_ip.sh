@@ -15,6 +15,7 @@ jobs=$4
 force=$5
 ddr_source=$6
 ddr_width=$7
+script_dir=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)
 
 require_file() {
   [[ -s $1 ]] || {
@@ -41,7 +42,7 @@ vivado_args=(
 )
 [[ $force != 1 ]] || vivado_args+=(--force)
 export VIVADO_HOME=$UV_XILINX_VIVADO XILINX_VIVADO=$UV_XILINX_VIVADO
-"$vivado" -mode batch -source "$origin_dir/uvhs/export_vivado_ip.tcl" \
+"$vivado" -mode batch -source "$script_dir/export_vivado_ip.tcl" \
   -tclargs "${vivado_args[@]}"
 
 # Generate the vendor generalBus from a private copy. Its original generator

@@ -94,7 +94,7 @@ create_system_design -name VU19P_X4 -platform U2.2
 
 uvhs::source_required topology.tcl
 uvhs::source_required assign_pin.tcl
-set_constraint_files [uvhs::path timing_common.tcl]
+set_constraint_files [uvhs::path timing.tcl]
 foreach reset_port {rstn_sw6 rstn_sw5 rstn_sw4} {
     create_reset -port ${design_top}.${reset_port} -active 0
 }

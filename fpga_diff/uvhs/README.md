@@ -58,7 +58,12 @@ when build outputs should live elsewhere.
 transformation, remap, partition, localization, system routing, FPGA PnR,
 timing signoff, bitstream generation, and runtime database commit. Fill-rate
 validation and automatic partitioning are kept next to that sequence in
-`backend_run.tcl`.
+`compilation/backend_run.tcl`.
+
+`compilation/timing.tcl` supplies the external clocks to the frontend. The
+asynchronous groups are applied from `compilation/async_clocks.tcl` after UVHS
+has inferred and transformed clocks, then applied again to each linked FPGA
+netlist before Vivado optimization.
 
 The default XiangShan partition limits are 70% LUT and 35% LUT6. They can be
 changed with `UVHS_LUT_FILL_RATE` and `UVHS_LUT6_FILL_RATE` for placement
@@ -86,6 +91,10 @@ the hardware, and keeps a detached UVHS session alive. Later reset and memory
 commands must use that same session. Its PID, command files, and log are stored
 under `runtime-work` in the selected build directory. The session has no idle
 timeout; use `uvhs_runtime_stop` after testing to release it cleanly.
+After the session stops, the released FPGA reports link down; loading the same
+database and calling `initialize` without `download` fails. Start the next
+runtime session with `uvhs_write_bitstream` so it reloads and downloads
+`hw.dat`.
 
 `uvhs_write_ddr` converts the Vivado address/data-pair format to the DDR DCP
 word width and calls `writemem -rtl`. It leaves the CPU halted until
@@ -119,18 +128,18 @@ or DDR pins.
 | `uvhs.mk` | Build and runtime target wiring. |
 | `../tools/update_core_flist.sh` | Shared Vivado/UVHS RTL file-list entry point. |
 | `../tools/rtl_filelist_lib.sh` | Nested file-list parsing and path resolution. |
-| `flow_common.tcl` | Shared UVHS path, environment, and source helpers. |
-| `frontend_run.tcl` | RTL/IP import, elaboration, and uvsyn frontend. |
-| `backend_run.tcl` | Fill-rate setup, partition, routing, PnR, and database commit. |
-| `topology.tcl` | Selects the FPGA set from the vendor board assembly. |
-| `assign_pin.tcl` | B0/F2 clock, PCIe, UART, JTAG, SD, and control pins. |
-| `timing_common.tcl` | External clock constraints. |
-| `async_clocks.tcl` | Asynchronous clock groups used by backend and Vivado PnR. |
-| `vivado_pre_opt.tcl` | XDMA refclock and CDC constraints. |
-| `prepare_ip.sh` | Vivado IP export plus generalBus and DDR DCP preparation. |
-| `export_vivado_ip.tcl` | Repository-owned Vivado IP export. |
-| `shell_compat.sh` | Generated launcher shell correction. |
-| `uv_shell_exec_compat.sh` | Runtime library wrapper. |
-| `runtime_server.tcl` | Download, reset sequencing, and command service. |
-| `runtime_command.tcl` | Reset, DDR, and flash operations. |
-| `runtime_session.sh` | Runtime lifecycle, command submission, and status. |
+| `compilation/flow_common.tcl` | Shared UVHS path, environment, and source helpers. |
+| `compilation/frontend_run.tcl` | RTL/IP import, elaboration, and uvsyn frontend. |
+| `compilation/backend_run.tcl` | Fill-rate setup, partition, routing, PnR, and database commit. |
+| `compilation/topology.tcl` | Selects the FPGA set from the vendor board assembly. |
+| `compilation/assign_pin.tcl` | B0/F2 clock, PCIe, UART, JTAG, SD, and control pins. |
+| `compilation/timing.tcl` | External clock constraints registered by the frontend. |
+| `compilation/async_clocks.tcl` | Asynchronous groups applied after clock transformation. |
+| `compilation/vivado_pre_opt.tcl` | XDMA refclock and CDC constraints. |
+| `compilation/prepare_ip.sh` | Vivado IP export plus generalBus and DDR DCP preparation. |
+| `compilation/export_vivado_ip.tcl` | Repository-owned Vivado IP export. |
+| `compilation/shell_compat.sh` | Generated launcher shell correction. |
+| `runtime/uv_shell_exec_compat.sh` | Runtime library wrapper used by build and runtime shells. |
+| `runtime/runtime_server.tcl` | Download, reset sequencing, and command service. |
+| `runtime/runtime_command.tcl` | Reset, DDR, and flash operations. |
+| `runtime/runtime_session.sh` | Runtime lifecycle, command submission, and status. |

@@ -1,4 +1,6 @@
 UVHS_ROOT_DIR := $(abspath $(dir $(lastword $(MAKEFILE_LIST)))/..)
+UVHS_COMPILATION_DIR := $(UVHS_ROOT_DIR)/uvhs/compilation
+UVHS_RUNTIME_DIR := $(UVHS_ROOT_DIR)/uvhs/runtime
 
 UVHS_TEMPLATE_DIR ?=
 UVHS_UVW_AXI4_TO_DDR4_SRC ?=
@@ -29,7 +31,7 @@ UVHS_TOOL_ENV = \
 	MAKEFLAGS="$${MAKEFLAGS:+$$MAKEFLAGS }SHELL=/bin/bash" \
 	LD_LIBRARY_PATH="$(UVHS_RUNTIME_LIB_DIR):$${LD_LIBRARY_PATH:-}" \
 	UVHS_RUNTIME_LIB_DIR="$(UVHS_RUNTIME_LIB_DIR)" \
-	UVSHELL_EXEC_NAME="$(UVHS_ROOT_DIR)/uvhs/uv_shell_exec_compat.sh"
+	UVSHELL_EXEC_NAME="$(UVHS_RUNTIME_DIR)/uv_shell_exec_compat.sh"
 
 UVHS_FLOW_ENV = \
 	$(UVHS_TOOL_ENV) \
@@ -52,11 +54,11 @@ uvhs_preflight:
 	test -x "$$UV_XILINX_VIVADO/bin/vivado"
 	test -n "$$UV_LICENSE"
 	test -x "$$UV_ROOT/bin/uv_shell_exec"
-	test -x "$(UVHS_ROOT_DIR)/uvhs/uv_shell_exec_compat.sh"
-	test -x "$(UVHS_ROOT_DIR)/uvhs/shell_compat.sh"
-	test -x "$(UVHS_ROOT_DIR)/uvhs/prepare_ip.sh"
+	test -x "$(UVHS_RUNTIME_DIR)/uv_shell_exec_compat.sh"
+	test -x "$(UVHS_COMPILATION_DIR)/shell_compat.sh"
+	test -x "$(UVHS_COMPILATION_DIR)/prepare_ip.sh"
 	test -x "$(UVHS_ROOT_DIR)/tools/update_core_flist.sh"
-	test -f "$(UVHS_ROOT_DIR)/uvhs/vivado_pre_opt.tcl"
+	test -f "$(UVHS_COMPILATION_DIR)/vivado_pre_opt.tcl"
 	test -d "$(UVHS_TEMPLATE_DIR)/script"
 	test -f "$(UVHS_TEMPLATE_DIR)/Makefile"
 	test -f "$(UVHS_TEMPLATE_DIR)/script/1B_4F_HGC_assemble.tcl"
@@ -87,7 +89,7 @@ uvhs_prepare: uvhs_preflight
 	mkdir -p "$(UVHS_WORK_DIR)/rtl/soc" "$(UVHS_WORK_DIR)/rtl/device/pcie"
 
 uvhs_prepare_ip: uvhs_prepare
-	$(UVHS_FLOW_ENV) bash "$(UVHS_ROOT_DIR)/uvhs/prepare_ip.sh" \
+	$(UVHS_FLOW_ENV) bash "$(UVHS_COMPILATION_DIR)/prepare_ip.sh" \
 		"$(UVHS_ROOT_DIR)" "$(UVHS_WORK_DIR)" "$(CORE_DIR)" \
 		"$(UVHS_EXPORT_IP_JOBS)" "$(UVHS_EXPORT_IP_FORCE)" \
 		"$(UVHS_UVW_AXI4_TO_DDR4_SRC)" "$(UVHS_DDR_AXI_WIDTH)"
@@ -101,7 +103,7 @@ uvhs_frontend: uvhs_filelist
 	bash -c 'set -euo pipefail; cd "$(UVHS_WORK_DIR)"; \
 		$(UVHS_FLOW_ENV) \
 		bash "$$UV_ROOT/bin/uv_shell" -bypass_vivado_version_check \
-		-s "$(UVHS_ROOT_DIR)/uvhs/frontend_run.tcl" |& tee frontend_run.log; \
+		-s "$(UVHS_COMPILATION_DIR)/frontend_run.tcl" |& tee frontend_run.log; \
 		grep -Fxq UVHS_FRONTEND_SUCCESS frontend_run.log'
 
 # Stable build entry point. Keep the stages serialized even under parallel make.
@@ -112,38 +114,38 @@ uvhs_backend:
 	bash -c 'set -euo pipefail; cd "$(UVHS_WORK_DIR)"; \
 		$(UVHS_FLOW_ENV) \
 		bash "$$UV_ROOT/bin/uv_shell" -bypass_vivado_version_check \
-		-s "$(UVHS_ROOT_DIR)/uvhs/backend_run.tcl" |& tee backend_run.log; \
+		-s "$(UVHS_COMPILATION_DIR)/backend_run.tcl" |& tee backend_run.log; \
 		grep -Fxq UVHS_BACKEND_SUCCESS backend_run.log'
 
 # The UVHS API requires one session to retain ownership of the downloaded
 # database. Detach that session after programming and track it in runtime-work.
 uvhs_write_bitstream:
 	test -d "$(UVHS_RUNTIME_DB)"
-	test -f "$(UVHS_ROOT_DIR)/uvhs/runtime_server.tcl"
-	test -x "$(UVHS_ROOT_DIR)/uvhs/runtime_session.sh"
+	test -f "$(UVHS_RUNTIME_DIR)/runtime_server.tcl"
+	test -x "$(UVHS_RUNTIME_DIR)/runtime_session.sh"
 	mkdir -p "$(UVHS_RUNTIME_WORK_DIR)" "$(UVHS_RUNTIME_TMP_DIR)"
 	$(UVHS_TOOL_ENV) UVHS_DB_PATH="$(UVHS_RUNTIME_DB)" \
 	UVHS_COMMAND_FILE="$(UVHS_RUNTIME_COMMAND_FILE)" \
 	UVHS_RUNTIME_READY_FILE="$(UVHS_RUNTIME_READY_FILE)" \
 	UVHS_RUNTIME_TMP_DIR="$(UVHS_RUNTIME_TMP_DIR)" \
-	bash "$(UVHS_ROOT_DIR)/uvhs/runtime_session.sh" start \
+	bash "$(UVHS_RUNTIME_DIR)/runtime_session.sh" start \
 		"$(UVHS_RUNTIME_PID_FILE)" "$(UVHS_RUNTIME_READY_FILE)" \
 		"$(UVHS_RUNTIME_LOG)" "$(UVHS_RUNTIME_COMMAND_FILE)" \
 		"$(UVHS_RUNTIME_TIMEOUT)" \
 		bash "$$UV_ROOT/bin/uv_shell" -rt_shell \
 		-workdir "$(UVHS_RUNTIME_WORK_DIR)" \
-		-script "$(UVHS_ROOT_DIR)/uvhs/runtime_server.tcl"
+		-script "$(UVHS_RUNTIME_DIR)/runtime_server.tcl"
 
 uvhs_runtime_check:
-	bash "$(UVHS_ROOT_DIR)/uvhs/runtime_session.sh" check \
+	bash "$(UVHS_RUNTIME_DIR)/runtime_session.sh" check \
 		"$(UVHS_RUNTIME_PID_FILE)" "$(UVHS_RUNTIME_READY_FILE)"
 
 uvhs_runtime_status: uvhs_runtime_check
 	@echo "UVHS_RUNTIME_LOG=$(UVHS_RUNTIME_LOG)"
 
 define uvhs_runtime_command
-	bash "$(UVHS_ROOT_DIR)/uvhs/runtime_session.sh" enqueue \
-		"$(UVHS_RUNTIME_COMMAND_FILE)" "$(UVHS_ROOT_DIR)/uvhs/runtime_command.tcl" \
+	bash "$(UVHS_RUNTIME_DIR)/runtime_session.sh" enqueue \
+		"$(UVHS_RUNTIME_COMMAND_FILE)" "$(UVHS_RUNTIME_DIR)/runtime_command.tcl" \
 		"$(UVHS_RUNTIME_TIMEOUT)" $(1)
 endef
 
@@ -163,12 +165,12 @@ uvhs_write_flash: uvhs_runtime_check
 
 uvhs_runtime_stop: uvhs_runtime_check
 	$(call uvhs_runtime_command,stop)
-	bash "$(UVHS_ROOT_DIR)/uvhs/runtime_session.sh" wait \
+	bash "$(UVHS_RUNTIME_DIR)/runtime_session.sh" wait \
 		"$(UVHS_RUNTIME_PID_FILE)" "$(UVHS_RUNTIME_READY_FILE)" \
 		"$(UVHS_RUNTIME_COMMAND_FILE)" "$(UVHS_RUNTIME_TIMEOUT)"
 
 uvhs_clean:
-	@! bash "$(UVHS_ROOT_DIR)/uvhs/runtime_session.sh" active \
+	@! bash "$(UVHS_RUNTIME_DIR)/runtime_session.sh" active \
 		"$(UVHS_RUNTIME_PID_FILE)" >/dev/null 2>&1 || \
 		{ echo "ERROR: stop the UVHS runtime before cleaning" >&2; exit 1; }
 	test -n "$(UVHS_WORK_DIR)"
