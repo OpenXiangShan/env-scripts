@@ -10,141 +10,92 @@ proc env_or_default {name default} {
 }
 
 proc split_words {value} {
-    set out [list]
-    foreach item $value {
-        if {$item ne ""} {
-            lappend out $item
+    set words {}
+    foreach word $value {
+        if {$word ne ""} {
+            lappend words $word
         }
     }
-    return $out
+    return $words
 }
 
-set required_dcp_modules [split_words [env_or_default UVHS_REQUIRED_DCP_MODULES {blk_mem_gen_0 AXI_bridge data_bridge xdma_ep uvw_axi4_to_ddr4 uvw_general_bus}]]
-
-proc dcp_module_is_required {module} {
-    return [expr {[lsearch -exact $::required_dcp_modules $module] >= 0}]
-}
-
-proc source_if_exists {file} {
-    if {$file eq "none"} {
-        puts "INFO: skip $file"
-        return
+proc source_required {file} {
+    if {![file exists $file]} {
+        error "required UVHS flow file not found: $file"
     }
-    if {[file exists $file]} {
-        puts "INFO: source $file"
-        if {[catch {uplevel #0 [list source $file]} err]} {
-            puts "WARNING: source $file failed: $err"
+    puts "INFO: source $file"
+    uplevel #0 [list source $file]
+}
+
+proc import_blackbox {module dcp args} {
+    if {![file exists $dcp] || [file size $dcp] == 0} {
+        error "required blackbox DCP missing or empty for $module: $dcp"
+    }
+
+    puts "INFO: set_blackbox $module $dcp"
+    uplevel #0 [concat [list set_blackbox -module $module -source_file $dcp] $args]
+}
+
+proc import_ip {module dcp stub args} {
+    foreach {kind file} [list DCP $dcp stub $stub] {
+        if {![file exists $file] || [file size $file] == 0} {
+            error "required $module $kind missing or empty: $file"
         }
-    } else {
-        puts "INFO: skip missing $file"
-    }
-}
-
-proc set_blackbox_if_exists {module dcp args} {
-    if {![dcp_module_is_required $module]} {
-        puts "INFO: skip blackbox $module because it is not listed in UVHS_REQUIRED_DCP_MODULES"
-        return
-    }
-    if {[file exists $dcp]} {
-        puts "INFO: set_blackbox $module $dcp"
-        set command [list set_blackbox -module $module -source_file $dcp]
-        if {[llength $args] > 0} {
-            set command [concat $command $args]
-        }
-        uplevel #0 $command
-    } else {
-        error "required blackbox DCP missing for $module: $dcp"
-    }
-}
-
-proc set_ip_if_exists {module dcp stub args} {
-    if {![dcp_module_is_required $module]} {
-        puts "INFO: skip set_ip $module because it is not listed in UVHS_REQUIRED_DCP_MODULES"
-        return
-    }
-    if {![file exists $dcp]} {
-        error "required IP DCP missing for $module: $dcp"
-    }
-    if {![file exists $stub]} {
-        error "required IP stub missing for $module: $stub"
     }
 
     puts "INFO: set_ip $module $dcp"
-    set command [list set_ip -module $module -source_file $dcp]
-    if {[llength $args] > 0} {
-        set command [concat $command $args]
-    }
-    uplevel #0 $command
-    set read_stub [env_or_default [string toupper UVHS_${module}_READ_STUB] 1]
-    if {$read_stub eq "0"} {
-        puts "INFO: skip read_verilog $stub because UVHS_[string toupper ${module}]_READ_STUB=0"
-    } else {
-        puts "INFO: read_verilog $stub"
-        uplevel #0 [list read_verilog $stub]
-    }
+    uplevel #0 [concat [list set_ip -module $module -source_file $dcp] $args]
+    puts "INFO: read_verilog $stub"
+    read_verilog $stub
 }
 
-proc require_file_for_uvhs_ip {description file} {
-    if {![file exists $file] || [file size $file] == 0} {
-        error "required UVHS DDR IP $description missing or empty: $file"
-    }
-    puts "INFO: found UVHS DDR IP $description: $file"
-}
-
-proc run_or_warn {description command} {
-    puts "INFO: $description"
-    if {[catch {uplevel #0 $command} err]} {
-        puts "WARNING: $description failed: $err"
-    }
-}
-
-proc append_line_if_missing {file line} {
-    if {$file eq "" || $line eq ""} {
-        return
-    }
-    set existing ""
+proc append_option_once {file line} {
+    set data ""
     if {[file exists $file]} {
-        set fh [open $file r]
-        set existing [read $fh]
-        close $fh
-        foreach entry [split $existing "\n"] {
-            if {[string trim $entry] eq $line} {
-                puts "INFO: keep existing option line in $file: $line"
+        set input [open $file r]
+        set data [read $input]
+        close $input
+        foreach existing [split $data "\n"] {
+            if {[string trim $existing] eq $line} {
                 return
             }
         }
     }
-    set fh [open $file a]
-    if {$existing ne "" && ![string match *\n $existing]} {
-        puts $fh ""
+
+    set output [open $file a]
+    if {$data ne "" && ![string match *\n $data]} {
+        puts $output ""
     }
-    puts $fh $line
-    close $fh
-    puts "INFO: appended option line to $file: $line"
+    puts $output $line
+    close $output
 }
 
-proc patch_option_add_rtl_inst {working_space inst_path} {
+# UVHS runtime writemem discovers backdoor instances from these database files;
+# the installed release does not expose an equivalent frontend Tcl command.
+proc register_runtime_memory {working_space inst_path} {
     if {$inst_path eq "" || $inst_path eq "none"} {
-        puts "INFO: skip option.add_rtl_inst patch"
         return
     }
     set option_dir [file join $working_space DB Options]
     file mkdir $option_dir
-    set add_inst_line "add_rtl_inst -inst_name $inst_path"
-    append_line_if_missing [file join $option_dir option.add_rtl_inst.txt] $add_inst_line
-    append_line_if_missing [file join $option_dir option.txt] $add_inst_line
+    set option "add_rtl_inst -inst_name $inst_path"
+    append_option_once [file join $option_dir option.add_rtl_inst.txt] $option
+    append_option_once [file join $option_dir option.txt] $option
+    puts "INFO: registered UVHS runtime memory instance $inst_path"
 }
 
-# UVHS generates this Makefile after elaboration. Its stock recipe invokes
-# uv_shell through /bin/sh even though the vendor script requires Bash.
-proc start_uvsyn_shell_patch_watcher {} {
-    set module_makefile [file join [pwd] hw.dat Synthesis Uvsyn Script module.makefile]
-    set patch_script [file normalize [file join [file dirname [info script]] patch_uvsyn_shell.sh]]
-    if {![file exists $patch_script]} {
-        error "missing UVHS worker shell compatibility helper: $patch_script"
+proc start_frontend_shell_compat {} {
+    set helper [env_or_default UVHS_SHELL_COMPAT_SCRIPT ""]
+    if {$helper eq ""} {
+        error "UVHS_SHELL_COMPAT_SCRIPT is not set"
     }
-    exec bash $patch_script $module_makefile &
-    puts "INFO: started UVHS worker shell compatibility helper"
+    set helper [file normalize $helper]
+    if {![file isfile $helper]} {
+        error "UVHS shell compatibility helper not found: $helper"
+    }
+    set module_makefile [file join [pwd] hw.dat Synthesis Uvsyn Script module.makefile]
+    exec bash $helper wait-module $module_makefile &
+    puts "INFO: started UVHS frontend shell compatibility helper"
 }
 
 create_working_space hw.dat
@@ -154,18 +105,25 @@ set frontend_threads [env_or_default UVHS_FRONTEND_THREADS 16]
 set frontend_processes [env_or_default UVHS_FRONTEND_PROCESSES 64]
 set fpga_threads [env_or_default UVHS_FPGA_THREADS 8]
 set fpga_processes [env_or_default UVHS_FPGA_PROCESSES 32]
-
-if {[env_or_default UVHS_USE_LSF 1]} {
-    set_parallel_option -max_threads $frontend_threads -max_processes $frontend_processes -submit_command bsub -terminate_command bkill -label frontend
-    set_parallel_option -max_threads $fpga_threads -max_processes $fpga_processes -submit_command {bsub -R "rusage[mem=80000]"} -terminate_command bkill -label fpga
+if {[env_or_default UVHS_USE_LSF 0]} {
+    set_parallel_option -max_threads $frontend_threads \
+        -max_processes $frontend_processes -submit_command bsub \
+        -terminate_command bkill -label frontend
+    set_parallel_option -max_threads $fpga_threads \
+        -max_processes $fpga_processes \
+        -submit_command {bsub -R "rusage[mem=80000]"} \
+        -terminate_command bkill -label fpga
 } else {
-    set_parallel_option -max_threads $frontend_threads -max_processes $frontend_processes -label frontend
-    set_parallel_option -max_threads $fpga_threads -max_processes $fpga_processes -label fpga
+    set_parallel_option -max_threads $frontend_threads \
+        -max_processes $frontend_processes -label frontend
+    set_parallel_option -max_threads $fpga_threads \
+        -max_processes $fpga_processes -label fpga
 }
 
 set_option global.log.label MEMORY
 set_option syn.checkMultiDriver false
 set_option syn.multipleDriverConflict WOR
+set_option syn.logicFillingRateThreshold 0.001
 set_option time.auto_clock_config true
 set_option clock.transform_clock.multi_iteration true
 set_option clock.glitch.force_transform true
@@ -173,69 +131,48 @@ set_option clock.async_control.force_accept true
 set_option time.enable_sign_off true
 set_option time.incremental_sign_off true
 set_option signal.uhd.sampling_clock.allow_local_clock true
-set_option syn.logicFillingRateThreshold 0.001
 
 set design_name [env_or_default UVHS_DESIGN_NAME VU19P_X4]
 set platform [env_or_default PLATFORM U2.2]
 set design_top [env_or_default UVHS_TOP fpga_top_debug]
-set ddr_inst_path [env_or_default UVHS_DDR_RTL_INST ${design_top}.core_def.U_JTAG_DDR_SUBSYS]
-set reset_ports [split_words [env_or_default UVHS_RESET_PORTS {rstn_sw6 rstn_sw5 rstn_sw4}]]
+set ddr_inst_path [env_or_default UVHS_DDR_RTL_INST \
+    ${design_top}.core_def.U_UVHS_UVW_AXI4_TO_DDR4]
 create_system_design -name $design_name -platform $platform
 
-set assemble_file [env_or_default UVHS_ASSEMBLE_FILE ./script/1B_4F_HGC_assemble.tcl]
-if {$assemble_file eq "none"} {
-    puts "INFO: skip board assembly"
-} else {
-    source_if_exists $assemble_file
+source_required [env_or_default UVHS_ASSEMBLE_FILE ./script/1B_4F_HGC_assemble.tcl]
+source_required [env_or_default UVHS_ASSIGN_PIN_FILE ./script/assign_pin.tcl]
+set timing_file [env_or_default UVHS_TIMING_FILE ./script/timing.tcl]
+if {![file exists $timing_file]} {
+    error "required UVHS timing constraints not found: $timing_file"
 }
-set skip_board_constraints [env_or_default UVHS_SKIP_BOARD_CONSTRAINTS 0]
-
-if {$skip_board_constraints} {
-    puts "INFO: skip board probe/pin/timing/partition constraints"
-} else {
-    source_if_exists [env_or_default UVHS_PROBE_FILE ./script/probe.tcl]
-    source_if_exists [env_or_default UVHS_ASSIGN_PIN_FILE ./script/assign_pin.tcl]
-    set timing_file [env_or_default UVHS_TIMING_FILE none]
-    if {$timing_file eq "none"} {
-        puts "INFO: skip timing constraints"
-    } else {
-        run_or_warn "set_constraint_files" [list set_constraint_files $timing_file]
-    }
-    set partition_file [env_or_default UVHS_PARTITION_FILE ./script/partition.tcl]
-    if {$partition_file eq "none"} {
-        puts "INFO: skip partition constraints"
-    } else {
-        run_or_warn "set_partition_constraint_file" [list set_partition_constraint_file $partition_file]
-    }
-    foreach reset_port $reset_ports {
-        set reset_net ${design_top}.${reset_port}
-        run_or_warn "create_reset $reset_net" [list create_reset -port $reset_net -active 0]
-    }
+set_constraint_files $timing_file
+foreach reset_port [split_words [env_or_default UVHS_RESET_PORTS {
+    rstn_sw6 rstn_sw5 rstn_sw4
+}]] {
+    create_reset -port ${design_top}.${reset_port} -active 0
 }
 
-set_blackbox_if_exists blk_mem_gen_0 ./rtl/soc/blk_mem_gen_0.dcp
-set_blackbox_if_exists AXI_bridge ./rtl/soc/AXI_bridge.dcp
-set_blackbox_if_exists data_bridge ./rtl/soc/data_bridge.dcp
-set_blackbox_if_exists xdma_ep ./rtl/device/pcie/xdma_ep.dcp
-set_blackbox_if_exists uvw_general_bus \
+import_blackbox blk_mem_gen_0 ./rtl/soc/blk_mem_gen_0.dcp
+import_blackbox AXI_bridge ./rtl/soc/AXI_bridge.dcp
+import_blackbox data_bridge ./rtl/soc/data_bridge.dcp
+import_blackbox xdma_ep ./rtl/device/pcie/xdma_ep.dcp
+import_blackbox uvw_general_bus \
     ./rtl/soc/uvw_general_bus/uvw_general_bus.dcp \
     -clock_enable_pairs {dut_axi_aclk dut_axi_aclk_en 1}
-require_file_for_uvhs_ip DCP ./rtl/soc/uvw_axi4_to_ddr4.dcp
-require_file_for_uvhs_ip stub ./rtl/soc/uvw_axi4_to_ddr4_Stub.v
-require_file_for_uvhs_ip pblock ./script/uvw_axi4_to_ddr4_pblock.tcl
-set_ip_if_exists uvw_axi4_to_ddr4 ./rtl/soc/uvw_axi4_to_ddr4.dcp \
+import_ip uvw_axi4_to_ddr4 ./rtl/soc/uvw_axi4_to_ddr4.dcp \
     ./rtl/soc/uvw_axi4_to_ddr4_Stub.v \
     -clock_enable_pairs {ddr4ip_dut_axi_aclk ddr4ip_dut_axi_aclk_en 1} \
     -script_file {prePlace ./script/uvw_axi4_to_ddr4_pblock.tcl}
 
 set filelist [env_or_default UVHS_FILELIST ./rtl/filelist.f]
-puts "INFO: read_verilog -f $filelist"
+if {![file exists $filelist]} {
+    error "required UVHS RTL file list not found: $filelist"
+}
 read_verilog -f $filelist -mfcu
-
-puts "INFO: elaborate_design $design_top"
 elaborate_design $design_top
-start_uvsyn_shell_patch_watcher
+start_frontend_shell_compat
 synthesize_design -parallel_option frontend
 save_working_space
-patch_option_add_rtl_inst hw.dat $ddr_inst_path
+register_runtime_memory hw.dat $ddr_inst_path
+puts "UVHS_FRONTEND_SUCCESS"
 exit

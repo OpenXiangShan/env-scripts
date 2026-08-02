@@ -1,16 +1,12 @@
 # UVHS FPGA-Diff Flow
 
-This directory contains the UVHS implementation flow for FPGA-Diff designs on
-the U2.2 B0/F2 target. Its targets use the `uvhs_*` prefix; the normal Vivado,
-PCIe, and JTAG targets retain their original names and recipes.
+This directory contains the UVHS build and runtime flow for FPGA-Diff on the
+U2.2 B0/F2 target. UVHS targets use the `uvhs_*` prefix; the existing Vivado,
+PCIe, and JTAG targets keep their original behavior.
 
 ## Environment
 
-Configure the runtime host shell before invoking `make`, for example directly
-in `.bashrc`. The following values are the validated Hejian runtime
-installation; `UVHS_TEMPLATE_DIR` and
-`UVHS_UVW_AXI4_TO_DDR4_SRC` identify the locally installed base project and
-vendor DDR IP and therefore remain site-specific.
+Configure the runtime host shell directly, for example in `.bashrc`:
 
 ```sh
 export UV_ROOT=/home/data/UVHS/2506p4_0210
@@ -21,66 +17,67 @@ export UVHS_TEMPLATE_DIR=/path/to/uvhs-template
 export UVHS_UVW_AXI4_TO_DDR4_SRC=/path/to/uvw_axi4_to_ddr4
 ```
 
-Complete UVHS installations resolve their own runtime libraries. If a shared
-installation reports a missing `libpcre.so.1`, point
-`UVHS_COMPAT_PCRE_LIB` at a compatible copy supplied with another installation;
-the preflight stages it in the selected work directory without modifying the
-shared tool tree.
+`UVHS_TEMPLATE_DIR` provides the U2.2 board assembly files. The flow regenerates
+the repository-owned Vivado IP and imports the vendor DDR DCP selected by
+`UVHS_UVW_AXI4_TO_DDR4_SRC`. That DCP must expose a 64-bit AXI interface for
+`CPU=nutshell` and a 256-bit interface for other designs; the stub is checked
+before frontend starts.
 
-`UVHS_TEMPLATE_DIR` supplies the board assembly skeleton. The flow regenerates
-the repository-owned Vivado IP DCPs and consumes the vendor DDR DCP separately;
-the source tree does not carry generated DCPs, bitstreams, or machine paths.
-`UVHS_UVW_AXI4_TO_DDR4_SRC` must select a vendor DDR DCP whose AXI width matches
-the design. The default is 64 bits for `CPU=nutshell` and 256 bits for the other
-designs; `uvhs_sync_uvw_axi4_to_ddr4` checks the copied stub before frontend
-starts.
+Some shared UVHS installations need a local `libpcre.so.1`. Set
+`UVHS_COMPAT_PCRE_LIB` to a compatible library when preflight reports that
+dependency. The flow stages the library in its work directory and does not
+modify the shared installation.
 
 ## Build
 
 ```sh
 make uvhs_tools_check
 make uvhs_preflight CPU=<design>
-make uvhs_frontend CPU=<design> CORE_DIR=/path/to/generated/core SUFFIX=<tag>
+make uvhs_frontend CPU=<design> CORE_DIR=/path/to/core SUFFIX=<tag>
 make uvhs_backend CPU=<design> SUFFIX=<tag>
 make uvhs_package_bitstream CPU=<design> SUFFIX=<tag>
 ```
 
-`uvhs_frontend` creates `hw.dat`, imports the generated Vivado IP DCPs and the
-vendor DDR DCP, elaborates the RTL, and records board/clock constraints.
-`uvhs_backend` partitions and localizes that database, generates the vendor
-implementation scripts, then runs placement, routing, timing signoff, and
-bitstream generation. Thus frontend is close to synthesis/elaboration and
-backend is close to physical implementation, but the boundary is UVHS's
-database handoff rather than a direct Vivado `synth_design` boundary.
-All designs use the B0/F2 `clk5_p` 25 MHz input as the CPU clock; its default
-timing period is 40 ns.
+`uvhs_frontend` creates `hw.dat`, applies board and timing constraints, imports
+the fixed IP DCPs, elaborates the RTL, and runs UVHS synthesis. It also records
+the DDR instance used by runtime `writemem`.
 
-`uvhs_all` runs frontend then backend. `UVHS_EXPORT_IP_FORCE=1` rebuilds the
-source-generated Vivado DCPs; the default reuses an existing DCP in the chosen
-work directory. `uvhs_clean` removes only the explicitly selected
-`UVHS_WORK_DIR`.
+`uvhs_backend` reads that database and runs clock inference, remap, partition,
+localization, system routing, FPGA placement/routing, timing signoff, and
+bitstream generation. Its implementation sequence follows the vendor reference
+flow. The only custom Vivado stage is `vivado_pre_opt.tcl`, which preserves the
+XDMA GT reference-clock input and marks the known XDMA synchronizer registers.
 
-### XiangShan
+`uvhs_all` runs both stages. `UVHS_EXPORT_IP_FORCE=1` regenerates Vivado and
+generalBus DCPs even when the selected work directory already contains them.
+`uvhs_clean` removes only the selected `UVHS_WORK_DIR` and refuses to run while
+its runtime session is active.
 
-Use the same entry points with `CPU=kmh` and an AXI-based XiangShan RTL tree:
+### XiangShan And External RTL
+
+For `CPU=kmh`, `uvhs_prepare_core_rtl` runs the upstream `difftest`
+`fpga-release` target and synthesizes the extracted release instead of the raw
+`build/rtl`. This keeps the normal FPGA clock-gate replacement,
+`DifftestClockGate.v`, and generated RAM-style conversion.
+
+`RTL_INCLUDE` accepts RTL files, directories, and nested `.f`, `.flist`, or
+`.list` files. `tools/update_core_flist.sh` resolves every relative entry
+against its containing file list before writing the UVHS input list. For
+example:
 
 ```sh
-make uvhs_all CPU=kmh CORE_DIR=/path/to/XiangShan SUFFIX=<tag>
+make uvhs_all CPU=kmh CORE_DIR=/path/to/XiangShan \
+  RTL_INCLUDE=/path/to/external_llc.f SUFFIX=<tag>
 ```
 
-The file-list step detects whether `SimTop` exposes DMA and enables the H2C
-path accordingly. XiangShan keeps the B0/F2 and x4 defaults, while using 80%
-LUT and 30% LUT6 fill limits and disabling the hold-expansion route bailout.
+The default XiangShan partition limits are 80% LUT and 30% LUT6. They remain
+overridable through `UVHS_LUT_FILL_RATE` and `UVHS_LUT6_FILL_RATE`; changing
+them is a placement experiment, not a functional requirement.
 
 ## Runtime
 
-UVHS runtime targets are separate from the normal Vivado LabTools targets:
-
 ```sh
-# Program the FPGA and return after the detached runtime is ready.
 make uvhs_write_bitstream CPU=<design> SUFFIX=<tag>
-
-# Use the same CPU/SUFFIX or UVHS_WORK_DIR for later commands.
 make uvhs_runtime_status CPU=<design> SUFFIX=<tag>
 make uvhs_halt_soc CPU=<design> SUFFIX=<tag>
 make uvhs_write_ddr CPU=<design> SUFFIX=<tag> WORKLOAD=/path/to/image.txt
@@ -89,52 +86,59 @@ make uvhs_reset_cpu CPU=<design> SUFFIX=<tag>
 make uvhs_runtime_stop CPU=<design> SUFFIX=<tag>
 ```
 
-`uvhs_write_bitstream` loads the completed `hw.dat`, configures the connector and
-clocks, holds `rstn_sw6/rstn_sw5/rstn_sw4` low across `download`, calls
-`initialize`, then releases system/DDR reset before CPU reset. It leaves the
-required UVHS runtime session detached, waits until its command service is
-ready, and then returns. Session state and `uv_shell.log` live under
-`runtime-work`; `uvhs_runtime_status` checks the PID and ready marker. The other
-runtime targets fail immediately without a live session, wait for command
-completion, and propagate errors to Make. Run `uvhs_runtime_stop` when finished.
-`uvhs_halt_soc` and `uvhs_reset_cpu` control `rstn_sw5`; the other two reset
-names remain reserved for the system and external DDR IP. Download and runtime
-commands share the reset sequences defined in `runtime_control.tcl`.
+`uvhs_write_bitstream` loads the completed database, configures the connector
+and clocks, holds the three named resets across `download`, initializes the
+hardware, and releases the resets in system/DDR/CPU order. It then detaches the
+session because later UVHS memory operations must use the process that owns the
+downloaded database. Runtime PID, readiness, commands, and logs are under
+`runtime-work`.
 
-`uvhs_write_ddr` accepts the same address/data-pair text file as the Vivado Tcl,
-converts each segment to the selected DCP word width, and writes the DDR IP
-through the UVHS `writemem` runtime backdoor. It holds CPU reset low after the
-write; run `uvhs_reset_cpu` when the image is ready. H2C remains available for
-the normal FPGA-Diff host workflow and is independent of this loader.
+`uvhs_write_ddr` converts the address/data-pair format used by the Vivado DDR
+loader to the selected 64-bit or 256-bit DCP word width, then calls UVHS
+`writemem -rtl`. It leaves the CPU halted; call `uvhs_reset_cpu` after loading.
 
-The BRAM-backed flash is inside an imported Vivado DCP and is not exposed as a
-UVHS runtime memory. The flow therefore generates a 64-bit UVHS generalBus IP
-and connects it to the existing 32-bit flash path through `AXI_bridge`'s width
-converter. `uvhs_write_flash` holds CPU reset, pads the raw binary to the
-generalBus 8-byte transfer alignment, writes at `0x10000000`, reads the entire
-transfer back, and releases CPU reset only after a byte-for-byte match. The
-maximum image size is the flash BRAM capacity, 32 KiB. The normal
-`write_jtag_flash` target continues to use its dedicated 32-bit JTAG AXI. A
-database built before this generalBus path was added cannot use
-`uvhs_write_flash` and must be rebuilt.
+`uvhs_write_flash` uses the 64-bit UVHS generalBus master and the existing
+32-bit `AXI_bridge` flash path. GeneralBus sees the flash at offset `0x0`; the
+CPU and the normal JTAG path retain their `0x10000000` mapping. The command pads
+the binary to an 8-byte transfer, writes at offset zero, and requires a complete
+readback match before releasing the CPU. The maximum image is 32 KiB.
+
+## Compatibility Boundary
+
+Only compatibility workarounds observed as necessary on the validated UVHS
+installation remain:
+
+- `make_compat/` supplies Bash-backed `make` and the limited `csh -fc limit`
+  query emitted by UVHS. The host does not provide `csh` or `tcsh`.
+- `shell_compat.sh` selects Bash in generated synthesis and PnR launchers. Those
+  launchers use Bash syntax but are generated with `/bin/sh` invocation paths.
+- `uv_shell_exec_compat.sh` restores staged runtime libraries after the vendor
+  launcher sanitizes `LD_LIBRARY_PATH`.
+- The private generalBus generator copy replaces its asynchronous DCP copy with
+  `shutil.copy2`; otherwise it can delete the project before the copy finishes.
+
+No generated clock, timing XDC, VIO/ILA, DDR pin, or hierarchy-version text
+patching remains in the backend flow.
 
 ## Files
 
 | File | Role |
 | --- | --- |
-| `uvhs.mk` | UVHS-only Make targets, prerequisites, DCP export, and stage invocation. |
-| `export_vivado_ip.tcl` | Regenerates repository-owned Vivado IP/BD DCPs; `uvhs.mk` separately invokes the vendor generalBus generator. |
-| `frontend_run.tcl` | Creates the UVHS database, imports DCPs, reads RTL, and runs frontend. |
-| `backend_run.tcl` | Applies implementation-stage clock/constraint compatibility patches and runs P&R. |
-| `assemble_uvhs.tcl` | Reduces the four-FPGA vendor template to the selected FPGA and its daughter cards. |
-| `assign_pin_u22_f2.tcl` | Assigns target-board clocks, PCIe, UART, and low-speed I/O; DDR pins remain owned by the vendor IP. |
-| `timing_common.tcl`, `async_clocks.tcl` | Declare clocks and asynchronous clock-domain relationships. |
-| `check_modules.sh`, `check_flow_tools.sh` | Validate the generated RTL file list and checked-in flow sources. |
-| `make_compat/` | Supplies the Bash-compatible commands required by UVHS-generated Makefiles and its `csh -fc limit` probe. |
-| `patch_uvsyn_shell.sh` | Patches the generated worker Makefile to run the vendor `uv_shell` script through Bash. |
-| `runtime_session.sh` | Starts, checks, and stops the detached UVHS runtime session. |
-| `runtime_control.tcl` | Owns reset sequencing, readiness, and command servicing. |
-| `enqueue_runtime_command.sh`, `runtime_command.tcl` | Atomically submit reset and memory operations to the runtime session. |
-| `uv_shell_exec_compat.sh` | Restores staged compatibility libraries after the vendor launcher sanitizes `LD_LIBRARY_PATH`. |
-| `../src/rtl/common/core_def_xdma.sv` | Instantiates the width-matched vendor DDR IP directly for UVHS builds. |
-| `../user_script/hw_run_download.tcl` | Downloads and initializes a completed UVHS database, then services runtime commands. |
+| `uvhs.mk` | UVHS targets, inputs, stage invocation, packaging, and runtime commands. |
+| `frontend_run.tcl` | Builds the synthesized UVHS database from RTL and imported DCPs. |
+| `backend_run.tcl` | Runs the standard partition, localization, PnR, and commit sequence. |
+| `vivado_pre_opt.tcl` | Applies the two required XDMA physical/CDC constraints. |
+| `assemble_uvhs.tcl` | Reduces the vendor four-FPGA assembly to the selected FPGA set. |
+| `assign_pin_u22_f2.tcl` | Assigns B0/F2 clocks, PCIe, UART, JTAG, SD, and low-speed pins. |
+| `timing_common.tcl` | Declares the external clocks consumed by frontend. |
+| `async_clocks.tcl` | Declares asynchronous relationships after clocks are available. |
+| `export_vivado_ip.tcl` | Regenerates repository-owned XCI and block-design DCPs. |
+| `check_modules.sh` | Confirms required RTL modules exist in the final file list. |
+| `check_flow_tools.sh` | Performs source, shell, Tcl, and local-path checks. |
+| `shell_compat.sh`, `make_compat/` | Contain the generated-launcher Bash compatibility. |
+| `uv_shell_exec_compat.sh` | Supplies the staged runtime library path to `uv_shell_exec`. |
+| `hw_run_download.tcl` | Downloads the database and starts its runtime command service. |
+| `runtime_control.tcl` | Defines reset sequencing and command polling. |
+| `runtime_command.tcl` | Implements reset, DDR, and flash operations. |
+| `runtime_session.sh` | Starts, checks, waits for, and stops the detached session. |
+| `enqueue_runtime_command.sh` | Submits one command and returns its completion status. |

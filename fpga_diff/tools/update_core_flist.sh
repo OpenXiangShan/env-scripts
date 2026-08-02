@@ -8,7 +8,7 @@ fail() {
 }
 
 usage() {
-  echo "Usage: $0 CORE_DIR [--] [RTL_INCLUDE ...]" >&2
+  echo "Usage: $0 CORE_DIR [--external-only] [--output-filelist FILE] [--] [RTL_INCLUDE ...]" >&2
   exit 2
 }
 
@@ -16,15 +16,39 @@ usage() {
 
 core_dir=$1
 shift
-if [[ ${1:-} == -- ]]; then
-  shift
-fi
-
-[[ -d $core_dir ]] || fail "CORE_DIR is not a directory: $core_dir"
 
 fpga_diff_dir=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)
 awk_script="$fpga_diff_dir/core_flist.awk"
 output_tcl="$fpga_diff_dir/src/tcl/cpu_files.tcl"
+output_filelist=""
+external_only=0
+
+while (($#)); do
+  case $1 in
+    --external-only)
+      external_only=1
+      shift
+      ;;
+    --output-filelist)
+      [[ $# -ge 2 ]] || usage
+      output_filelist=$2
+      shift 2
+      ;;
+    --)
+      shift
+      break
+      ;;
+    *)
+      break
+      ;;
+  esac
+done
+
+[[ -d $core_dir ]] || fail "CORE_DIR is not a directory: $core_dir"
+if [[ $external_only == 1 && -z $output_filelist ]]; then
+  fail "--external-only requires --output-filelist"
+fi
+
 tmp_dir=$(mktemp -d)
 trap 'rm -rf "$tmp_dir"' EXIT
 
@@ -178,26 +202,48 @@ for rtl_include in "$@"; do
   fi
 done
 
-core_dir=$(realpath -e -- "$core_dir")
-find "$core_dir" -path "$core_dir/rtl/verification" -prune -o \
-  -type f \( -name '*.v' -o -name '*.sv' -o -name '*.vh' -o -name '*.svh' \) \
-  -print | LC_ALL=C sort > "$tmp_dir/cpu_files"
-: > "$tmp_dir/rtl_files"
-: > "$tmp_dir/rtl_include_dirs"
-if ((${#rtl_files[@]})); then
-  printf '%s\n' "${rtl_files[@]}" > "$tmp_dir/rtl_files"
-fi
-if ((${#rtl_include_dirs[@]})); then
-  printf '%s\n' "${rtl_include_dirs[@]}" > "$tmp_dir/rtl_include_dirs"
+if [[ $external_only == 0 ]]; then
+  core_dir=$(realpath -e -- "$core_dir")
+  find "$core_dir" -path "$core_dir/rtl/verification" -prune -o \
+    -type f \( -name '*.v' -o -name '*.sv' -o -name '*.vh' -o -name '*.svh' \) \
+    -print | LC_ALL=C sort > "$tmp_dir/cpu_files"
+  : > "$tmp_dir/rtl_files"
+  : > "$tmp_dir/rtl_include_dirs"
+  if ((${#rtl_files[@]})); then
+    printf '%s\n' "${rtl_files[@]}" > "$tmp_dir/rtl_files"
+  fi
+  if ((${#rtl_include_dirs[@]})); then
+    printf '%s\n' "${rtl_include_dirs[@]}" > "$tmp_dir/rtl_include_dirs"
+  fi
+
+  tmp_output="$tmp_dir/cpu_files.tcl"
+  awk -v var=cpu_files -v detect_simtop_dma=1 -f "$awk_script" \
+    "$tmp_dir/cpu_files" > "$tmp_output"
+  awk -v var=rtl_include_files -f "$awk_script" \
+    "$tmp_dir/rtl_files" >> "$tmp_output"
+  awk -v var=rtl_include_dirs -f "$awk_script" \
+    "$tmp_dir/rtl_include_dirs" >> "$tmp_output"
+  mkdir -p "$(dirname -- "$output_tcl")"
+  mv -- "$tmp_output" "$output_tcl"
 fi
 
-tmp_output="$tmp_dir/cpu_files.tcl"
-awk -v var=cpu_files -v detect_simtop_dma=1 -f "$awk_script" \
-  "$tmp_dir/cpu_files" > "$tmp_output"
-awk -v var=rtl_include_files -f "$awk_script" \
-  "$tmp_dir/rtl_files" >> "$tmp_output"
-awk -v var=rtl_include_dirs -f "$awk_script" \
-  "$tmp_dir/rtl_include_dirs" >> "$tmp_output"
-mv -- "$tmp_output" "$output_tcl"
+if [[ -n $output_filelist ]]; then
+  tmp_output="$tmp_dir/rtl_include.f"
+  {
+    if ((${#rtl_include_dirs[@]})); then
+      printf '+incdir+%s\n' "${rtl_include_dirs[@]}"
+    fi
+    if ((${#rtl_files[@]})); then
+      printf '%s\n' "${rtl_files[@]}"
+    fi
+  } > "$tmp_output"
+  mkdir -p "$(dirname -- "$output_filelist")"
+  mv -- "$tmp_output" "$output_filelist"
+fi
 
-echo "INFO: generated $output_tcl with ${#rtl_files[@]} external RTL files"
+if [[ $external_only == 0 ]]; then
+  echo "INFO: generated $output_tcl with ${#rtl_files[@]} external RTL files"
+fi
+if [[ -n $output_filelist ]]; then
+  echo "INFO: generated $output_filelist with ${#rtl_files[@]} external RTL files"
+fi
