@@ -127,7 +127,6 @@ if {![file exists $filelist]} {
 }
 read_verilog -f $filelist -mfcu
 elaborate_design $design_top
-set_partition_constraint_file [uvhs::path partition.tcl]
 uvhs::start_frontend_shell_compat
 synthesize_design -parallel_option frontend
 save_working_space

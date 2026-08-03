@@ -3,7 +3,7 @@
 ################################################################################
 
 set uvhs_ddr_cell \
-    [get_cells -rtl {fpga_top_debug.core_def.U_UVHS_UVW_AXI4_TO_DDR4}]
+    [get_cells -quiet {core_def/U_UVHS_UVW_AXI4_TO_DDR4}]
 if {[llength $uvhs_ddr_cell] != 1} {
     error "expected one UVHS DUT DDR instance, got [llength $uvhs_ddr_cell]"
 }

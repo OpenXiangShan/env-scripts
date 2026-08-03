@@ -24,6 +24,7 @@ unset ::env(UVHS_ASSIGN_PIN_TOP)
 create_design -name test
 read_netlist
 link_design
+uvhs::source_required partition.tcl
 report_resource -depth 4
 
 instrument_design
@@ -51,6 +52,25 @@ if {[llength $ddr_ui_clock_pin] != 1} {
     error "required DDR user-interface clock pin not found"
 }
 create_clock -name DDR_UI_CLK -period 5.0 $ddr_ui_clock_pin
+
+foreach {clock_name master_name cell_name} {
+    SOC_GATED_CLK CPU_CLK_IN core_def/SOC_CLK_CTRL_UVin_bufgce_1
+    RTC_GATED_CLK TMCLK      core_def/RTC_CLK_CTRL_UVin_bufgce_1
+} {
+    set master_clock [get_clocks -quiet $master_name]
+    set input_pin [get_pins -quiet ${cell_name}/I]
+    set output_pin [get_pins -quiet ${cell_name}/O]
+    if {![llength $input_pin] && ![llength $output_pin]} {
+        puts "INFO: skip optimized-away generated clock $clock_name"
+        continue
+    }
+    if {[llength $master_clock] != 1 || [llength $input_pin] != 1 ||
+        [llength $output_pin] != 1} {
+        error "required generated clock path not found for $clock_name"
+    }
+    create_generated_clock -add -name $clock_name \
+        -master_clock $master_clock -source $input_pin -divide_by 1 $output_pin
+}
 
 infer_clock
 report_clock -inferred
