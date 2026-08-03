@@ -1,8 +1,8 @@
 ################################################################################
 # Pin assignment for fpga_diff on the U2.2 VU19P platform.
 #
-# CPU, PCIe, and low-speed I/O use b0.f2. DDR-owned status follows the user DDR
-# controller on b0.f0.
+# CPU, PCIe, and low-speed I/O use b0.f2. The user-DDR controller is bound to
+# b0.f0 separately by partition.tcl.
 ################################################################################
 
 proc pin_name {top port} {
@@ -36,7 +36,8 @@ proc apc16_pin {port slot} {
 # rstn_sw* are exported as UVHS global resets and must not also be assign_pin'd.
 apc16_pin led0 3
 apc16_pin led2 4
-apc16_pin led3 5
+# led3 is the DDR calibration-status output.  It crosses the user-DDR and
+# CPU partitions, so it must remain an unbound top-level status signal.
 
 # UART0 defaults to the F2 APC16 sideband connector.  A two-FPGA build can
 # route it through the F1 UV_FMCH_FLASH USB-UART with FMC indices 311/270.
