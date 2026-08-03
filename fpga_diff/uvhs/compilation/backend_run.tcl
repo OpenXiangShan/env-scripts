@@ -45,6 +45,13 @@ set xdma_axi_clock_period [expr {
 create_clock -name XDMA_AXI_ACLK -period $xdma_axi_clock_period \
     $xdma_axi_clock_pin
 
+set ddr_ui_clock_pin [get_pins -quiet \
+    core_def/U_UVHS_UVW_AXI4_TO_DDR4/ddr4ip_ddr4_user_clk]
+if {[llength $ddr_ui_clock_pin] != 1} {
+    error "required DDR user-interface clock pin not found"
+}
+create_clock -name DDR_UI_CLK -period 5.0 $ddr_ui_clock_pin
+
 infer_clock
 report_clock -inferred
 transform_clock

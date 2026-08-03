@@ -261,11 +261,10 @@ UVHS UHD path; the normal Vivado flow continues to use `make dump_ila` and a
 `.ltx` file.
 
 UHD capture inserts its own external DDR wrapper on every FPGA containing a
-probe group. On the current single-F2 NutShell topology, that capture memory
-and the DUT DDR IP both require the F2 PDDR4DME/FMC3 resource, so a probe-enabled
-build fails `bind_system` with `BND-026`. Keep the template empty for the normal
-single-F2 bitstream. A probe-enabled build requires a topology that provides a
-separate compatible UHD capture-memory resource.
+probe group. The four PDDR4DME cards on the FPGA FMC3 connectors are reserved
+for UHD. The DUT DDR controller is constrained to B0/F0, which owns the separate
+`pddr4dme_user_inst`; NutShell therefore keeps both B0/F0 and B0/F2. This avoids
+sharing the B0/F2 UHD card between the DUT and waveform capture.
 
 ## Compatibility Boundary
 
@@ -295,6 +294,7 @@ or DDR pins.
 | `compilation/frontend_run.tcl` | RTL/IP import, elaboration, and uvsyn frontend. |
 | `compilation/backend_run.tcl` | Fill-rate setup, partition, routing, PnR, and database commit. |
 | `compilation/topology.tcl` | Selects the FPGA set from the vendor board assembly. |
+| `compilation/partition.tcl` | Places the DUT DDR controller on the user-DDR FPGA. |
 | `compilation/assign_pin.tcl` | B0/F2 clock, PCIe, UART, JTAG, SD, and control pins. |
 | `compilation/timing.tcl` | External clock and asynchronous-group constraints. |
 | `compilation/vivado_pre_opt.tcl` | XDMA refclock and CDC constraints. |

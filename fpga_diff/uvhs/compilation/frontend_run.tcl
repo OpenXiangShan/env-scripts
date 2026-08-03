@@ -95,6 +95,7 @@ create_system_design -name VU19P_X4 -platform U2.2
 
 uvhs::source_required topology.tcl
 uvhs::source_required assign_pin.tcl
+set_partition_constraint_file [uvhs::path partition.tcl]
 set probe_script [uvhs::env_or_default UVHS_PROBE_TCL ""]
 if {$probe_script ne ""} {
     set probe_script [file normalize $probe_script]
