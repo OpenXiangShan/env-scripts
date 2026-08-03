@@ -71,7 +71,7 @@ proc uvhs::start_frontend_shell_compat {} {
     puts "INFO: started UVHS frontend shell compatibility helper"
 }
 
-create_working_space hw.dat
+create_working_space -force hw.dat
 set_option syn.computeFeCheckSum true
 
 set_parallel_option -max_threads 4 -max_processes 16 -label frontend
