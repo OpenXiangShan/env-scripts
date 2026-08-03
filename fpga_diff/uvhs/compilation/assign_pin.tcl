@@ -1,8 +1,8 @@
 ################################################################################
-# Pin assignment for fpga_diff on a U2.2 VU19P FPGA (b0.f2).
+# Pin assignment for fpga_diff on the U2.2 VU19P platform.
 #
-# This file targets the single-FPGA b0.f2 configuration. All user-visible top
-# ports bind to b0.F2_* connectors instead of the mixed F0/F1/F2 template.
+# CPU, PCIe, and low-speed I/O use b0.f2. DDR-owned status follows the user DDR
+# controller on b0.f0.
 ################################################################################
 
 proc pin_name {top port} {
@@ -36,7 +36,9 @@ proc apc16_pin {port slot} {
 # rstn_sw* are exported as UVHS global resets and must not also be assign_pin'd.
 apc16_pin led0 3
 apc16_pin led2 4
-apc16_pin led3 5
+# led3 is driven by the DDR calibration status and must follow the user DDR to
+# F0. FMC1 is unused by the U2.2 assembly template.
+assign_pin -port [pin_name $top led3] -connector b0.F0_FMC1 -index 311
 
 # UART0 defaults to the F2 APC16 sideband connector.  A two-FPGA build can
 # route it through the F1 UV_FMCH_FLASH USB-UART with FMC indices 311/270.
