@@ -114,7 +114,7 @@ localize_design -replicate_cell -clock -self_check
 sweep_design -keep_feedthrough
 localize_design -data
 route_design
-check_timing -verbose -exclude local_clock_domain_cross_TDM
+check_timing -verbose -exclude clock_tdm
 report_system_performance -show_clock_relation -verbose
 report_path -normalize -exception -tdr -net -rtl \
     -max_path 100 -sort_by fmax
