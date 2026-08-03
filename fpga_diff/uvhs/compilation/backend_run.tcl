@@ -75,10 +75,6 @@ foreach {clock_name master_name cell_name} {
 infer_clock
 report_clock -inferred
 fpga_diff_set_async_clock_groups
-set soc_gated_clock [get_clocks -quiet SOC_GATED_CLK]
-if {[llength $soc_gated_clock] == 1} {
-    config_clock -localize $soc_gated_clock
-}
 transform_clock
 set fill_rate_args {}
 foreach {option variable} {
