@@ -32,13 +32,11 @@ proc apc16_pin {port slot} {
     assign_pin -port [pin_name $top $port] -connector b0.F2_APC16 -index [lindex $apc16_indices $slot]
 }
 
-# Low-speed debug/control pins on the unused f2 APC16 connector.
+# Low-speed debug/control pins on the unused F2 APC16 connector.
 # rstn_sw* are exported as UVHS global resets and must not also be assign_pin'd.
 apc16_pin led0 3
 apc16_pin led2 4
-# led3 is driven by the DDR calibration status and must follow the user DDR to
-# F0. FMC1 is unused by the U2.2 assembly template.
-assign_pin -port [pin_name $top led3] -connector b0.F0_FMC1 -index 311
+apc16_pin led3 5
 
 # UART0 defaults to the F2 APC16 sideband connector.  A two-FPGA build can
 # route it through the F1 UV_FMCH_FLASH USB-UART with FMC indices 311/270.
