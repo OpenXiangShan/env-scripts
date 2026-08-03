@@ -221,8 +221,8 @@ upload_uhd -depth 1000000 -position 0 -out uvhs_ila
 
 The FPGA host clears `HOST_IO_ILA_TRIGGER`, invokes `FPGA_ILA_DUMP_CMD`, and
 then releases the CPU. It raises that signal at Good Trap or DiffTest failure.
-Use `uvhs_ila_arm` as the hook so the complete capture window precedes the
-host trigger:
+Use `uvhs_ila_arm` as the hook so capture starts before the host releases the
+CPU and the requested history precedes the host trigger:
 
 ```sh
 export FPGA_ILA_DUMP_CMD='ssh <runtime-host> \
@@ -279,9 +279,12 @@ make uvhs_ila CPU=<design> SUFFIX=<tag> UVHS_ILA_DEPTH=1000000
 `UVHS_ILA_DEPTH` is the total uploaded sample count. `UVHS_ILA_POSITION` is the
 percentage after the trigger, from 0 through 100. Position 0, the default,
 keeps the window before the trigger; 50 centers it; 100 keeps the window after
-the trigger. `UVHS_ILA_CLOCK` can select the depth-counting clock by a
-runtime-database global clock name or a frequency; when empty, the tool uses
-its 200 MHz TS clock. If the compile-time sampling path is a gated clock, pass
+the trigger. Position 0 requests no intentional post-trigger allocation, but
+the trigger-recognition and capture-stop pipeline can still leave a small tail
+after the sampled trigger edge. `UVHS_ILA_CLOCK` can select the depth-counting
+clock by a runtime-database global clock name or a frequency; when empty, the
+tool uses its 200 MHz TS clock. If the compile-time sampling path is a gated
+clock, pass
 its backend clock path through `UVHS_ILA_GATED_CLOCK`; its frequency defaults
 to 25 MHz and can be changed with `UVHS_ILA_GATED_CLOCK_FREQUENCY`. Prefer the
 ungated parent clock in new probe files so capture completion does not depend
