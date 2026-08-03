@@ -75,7 +75,8 @@ check_design
 report_resource -depth 4
 report_system_resource
 list_partition_constraints -all
-partition_design -tdc -tdss true
+partition_design -tdc -tdss true \
+    -bs_max_blk_ratio 0.96 -bs_min_blk_ratio 0.005
 report_resource -depth 4
 
 instrument_design
