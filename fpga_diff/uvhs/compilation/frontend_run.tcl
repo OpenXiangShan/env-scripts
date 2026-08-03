@@ -95,7 +95,6 @@ create_system_design -name VU19P_X4 -platform U2.2
 
 uvhs::source_required topology.tcl
 uvhs::source_required assign_pin.tcl
-set_partition_constraint_file [uvhs::path partition.tcl]
 set probe_script [uvhs::env_or_default UVHS_PROBE_TCL ""]
 if {$probe_script ne ""} {
     set probe_script [file normalize $probe_script]
@@ -128,6 +127,7 @@ if {![file exists $filelist]} {
 }
 read_verilog -f $filelist -mfcu
 elaborate_design $design_top
+set_partition_constraint_file [uvhs::path partition.tcl]
 uvhs::start_frontend_shell_compat
 synthesize_design -parallel_option frontend
 save_working_space
