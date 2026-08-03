@@ -1,7 +1,8 @@
 # Fill only the RTL paths below. Braces preserve hierarchy indexes such as [0].
 # Leave the clock and signal lists empty to build without UHD instrumentation.
 set uvhs_ila_group_name uvhs_ila
-# Sampling clock path for this probe/trigger group.
+# Sampling clock path for this probe/trigger group. Prefer the ungated parent
+# clock so post-trigger samples can complete after the DUT clock stops.
 set uvhs_ila_clock_path [string trim {
 }]
 # Probe signal paths, one per line.

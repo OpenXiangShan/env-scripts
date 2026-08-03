@@ -98,7 +98,9 @@ make uvhs_halt_soc CPU=<design> SUFFIX=<tag>
 make uvhs_write_ddr CPU=<design> SUFFIX=<tag> WORKLOAD=/path/to/image.txt
 make uvhs_write_flash CPU=<design> SUFFIX=<tag> WORKLOAD=/path/to/image.bin
 make uvhs_reset_cpu CPU=<design> SUFFIX=<tag>
-make uvhs_ila CPU=<design> SUFFIX=<tag> TRIGGER=/path/to/trigger.ini
+make uvhs_ila_arm CPU=<design> SUFFIX=<tag> TRIGGER=/path/to/trigger.ini
+make uvhs_ila CPU=<design> SUFFIX=<tag>
+make uvhs_vcd CPU=<design> SUFFIX=<tag>
 make uvhs_ila_clear CPU=<design> SUFFIX=<tag>
 make uvhs_runtime_stop CPU=<design> SUFFIX=<tag>
 ```
@@ -151,14 +153,14 @@ for signals that may participate in a trigger condition. Fill it as follows:
 
 ```tcl
 set uvhs_ila_clock_path [string trim {
-    fpga_top_debug.core_def.inter_soc_clk
+    fpga_top_debug.core_def.sys_clk_i
 }]
 set uvhs_ila_probe_paths {
     fpga_top_debug.core_def.cpu_rstn_io
-    fpga_top_debug.core_def.difftest_startup_ready_pcie
+    fpga_top_debug.core_def.io_host_ila_trigger
 }
 set uvhs_ila_trigger_paths {
-    fpga_top_debug.core_def.cpu_rstn_io
+    fpga_top_debug.core_def.io_host_ila_trigger
 }
 ```
 
@@ -187,17 +189,19 @@ reported by `query -trigger`:
 ```ini
 [uvhs_ila]
 LOGIC = OR
-fpga_top_debug.core_def.cpu_rstn_io = 1
+fpga_top_debug.core_def.io_host_ila_trigger = R
 
 [UHD_FINAL_CONDITIONS_LOGIC]
 LOGIC = OR
 uvhs_ila
 ```
 
-After `uvhs_write_bitstream`, `uvhs_ila` is the one-shot capture start command.
-It checks the condition file, enables capture and trigger logic, resets the
-CPU, waits for the trigger, uploads the UHD data, and reconstructs the
-waveform. It creates both files below the selected build directory:
+Waveform capture is split around the host run. `uvhs_ila_arm` validates and
+installs the trigger condition, starts capture, and returns immediately. It
+does not reset or release the CPU. `uvhs_ila` waits for an armed trigger,
+uploads the UHD data, reconstructs the waveform database, and calls
+`uvhs_vcd`. The standalone `uvhs_vcd` target repeats only the USDB-to-VCD
+conversion. The commands create both files below the selected build directory:
 
 ```text
 runtime-work/UHD/uvhs_ila/UvData.usdb
@@ -208,15 +212,36 @@ The corresponding UVHS runtime sequence is:
 
 ```tcl
 trigger -ini_check /path/to/trigger.ini
-trigger -set -condition /path/to/trigger.ini -position 70
+trigger -set -condition /path/to/trigger.ini -position 0
 capture -enable
 trigger -enable
 trigger -status -wait 1 -timeout 60
-upload_uhd -depth 1000000 -position 70 -out uvhs_ila
+upload_uhd -depth 1000000 -position 0 -out uvhs_ila
 ```
 
-Capture hardware is armed only by `uvhs_ila`. Clear the trigger configuration
-after a timed-out or unwanted capture with:
+The FPGA host clears `HOST_IO_ILA_TRIGGER`, invokes `FPGA_ILA_DUMP_CMD`, and
+then releases the CPU. It raises that signal at Good Trap or DiffTest failure.
+Use `uvhs_ila_arm` as the hook so the complete capture window precedes the
+host trigger:
+
+```sh
+export FPGA_ILA_DUMP_CMD='ssh <runtime-host> \
+  "make -C /path/to/env-scripts/fpga_diff uvhs_ila_arm \
+  CPU=<design> SUFFIX=<tag> TRIGGER=/path/to/trigger.ini \
+  UVHS_ILA_POSITION=0"'
+
+/path/to/fpga-host <host arguments>
+
+# Run on the runtime host after fpga-host exits.
+make uvhs_ila CPU=<design> SUFFIX=<tag>
+```
+
+The arm command must use the same runtime work directory as
+`uvhs_write_bitstream`. If the FPGA host and UVHS runtime are on one machine,
+omit `ssh <runtime-host>`. The trigger signal must be listed in the compile-time
+`trigger_net` group; adding it to RTL with `mark_debug` alone is not sufficient.
+
+Clear the trigger configuration after a timed-out or unwanted capture with:
 
 ```sh
 make uvhs_ila_clear CPU=<design> SUFFIX=<tag>
@@ -232,8 +257,8 @@ debug-command latency rather than DUT cycle time. A large probe set can still
 lower the achievable clock frequency indirectly by adding routing and timing
 pressure during compilation.
 The runtime command service is serial, so `uvhs_ila_clear` is handled after an
-in-flight `uvhs_ila` reaches its trigger or timeout; it is not an asynchronous
-interrupt for the current wait.
+in-flight `uvhs_ila` wait reaches its trigger or timeout; it is not an
+asynchronous interrupt for the current wait.
 
 The USDB-to-VCD step is equivalent to:
 
@@ -246,17 +271,21 @@ $UV_ROOT/uvd/uvs/bin/usdb2vcd \
 The upload window is controlled when starting the capture:
 
 ```sh
-make uvhs_ila CPU=<design> SUFFIX=<tag> TRIGGER=/path/to/trigger.ini \
-  UVHS_ILA_DEPTH=1000000 UVHS_ILA_POSITION=70
+make uvhs_ila_arm CPU=<design> SUFFIX=<tag> TRIGGER=/path/to/trigger.ini \
+  UVHS_ILA_POSITION=0
+make uvhs_ila CPU=<design> SUFFIX=<tag> UVHS_ILA_DEPTH=1000000
 ```
 
 `UVHS_ILA_DEPTH` is the total uploaded sample count. `UVHS_ILA_POSITION` is the
-percentage after the trigger, from 0 through 100; the example uploads roughly
-300,000 samples before the trigger and 700,000 after it. Position 0 keeps the
-window before the trigger, 50 centers it, and 100 keeps the window after the
-trigger. `UVHS_ILA_CLOCK` can select the depth-counting clock by a
+percentage after the trigger, from 0 through 100. Position 0, the default,
+keeps the window before the trigger; 50 centers it; 100 keeps the window after
+the trigger. `UVHS_ILA_CLOCK` can select the depth-counting clock by a
 runtime-database global clock name or a frequency; when empty, the tool uses
-its 200 MHz TS clock. `UVHS_ILA_TIMEOUT` defaults to 60 seconds. This is the
+its 200 MHz TS clock. If the compile-time sampling path is a gated clock, pass
+its backend clock path through `UVHS_ILA_GATED_CLOCK`; its frequency defaults
+to 25 MHz and can be changed with `UVHS_ILA_GATED_CLOCK_FREQUENCY`. Prefer the
+ungated parent clock in new probe files so capture completion does not depend
+on DUT clock-gate state. `UVHS_ILA_TIMEOUT` defaults to 60 seconds. This is the
 UVHS UHD path; the normal Vivado flow continues to use `make dump_ila` and a
 `.ltx` file.
 
