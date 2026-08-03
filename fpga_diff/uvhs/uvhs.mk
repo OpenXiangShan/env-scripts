@@ -134,6 +134,7 @@ uvhs_write_bitstream:
 	test -x "$(UVHS_RUNTIME_DIR)/runtime_session.sh"
 	mkdir -p "$(UVHS_RUNTIME_WORK_DIR)"
 	$(UVHS_TOOL_ENV) UVHS_DB_PATH="$(UVHS_RUNTIME_DB)" \
+	UVHS_RUNTIME_WORK_DIR="$(UVHS_RUNTIME_WORK_DIR)" \
 	UVHS_COMMAND_FILE="$(UVHS_RUNTIME_COMMAND_FILE)" \
 	UVHS_RUNTIME_READY_FILE="$(UVHS_RUNTIME_READY_FILE)" \
 	bash "$(UVHS_RUNTIME_DIR)/runtime_session.sh" start \

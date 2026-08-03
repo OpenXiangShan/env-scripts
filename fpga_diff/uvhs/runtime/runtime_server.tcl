@@ -1,7 +1,7 @@
 # Download a completed UVHS database and retain its owning runtime session.
 
 proc uvhs_temp_dir {} {
-    set path [file join [pwd] tmp]
+    set path [file join $::uvhs_runtime_work_dir tmp]
     file mkdir $path
     return $path
 }
@@ -227,7 +227,7 @@ proc uvhs_ila {trigger_file output_name timeout depth position clock} {
         error "capture position must be between 0 and 100: $position"
     }
 
-    set output_dir [file join [pwd] UHD $output_name]
+    set output_dir [file join $::uvhs_runtime_work_dir UHD $output_name]
     file delete -force $output_dir
     query -trigger
     trigger -ini_check $trigger_file
@@ -344,13 +344,16 @@ proc uvhs_poll_command_file {} {
 }
 
 proc uvhs_serve_runtime_commands {} {
-    foreach variable {UVHS_COMMAND_FILE UVHS_RUNTIME_READY_FILE} {
+    foreach variable {
+        UVHS_COMMAND_FILE UVHS_RUNTIME_READY_FILE UVHS_RUNTIME_WORK_DIR
+    } {
         if {![info exists ::env($variable)] || $::env($variable) eq ""} {
             error "$variable is not set"
         }
     }
     set ::uvhs_command_file $::env(UVHS_COMMAND_FILE)
     set ::uvhs_ready_file $::env(UVHS_RUNTIME_READY_FILE)
+    set ::uvhs_runtime_work_dir $::env(UVHS_RUNTIME_WORK_DIR)
     set ::uvhs_keepalive 0
     uvhs_signal_runtime_ready
     uvhs_poll_command_file
@@ -381,9 +384,10 @@ proc uvhs_initialize_runtime {} {
         puts "WARN: retaining database replay clocks: $clock_error"
     } else {
         config -clock -default
-        config -clock -commit
-        query -clock
     }
+    config -clock -name clk5_p -frequency 25000000
+    config -clock -commit
+    query -clock
 
     uvhs_hold_soc_for_download
     download
