@@ -1245,6 +1245,7 @@ wire [0:0]    br2cfg_wvalid;
   wire [`CONFIG_DIFFTEST_HOST_AXIS_BYTES-1:0] difftest_from_host_axis_tkeep;
   wire        difftest_from_host_axis_tlast;
   wire        difftest_clock_enable;
+  wire        difftest_clock_gate_enable;
   wire        inter_soc_clk;
   wire        inter_soc_sync_rstn;
   wire        inter_rtc_clk;
@@ -1265,6 +1266,9 @@ wire [0:0]    br2cfg_wvalid;
   wire difftest_pcie_clock;
   assign sys_rstn_io = sys_rstn & ~io_host_reset;
   assign cpu_rstn_io = cpu_rstn & ~io_host_reset;
+  assign difftest_clock_gate_enable =
+      difftest_clock_enable || ~io_host_diff_enable ||
+      ~sys_rstn_io || ~cpu_rstn_io;
 
   RST_SYNC #(
       .SYNC_STAGES(3),
@@ -1352,7 +1356,7 @@ wire [0:0]    br2cfg_wvalid;
 
   DifftestClockGate SOC_CLK_CTRL(
       .CK  (sys_clk_i),
-      .E   (difftest_clock_enable || ~io_host_diff_enable || ~sys_rstn_io || ~cpu_rstn_io),
+      .E   (difftest_clock_gate_enable),
       .Q   (inter_soc_clk)
   );
 
@@ -1442,7 +1446,7 @@ assign cpu2ddr_s2m_rid = {4'b0, uvhs_ddr_rid};
 assign init_calib_complete = rstn_sw4 & ~uvhs_ddr_user_rst;
 
 uvw_axi4_to_ddr4 U_UVHS_UVW_AXI4_TO_DDR4 (
-    .ddr4ip_dut_axi_aclk       (inter_soc_clk),
+    .ddr4ip_dut_axi_aclk       (sys_clk_i),
     .ddr4ip_dut_axi_aresetn    (rstn_sw4),
     .ddr4ip_dut_axi_awaddr     (uvhs_ddr_awaddr),
     .ddr4ip_dut_axi_awburst    (cpu2ddr_m2s_awburst),
@@ -1483,7 +1487,7 @@ uvw_axi4_to_ddr4 U_UVHS_UVW_AXI4_TO_DDR4 (
     .ddr4ip_dut_axi_rready     (cpu2ddr_m2s_rready),
     .ddr4ip_dut_axi_rresp      (cpu2ddr_s2m_rresp),
     .ddr4ip_dut_axi_rvalid     (cpu2ddr_s2m_rvalid),
-    .ddr4ip_dut_axi_aclk_en    (1'b1),
+    .ddr4ip_dut_axi_aclk_en    (difftest_clock_gate_enable),
     .ddr4ip_ddr4_user_clk      (),
     .ddr4ip_ddr4_user_rst      (uvhs_ddr_user_rst),
     .sysbus_ghbd_i             (256'b0),

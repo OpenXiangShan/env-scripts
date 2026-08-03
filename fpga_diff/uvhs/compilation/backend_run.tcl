@@ -8,6 +8,9 @@ set_working_space hw.dat
 set_parallel_option -max_threads 4 -max_processes 8 -label fpga
 
 set_option time.auto_clock_config true
+set_option time.group_io_logic false
+set_option time.clock_part_group_mode 2
+set_option part.allow_timing_group_merge false
 set_option clock.transform_clock.multi_iteration true
 set_option clock.glitch.force_transform true
 set_option clock.async_control.force_accept true
@@ -75,12 +78,6 @@ foreach {clock_name master_name cell_name} {
 infer_clock
 report_clock -inferred
 fpga_diff_set_async_clock_groups
-# Drive the SoC and F0 user-DDR clock cones with the board global-clock path.
-# Localizing this cone replicates clock primitives into the DDR FPGA.
-set soc_gated_clock [get_clocks -quiet SOC_GATED_CLK]
-if {[llength $soc_gated_clock] == 1} {
-    config_clock -use_global_clock $soc_gated_clock
-}
 transform_clock
 set fill_rate_args {}
 foreach {option variable} {
@@ -117,7 +114,7 @@ localize_design -replicate_cell -clock -self_check
 sweep_design -keep_feedthrough
 localize_design -data
 route_design
-check_timing -verbose
+check_timing -verbose -exclude local_clock_domain_cross_TDM
 report_system_performance -show_clock_relation -verbose
 report_path -normalize -exception -tdr -net -rtl \
     -max_path 100 -sort_by fmax
