@@ -12,12 +12,6 @@ set_property PACKAGE_PIN R43 [get_ports clk6_n]
 set_property PACKAGE_PIN C35 [get_ports clk5_p]
 set_property PACKAGE_PIN C36 [get_ports clk5_n]
 
-set_property PACKAGE_PIN BA11 [get_ports refclk_p]
-set_property PACKAGE_PIN BA10 [get_ports refclk_n]
-
-set_property PACKAGE_PIN AR11 [get_ports refclk2_p]
-set_property PACKAGE_PIN AR10 [get_ports refclk2_n]
-
 #set_property PACKAGE_PIN CA36 [get_ports clk4_p]
 #set_property PACKAGE_PIN CA37 [get_ports clk4_n]
 
@@ -47,14 +41,6 @@ set_property PACKAGE_PIN AE15 [get_ports uart1_sin]
 set_property PACKAGE_PIN V16 [get_ports uart2_sout]
 
 set_property PACKAGE_PIN W15 [get_ports uart2_sin]
-#pcie
-set_property PACKAGE_PIN BY22 [get_ports pcie_ep_perstn]
-set_property PACKAGE_PIN AU11 [get_ports pcie_ep_gt_ref_clk_p]
-set_property PACKAGE_PIN AD15 [get_ports pcie_ep_lnk_up]
-
-set_property IOSTANDARD LVCMOS33 [get_ports pcie_ep_lnk_up]
-set_property IOSTANDARD LVCMOS18 [get_ports pcie_ep_perstn]
-create_clock -name PCIE_EP_CLK_IN -period 10.000 [get_ports pcie_ep_gt_ref_clk_p]
 #gpio
 #set_property PACKAGE_PIN AA15 [get_ports GPIO_O0]
 
@@ -272,21 +258,6 @@ set_property IOB TRUE [get_ports RGMII_TXD3]
 
 
 
-#####################################################################################
-# JX1-- PCIe x16 slot PCIe1
-# board connector --  PCIe Gen2 x4
-# phy_ip --  x1 Gen3
-# set_property PACKAGE_PIN BF8 [get_ports PCIE_TXN]
-# set_property PACKAGE_PIN BF9 [get_ports PCIE_TXP]
-# set_property PACKAGE_PIN BD3 [get_ports PCIE_RXN]
-# set_property PACKAGE_PIN BD4 [get_ports PCIE_RXP]
-set_property PACKAGE_PIN CB13 [get_ports PERST_N]
-set_property PACKAGE_PIN CB23 [get_ports PERST2_N]
-
-#####################################################################################
-
-
-
 ####################################################################################
 # Constraints from file : 'ddr.xdc'
 ####################################################################################
@@ -381,8 +352,6 @@ set_property DIFF_TERM TRUE [get_ports clk5_p]
 set_property DIFF_TERM_ADV TERM_100  [get_ports clk5_p]
 set_property DIFF_TERM TRUE [get_ports clk6_p]
 set_property DIFF_TERM_ADV TERM_100  [get_ports clk6_p]
-set_property IOSTANDARD LVCMOS18 [get_ports PERST_N]
-set_property IOSTANDARD LVCMOS18 [get_ports PERST2_N]
 set_property IOSTANDARD LVCMOS18 [get_ports rstn_sw6]
 set_property IOSTANDARD LVCMOS18 [get_ports rstn_sw5]
 set_property IOSTANDARD LVCMOS18 [get_ports rstn_sw4]
@@ -426,32 +395,18 @@ create_clock -period 400.000 -name mdc_clk [get_ports MDC]
 create_clock -period 5.000 -name CPU_CLK_IN [get_ports clk6_p]
 create_clock -period 1000.000 -name TMCLK [get_ports clk8_p]
 create_clock -period 40.000 -name DEBUG_CLK_IN [get_ports clk5_p]
-create_clock -period 10.000 -name PCIE_CLK_IN [get_ports refclk_p]
-create_clock -period 10.000 -name PCIE2_CLK_IN [get_ports refclk2_p]
 create_clock -period 83.333 -name jtag_vclk [get_ports JTAG_TCK]
 set_clock_groups -asynchronous -group [get_clocks jtag_vclk -include_generated_clocks]
 set_clock_groups -asynchronous -group [get_clocks -include_generated_clocks CPU_CLK_IN] -group [get_clocks -include_generated_clocks TMCLK]
 set_clock_groups -asynchronous -group [get_clocks -include_generated_clocks CPU_CLK_IN] -group [get_clocks -include_generated_clocks DEBUG_CLK_IN]
 set_clock_groups -asynchronous -group [get_clocks -include_generated_clocks TMCLK] -group [get_clocks -include_generated_clocks DEBUG_CLK_IN]
-set_clock_groups -asynchronous -group [get_clocks -include_generated_clocks PCIE_CLK_IN] -group [get_clocks -include_generated_clocks DEBUG_CLK_IN]
-set_clock_groups -asynchronous -group [get_clocks -include_generated_clocks difftest_pcie_clock] -group [get_clocks -include_generated_clocks DEBUG_CLK_IN]
-set_clock_groups -asynchronous -group [get_clocks -include_generated_clocks PCIE_CLK_IN] -group [get_clocks -include_generated_clocks TMCLK]
-set_clock_groups -asynchronous -group [get_clocks -include_generated_clocks PCIE_CLK_IN] -group [get_clocks -include_generated_clocks CPU_CLK_IN]
 set_clock_groups -asynchronous -group [get_clocks [list clk7_p mmcm_clkout0 mmcm_clkout1 mmcm_clkout2 mmcm_clkout3 mmcm_clkout4 mmcm_clkout5 mmcm_clkout6 {pll_clk[0]} {pll_clk[1]} {pll_clk[2]} {pll_clk[0]_DIV} {pll_clk[2]_DIV} {pll_clk[1]_DIV}]] -group [get_clocks -include_generated_clocks CPU_CLK_IN]
 set_clock_groups -asynchronous -group [get_clocks [list clk7_p mmcm_clkout0 mmcm_clkout1 mmcm_clkout2 mmcm_clkout3 mmcm_clkout4 mmcm_clkout5 mmcm_clkout6 {pll_clk[0]} {pll_clk[1]} {pll_clk[2]} {pll_clk[0]_DIV} {pll_clk[2]_DIV} {pll_clk[1]_DIV}]] -group [get_clocks -include_generated_clocks TMCLK]
 set_clock_groups -asynchronous -group [get_clocks [list clk7_p mmcm_clkout0 mmcm_clkout1 mmcm_clkout2 mmcm_clkout3 mmcm_clkout4 mmcm_clkout5 mmcm_clkout6 {pll_clk[0]} {pll_clk[1]} {pll_clk[2]} {pll_clk[0]_DIV} {pll_clk[2]_DIV} {pll_clk[1]_DIV}]] -group [get_clocks -include_generated_clocks DEBUG_CLK_IN]
-set_clock_groups -asynchronous -group [get_clocks [list clk7_p mmcm_clkout0 mmcm_clkout1 mmcm_clkout2 mmcm_clkout3 mmcm_clkout4 mmcm_clkout5 mmcm_clkout6 {pll_clk[0]} {pll_clk[1]} {pll_clk[2]} {pll_clk[0]_DIV} {pll_clk[2]_DIV} {pll_clk[1]_DIV}]] -group [get_clocks -include_generated_clocks PCIE_CLK_IN]
 set_clock_groups -asynchronous -group [get_clocks -include_generated_clocks jtag_vclk] -group [get_clocks -include_generated_clocks CPU_CLK_IN]
 set_clock_groups -asynchronous -group [get_clocks -include_generated_clocks jtag_vclk] -group [get_clocks -include_generated_clocks TMCLK]
 set_clock_groups -asynchronous -group [get_clocks -include_generated_clocks jtag_vclk] -group [get_clocks -include_generated_clocks DEBUG_CLK_IN]
-set_clock_groups -asynchronous -group [get_clocks -include_generated_clocks jtag_vclk] -group [get_clocks -include_generated_clocks PCIE_CLK_IN]
 set_clock_groups -asynchronous -group [get_clocks -include_generated_clocks jtag_vclk] -group [get_clocks [list clk7_p mmcm_clkout0 mmcm_clkout1 mmcm_clkout2 mmcm_clkout3 mmcm_clkout4 mmcm_clkout5 mmcm_clkout6 {pll_clk[0]} {pll_clk[1]} {pll_clk[2]} {pll_clk[0]_DIV} {pll_clk[2]_DIV} {pll_clk[1]_DIV}]]
-set_clock_groups -asynchronous -group [get_clocks -include_generated_clocks PCIE2_CLK_IN] -group [get_clocks -include_generated_clocks jtag_vclk]
-set_clock_groups -asynchronous -group [get_clocks -include_generated_clocks PCIE2_CLK_IN] -group [get_clocks -include_generated_clocks CPU_CLK_IN]
-set_clock_groups -asynchronous -group [get_clocks -include_generated_clocks PCIE2_CLK_IN] -group [get_clocks -include_generated_clocks TMCLK]
-set_clock_groups -asynchronous -group [get_clocks -include_generated_clocks PCIE2_CLK_IN] -group [get_clocks -include_generated_clocks DEBUG_CLK_IN]
-set_clock_groups -asynchronous -group [get_clocks -include_generated_clocks PCIE2_CLK_IN] -group [get_clocks -include_generated_clocks PCIE_CLK_IN]
-set_clock_groups -asynchronous -group [get_clocks -include_generated_clocks PCIE2_CLK_IN] -group [get_clocks [list clk7_p mmcm_clkout0 mmcm_clkout1 mmcm_clkout2 mmcm_clkout3 mmcm_clkout4 mmcm_clkout5 mmcm_clkout6 {pll_clk[0]} {pll_clk[1]} {pll_clk[2]} {pll_clk[0]_DIV} {pll_clk[2]_DIV} {pll_clk[1]_DIV}]]
 set_property PULLUP true [get_ports SD_CMD]
 set_property PULLUP true [get_ports SD_DATA0]
 set_property PULLUP true [get_ports SD_DATA1]

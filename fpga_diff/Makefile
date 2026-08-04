@@ -5,6 +5,7 @@ RTL_INCLUDE ?=
 FPGA_BIT_HOME ?=
 WORKLOAD ?=
 AXI_WIDTH ?= 64
+NO_DIFF ?= 0
 # Host-trigger ILA capture is opt-in. Keep the trigger mark_debug net in RTL,
 # but avoid instantiating the ILA core by default to reduce routing pressure.
 ENABLE_ILA ?= 0
@@ -12,13 +13,18 @@ ILA_DEPTH ?= 16384
 XDMA_LINK_WIDTH ?= X4
 VIVADO_JOBS ?=
 DDR_RANK_WIDTH ?= 2
-export ENABLE_ILA ILA_DEPTH XDMA_LINK_WIDTH VIVADO_JOBS DDR_RANK_WIDTH
+export ENABLE_ILA ILA_DEPTH XDMA_LINK_WIDTH VIVADO_JOBS DDR_RANK_WIDTH NO_DIFF
 # Supported CPU parameters:
 #   kmh
 #   nutshell
 #   nanhu
 CPU ?=
 SUFFIX ?=
+ifeq ($(NO_DIFF),1)
+ifeq ($(filter nodiff nodiff-%,$(SUFFIX)),)
+override SUFFIX := nodiff$(if $(strip $(SUFFIX)),-$(strip $(SUFFIX)),)
+endif
+endif
 PRJ_NAME = fpga_$(CPU)$(if $(strip $(SUFFIX)),-$(strip $(SUFFIX)),)
 PRJ_DIR ?= $(ENV_SCRIPTS_HOME)/$(PRJ_NAME)
 PRJ ?= $(PRJ_DIR)/$(PRJ_NAME).xpr
@@ -53,9 +59,13 @@ check_version:
 
 # Write bitstream to FPGA via PCIe
 write_bitstream:
+ifneq ($(NO_DIFF),1)
 	sh tools/pcie-remove.sh
+endif
 	vivado -mode tcl -source tools/write_bitstream.tcl -tclargs $(FPGA_BIT_HOME)
+ifneq ($(NO_DIFF),1)
 	sh tools/pcie-rescan.sh
+endif
 	vivado -mode tcl -source tools/reset_ddr.tcl -tclargs $(FPGA_BIT_HOME)/fpga_top_debug.ltx
 	$(MAKE) reset_cpu
 

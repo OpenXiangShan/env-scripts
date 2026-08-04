@@ -1,7 +1,7 @@
 function simtop_has_dma(path, line, in_simtop) {
     while ((getline line < path) > 0) {
         if (!in_simtop && line ~ /^[[:space:]]*module[[:space:]]+/) {
-            if (line !~ /^[[:space:]]*module[[:space:]]+SimTop([[:space:]#(]|$)/) {
+            if (line !~ ("^[[:space:]]*module[[:space:]]+" top_module "([[:space:]#(]|$)")) {
                 close(path)
                 return 0
             }
@@ -21,6 +21,7 @@ function simtop_has_dma(path, line, in_simtop) {
 
 BEGIN{
     if (var == "") var = "cpu_files"
+    if (top_module == "") top_module = "SimTop"
     printf "set %s [list \\\n", var
 }
 {

@@ -8,7 +8,9 @@
 //Purpose     : IP block netlist
 //--------------------------------------------------------------------------------
 `timescale 1 ps / 1 ps
+`ifndef NO_DIFF
 `include "DifftestMacros.svh"
+`endif
 `ifndef CONFIG_RANK_WIDTH
 `define CONFIG_RANK_WIDTH 1
 `endif
