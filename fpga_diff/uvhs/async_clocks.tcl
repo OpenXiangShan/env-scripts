@@ -172,6 +172,16 @@ fpga_diff_set_async_clock_groups xdma_axi_to_gt_pipe \
     $fpga_diff_xdma_axis_clocks \
     [concat $fpga_diff_pcie_gt_clocks $fpga_diff_xdma_pipe_clocks]
 
+# The XDMA PCIe4C core creates an internal GT clock that is unrelated to the
+# endpoint reference clock.  Match the proven UVHS baseline constraint in the
+# one reported direction; do not hide any crossing in fpga_diff-owned RTL.
+if {[llength $fpga_diff_xdma_pipe_clocks] && [llength $fpga_diff_pcie_ref_clocks]} {
+    puts "INFO: UVHS patch: false path XDMA GT internal clock -> pcie_ep_refclk"
+    set_false_path -from $fpga_diff_xdma_pipe_clocks -to $fpga_diff_pcie_ref_clocks
+} else {
+    puts "INFO: UVHS patch: skip XDMA GT internal clock -> pcie_ep_refclk, missing clocks"
+}
+
 # UVHS may expose the same XDMA clk_wiz 100 MHz user clock twice: once as the
 # real Vivado clk_wiz output and once as the xdma_ep black-box boundary output.
 # Treating those as separate timed clocks creates large false hold violations

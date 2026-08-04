@@ -230,7 +230,20 @@ set skip_board_constraints [env_or_default UVHS_SKIP_BOARD_CONSTRAINTS 0]
 if {$skip_board_constraints} {
     puts "INFO: skip board probe/pin/timing/partition constraints"
 } else {
-    source_if_exists [env_or_default UVHS_PROBE_FILE ./script/probe.tcl]
+    set probe_file [env_or_default UVHS_PROBE_FILE ./script/probe.tcl]
+    set enable_probe_net [env_or_default UVHS_ENABLE_PROBE_NET 0]
+    if {$enable_probe_net ni {0 1}} {
+        error "UVHS_ENABLE_PROBE_NET must be 0 or 1, got '$enable_probe_net'"
+    }
+    if {$enable_probe_net} {
+        if {![file exists $probe_file] || [file size $probe_file] == 0} {
+            error "enabled UVHS probe file is missing or empty: $probe_file"
+        }
+        puts "INFO: source required UVHS probe file $probe_file"
+        source $probe_file
+    } else {
+        source_if_exists $probe_file
+    }
     source_if_exists [env_or_default UVHS_ASSIGN_PIN_FILE ./script/assign_pin.tcl]
     set timing_file [env_or_default UVHS_TIMING_FILE none]
     if {$timing_file eq "none"} {

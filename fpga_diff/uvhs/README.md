@@ -51,15 +51,56 @@ UVHS_STAGE_DIR=/path/to/runtime-stage \
 Do not add DDR writes or manual reset toggles to `hw_run_download.tcl`. The
 normal `fpga-host` flow writes its workload through H2C.
 
+For a bitstream built with the standard probe template, queue the one supported
+runtime capture flow before starting `fpga-host`:
+
+```sh
+UVHS_RUN_TAG=<tag> UVHS_STAGE_DIR=/path/containing/<tag> \
+  bash uvhs/uvhs_queue_uhd_capture.sh
+```
+
+This arms the `difftest_to_host_axis_tvalid_io` condition, uploads the existing
+15-signal stations, and runs `wavegen`. It writes `UvData.usdb` under the same
+tagged runtime work directory. The helper does not program the board, write the
+workload, or declare another probe/capture implementation.
+
 ## Supporting Tools
 
-Tracked supporting helpers live under `tools/build/` and contain only
-generated-RTL fixes applied while constructing the file list. Board-specific
-probe, BAR, XDMA, strace, and backdoor-DDR debug scripts are kept as local
-tools and intentionally excluded from Git.
+Tracked supporting helpers live under `tools/build/` and contain generated-RTL
+fixes applied while constructing the file list. `probe_template.tcl` is the
+standard CPU-independent Hejian `probe_net`/`trigger_net` template. It covers
+reset, host control, XDMA link, DiffTest startup, and C2H handshakes. More
+focused CPU hierarchy, BAR, XDMA, strace, and backdoor-DDR debug scripts remain
+local tools.
 
-The Makefile accepts `UVHS_PROBE_FILE=/path/to/local/probe.tcl`; without a
-local probe file it generates an intentionally empty probe script.
+The standard template is deliberately opt-in. It does not change CPU/SoC RTL
+or the functional AXI-to-DDR connection. On a board verified to have
+PDDR4DME cards at both F2/FMC3 and F3/FMC3, build the validated two-FPGA
+waveform topology with:
+
+```sh
+make uvhs_hejian_pcie_x4_nutshell_probe_all \
+  CORE_DIR=/path/to/NutShell SUFFIX=<wave-tag>
+```
+
+This keeps the F2/FMC3 capture DDR with the single F2 probe implementation and
+moves only the complete functional AXI-to-DDR IP to F3/FMC3. The target keeps
+F2 and F3, selects `partition_capture_ddr_f3.tcl`, and localizes the gated SoC
+clock used by the CPU side of the cross-FPGA memory path.
+
+The template creates the `uvhs_control` and `uvhs_c2h` trigger groups in their
+respective clock domains. Set `UVHS_ENABLE_TRIGGER_NET=0` for probes without
+trigger groups. These groups expose trigger-capable signals; runtime capture
+still selects the comparison condition and arms the trigger. `UVHS_PROBE_TOP`
+defaults to `UVHS_TOP`. A specialized local template can explicitly override
+the default with `UVHS_PROBE_FILE=/path/to/local/probe.tcl`.
+
+There is one supported probe/trigger definition: the standard template selected
+by `UVHS_ENABLE_PROBE_NET`. Do not add a second probe flow. UHD uses a capture
+DDR controller in addition to the probe/trigger instrumentation; it does not
+replace that instrumentation or reduce its LUT cost. Board programming must
+stop unless the generated binding report and physical inventory prove that UHD
+capture and functional AXI-to-DDR each have usable memory hardware.
 
 ## Useful Checks
 

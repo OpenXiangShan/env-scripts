@@ -1,3 +1,5 @@
 *
 !.gitignore
 !hw_run_download.tcl
+!hw_capture_uhd.tcl
+!uhd_c2h.ini
