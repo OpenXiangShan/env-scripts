@@ -1,5 +1,7 @@
 `include "sys_define.vh"
+`ifndef NO_DIFF
 `include "DifftestMacros.svh"
+`endif
 
 `ifndef XDMA_PCIE_LANES
 `define XDMA_PCIE_LANES 4
@@ -358,6 +360,7 @@ wire                                           data_cpu_bridge_s2m_rlast      ;
 wire                                           data_cpu_bridge_s2m_rvalid     ;
 wire            [3:0]                          data_cpu_bridge_m2s_awqos      ;
 wire            [3:0]                          data_cpu_bridge_m2s_arqos      ;
+
 wire                                           dft_glb_gt_se                  ;
 wire                                           dft_dp_rst_disable             ;
 wire                                           dft_dp_ram_hold                ;
@@ -1123,6 +1126,7 @@ wire [0:0]    br2cfg_wready;
 wire [7:0]    br2cfg_wstrb;
 wire [0:0]    br2cfg_wvalid;
 
+`ifndef NO_DIFF
   wire [31:0] XDMA_AXI_LITE_awaddr;
   wire        XDMA_AXI_LITE_awvalid;
   wire        XDMA_AXI_LITE_awready;
@@ -1285,6 +1289,17 @@ wire [0:0]    br2cfg_wvalid;
       .E   ((difftest_clock_enable & xdma_link_up) || ~io_host_diff_enable || ~sys_rstn_io || ~cpu_rstn_io ),
       .Q   (inter_rtc_clk)
   );
+`else
+  wire inter_soc_clk;
+  wire inter_rtc_clk;
+  wire sys_rstn_io;
+  wire cpu_rstn_io;
+
+  assign inter_soc_clk = sys_clk_i;
+  assign inter_rtc_clk = tmclk;
+  assign sys_rstn_io = sys_rstn;
+  assign cpu_rstn_io = cpu_rstn;
+`endif
 
 xilnx_crg xilnx_crg(
    .sys_clk                         (sys_clk_i                     ),
@@ -1436,6 +1451,7 @@ jtag_ddr_subsys_wrapper U_JTAG_DDR_SUBSYS(
 );
 
 SimTop_wrapper U_CPU_TOP(
+`ifndef NO_DIFF
     .difftest_pcie_clock             (difftest_pcie_clock),
     .difftest_to_host_axis_tready    (difftest_to_host_axis_tready),
     .difftest_to_host_axis_tvalid    (difftest_to_host_axis_tvalid),
@@ -1470,6 +1486,7 @@ SimTop_wrapper U_CPU_TOP(
     .difftest_cfg_axilite_rresp      (XDMA_AXI_LITE_rresp),
     .difftest_cfg_axilite_rvalid     (XDMA_AXI_LITE_rvalid),
     .difftest_cfg_axilite_rready     (XDMA_AXI_LITE_rready),
+`endif
     .inter_soc_clk                  (inter_soc_clk),
     .sys_rstn_i                     (cpu_rstn_io  ),
     .tmclk                          (inter_rtc_clk),
@@ -1752,6 +1769,7 @@ AXI_bridge CFG_AXI_bridge_i
         .rom_axi_wvalid         (rom_axi_wvalid)
         );
 
+`ifndef NO_DIFF
   data_bridge data_bridge_i
        (.ACLK                   (axi_bus_clk),
         .ARESETN                (axi_bclk_sync_rstn),
@@ -1874,6 +1892,7 @@ AXI_bridge CFG_AXI_bridge_i
         .S01_AXI_wready         (gmac_m_wready),
         .S01_AXI_wstrb          (gmac_m_wstrb),
         .S01_AXI_wvalid         (gmac_m_wvalid));
+`endif
 
 
 endmodule

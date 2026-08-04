@@ -179,6 +179,10 @@ for rtl_include in "$@"; do
 done
 
 core_dir=$(realpath -e -- "$core_dir")
+top_module=SimTop
+if [[ ${NO_DIFF:-0} == 1 ]]; then
+  top_module=XSTop
+fi
 find "$core_dir" -path "$core_dir/rtl/verification" -prune -o \
   -type f \( -name '*.v' -o -name '*.sv' -o -name '*.vh' -o -name '*.svh' \) \
   -print | LC_ALL=C sort > "$tmp_dir/cpu_files"
@@ -192,7 +196,7 @@ if ((${#rtl_include_dirs[@]})); then
 fi
 
 tmp_output="$tmp_dir/cpu_files.tcl"
-awk -v var=cpu_files -v detect_simtop_dma=1 -f "$awk_script" \
+awk -v var=cpu_files -v detect_simtop_dma=1 -v top_module="$top_module" -f "$awk_script" \
   "$tmp_dir/cpu_files" > "$tmp_output"
 awk -v var=rtl_include_files -f "$awk_script" \
   "$tmp_dir/rtl_files" >> "$tmp_output"

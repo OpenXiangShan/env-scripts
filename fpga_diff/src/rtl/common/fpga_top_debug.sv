@@ -34,7 +34,8 @@ module fpga_top_debug
    output                uart2_sout,
    input                 uart2_sin,
 `endif
-   //PCIE 
+   //PCIE
+`ifdef XS_XDMA_EP
    input                 refclk_p, // pcie 100MHz
    input                 refclk_n,
    output                PERST_N,
@@ -42,7 +43,6 @@ module fpga_top_debug
    input                 refclk2_p, // pcie 100MHz
    input                 refclk2_n,
    output                PERST2_N,
-`ifdef XS_XDMA_EP
    input    [`XDMA_PCIE_LANES-1:0] pci_ep_rxn,
    input    [`XDMA_PCIE_LANES-1:0] pci_ep_rxp,
    output   [`XDMA_PCIE_LANES-1:0] pci_ep_txn,
@@ -114,8 +114,10 @@ wire pcie_rstn;
 
 IBUF sys_rstn_ibuf (.O(sys_rstn), .I(rstn_sw6));
 IBUF cpu_rstn_ibuf (.O(cpu_setn_buf), .I(rstn_sw5));
+`ifdef XS_XDMA_EP
 OBUF pcie_rstn_obuf (.O(PERST_N), .I(vio_sw6));
 OBUF pcie2_rstn_obuf (.O(PERST2_N), .I(vio_sw6));
+`endif
 
 button_debounce u_cpu_rstn(
    .clk             (sys_clk_i),
@@ -182,9 +184,9 @@ BUFG bufg_dbgclk
     .O              (dbg_clk_buf)
 );
 
+`ifdef XS_XDMA_EP
 wire    pcie_sysclk_gt;
 wire    pcie_sysclk;
-
 
 IBUFDS_GTE4 refclk_ibuf (
     .O(pcie_sysclk_gt), 
@@ -201,6 +203,7 @@ IBUFDS_GTE4 refclk2_ibuf (
     .CEB(1'b0), 
     .IB(refclk2_n)
 );
+`endif
 
 assign        sys_clk_i = dbg_clk_buf;
 assign        dev_clk_i = dbg_clk_buf;

@@ -21,6 +21,15 @@
 set cpu "kmh"
 set cpu_candidates [list "kmh" "nanhu" "dualcore" "nutshell"]
 set vivado_version ""
+set no_diff 0
+if {[info exists ::env(NO_DIFF)] && [string trim $::env(NO_DIFF)] ne ""} {
+  set no_diff [string trim $::env(NO_DIFF)]
+}
+if {[lsearch -exact {0 1} $no_diff] < 0} {
+  error "NO_DIFF must be 0 or 1, got '$no_diff'"
+}
+set ::no_diff $no_diff
+puts "INFO: NO_DIFF=$no_diff"
 
 proc checkRequiredFiles {files} {
   set status true
@@ -129,7 +138,6 @@ set constr_dir "[file normalize "$origin_dir/src/constr/common"]"
 
 source "$tcl_dir/common/ip_files.tcl"
 source "$tcl_dir/common/rtl_files.tcl"
-source "$tcl_dir/common/constraints.tcl"
 source "$tcl_dir/common/defines.tcl"
 source "$tcl_dir/common/include_dirs.tcl"
 source "$tcl_dir/common/header_files.tcl"
@@ -174,6 +182,8 @@ create_project ${_xil_proj_name_} ./${_xil_proj_name_} -part xcvu19p-fsva3824-2-
 # Set the directory path for the new project
 set proj_dir [get_property directory [current_project]]
 
+source "$tcl_dir/common/constraints.tcl"
+
 # Set project properties
 set obj [current_project]
 set_property -name "default_lib" -value "xil_defaultlib" -objects $obj
@@ -213,23 +223,30 @@ set_property -name "include_dirs" -value "$include_dirs" -objects $obj
 set_property -name "top" -value "fpga_top_debug" -objects $obj
 set_property -name "top_auto_set" -value "0" -objects $obj
 
+if {$no_diff} {
+    fpga_append_unique defines "NO_DIFF"
+    puts "INFO: standalone CPU RTL selected; DiffTest and XDMA are disabled"
+}
 if {$cpu_files_has_dma} {
     fpga_append_unique defines "CONFIG_SIMTOP_HAS_DMA"
     puts "INFO: SimTop DMA ports detected"
 } else {
     puts "INFO: SimTop DMA ports not present; wrapper DMA is tied off"
 }
-
-set xdma_pcie_lanes 4
-if {[info exists ::env(XDMA_LINK_WIDTH)] && [string trim $::env(XDMA_LINK_WIDTH)] ne ""} {
-  set xdma_link_width [string trim $::env(XDMA_LINK_WIDTH)]
-  if {![regexp {^X([48])$} $xdma_link_width _ lane_count]} {
-    error "XDMA_LINK_WIDTH must be one of X4/X8, got '$xdma_link_width'"
+if {!$no_diff} {
+  set xdma_pcie_lanes 4
+  if {[info exists ::env(XDMA_LINK_WIDTH)] && [string trim $::env(XDMA_LINK_WIDTH)] ne ""} {
+    set xdma_link_width [string trim $::env(XDMA_LINK_WIDTH)]
+    if {![regexp {^X([48])$} $xdma_link_width _ lane_count]} {
+      error "XDMA_LINK_WIDTH must be one of X4/X8, got '$xdma_link_width'"
+    }
+    set xdma_pcie_lanes $lane_count
   }
-  set xdma_pcie_lanes $lane_count
+  lappend defines "XDMA_PCIE_LANES=$xdma_pcie_lanes"
+  puts "INFO: XDMA_PCIE_LANES=$xdma_pcie_lanes"
+} else {
+  puts "INFO: NO_DIFF=1; skipping XDMA lane definition"
 }
-lappend defines "XDMA_PCIE_LANES=$xdma_pcie_lanes"
-puts "INFO: XDMA_PCIE_LANES=$xdma_pcie_lanes"
 
 set ddr_rank_width 1
 if {[info exists ::env(DDR_RANK_WIDTH)] && [string trim $::env(DDR_RANK_WIDTH)] ne ""} {
@@ -300,9 +317,17 @@ source "$tcl_dir/common/jtag_ddr_subsys.tcl"
 # source "$tcl_dir/ahblite_axi_bridge_0.tcl"
 source "$tcl_dir/common/blk_mem_gen_0.tcl"
 source "$tcl_dir/common/vio_0.tcl"
-source "$tcl_dir/common/xdma_ep.tcl"
+if {!$no_diff} {
+  source "$tcl_dir/common/xdma_ep.tcl"
+} else {
+  puts "INFO: NO_DIFF=1; skipping xdma_ep IP"
+}
 source "$tcl_dir/common/AXI_bridge.tcl"
-source "$tcl_dir/common/data_bridge.tcl"
+if {!$no_diff} {
+  source "$tcl_dir/common/data_bridge.tcl"
+} else {
+  puts "INFO: NO_DIFF=1; skipping PCIe/DMA data_bridge IP"
+}
 # source "$tcl_dir/pcie4c_uscale_plus_0.tcl"
 # source "$tcl_dir/pcie_axi_axis_bd.tcl"
 # source "$tcl_dir/axi_interconnect_0.tcl"

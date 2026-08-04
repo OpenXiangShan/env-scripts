@@ -2,7 +2,9 @@
 
 `define XS_UART         // 11
 `define XS_QSPI2ROM     // 10
+`ifndef NO_DIFF
 `define XS_XDMA_EP
+`endif
 //`define XS_GMAC       // 18 cpu_int = {} xs_core_def(top_debug)
 
 /* 
@@ -18,7 +20,6 @@
            
 */
 //`define XS_XDMA       
-
 
 
 
