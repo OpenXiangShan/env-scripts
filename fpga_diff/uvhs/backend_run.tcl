@@ -485,6 +485,69 @@ proc patch_vivado_wrappers {} {
     }
 }
 
+proc uvhs_guard_vendor_ip_false_paths {pre_opt} {
+    set fh [open $pre_opt r]
+    set data [read $fh]
+    close $fh
+
+    # The platform template can emit an IP-internal PCIe reset exception for
+    # every FPGA even when that partition contains no PCIe instance. Vivado
+    # treats set_false_path with an empty object set as an error. Guard only
+    # these vendor-IP targets; do not weaken fpga_diff-owned RTL constraints.
+    set uvhs_lines {}
+    set uvhs_guarded_ip_false_paths 0
+    foreach uvhs_line [split $data "\n"] {
+        if {[regexp {^[[:space:]]*set_false_path[[:space:]]+-to[[:space:]]+\[get_pins[[:space:]]+([^]]*u_pcie_wrapper[^]]*)\][[:space:]]*$} \
+                $uvhs_line -> uvhs_ip_pin_pattern]} {
+            lappend uvhs_lines [format {set uvhs_ip_false_path_pins [get_pins -quiet {%s}]} $uvhs_ip_pin_pattern]
+            lappend uvhs_lines {if {[llength $uvhs_ip_false_path_pins]} {
+    set_false_path -to $uvhs_ip_false_path_pins
+    puts "INFO: UVHS patch: applied vendor PCIe IP reset false path to $uvhs_ip_false_path_pins"
+} else {
+    puts "INFO: UVHS patch: skip absent vendor PCIe IP reset false-path target"
+}}
+            incr uvhs_guarded_ip_false_paths
+        } else {
+            lappend uvhs_lines $uvhs_line
+        }
+    }
+    if {$uvhs_guarded_ip_false_paths} {
+        set fh [open $pre_opt w]
+        puts -nonewline $fh [join $uvhs_lines "\n"]
+        close $fh
+        puts "INFO: guarded $uvhs_guarded_ip_false_paths vendor PCIe IP false path(s): $pre_opt"
+    }
+}
+
+proc uvhs_guard_vendor_pcie_pblock {pre_place} {
+    set fh [open $pre_place r]
+    set data [read $fh]
+    close $fh
+
+    set uvhs_get_cells {[get_cells [list part_3/xs_core_def/u_pcie_wrapper/inst/u_xilinx_pcie_phy_x4]]}
+    if {[string first $uvhs_get_cells $data] < 0 ||
+        [string first {set uvhs_vendor_pcie_cells [get_cells -quiet} $data] >= 0} {
+        return
+    }
+    set uvhs_patched $data
+    set uvhs_lines {}
+    set uvhs_vendor_if_line [format {if {$current_fpga == "b0.f3"} %s} "\{"]
+    foreach uvhs_line [split $uvhs_patched "\n"] {
+        if {[string trim $uvhs_line] eq $uvhs_vendor_if_line} {
+            lappend uvhs_lines {set uvhs_vendor_pcie_cells [get_cells -quiet {part_3/xs_core_def/u_pcie_wrapper/inst/u_xilinx_pcie_phy_x4}]}
+            lappend uvhs_lines [format {if {$current_fpga == "b0.f3" && [llength $uvhs_vendor_pcie_cells]} %s} "\{"]
+        } else {
+            lappend uvhs_lines [string map \
+                [list $uvhs_get_cells {$uvhs_vendor_pcie_cells}] $uvhs_line]
+        }
+    }
+    set uvhs_patched [join $uvhs_lines "\n"]
+    set fh [open $pre_place w]
+    puts -nonewline $fh $uvhs_patched
+    close $fh
+    puts "INFO: guarded absent vendor PCIe IP pblock target: $pre_place"
+}
+
 proc patch_vivado_pre_opt {} {
     set write_xdc_patch_script [uvhs_write_xdc_patch_script]
     set xdma_cdc_script {
@@ -494,9 +557,13 @@ if {[file exists $uvhs_xdma_cdc_script]} {
     source $uvhs_xdma_cdc_script
 } else {
     puts "WARNING: UVHS patch: missing XDMA CDC attribute script $uvhs_xdma_cdc_script"
-}
+    }
 }
     set async_script [uvhs_async_clock_patch_script]
+    foreach platform_pre_opt [glob -nocomplain \
+            hw.dat/Compile/PnR/*/*/user_stage_tcl/preOpt_pre_opt.tcl] {
+        uvhs_guard_vendor_ip_false_paths $platform_pre_opt
+    }
     foreach pre_opt [uvhs_vivado_stage_hook_files pre_opt] {
         set fh [open $pre_opt r]
         set data [read $fh]
@@ -568,6 +635,10 @@ if {[llength $uvhs_ddr_ck_ports]} {
 }
     append script "\n" $refclk_patch_script
     append script [uvhs_async_clock_patch_script]
+    foreach platform_pre_place [glob -nocomplain \
+            hw.dat/Compile/PnR/*/*/user_stage_tcl/prePlace_pre_place.tcl] {
+        uvhs_guard_vendor_pcie_pblock $platform_pre_place
+    }
     foreach pre_place [uvhs_vivado_stage_hook_files pre_place] {
         set fh [open $pre_place r]
         set data [read $fh]
@@ -951,6 +1022,19 @@ create_generated_clock_if_bufgce_exists RTC_GATED_CLK TMCLK {
 }
 create_blackbox_output_clock_if_pin_exists XDMA_AXI_ACLK [uvhs_xdma_axi_clk_period_ns] core_def/xdma_ep_i/TO_DIFFTEST_PCIE_CLK
 create_ddr_ui_clock_if_exists
+foreach uvhs_localize_clock [split [env_or_default UVHS_LOCALIZE_CLOCKS ""]] {
+    set uvhs_localize_clock [string trim $uvhs_localize_clock]
+    if {$uvhs_localize_clock eq ""} {
+        continue
+    }
+    set uvhs_localize_clock_obj [get_clocks -quiet $uvhs_localize_clock]
+    if {[llength $uvhs_localize_clock_obj] != 1} {
+        error "UVHS_LOCALIZE_CLOCKS entry must resolve to exactly one clock, got [llength $uvhs_localize_clock_obj]: '$uvhs_localize_clock'"
+    }
+    puts "INFO: localize cross-FPGA clock network: $uvhs_localize_clock_obj"
+    config_clock -localize $uvhs_localize_clock_obj
+}
+config_clock -check
 run_or_warn "infer_clock" {infer_clock}
 run_or_warn "report_clock -inferred" {report_clock -inferred}
 source_if_exists [file normalize [file join [file dirname [info script]] async_clocks.tcl]]

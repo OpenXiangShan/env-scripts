@@ -136,7 +136,8 @@ wait_ready_runtime() {
 
   while [ "$(date +%s)" -lt "$deadline" ]; do
     if [ -f "$LOG" ]; then
-      error_match="$(last_log_match '(^|[[:space:]])ERROR:|[[]RTM-[0-9]+[]].*ERROR|download.*fail|initializ(e|ation).*fail|Load_DB.*fail')"
+      error_match="$(last_log_match '(^|[[:space:]])ERROR:|[[]RTM-[0-9]+[]].*ERROR|download.*fail|initializ(e|ation).*fail|Load_DB.*fail' \
+        | grep -v 'RTM-103.*Query get invalid parameter, clock has no sign-off frequency set' || true)"
       if [ -n "$error_match" ]; then
         echo "runtime_ready=0"
         emit_log_evidence runtime_error "$error_match"
@@ -219,6 +220,10 @@ set -euo pipefail
 export UVHS_DB_PATH=$(printf '%q' "$DB_PATH")
 export UVHS_COMMAND_FILE=$(printf '%q' "$COMMAND_FILE")
 export UVHS_DDR_RTL=$(printf '%q' "$DDR_RTL")
+export UVHS_STAGE_DIR=$(printf '%q' "$STAGE")
+export UVHS_RUNTIME_WORKDIR=$(printf '%q' "$WORKDIR")
+$(if [ -n "${UVHS_CLOCK_INDEX:-}" ]; then printf 'export UVHS_CLOCK_INDEX=%q' "$UVHS_CLOCK_INDEX"; fi)
+$(if [ -n "${UVHS_CLOCK_FREQUENCY_HZ:-}" ]; then printf 'export UVHS_CLOCK_FREQUENCY_HZ=%q' "$UVHS_CLOCK_FREQUENCY_HZ"; fi)
 cd $(printf '%q' "$STAGE")
 exec $(printf '%q' "$UV_SHELL") -rt_shell -workdir $(printf '%q' "$WORKDIR") -script $(printf '%q' "$DOWNLOAD_SCRIPT")
 EOF

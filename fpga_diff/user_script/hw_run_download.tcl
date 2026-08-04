@@ -23,9 +23,24 @@ query -connector -type fmc
 query -voltage
 
 # Apply the compiler-assigned frequencies to the U2 ClockHub, then record both
-# the requested defaults and the actual device state in the download log.
-query -clock -default
-config -clock -default
+# the requested defaults and the actual device state in the download log. A
+# design may intentionally leave an unused ClockHub output dangling; older
+# runtimes reject the complete default table in that case. Allow a caller to
+# provide the one used clock explicitly, but never guess its index/frequency.
+if {[catch {query -clock -default} uvhs_clock_default_error]} {
+    if {![info exists ::env(UVHS_CLOCK_INDEX)] ||
+        ![info exists ::env(UVHS_CLOCK_FREQUENCY_HZ)] ||
+        $::env(UVHS_CLOCK_INDEX) eq "" ||
+        $::env(UVHS_CLOCK_FREQUENCY_HZ) eq ""} {
+        error "query -clock -default failed and explicit UVHS_CLOCK_INDEX/UVHS_CLOCK_FREQUENCY_HZ are not set: $uvhs_clock_default_error"
+    }
+    puts "WARNING: default ClockHub table unavailable: $uvhs_clock_default_error"
+    puts "INFO: configuring ClockHub index $::env(UVHS_CLOCK_INDEX) to $::env(UVHS_CLOCK_FREQUENCY_HZ) Hz"
+    config -clock -index $::env(UVHS_CLOCK_INDEX) \
+        -frequency $::env(UVHS_CLOCK_FREQUENCY_HZ)
+} else {
+    config -clock -default
+}
 config -clock -commit
 query -clock
 
