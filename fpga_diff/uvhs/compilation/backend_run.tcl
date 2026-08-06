@@ -106,7 +106,7 @@ report_resource -depth 4
 report_system_resource
 list_partition_constraints -all
 partition_design -tdc -tdss true \
-    -bs_max_blk_ratio 0.96 -bs_min_blk_ratio 0.005
+    -bs_max_blk_ratio 0.96 -bs_min_blk_ratio 0.005 -effort high
 report_resource -depth 4
 
 instrument_design
@@ -126,7 +126,7 @@ save_runtime_data
 
 set_option compile.resourceUsageLimit 100
 set_option compile.strategyNum 1
-set_option compile.strategy0 uv_high_fanout_explore
+set_option compile.strategy0 uv_placer_balance_slrs
 set_option compile.stage.preOpt \
     [uvhs::path vivado_pre_opt.tcl]
 

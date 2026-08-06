@@ -1,8 +1,8 @@
 ################################################################################
 # Pin assignment for fpga_diff on the U2.2 VU19P platform.
 #
-# CPU, PCIe, and low-speed I/O use b0.f2. The user-DDR controller is bound to
-# b0.f0 separately by partition.tcl.
+# CPU, PCIe, and low-speed debug I/O use b0.f2. UART0 uses the USB-UART on the
+# flash daughter card at b0.F1_FMC0. The user-DDR controller uses b0.f0.
 ################################################################################
 
 proc pin_name {top port} {
@@ -39,11 +39,11 @@ apc16_pin led2 4
 # led3 is driven by the user-DDR calibration status on F0.
 assign_pin -port [pin_name $top led3] -connector b0.F0_FMC1 -index 311
 
-# UART0 defaults to the F2 APC16 sideband connector.  A two-FPGA build can
-# route it through the F1 UV_FMCH_FLASH USB-UART with FMC indices 311/270.
-set uvhs_uart0_connector [uvhs::env_or_default UVHS_UART0_CONNECTOR b0.F2_APC16]
-set uvhs_uart0_tx_index [uvhs::env_or_default UVHS_UART0_TX_INDEX [lindex $apc16_indices 6]]
-set uvhs_uart0_rx_index [uvhs::env_or_default UVHS_UART0_RX_INDEX [lindex $apc16_indices 7]]
+# UV_FMCH_FLASH drives USB_UART_RX at FMC[270] and receives USB_UART_TX at
+# FMC[311], so the FPGA RX/TX directions map to 270/311 respectively.
+set uvhs_uart0_connector b0.F1_FMC0
+set uvhs_uart0_tx_index 311
+set uvhs_uart0_rx_index 270
 puts "INFO: UART0 pins: TX ${uvhs_uart0_connector}\[$uvhs_uart0_tx_index\], RX ${uvhs_uart0_connector}\[$uvhs_uart0_rx_index\]"
 assign_pin -port [pin_name $top uart0_sout] -connector $uvhs_uart0_connector -index $uvhs_uart0_tx_index
 assign_pin -port [pin_name $top uart0_sin] -connector $uvhs_uart0_connector -index $uvhs_uart0_rx_index

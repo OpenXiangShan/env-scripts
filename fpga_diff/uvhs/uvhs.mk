@@ -12,7 +12,7 @@ UVHS_FILELIST := $(UVHS_WORK_DIR)/rtl/filelist.f
 
 UVHS_EXPORT_IP_FORCE ?= 0
 UVHS_EXPORT_IP_JOBS := $(if $(strip $(VIVADO_JOBS)),$(VIVADO_JOBS),8)
-UVHS_KEEP_FPGAS ?= $(if $(filter kmh,$(CPU)),b0.f0 b0.f1 b0.f2 b0.f3,b0.f0 b0.f2)
+UVHS_KEEP_FPGAS ?= b0.f0 b0.f1 b0.f2
 UVHS_LUT_FILL_RATE ?= $(if $(filter kmh,$(CPU)),70,)
 UVHS_LUT6_FILL_RATE ?= $(if $(filter kmh,$(CPU)),35,)
 

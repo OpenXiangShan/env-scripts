@@ -300,6 +300,10 @@ proc create_root_design { parentCell } {
     set_property CONFIG.ASSOCIATED_RESET {SYS_INTER_ARESETN} $SYS_INTER_CLK
     set SYS_INTER_ARESETN [ create_bd_port -dir I -type rst SYS_INTER_ARESETN ]
     set_property CONFIG.POLARITY {ACTIVE_LOW} $SYS_INTER_ARESETN
+    set UART_ACLK [ create_bd_port -dir I -type clk -freq_hz 50000000 UART_ACLK ]
+    set UART_ARESETN [ create_bd_port -dir I -type rst UART_ARESETN ]
+    set_property CONFIG.ASSOCIATED_RESET {UART_ARESETN} $UART_ACLK
+    set_property CONFIG.POLARITY {ACTIVE_LOW} $UART_ARESETN
   }
   set uart0_intc [ create_bd_port -dir O -type intr uart0_intc ]
 
@@ -379,32 +383,35 @@ proc create_root_design { parentCell } {
     [get_bd_pins axi_apb_bridge_0/s_axi_aclk] \
     [get_bd_pins axi_interconnect_0/ACLK] \
     [get_bd_pins axi_interconnect_0/M00_ACLK] \
-    [get_bd_pins axi_interconnect_0/M01_ACLK] \
     [get_bd_pins axi_interconnect_0/M02_ACLK] \
     [get_bd_pins axi_interconnect_0/M03_ACLK] \
     [get_bd_pins axi_interconnect_0/S01_ACLK] \
-    [get_bd_pins axi_uart16550_0/s_axi_aclk] \
     [get_bd_pins extllc_bram_ctrl/s_axi_aclk] \
     [get_bd_pins jtag_axi_flash/aclk] \
   ]
   if {$uvhs_flow} {
     lappend aclk_pins [get_bd_pins axi_interconnect_0/S02_ACLK]
+  } else {
+    lappend aclk_pins \
+      [get_bd_pins axi_interconnect_0/M01_ACLK] \
+      [get_bd_pins axi_uart16550_0/s_axi_aclk]
   }
   connect_bd_net -net ACLK_0_1 [get_bd_ports ACLK] {*}$aclk_pins
   set aresetn_pins [list \
     [get_bd_pins axi_apb_bridge_0/s_axi_aresetn] \
     [get_bd_pins axi_interconnect_0/ARESETN] \
     [get_bd_pins axi_interconnect_0/M00_ARESETN] \
-    [get_bd_pins axi_interconnect_0/M01_ARESETN] \
     [get_bd_pins axi_interconnect_0/M02_ARESETN] \
     [get_bd_pins axi_interconnect_0/M03_ARESETN] \
     [get_bd_pins axi_interconnect_0/S01_ARESETN] \
-    [get_bd_pins axi_uart16550_0/s_axi_aresetn] \
     [get_bd_pins extllc_bram_ctrl/s_axi_aresetn] \
     [get_bd_pins jtag_axi_flash/aresetn] \
   ]
   if {!$uvhs_flow} {
-    lappend aresetn_pins [get_bd_pins axi_interconnect_0/S00_ARESETN]
+    lappend aresetn_pins \
+      [get_bd_pins axi_interconnect_0/S00_ARESETN] \
+      [get_bd_pins axi_interconnect_0/M01_ARESETN] \
+      [get_bd_pins axi_uart16550_0/s_axi_aresetn]
   } else {
     lappend aresetn_pins [get_bd_pins axi_interconnect_0/S02_ARESETN]
   }
@@ -412,6 +419,12 @@ proc create_root_design { parentCell } {
   connect_bd_net -net SYS_INTER_CLK_1 [get_bd_ports SYS_INTER_CLK] [get_bd_pins axi_interconnect_0/S00_ACLK]
   if {$uvhs_flow} {
     connect_bd_net -net SYS_INTER_ARESETN_1 [get_bd_ports SYS_INTER_ARESETN] [get_bd_pins axi_interconnect_0/S00_ARESETN]
+    connect_bd_net -net UART_ACLK_1 [get_bd_ports UART_ACLK] \
+      [get_bd_pins axi_interconnect_0/M01_ACLK] \
+      [get_bd_pins axi_uart16550_0/s_axi_aclk]
+    connect_bd_net -net UART_ARESETN_1 [get_bd_ports UART_ARESETN] \
+      [get_bd_pins axi_interconnect_0/M01_ARESETN] \
+      [get_bd_pins axi_uart16550_0/s_axi_aresetn]
   }
   connect_bd_net -net axi_uart16550_0_ip2intc_irpt [get_bd_ports uart0_intc] [get_bd_pins axi_uart16550_0/ip2intc_irpt]
   connect_bd_net -net xlconstant_0_dout [get_bd_pins axi_uart16550_0/freeze] [get_bd_pins xlconstant_0/dout]

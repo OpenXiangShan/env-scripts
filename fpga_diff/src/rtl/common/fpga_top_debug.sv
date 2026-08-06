@@ -15,7 +15,7 @@ module fpga_top_debug
    input                 clk8_n,
    input                 clk7_p, // ddr 80MHz
    input                 clk7_n, 
-   input                 clk6_p, // system 200MHz
+   input                 clk6_p, // system 200MHz / UVHS UART 50MHz
    input                 clk6_n,
    input                 clk5_p, // debug 25MHz
    input                 clk5_n,
@@ -233,7 +233,11 @@ IBUFDS_GTE4 refclk2_ibuf (
 `endif
 
 assign        sys_clk_i = dbg_clk_buf;
+`ifdef UVHS
+assign        dev_clk_i = cqetmclk_buf;
+`else
 assign        dev_clk_i = dbg_clk_buf;
+`endif
 
 `ifndef UVHS
 vio_0 u_vio(

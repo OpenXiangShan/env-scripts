@@ -86,8 +86,16 @@ experiments. `UVHS_EXPORT_IP_FORCE=1` regenerates cached Vivado and generalBus
 IP. `uvhs_clean` removes only the selected work directory and refuses to run
 while its runtime session is active.
 
-XiangShan leaves all four B0 FPGAs available to the automatic partitioner;
-the validated 70/35 result used F2 and F3. NutShell keeps the single F2 FPGA.
+The default topology keeps B0/F0 for user DDR, B0/F1 for the physical
+UV_FMCH_FLASH USB-UART, and B0/F2 for XDMA and the XiangShan fetch path. The
+remaining logic is partitioned automatically. XiangShan uses the validated
+fetch-path colocation together with high partition effort and the
+`uv_placer_balance_slrs` PnR strategy.
+
+UVHS drives the AXI UART16550 from `clk6_p` at a fixed 50 MHz while `clk5_p`
+remains the 25 MHz CPU/SoC clock. The runtime configures both clocks before
+download. This matches the 50 MHz UART clock declared by the XiangShan FPGA
+device tree and keeps UART baud timing independent of CPU clock gating.
 
 ## Runtime
 
@@ -295,8 +303,9 @@ UVHS UHD path; the normal Vivado flow continues to use `make dump_ila` and a
 UHD capture inserts its own external DDR wrapper on every FPGA containing a
 probe group. The four PDDR4DME cards on the FPGA FMC3 connectors are reserved
 for UHD. The DUT DDR controller is constrained to B0/F0, which owns the separate
-`pddr4dme_user_inst`; NutShell therefore keeps both B0/F0 and B0/F2. This avoids
-sharing the B0/F2 UHD card between the DUT and waveform capture.
+`pddr4dme_user_inst`. The default topology also keeps B0/F1 for the USB-UART
+daughter card and B0/F2 for CPU/XDMA. This avoids sharing an UHD card with the
+DUT DDR controller.
 
 ## Compatibility Boundary
 
@@ -326,8 +335,8 @@ or DDR pins.
 | `compilation/frontend_run.tcl` | RTL/IP import, elaboration, and uvsyn frontend. |
 | `compilation/backend_run.tcl` | Fill-rate setup, partition, routing, PnR, and database commit. |
 | `compilation/topology.tcl` | Selects the FPGA set from the vendor board assembly. |
-| `compilation/partition.tcl` | Places the DUT DDR controller on the user-DDR FPGA. |
-| `compilation/assign_pin.tcl` | B0/F2 clock, PCIe, UART, JTAG, SD, and control pins. |
+| `compilation/partition.tcl` | Places user DDR on B0/F0 and the XiangShan fetch path on B0/F2. |
+| `compilation/assign_pin.tcl` | Physical UART daughter-card, clock, PCIe, JTAG, SD, and control pins. |
 | `compilation/timing.tcl` | External clock and asynchronous-group constraints. |
 | `compilation/vivado_pre_opt.tcl` | XDMA refclock and CDC constraints. |
 | `compilation/prepare_ip.sh` | Coordinates Vivado, generalBus, and external DDR IP preparation. |

@@ -1827,6 +1827,8 @@ AXI_bridge CFG_AXI_bridge_i
        (.SYS_INTER_CLK          (inter_soc_clk),
 `ifdef UVHS
         .SYS_INTER_ARESETN      (inter_soc_sync_rstn),
+        .UART_ACLK              (uart_sclk),
+        .UART_ARESETN           (uart_sclk_sync_rstn),
 `endif
         .ACLK                   (sys_clk_i),
         .ARESETN                (axi_bclk_sync_rstn),

@@ -431,6 +431,7 @@ proc uvhs_initialize_runtime {} {
         config -clock -default
     }
     config -clock -name clk5_p -frequency 25000000
+    config -clock -name clk6_p -frequency 50000000
     config -clock -commit
     query -clock
 
