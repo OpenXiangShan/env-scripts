@@ -311,8 +311,9 @@ DUT DDR controller.
 
 The retained compatibility code is limited to observed tool behavior:
 
-- `shell_compat.sh` selects Bash in generated synthesis and PnR launchers that
-  contain Bash syntax.
+- `shell_compat.sh` selects Bash in generated synthesis and PnR launchers and
+  translates the observed Vivado-to-UVHS signoff differences for the DDR UI
+  clock alias and multicycle reset syntax.
 - `uv_shell_exec_compat.sh` prepares the required libffi/libpcre compatibility
   links and restores runtime libraries after the vendor launcher sanitizes
   `LD_LIBRARY_PATH`.
@@ -321,8 +322,9 @@ The retained compatibility code is limited to observed tool behavior:
 - `vivado_pre_opt.tcl` preserves the XDMA GT reference clock and marks the
   validated XDMA CDC registers.
 
-The flow does not patch generated timing XDC, hierarchy names, VIO/ILA logic,
-or DDR pins.
+The flow does not patch user timing constraints, hierarchy names, VIO/ILA
+logic, or DDR pins. The generated signoff UDC is normalized only immediately
+before the UVHS timing worker reads it.
 
 ## Files
 
@@ -341,7 +343,7 @@ or DDR pins.
 | `compilation/vivado_pre_opt.tcl` | XDMA refclock and CDC constraints. |
 | `compilation/prepare_ip.sh` | Coordinates Vivado, generalBus, and external DDR IP preparation. |
 | `compilation/export_vivado_ip.tcl` | Runs repository-owned XCI/BD exports inside Vivado. |
-| `compilation/shell_compat.sh` | Generated launcher shell correction. |
+| `compilation/shell_compat.sh` | Generated launcher and signoff-constraint compatibility. |
 | `runtime/uv_shell_exec_compat.sh` | Runtime library wrapper for UVHS shells and generated Python workers. |
 | `runtime/runtime_server.tcl` | Download, reset, DDR, flash, capture, and command service. |
 | `runtime/runtime_session.sh` | Process lifecycle and atomic command/result transport. |
