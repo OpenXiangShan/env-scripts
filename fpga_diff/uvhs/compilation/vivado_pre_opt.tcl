@@ -92,11 +92,11 @@ set_clock_groups -asynchronous {*}$fpga_diff_async_groups
 # its peripheral_aresetn consumer on another FPGA, UVHS inserts a TDM input
 # synchronizer clocked by the GT TX clock. The MIG clock is not a DUT clock, so
 # the generated DUT-to-TDM exceptions do not cover this reset-only crossing.
-set fpga_diff_ddr_reset_q_pins [get_pins -hier -quiet -filter {
-    REF_PIN_NAME == Q &&
-    NAME =~ */core_def/U_UVHS_UVW_AXI4_TO_DDR4/*/proc_sys_reset_0/U0/ACTIVE_LOW_PR_OUT_DFF*/Q
+set fpga_diff_ddr_reset_regs [get_cells -hier -quiet -filter {
+    IS_SEQUENTIAL &&
+    NAME =~ */core_def/U_UVHS_UVW_AXI4_TO_DDR4/*/proc_sys_reset_0/U0/ACTIVE_LOW_PR_OUT_DFF*
 }]
-if {[llength $fpga_diff_ddr_reset_q_pins]} {
+if {[llength $fpga_diff_ddr_reset_regs]} {
     set fpga_diff_tdm_tx_sync_d_pins [get_pins -hier -quiet -filter {
         REF_PIN_NAME == D &&
         NAME =~ */uvtdm_tx_ctrl_inst/sync_flop_0_reg*/D
@@ -104,10 +104,10 @@ if {[llength $fpga_diff_ddr_reset_q_pins]} {
     if {![llength $fpga_diff_tdm_tx_sync_d_pins]} {
         error "DDR reset sources found, but no TDM TX synchronizer inputs matched"
     }
-    set_false_path -from $fpga_diff_ddr_reset_q_pins \
+    set_false_path -from $fpga_diff_ddr_reset_regs \
         -to $fpga_diff_tdm_tx_sync_d_pins
     puts "INFO: constrained DDR reset-to-TDM CDC: \
-        sources=[llength $fpga_diff_ddr_reset_q_pins] \
+        sources=[llength $fpga_diff_ddr_reset_regs] \
         destinations=[llength $fpga_diff_tdm_tx_sync_d_pins]"
 } else {
     puts "INFO: no DDR reset-to-TDM CDC sources on this FPGA"
