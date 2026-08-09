@@ -1,15 +1,18 @@
-# Fill only the RTL paths below. Braces preserve hierarchy indexes such as [0].
-# Leave the clock and signal lists empty to build without UHD instrumentation.
+# The XDMA host trigger is always available. Add temporary design-specific
+# paths below when a build needs more probes or trigger sources.
 set uvhs_ila_group_name uvhs_ila
 # Sampling clock path for this probe/trigger group. Prefer the ungated parent
 # clock so post-trigger samples can complete after the DUT clock stops.
 set uvhs_ila_clock_path [string trim {
+    fpga_top_debug.core_def.sys_clk_i
 }]
 # Probe signal paths, one per line.
 set uvhs_ila_probe_paths {
+    fpga_top_debug.core_def.io_host_ila_trigger
 }
 # Trigger signal paths, one per line.
 set uvhs_ila_trigger_paths {
+    fpga_top_debug.core_def.io_host_ila_trigger
 }
 
 if {$uvhs_ila_clock_path eq ""} {

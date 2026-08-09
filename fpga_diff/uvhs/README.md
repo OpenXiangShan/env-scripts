@@ -155,12 +155,13 @@ from the server's global Tcl scope.
 ## UVHS ILA Waveform Capture
 
 The reference probe scripts describe compile-time instrumentation, not a
-runtime dump. The frontend sources `compilation/probe_ila.tcl` by default. Its
-template is inactive while the clock and signal lists are empty. Fill the
-clock path and the probe/trigger path lists to enable it; the braces preserve
-hierarchy indexes such as `[0]`. Set `UVHS_PROBE_TCL` to use another file
-instead. The template calls `probe_net` for sampled signals and `trigger_net`
-for signals that may participate in a trigger condition. Fill it as follows:
+runtime dump. The frontend sources `compilation/probe_ila.tcl` by default. It
+always samples the XDMA host trigger on `core_def.sys_clk_i`; add temporary
+design-specific paths to its probe and trigger lists as needed. The braces
+preserve hierarchy indexes such as `[0]`. Set `UVHS_PROBE_TCL` to use another
+file instead; an override must retain the XDMA host trigger if host-controlled
+capture is required. The template calls `probe_net` for sampled signals and
+`trigger_net` for signals that may participate in a trigger condition.
 
 ```tcl
 set uvhs_ila_clock_path [string trim {
