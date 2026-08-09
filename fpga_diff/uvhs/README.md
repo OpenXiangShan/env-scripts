@@ -338,7 +338,7 @@ before the UVHS timing worker reads it.
 | `compilation/flow_common.tcl` | Shared UVHS path, environment, and source helpers. |
 | `compilation/frontend_run.tcl` | RTL/IP import, elaboration, and uvsyn frontend. |
 | `compilation/backend_run.tcl` | Fill-rate setup, partition, routing, PnR, and database commit. |
-| `compilation/topology.tcl` | Selects the FPGA set from the vendor board assembly. |
+| `compilation/assemble.tcl` | Assembles the FPGA set from the vendor board description. |
 | `compilation/partition.tcl` | Places CHI/CMN and DDR on B0/F0, and the core/DiffTest/XDMA path on B0/F2. |
 | `compilation/assign_pin.tcl` | Physical UART daughter-card, clock, PCIe, JTAG, SD, and control pins. |
 | `compilation/timing.tcl` | External clock and asynchronous-group constraints. |

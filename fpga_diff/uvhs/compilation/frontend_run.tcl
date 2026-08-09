@@ -93,7 +93,7 @@ set design_top fpga_top_debug
 set ddr_inst_path ${design_top}.core_def.U_UVHS_UVW_AXI4_TO_DDR4
 create_system_design -name VU19P_X4 -platform U2.2
 
-uvhs::source_required topology.tcl
+uvhs::source_required assemble.tcl
 uvhs::source_required assign_pin.tcl
 set probe_script [uvhs::env_or_default UVHS_PROBE_TCL ""]
 if {$probe_script ne ""} {

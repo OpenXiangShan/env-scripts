@@ -1,5 +1,5 @@
 ################################################################################
-# Select the active FPGA topology from the vendor four-FPGA board template.
+# Assemble the active FPGA set from the vendor four-FPGA board template.
 ################################################################################
 
 set uvhs_base_assemble ./script/1B_4F_HGC_assemble.tcl
