@@ -14,6 +14,7 @@ set uvhs_f0_cells $uvhs_ddr_cell
 set uvhs_memory_path_names {
     core_def/U_CPU_TOP/u_XSTop/soc/chi_extllc_opt
     core_def/U_CPU_TOP/u_XSTop/soc/nocMisc
+    core_def/U_CPU_TOP/u_XSTop/soc/imsic_bus_tops
     core_def/U_CPU_TOP/u_XSTop/soc/widget
     core_def/U_CPU_TOP/u_XSTop/soc/fragmenter
     core_def/U_CPU_TOP/u_XSTop/soc/tl2axi4
