@@ -97,18 +97,29 @@ set fpga_diff_ddr_reset_regs [get_cells -hier -quiet -filter {
     NAME =~ */core_def/U_UVHS_UVW_AXI4_TO_DDR4/*/proc_sys_reset_0/U0/ACTIVE_LOW_PR_OUT_DFF*
 }]
 if {[llength $fpga_diff_ddr_reset_regs]} {
-    set fpga_diff_tdm_tx_sync_d_pins [get_pins -hier -quiet -filter {
+    set fpga_diff_tdm_tx_sync_candidates [get_pins -hier -quiet -filter {
         REF_PIN_NAME == D &&
         NAME =~ */uvtdm_tx_ctrl_inst/sync_flop_0_reg*/D
     }]
-    if {![llength $fpga_diff_tdm_tx_sync_d_pins]} {
-        error "DDR reset sources found, but no TDM TX synchronizer inputs matched"
+    set fpga_diff_tdm_tx_sync_d_pins {}
+    if {[llength $fpga_diff_tdm_tx_sync_candidates]} {
+        set fpga_diff_ddr_reset_endpoints \
+            [all_fanout -flat -endpoints_only -from $fpga_diff_ddr_reset_regs]
+        foreach fpga_diff_pin $fpga_diff_tdm_tx_sync_candidates {
+            if {[lsearch -exact $fpga_diff_ddr_reset_endpoints $fpga_diff_pin] >= 0} {
+                lappend fpga_diff_tdm_tx_sync_d_pins $fpga_diff_pin
+            }
+        }
     }
-    set_false_path -from $fpga_diff_ddr_reset_regs \
-        -to $fpga_diff_tdm_tx_sync_d_pins
-    puts "INFO: constrained DDR reset-to-TDM CDC: \
-        sources=[llength $fpga_diff_ddr_reset_regs] \
-        destinations=[llength $fpga_diff_tdm_tx_sync_d_pins]"
+    if {[llength $fpga_diff_tdm_tx_sync_d_pins]} {
+        set_false_path -from $fpga_diff_ddr_reset_regs \
+            -to $fpga_diff_tdm_tx_sync_d_pins
+        puts "INFO: constrained DDR reset-to-TDM CDC: \
+            sources=[llength $fpga_diff_ddr_reset_regs] \
+            destinations=[llength $fpga_diff_tdm_tx_sync_d_pins]"
+    } else {
+        puts "INFO: no DDR reset-to-TDM CDC endpoints on this FPGA"
+    }
 } else {
     puts "INFO: no DDR reset-to-TDM CDC sources on this FPGA"
 }
