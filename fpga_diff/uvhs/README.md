@@ -86,9 +86,10 @@ experiments. `UVHS_EXPORT_IP_FORCE=1` regenerates cached Vivado and generalBus
 IP. `uvhs_clean` removes only the selected work directory and refuses to run
 while its runtime session is active.
 
-The default topology keeps the XiangShan CHI/CMN memory path with user DDR on
-B0/F0, the physical UV_FMCH_FLASH USB-UART on B0/F1, and the core, DiffTest
-endpoint, and XDMA host path on B0/F2. The remaining logic is partitioned
+The default topology keeps the XiangShan CHI/CMN memory path, configuration
+bridge, runtime flash interface, syscfg, and boot ROM with user DDR on B0/F0.
+The physical UV_FMCH_FLASH USB-UART remains on B0/F1, while the core, DiffTest
+endpoint, and XDMA host path stay on B0/F2. The remaining logic is partitioned
 automatically. XiangShan uses these path constraints together with high
 partition effort and the `uv_placer_balance_slrs` PnR strategy.
 
@@ -339,7 +340,7 @@ before the UVHS timing worker reads it.
 | `compilation/frontend_run.tcl` | RTL/IP import, elaboration, and uvsyn frontend. |
 | `compilation/backend_run.tcl` | Fill-rate setup, partition, routing, PnR, and database commit. |
 | `compilation/assemble.tcl` | Assembles the FPGA set from the vendor board description. |
-| `compilation/partition.tcl` | Places CHI/CMN and DDR on B0/F0, and the core/DiffTest/XDMA path on B0/F2. |
+| `compilation/partition.tcl` | Places memory/configuration on B0/F0 and the core/DiffTest/XDMA path on B0/F2. |
 | `compilation/assign_pin.tcl` | Physical UART daughter-card, clock, PCIe, JTAG, SD, and control pins. |
 | `compilation/timing.tcl` | External clock and asynchronous-group constraints. |
 | `compilation/vivado_pre_opt.tcl` | XDMA refclock and CDC constraints. |
