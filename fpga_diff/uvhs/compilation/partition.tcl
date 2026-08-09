@@ -65,7 +65,16 @@ puts "INFO: constrain UVHS DUT DDR to $uvhs_bound_ddr_connector"
 if {[info exists uvhs_memory_path_cells]} {
     puts "INFO: constrain XiangShan memory path to b0.f0: $uvhs_memory_path_cells"
 }
+if {[llength $uvhs_xiangshan_cell] == 1} {
+    set uvhs_clock_enable_net \
+        [get_nets -quiet {core_def/difftest_clock_gate_enable}]
+    if {[llength $uvhs_clock_enable_net] != 1} {
+        error "expected one DiffTest clock-enable net, got [llength $uvhs_clock_enable_net]"
+    }
+    assign_route -signals $uvhs_clock_enable_net -path {b0.f2 b0.f0}
+    puts "INFO: constrain DiffTest clock enable to direct b0.f2-b0.f0 route"
+}
 unset -nocomplain uvhs_ddr_cell uvhs_ddr_connector \
     uvhs_bound_ddr_connector uvhs_f0_cells uvhs_memory_path_names \
     uvhs_memory_path_cells uvhs_host_path_names uvhs_host_path_cells \
-    uvhs_xiangshan_cell
+    uvhs_xiangshan_cell uvhs_clock_enable_net
