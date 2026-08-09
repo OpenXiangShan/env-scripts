@@ -430,7 +430,8 @@ proc uvhs_initialize_runtime {} {
     } else {
         config -clock -default
     }
-    config -clock -name clk5_p -frequency 25000000
+    # Keep clk5_p at the system sign-off frequency committed in this runtime DB.
+    # It varies with the partition and PnR result, so it must not be hard-coded.
     config -clock -name clk6_p -frequency 50000000
     config -clock -commit
     query -clock

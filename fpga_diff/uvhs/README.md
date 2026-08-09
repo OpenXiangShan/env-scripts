@@ -92,10 +92,12 @@ endpoint, and XDMA host path on B0/F2. The remaining logic is partitioned
 automatically. XiangShan uses these path constraints together with high
 partition effort and the `uv_placer_balance_slrs` PnR strategy.
 
-UVHS drives the AXI UART16550 from `clk6_p` at a fixed 50 MHz while `clk5_p`
-remains the 25 MHz CPU/SoC clock. The runtime configures both clocks before
-download. This matches the 50 MHz UART clock declared by the XiangShan FPGA
-device tree and keeps UART baud timing independent of CPU clock gating.
+UVHS drives the AXI UART16550 from `clk6_p` at a fixed 50 MHz. The CPU/SoC
+`clk5_p` frequency comes from the system sign-off result committed in the
+selected runtime database, so each partition and PnR result runs at its own
+reported frequency. The fixed UART clock matches the 50 MHz clock declared by
+the XiangShan FPGA device tree and keeps UART baud timing independent of CPU
+clock gating.
 
 ## Runtime
 
