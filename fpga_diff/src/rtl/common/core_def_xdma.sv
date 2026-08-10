@@ -1465,9 +1465,23 @@ wire [0:0]    br2cfg_wvalid;
     .pcie_ep_perstn(pcie_ep_perstn)
   );
 
+`ifdef UVHS_CPU_TRACE_AXI_DDR
+  wire [691:0] cpu_trace_data;
+  wire cpu_trace_valid;
+  wire cpu_trace_ready;
+`endif
+
+  // Trace is a passive observer. Its DDR/FIFO readiness must never alter the
+  // CPU/DiffTest clock; otherwise a held commit-valid can be sampled more than
+  // once by logic outside this gated clock domain. The trace ingress drops a
+  // snapshot when its FIFO is full instead of stalling the observed CPU.
+  wire soc_clock_run_enable =
+      (difftest_clock_gate_enable & xdma_link_up) ||
+      ~io_host_diff_enable || ~sys_rstn_io || ~cpu_rstn_io;
+
   DifftestClockGate SOC_CLK_CTRL(
       .CK  (sys_clk_i),
-      .E   ((difftest_clock_gate_enable & xdma_link_up ) || ~io_host_diff_enable || ~sys_rstn_io || ~cpu_rstn_io),
+      .E   (soc_clock_run_enable),
       .Q   (inter_soc_clk)
   );
 
@@ -1627,9 +1641,28 @@ wire         uvhs_ddr_user_clk;
 wire         uvhs_ddr_user_rst;
 wire [255:0] uvhs_ddr_sysbus_i;
 wire [255:0] uvhs_ddr_sysbus_o;
+`ifdef UVHS_FUNCTIONAL_DDR_REMOTE_LINK
+wire [79:0]  uvhs_func_ddr_req_data;
+wire         uvhs_func_ddr_req_valid;
+wire         uvhs_func_ddr_req_ready;
+wire [79:0]  uvhs_func_ddr_rsp_data;
+wire         uvhs_func_ddr_rsp_valid;
+wire         uvhs_func_ddr_rsp_ready;
+`endif
 
 assign uvhs_ddr_sysbus_i = 256'b0;
-assign init_calib_complete = rstn_sw4 & ~uvhs_ddr_user_rst;
+// The UVHS DDR wrapper generates user_rst in its UI-clock domain.  Synchronize
+// the status into the SoC clock domain before it reaches the top-level status
+// output (and, after UVHS partitioning, a cross-FPGA TDM endpoint).
+(* ASYNC_REG = "TRUE", SHREG_EXTRACT = "NO" *) reg [1:0] uvhs_ddr_user_rst_sync;
+always @(posedge inter_soc_clk or negedge rstn_sw4) begin
+  if (!rstn_sw4) begin
+    uvhs_ddr_user_rst_sync <= 2'b11;
+  end else begin
+    uvhs_ddr_user_rst_sync <= {uvhs_ddr_user_rst_sync[0], uvhs_ddr_user_rst};
+  end
+end
+assign init_calib_complete = ~uvhs_ddr_user_rst_sync[1];
 
 `ifdef CONFIG_USE_XSCORE_AXI
 `ifdef CPU_NUTSHELL
@@ -1716,6 +1749,80 @@ uvhs_axi64_to_axi256 u_uvhs_axi64_to_axi256 (
 assign cpu2ddr_s2m_bid[17:14] = 4'b0;
 assign cpu2ddr_s2m_rid[17:14] = 4'b0;
 `else
+`ifdef UVHS_FUNCTIONAL_DDR_REMOTE_LINK
+// Keep XiangShan/XDMA on F2 and functional DDR on F3 without routing the full
+// 688-bit AXI interface through the partition. Requests and responses are
+// losslessly serialized into two 80-bit ready/valid links.
+uvhs_axi_remote_source #(
+    .DATA_WIDTH(256), .ADDR_WIDTH(34), .ID_WIDTH(14),
+    .FLIT_WIDTH(80), .PACKET_WIDTH(320)
+) u_uvhs_func_ddr_remote_source (
+    .clk(inter_soc_clk), .rst_n(rstn_sw4),
+    .s_axi_awid(cpu2ddr_m2s_awid_mix[13:0]),
+    .s_axi_awaddr(cpu2ddr_m2s_awaddr_mix[33:0]),
+    .s_axi_awlen(cpu2ddr_m2s_awlen), .s_axi_awsize(cpu2ddr_m2s_awsize),
+    .s_axi_awburst(cpu2ddr_m2s_awburst), .s_axi_awlock(cpu2ddr_m2s_awlock),
+    .s_axi_awcache(cpu2ddr_m2s_awcache), .s_axi_awprot(cpu2ddr_m2s_awprot),
+    .s_axi_awqos(cpu2ddr_m2s_awqos), .s_axi_awregion(cpu2ddr_m2s_awregion),
+    .s_axi_awvalid(cpu2ddr_m2s_awvalid), .s_axi_awready(cpu2ddr_s2m_awready),
+    .s_axi_wdata(cpu2ddr_m2s_wdata), .s_axi_wstrb(cpu2ddr_m2s_wstrb),
+    .s_axi_wlast(cpu2ddr_m2s_wlast), .s_axi_wvalid(cpu2ddr_m2s_wvalid),
+    .s_axi_wready(cpu2ddr_s2m_wready), .s_axi_bid(cpu2ddr_s2m_bid[13:0]),
+    .s_axi_bresp(cpu2ddr_s2m_bresp), .s_axi_bvalid(cpu2ddr_s2m_bvalid),
+    .s_axi_bready(cpu2ddr_m2s_bready),
+    .s_axi_arid(cpu2ddr_m2s_arid_mix[13:0]),
+    .s_axi_araddr(cpu2ddr_m2s_araddr_mix[33:0]),
+    .s_axi_arlen(cpu2ddr_m2s_arlen), .s_axi_arsize(cpu2ddr_m2s_arsize),
+    .s_axi_arburst(cpu2ddr_m2s_arburst), .s_axi_arlock(cpu2ddr_m2s_arlock),
+    .s_axi_arcache(cpu2ddr_m2s_arcache), .s_axi_arprot(cpu2ddr_m2s_arprot),
+    .s_axi_arqos(cpu2ddr_m2s_arqos), .s_axi_arregion(cpu2ddr_m2s_arregion),
+    .s_axi_arvalid(cpu2ddr_m2s_arvalid), .s_axi_arready(cpu2ddr_s2m_arready),
+    .s_axi_rid(cpu2ddr_s2m_rid[13:0]), .s_axi_rdata(cpu2ddr_s2m_rdata),
+    .s_axi_rresp(cpu2ddr_s2m_rresp), .s_axi_rlast(cpu2ddr_s2m_rlast),
+    .s_axi_rvalid(cpu2ddr_s2m_rvalid), .s_axi_rready(cpu2ddr_m2s_rready),
+    .req_tx_data(uvhs_func_ddr_req_data),
+    .req_tx_valid(uvhs_func_ddr_req_valid),
+    .req_tx_ready(uvhs_func_ddr_req_ready),
+    .rsp_rx_data(uvhs_func_ddr_rsp_data),
+    .rsp_rx_valid(uvhs_func_ddr_rsp_valid),
+    .rsp_rx_ready(uvhs_func_ddr_rsp_ready)
+);
+
+uvhs_axi_remote_sink #(
+    .DATA_WIDTH(256), .ADDR_WIDTH(34), .ID_WIDTH(14),
+    .FLIT_WIDTH(80), .PACKET_WIDTH(320)
+) u_uvhs_func_ddr_remote_sink (
+    .clk(inter_soc_clk), .rst_n(rstn_sw4),
+    .req_rx_data(uvhs_func_ddr_req_data),
+    .req_rx_valid(uvhs_func_ddr_req_valid),
+    .req_rx_ready(uvhs_func_ddr_req_ready),
+    .rsp_tx_data(uvhs_func_ddr_rsp_data),
+    .rsp_tx_valid(uvhs_func_ddr_rsp_valid),
+    .rsp_tx_ready(uvhs_func_ddr_rsp_ready),
+    .m_axi_awid(uvhs_ddr_awid), .m_axi_awaddr(uvhs_ddr_awaddr),
+    .m_axi_awlen(uvhs_ddr_awlen), .m_axi_awsize(uvhs_ddr_awsize),
+    .m_axi_awburst(uvhs_ddr_awburst), .m_axi_awlock(uvhs_ddr_awlock),
+    .m_axi_awcache(uvhs_ddr_awcache), .m_axi_awprot(uvhs_ddr_awprot),
+    .m_axi_awqos(uvhs_ddr_awqos), .m_axi_awregion(uvhs_ddr_awregion),
+    .m_axi_awvalid(uvhs_ddr_awvalid), .m_axi_awready(uvhs_ddr_awready),
+    .m_axi_wdata(uvhs_ddr_wdata), .m_axi_wstrb(uvhs_ddr_wstrb),
+    .m_axi_wlast(uvhs_ddr_wlast), .m_axi_wvalid(uvhs_ddr_wvalid),
+    .m_axi_wready(uvhs_ddr_wready), .m_axi_bid(uvhs_ddr_bid),
+    .m_axi_bresp(uvhs_ddr_bresp), .m_axi_bvalid(uvhs_ddr_bvalid),
+    .m_axi_bready(uvhs_ddr_bready), .m_axi_arid(uvhs_ddr_arid),
+    .m_axi_araddr(uvhs_ddr_araddr), .m_axi_arlen(uvhs_ddr_arlen),
+    .m_axi_arsize(uvhs_ddr_arsize), .m_axi_arburst(uvhs_ddr_arburst),
+    .m_axi_arlock(uvhs_ddr_arlock), .m_axi_arcache(uvhs_ddr_arcache),
+    .m_axi_arprot(uvhs_ddr_arprot), .m_axi_arqos(uvhs_ddr_arqos),
+    .m_axi_arregion(uvhs_ddr_arregion), .m_axi_arvalid(uvhs_ddr_arvalid),
+    .m_axi_arready(uvhs_ddr_arready), .m_axi_rid(uvhs_ddr_rid),
+    .m_axi_rdata(uvhs_ddr_rdata), .m_axi_rresp(uvhs_ddr_rresp),
+    .m_axi_rlast(uvhs_ddr_rlast), .m_axi_rvalid(uvhs_ddr_rvalid),
+    .m_axi_rready(uvhs_ddr_rready)
+);
+assign cpu2ddr_s2m_bid[17:14] = 4'b0;
+assign cpu2ddr_s2m_rid[17:14] = 4'b0;
+`else
 assign uvhs_ddr_awid     = cpu2ddr_m2s_awid_mix[13:0];
 assign uvhs_ddr_awaddr   = cpu2ddr_m2s_awaddr_mix[33:0];
 assign uvhs_ddr_awlen    = cpu2ddr_m2s_awlen;
@@ -1755,6 +1862,7 @@ assign cpu2ddr_s2m_rresp = uvhs_ddr_rresp;
 assign cpu2ddr_s2m_rlast = uvhs_ddr_rlast;
 assign cpu2ddr_s2m_rvalid = uvhs_ddr_rvalid;
 assign uvhs_ddr_rready   = cpu2ddr_m2s_rready;
+`endif
 `endif
 `endif
 
@@ -1924,6 +2032,18 @@ jtag_ddr_subsys_wrapper U_JTAG_DDR_SUBSYS(
 );
 `endif
 
+`ifdef UVHS_CPU_TRACE_AXI_DDR
+cpu_trace_uvhs_ddr U_CPU_TRACE (
+    .cpu_clk       (inter_soc_clk),
+    .cpu_ctrl_clk  (sys_clk_i),
+    .trace_clk     (sys_clk_i),
+    .resetn        (sys_rstn_io & cpu_rstn_io & rstn_sw4),
+    .trace_data    (cpu_trace_data),
+    .trace_valid   (cpu_trace_valid),
+    .trace_ready   (cpu_trace_ready)
+);
+`endif
+
 SimTop_wrapper U_CPU_TOP(
     .difftest_pcie_clock             (difftest_pcie_clock),
     .difftest_to_host_axis_tready    (difftest_to_host_axis_tready),
@@ -1960,6 +2080,11 @@ SimTop_wrapper U_CPU_TOP(
     .difftest_cfg_axilite_rresp      (difftest_cfg_axilite_rresp),
     .difftest_cfg_axilite_rvalid     (difftest_cfg_axilite_rvalid),
     .difftest_cfg_axilite_rready     (difftest_cfg_axilite_rready),
+`ifdef UVHS_CPU_TRACE_AXI_DDR
+    .cpu_trace_data                  (cpu_trace_data),
+    .cpu_trace_valid                 (cpu_trace_valid),
+    .cpu_trace_ready                 (cpu_trace_ready),
+`endif
     .inter_soc_clk                  (inter_soc_clk),
     .sys_rstn_i                     (cpu_rstn_io  ),
     .tmclk                          (inter_rtc_clk),

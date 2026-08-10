@@ -215,7 +215,11 @@ set_option syn.logicFillingRateThreshold 0.001
 set design_name [env_or_default UVHS_DESIGN_NAME VU19P_X4]
 set platform [env_or_default PLATFORM U2.2]
 set design_top [env_or_default UVHS_TOP fpga_top_debug]
-set ddr_inst_path ${design_top}.core_def.U_UVHS_UVW_AXI4_TO_DDR4
+set ddr_inst_paths [list ${design_top}.core_def.U_UVHS_UVW_AXI4_TO_DDR4]
+if {[env_or_default UVHS_ENABLE_CPU_TRACE_AXI_DDR 0] eq "1"} {
+    lappend ddr_inst_paths ${design_top}.core_def.U_CPU_TRACE.U_CPU_TRACE_CH0_DDR
+    lappend ddr_inst_paths ${design_top}.core_def.U_CPU_TRACE.U_CPU_TRACE_CH1_DDR
+}
 set reset_ports [split_words [env_or_default UVHS_RESET_PORTS {rstn_sw6 rstn_sw5 rstn_sw4}]]
 create_system_design -name $design_name -platform $platform
 
@@ -282,5 +286,7 @@ elaborate_design $design_top
 start_uvsyn_shell_patch_watcher
 synthesize_design -parallel_option frontend
 save_working_space
-patch_option_add_rtl_inst hw.dat $ddr_inst_path
+foreach ddr_inst_path $ddr_inst_paths {
+    patch_option_add_rtl_inst hw.dat $ddr_inst_path
+}
 exit

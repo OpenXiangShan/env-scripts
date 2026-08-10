@@ -265,28 +265,40 @@ proc uvhs_write_xdc_patch_script {} {
     set async_file [file normalize [file join $::fpga_diff_uvhs_dir async_clocks.tcl]]
     set script [format {
 proc ::uvhs_create_ddr_ui_clock_patch {} {
-    if {[llength [get_clocks -quiet DDR_UI_CLK]] > 0} {
-        return
-    }
-    set uvhs_pins {}
-    foreach uvhs_pattern {
-        part_2/core_def/U_UVHS_UVW_AXI4_TO_DDR4/ddr4ip_ddr4_user_clk
-        */U_UVHS_UVW_AXI4_TO_DDR4/ddr4ip_ddr4_user_clk
+    foreach {uvhs_name uvhs_patterns} {
+        DDR_UI_CLK {
+            part_2/core_def/U_UVHS_UVW_AXI4_TO_DDR4/ddr4ip_ddr4_user_clk
+            */U_UVHS_UVW_AXI4_TO_DDR4/ddr4ip_ddr4_user_clk
+        }
+        DDR_UI_CLK_TRACE_CH0 {
+            part_2/core_def/U_CPU_TRACE/U_CPU_TRACE_CH0_DDR/ddr4ip_ddr4_user_clk
+            */U_CPU_TRACE/U_CPU_TRACE_CH0_DDR/ddr4ip_ddr4_user_clk
+        }
+        DDR_UI_CLK_TRACE_CH1 {
+            part_1/core_def/U_CPU_TRACE/U_CPU_TRACE_CH1_DDR/ddr4ip_ddr4_user_clk
+            */U_CPU_TRACE/U_CPU_TRACE_CH1_DDR/ddr4ip_ddr4_user_clk
+        }
     } {
-        foreach uvhs_pin [get_pins -quiet $uvhs_pattern] {
-            if {[lsearch -exact $uvhs_pins $uvhs_pin] < 0} {
-                lappend uvhs_pins $uvhs_pin
+        if {[llength [get_clocks -quiet $uvhs_name]] > 0} {
+            continue
+        }
+        set uvhs_pins {}
+        foreach uvhs_pattern $uvhs_patterns {
+            foreach uvhs_pin [get_pins -quiet $uvhs_pattern] {
+                if {[lsearch -exact $uvhs_pins $uvhs_pin] < 0} {
+                    lappend uvhs_pins $uvhs_pin
+                }
+            }
+            foreach uvhs_pin [get_pins -hierarchical -quiet -filter "NAME =~ $uvhs_pattern"] {
+                if {[lsearch -exact $uvhs_pins $uvhs_pin] < 0} {
+                    lappend uvhs_pins $uvhs_pin
+                }
             }
         }
-        foreach uvhs_pin [get_pins -hierarchical -quiet -filter "NAME =~ $uvhs_pattern"] {
-            if {[lsearch -exact $uvhs_pins $uvhs_pin] < 0} {
-                lappend uvhs_pins $uvhs_pin
-            }
+        if {[llength $uvhs_pins]} {
+            create_clock -period 5.000 -name $uvhs_name -waveform {0.000 2.500} -add [lindex $uvhs_pins 0]
+            puts "INFO: UVHS patch: create $uvhs_name on UVHS DDR user clock [lindex $uvhs_pins 0]"
         }
-    }
-    if {[llength $uvhs_pins]} {
-        create_clock -period 5.000 -name DDR_UI_CLK -waveform {0.000 2.500} -add [lindex $uvhs_pins 0]
-        puts "INFO: UVHS patch: create DDR_UI_CLK on UVHS DDR user clock [lindex $uvhs_pins 0]"
     }
 }
 
@@ -306,12 +318,40 @@ proc ::uvhs_patch_xdma_preopt_xdc {uvhs_xdc_file} {
         # primary clock.  Preserve its original CPU_CLK_IN relationship.
         set uvhs_lines {}
         foreach uvhs_line [split $uvhs_patched "\n"] {
+            # UVHS temporarily falsifies slow DUT setup clocks while it
+            # budgets the partition boundary.  Its generated constraint also
+            # includes the source clock itself in the destination collection,
+            # which hides every same-clock DUT setup path from Vivado PnR.
+            # Keep only the intended DUT-to-virtual-boundary exception so the
+            # CPU and other owned logic remain timing-driven and signoff-clean.
+            if {[regexp {^[[:space:]]*set_false_path[[:space:]]+-setup[[:space:]]+-from[[:space:]]+\[get_clocks[[:space:]]+([^]]+)\][[:space:]]+-to[[:space:]]+\[get_clocks[[:space:]]+([^]]+)\][[:space:]]*$} \
+                    $uvhs_line -> uvhs_setup_from uvhs_setup_to]} {
+                set uvhs_setup_from [string trim $uvhs_setup_from " \t{}"]
+                set uvhs_setup_to [string trim $uvhs_setup_to " \t{}"]
+            }
+            if {[info exists uvhs_setup_from] && \
+                [lsearch -exact $uvhs_setup_to $uvhs_setup_from] >= 0} {
+                if {$uvhs_setup_from eq "clock_vir_UV"} {
+                    puts "INFO: UVHS patch: drop virtual-clock self setup false path"
+                    continue
+                }
+                if {[lsearch -exact $uvhs_setup_to clock_vir_UV] >= 0} {
+                    set uvhs_line [format {set_false_path -setup -from [get_clocks %%s] -to [get_clocks clock_vir_UV]} \
+                        $uvhs_setup_from]
+                    puts "INFO: UVHS patch: preserve $uvhs_setup_from same-clock setup timing"
+                }
+            }
+            unset -nocomplain uvhs_setup_from uvhs_setup_to
             if {[string first {-name SOC_GATED_CLK} $uvhs_line] >= 0 && \
                 [regexp {^create_clock[^\n]*\[get_pins[[:space:]]+([^]]+)/O\]} \
                     $uvhs_line -> uvhs_soc_bufg]} {
-                set uvhs_line [format {create_generated_clock -name SOC_GATED_CLK -source [get_pins %%s/I] -divide_by 1 -add -master_clock [get_clocks CPU_CLK_IN] [get_pins %%s/O]} \
-                    $uvhs_soc_bufg $uvhs_soc_bufg]
-                puts "INFO: UVHS patch: restore replicated SOC_GATED_CLK as CPU_CLK_IN generated clock on $uvhs_soc_bufg"
+                # The replicated BUFG I is driven from a localized clock port,
+                # so using it as -source makes Vivado serialize SOC_GATED_CLK
+                # as an unrelated primary clock.  Anchor the generated clock
+                # to CPU_CLK_IN's real partition input port instead.
+                set uvhs_line [format {create_generated_clock -name SOC_GATED_CLK -source [get_ports [get_property SOURCE_PINS [get_clocks CPU_CLK_IN]]] -divide_by 1 -add -master_clock [get_clocks CPU_CLK_IN] [get_pins %%s/O]} \
+                    $uvhs_soc_bufg]
+                puts "INFO: UVHS patch: restore replicated SOC_GATED_CLK from CPU_CLK_IN source port on $uvhs_soc_bufg"
             }
             lappend uvhs_lines $uvhs_line
         }
@@ -346,6 +386,22 @@ if {[info commands ::uvhs_vivado_write_xdc] eq "" && [info commands ::write_xdc]
             if {[string match *pnr_timing_constraints_preopt.xdc $uvhs_arg] || \
                 [string match *pnr_timing_constraints.xdc $uvhs_arg]} {
                 ::uvhs_patch_xdma_preopt_xdc $uvhs_arg
+            }
+            if {[string match *pnr_timing_constraints_preopt.xdc $uvhs_arg] && \
+                ![info exists ::uvhs_preopt_timing_reloaded]} {
+                # write_xdc serialized the complete pre-opt timing state, and
+                # the patch above repaired clocks that partitioning emitted as
+                # unrelated primary clocks.  Reload it once so the repaired
+                # clock objects replace the stale in-memory objects before
+                # opt_design; otherwise the fixed XDC only affects the file.
+                set ::uvhs_preopt_timing_reloaded 1
+                puts "INFO: UVHS patch: reload repaired pre-opt timing constraints from $uvhs_arg"
+                reset_timing
+                # The serialized file intentionally ends with our Tcl helpers
+                # for DDR clocks and async clock groups.  `read_xdc` rejects
+                # those commands; source executes both ordinary XDC commands
+                # and the appended helpers in the same design context.
+                uplevel #0 [list source $uvhs_arg]
             }
         }
         return -options $uvhs_options $uvhs_result
@@ -389,38 +445,49 @@ proc create_blackbox_output_clock_if_pin_exists {name period pin} {
         [list create_clock -name $name -per $period $pins]
 }
 
-proc create_ddr_ui_clock_if_exists {} {
-    set pin_patterns {
-        core_def/U_UVHS_UVW_AXI4_TO_DDR4/ddr4ip_ddr4_user_clk
-        */U_UVHS_UVW_AXI4_TO_DDR4/ddr4ip_ddr4_user_clk
-    }
-    set pins {}
-    foreach pin_pattern $pin_patterns {
-        foreach pin [get_pins -quiet $pin_pattern] {
-            if {[lsearch -exact $pins $pin] < 0} {
-                lappend pins $pin
+proc create_ddr_ui_clocks_if_exist {} {
+    foreach {name pin_patterns} {
+        DDR_UI_CLK {
+            core_def/U_UVHS_UVW_AXI4_TO_DDR4/ddr4ip_ddr4_user_clk
+            */U_UVHS_UVW_AXI4_TO_DDR4/ddr4ip_ddr4_user_clk
+        }
+        DDR_UI_CLK_TRACE_CH0 {
+            core_def/U_CPU_TRACE/U_CPU_TRACE_CH0_DDR/ddr4ip_ddr4_user_clk
+            */U_CPU_TRACE/U_CPU_TRACE_CH0_DDR/ddr4ip_ddr4_user_clk
+        }
+        DDR_UI_CLK_TRACE_CH1 {
+            core_def/U_CPU_TRACE/U_CPU_TRACE_CH1_DDR/ddr4ip_ddr4_user_clk
+            */U_CPU_TRACE/U_CPU_TRACE_CH1_DDR/ddr4ip_ddr4_user_clk
+        }
+    } {
+        set pins {}
+        foreach pin_pattern $pin_patterns {
+            foreach pin [get_pins -quiet $pin_pattern] {
+                if {[lsearch -exact $pins $pin] < 0} {
+                    lappend pins $pin
+                }
+            }
+            foreach pin [get_pins -hierarchical -quiet -filter "NAME =~ $pin_pattern"] {
+                if {[lsearch -exact $pins $pin] < 0} {
+                    lappend pins $pin
+                }
             }
         }
-        foreach pin [get_pins -hierarchical -quiet -filter "NAME =~ $pin_pattern"] {
-            if {[lsearch -exact $pins $pin] < 0} {
-                lappend pins $pin
-            }
+        if {![llength $pins]} {
+            puts "INFO: skip create_clock $name, missing UVHS DDR user clock pin"
+            continue
         }
-    }
-    if {![llength $pins]} {
-        puts "INFO: skip create_clock DDR_UI_CLK, missing UVHS DDR user clock pin"
-        return
-    }
 
-    set pin [lindex $pins 0]
-    set clocks [get_clocks -quiet -of_objects $pin]
-    if {[llength $clocks]} {
-        puts "INFO: DDR UI pin $pin already has clocks: $clocks"
-        return
-    }
+        set pin [lindex $pins 0]
+        set clocks [get_clocks -quiet -of_objects $pin]
+        if {[llength $clocks]} {
+            puts "INFO: DDR UI pin $pin already has clocks: $clocks"
+            continue
+        }
 
-    run_or_warn "create_clock DDR_UI_CLK on $pin" \
-        [list create_clock -name DDR_UI_CLK -per 5.000 $pin]
+        run_or_warn "create_clock $name on $pin" \
+            [list create_clock -name $name -per 5.000 $pin]
+    }
 }
 
 proc create_generated_clock_if_bufgce_exists {name master_clock cell_patterns} {
@@ -700,6 +767,33 @@ if {[file exists {%s}]} {
 } [file normalize [file join $::fpga_diff_uvhs_dir async_clocks.tcl]] \
   [file normalize [file join $::fpga_diff_uvhs_dir async_clocks.tcl]] \
   [file normalize [file join $::fpga_diff_uvhs_dir async_clocks.tcl]]]
+
+    foreach file [glob -nocomplain hw.dat/Compile/PnR/*/*/timing_settings.tcl] {
+        set fh [open $file r]
+        set data [read $fh]
+        close $fh
+        set patched $data
+        set old_block {foreach clk [get_clocks $falsifyDutClocks] {
+            set_false_path -setup -from [get_clocks $clk] -to [get_clocks "$clk clock_vir_UV"]
+        }}
+        set new_block {foreach clk [get_clocks $falsifyDutClocks] {
+            # Keep DUT-to-virtual partition budgeting, but never falsify the
+            # owned DUT's same-clock setup paths.
+            if {$clk eq "clock_vir_UV"} {
+                continue
+            }
+            set_false_path -setup -from [get_clocks $clk] -to [get_clocks clock_vir_UV]
+        }}
+        if {[string first $old_block $patched] >= 0} {
+            set patched [string map [list $old_block $new_block] $patched]
+        }
+        if {$patched ne $data} {
+            set fh [open $file w]
+            puts -nonewline $fh $patched
+            close $fh
+            puts "INFO: patched UVHS DUT same-clock setup timing constraints: $file"
+        }
+    }
 
     foreach file [glob -nocomplain hw.dat/Compile/PnR/*/*/timing_constraints.tcl] {
         set fh [open $file r]
@@ -1021,7 +1115,7 @@ create_generated_clock_if_bufgce_exists RTC_GATED_CLK TMCLK {
     *inter_rtc_clk*
 }
 create_blackbox_output_clock_if_pin_exists XDMA_AXI_ACLK [uvhs_xdma_axi_clk_period_ns] core_def/xdma_ep_i/TO_DIFFTEST_PCIE_CLK
-create_ddr_ui_clock_if_exists
+create_ddr_ui_clocks_if_exist
 foreach uvhs_localize_clock [split [env_or_default UVHS_LOCALIZE_CLOCKS ""]] {
     set uvhs_localize_clock [string trim $uvhs_localize_clock]
     if {$uvhs_localize_clock eq ""} {

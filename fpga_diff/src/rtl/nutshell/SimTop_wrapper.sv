@@ -180,6 +180,11 @@ output [31:0]  difftest_cfg_axilite_rdata,
 output [1:0]   difftest_cfg_axilite_rresp,
 output         difftest_cfg_axilite_rvalid,
 input          difftest_cfg_axilite_rready
+`ifdef UVHS_CPU_TRACE_AXI_DDR
+,output [691:0] cpu_trace_data
+,output         cpu_trace_valid
+,input          cpu_trace_ready
+`endif
 );
 
 SimTop u_SimTop (
@@ -367,4 +372,33 @@ SimTop u_SimTop (
     .difftest_cfg_axilite_rdata      (difftest_cfg_axilite_rdata),
     .difftest_cfg_axilite_rresp      (difftest_cfg_axilite_rresp)
 );
+
+`ifdef UVHS_CPU_TRACE_AXI_DDR
+// Keep all generated-RTL hierarchy knowledge local to this wrapper.  NutShell
+// is single-issue/in-order, so capture its WBU state using the documented
+// NutShell commit schema rather than pretending that it has a ROB snapshot.
+`define UVHS_NUTSHELL_WBU u_SimTop.cpu.nutcore.backend.wbu
+nutshell_commit_trace_pack u_nutshell_commit_trace_pack (
+    .clk              (inter_soc_clk),
+    .resetn           (sys_rstn_i),
+    .commit_valid     (`UVHS_NUTSHELL_WBU.io_in_valid),
+    .commit_pc        (`UVHS_NUTSHELL_WBU.io_in_bits_decode_cf_pc),
+    .commit_instr     (`UVHS_NUTSHELL_WBU.io_in_bits_decode_cf_instr[31:0]),
+    .commit_skip      (`UVHS_NUTSHELL_WBU.io_in_bits_isMMIO),
+    .commit_rfwen     (`UVHS_NUTSHELL_WBU.io_wb_rfWen),
+    .commit_rfdest    (`UVHS_NUTSHELL_WBU.io_wb_rfDest),
+    .commit_rfdata    (`UVHS_NUTSHELL_WBU.io_wb_rfData),
+    .redirect_valid   (`UVHS_NUTSHELL_WBU.io_redirect_valid),
+    .redirect_target  (`UVHS_NUTSHELL_WBU.io_redirect_target),
+    .fu_type          (`UVHS_NUTSHELL_WBU.io_in_bits_decode_ctrl_fuType),
+    .commit_payload_0 (`UVHS_NUTSHELL_WBU.io_in_bits_commits_0),
+    .commit_payload_1 (`UVHS_NUTSHELL_WBU.io_in_bits_commits_1),
+    .commit_payload_2 (`UVHS_NUTSHELL_WBU.io_in_bits_commits_2),
+    .commit_payload_3 (`UVHS_NUTSHELL_WBU.io_in_bits_commits_3),
+    .trace_data       (cpu_trace_data),
+    .trace_valid      (cpu_trace_valid)
+);
+wire _unused_cpu_trace_ready = cpu_trace_ready;
+`undef UVHS_NUTSHELL_WBU
+`endif
 endmodule

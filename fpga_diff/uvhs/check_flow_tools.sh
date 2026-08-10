@@ -26,6 +26,8 @@ for path in \
   uvhs/hejian_pcie_x4_env.sh uvhs/frontend_run.tcl uvhs/backend_run.tcl \
   uvhs/assemble_uvhs.tcl uvhs/assign_pin_nutshell_f2.tcl uvhs/async_clocks.tcl \
   uvhs/probe_template.tcl uvhs/partition_capture_ddr_f3.tcl \
+  uvhs/partition_nutshell_cpu_trace_ddr.tcl \
+  uvhs/partition_xiangshan_cpu_trace_ddr.tcl \
   uvhs/uvhs_preflight_status.sh uvhs/uvhs_tagged_runtime.sh \
   uvhs/uvhs_queue_uhd_capture.sh \
   uvhs/tools/build/patch_nutshell_cdc.sh \
@@ -34,6 +36,12 @@ for path in \
   tools/report_post_route_cdc.tcl tools/report_pcie_route_evidence.tcl \
   src/rtl/common/core_def_xdma.sv src/rtl/common/uvhs_axi64_to_axi256.sv \
   src/rtl/common/uvhs_axilite_cdc_bridge.sv src/rtl/common/uvhs_blackbox_stubs.v \
+  src/rtl/common/cpu_trace/cpu_trace_uvhs_ddr.sv \
+  src/rtl/common/cpu_trace/nutshell_commit_trace_pack.sv \
+  src/rtl/common/cpu_trace/uvhs_axi_remote_link.sv \
+  tests/cpu_trace_axi_ddr_tb.sv tests/nutshell_commit_trace_pack_tb.sv \
+  tests/run_cpu_trace_axi_ddr_verilator.sh \
+  tests/uvhs_axi_remote_link_tb.sv tests/run_uvhs_axi_remote_link_verilator.sh \
   src/tcl/common/AXI_bridge.tcl; do
   require_file "$path"
 done
@@ -84,6 +92,9 @@ require_text uvhs/uvhs_tagged_runtime.sh 'UVHS_RUN_TAG:?set a unique UVHS_RUN_TA
 require_text uvhs/uvhs_queue_uhd_capture.sh 'UVHS_RUN_TAG:?set the exact active UVHS_RUN_TAG'
 require_text uvhs/probe_template.tcl 'trigger_net -add -group $group -clock $clock -signal $signals'
 require_text uvhs/partition_capture_ddr_f3.tcl 'get_cells core_def/U_UVHS_UVW_AXI4_TO_DDR4'
+require_text uvhs/partition_nutshell_cpu_trace_ddr.tcl 'U_CPU_TRACE_CH0_DDR'
+require_text uvhs/partition_nutshell_cpu_trace_ddr.tcl 'U_CPU_TRACE_CH1_DDR'
+require_text uvhs/partition_xiangshan_cpu_trace_ddr.tcl 'u_uvhs_func_ddr_remote_sink'
 require_text user_script/uhd_c2h.ini 'difftest_to_host_axis_tvalid_io = 1'
 require_text uvhs/Makefile 'UVHS_PROBE_FILE ?= $(ROOT_DIR)/uvhs/probe_template.tcl'
 require_text uvhs/Makefile 'UVHS_ENABLE_PROBE_NET ?= 0'
@@ -91,6 +102,16 @@ require_text uvhs/Makefile 'uvhs_hejian_pcie_x4_nutshell_probe_all: UVHS_FPGA_CO
 require_text uvhs/Makefile 'uvhs_hejian_pcie_x4_nutshell_probe_all: UVHS_KEEP_FPGAS = b0.f2 b0.f3'
 require_text uvhs/Makefile 'uvhs_hejian_pcie_x4_nutshell_probe_all: UVHS_PARTITION_FILE = $(ROOT_DIR)/uvhs/partition_capture_ddr_f3.tcl'
 require_text uvhs/Makefile 'uvhs_hejian_pcie_x4_nutshell_probe_all: UVHS_LOCALIZE_CLOCKS = SOC_GATED_CLK'
+require_text uvhs/Makefile 'uvhs_hejian_pcie_x4_nutshell_trace_all: UVHS_ENABLE_CPU_TRACE_AXI_DDR = 1'
+require_text uvhs/Makefile 'uvhs_hejian_pcie_x4_nutshell_trace_all: UVHS_FPGA_COUNT = 3'
+require_text uvhs/Makefile 'uvhs_hejian_pcie_x4_nutshell_trace_all: UVHS_KEEP_FPGAS = b0.f1 b0.f2 b0.f3'
+require_text uvhs/Makefile 'uvhs_hejian_pcie_x4_nutshell_trace_all: UVHS_PARTITION_FILE = $(ROOT_DIR)/uvhs/partition_nutshell_cpu_trace_ddr.tcl'
+require_text src/rtl/nutshell/SimTop_wrapper.sv 'wire _unused_cpu_trace_ready = cpu_trace_ready;'
+require_text uvhs/Makefile 'uvhs_hejian_pcie_x4_xiangshan_trace_all: UVHS_ENABLE_CPU_TRACE_AXI_DDR = 1'
+require_text uvhs/Makefile 'uvhs_hejian_pcie_x4_xiangshan_trace_all: UVHS_ENABLE_FUNCTIONAL_DDR_REMOTE_LINK = 1'
+require_text uvhs/Makefile 'uvhs_hejian_pcie_x4_xiangshan_trace_all: UVHS_PARTITION_FILE = $(ROOT_DIR)/uvhs/partition_xiangshan_cpu_trace_ddr.tcl'
+require_text uvhs/Makefile 'uvhs_hejian_pcie_x4_xiangshan_trace_all: UVHS_KEEP_FPGAS = b0.f1 b0.f2 b0.f3'
+require_text src/rtl/kmh/SimTop_wrapper.sv 'wire _unused_cpu_trace_ready = cpu_trace_ready;'
 require_text uvhs/frontend_run.tcl 'enabled UVHS probe file is missing or empty'
 
 if git -C "$root_dir" grep -En 'UVHS_UHD_CAPTURE_DDR|pddr4dme_f2_uhd_inst' -- \

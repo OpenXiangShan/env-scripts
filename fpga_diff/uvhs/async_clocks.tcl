@@ -67,7 +67,7 @@ set fpga_diff_tm_clocks [fpga_diff_collect_clocks {TMCLK RTC_GATED_CLK}]
 set fpga_diff_cpu_clocks [fpga_diff_collect_clocks {CPU_CLK_IN SOC_GATED_CLK}]
 set fpga_diff_debug_clocks [fpga_diff_collect_clocks {DEBUG_CLK_IN}]
 set fpga_diff_ddr_clocks [fpga_diff_collect_clocks {
-    DDR_UI_CLK
+    DDR_UI_CLK*
     ddr_ref_clk
     clk7_p_pad_net*
     *c0_ddr4_ui_clk*
