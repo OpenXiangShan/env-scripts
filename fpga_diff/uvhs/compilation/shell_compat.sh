@@ -49,10 +49,10 @@ patch_signoff_constraints() {
   local udc="$signoff_dir/cstr/FPGA_filtered.udc"
   local clock_map="$signoff_dir/cstr.tcl"
   local alias_count
-  local supported_alias_count
+  local ddr_map_count
+  local ddr_master_clock
   local identity_map_count
-  local mapped_count
-  local mmcm_count
+  local master_clock_count
   local reset_count
   local multiplier_count_before
   local multiplier_count_after
@@ -63,31 +63,38 @@ patch_signoff_constraints() {
   }
 
   alias_count=$(grep -c '^create_generated_clock -name DDR_UI_CLK ' "$udc" || true)
-  supported_alias_count=$(grep -cE \
-    '^create_generated_clock -name DDR_UI_CLK .* -master_clock \[get_clocks mmcm_clkout0\] \[get_pins .*/ddr4ip_ddr4_user_clk\]$' \
-    "$udc" || true)
+  ddr_map_count=$(grep -oE '\{DDR_UI_CLK [^}]+\}' "$clock_map" | wc -l || true)
   identity_map_count=$(grep -cF '{DDR_UI_CLK DDR_UI_CLK}' "$clock_map" || true)
-  mapped_count=$(grep -cF '{DDR_UI_CLK mmcm_clkout0}' "$clock_map" || true)
-  mmcm_count=$(grep -c '^create_generated_clock -name mmcm_clkout0 ' "$udc" || true)
 
-  ((alias_count <= 1 && identity_map_count <= 1 && mapped_count <= 1 &&
-    identity_map_count + mapped_count <= 1)) || {
+  ((alias_count <= 1 && ddr_map_count <= 1 && identity_map_count <= 1)) || {
     echo "ERROR: ambiguous DDR signoff clock constraints in $signoff_dir" >&2
     exit 1
   }
-  ((alias_count == supported_alias_count)) || {
-    echo "ERROR: unsupported DDR signoff clock alias in $udc" >&2
-    exit 1
-  }
   if ((alias_count == 1)); then
-    ((identity_map_count == 1 && mapped_count == 0 && mmcm_count == 1)) || {
+    ddr_master_clock=$(sed -nE '
+      /^create_generated_clock -name DDR_UI_CLK .*\/ddr4ip_ddr4_user_clk]$/ {
+        s/.* -master_clock \[get_clocks ([^]]+)\] \[get_pins .*/\1/p
+      }
+    ' "$udc")
+    [[ $ddr_master_clock =~ ^[[:alnum:]_.:/-]+$ ]] || {
+      echo "ERROR: unsupported DDR signoff clock alias in $udc" >&2
+      exit 1
+    }
+    master_clock_count=$(grep -cF \
+      "create_generated_clock -name $ddr_master_clock " "$udc" || true)
+    ((identity_map_count == 1 && ddr_map_count == 1 &&
+      master_clock_count == 1)) || {
       echo "ERROR: DDR signoff clock mapping has no unique MIG MMCM clock" >&2
       exit 1
     }
-    sed -i 's/{DDR_UI_CLK DDR_UI_CLK}/{DDR_UI_CLK mmcm_clkout0}/' \
+    sed -i "s/{DDR_UI_CLK DDR_UI_CLK}/{DDR_UI_CLK $ddr_master_clock}/" \
       "$clock_map"
     sed -i '/^create_generated_clock -name DDR_UI_CLK .*\/ddr4ip_ddr4_user_clk]$/d' \
       "$udc"
+    grep -Fq "{DDR_UI_CLK $ddr_master_clock}" "$clock_map" || {
+      echo "ERROR: failed to map DDR signoff clock to $ddr_master_clock" >&2
+      exit 1
+    }
   fi
 
   reset_count=$(awk '
