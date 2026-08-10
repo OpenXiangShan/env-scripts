@@ -1,6 +1,7 @@
 UVHS_ROOT_DIR := $(abspath $(dir $(lastword $(MAKEFILE_LIST)))/..)
 UVHS_COMPILATION_DIR := $(UVHS_ROOT_DIR)/uvhs/compilation
 UVHS_RUNTIME_DIR := $(UVHS_ROOT_DIR)/uvhs/runtime
+TRIGGER ?= $(UVHS_RUNTIME_DIR)/trigger.ini
 
 UVHS_TEMPLATE_DIR ?=
 UVHS_UVW_AXI4_TO_DDR4_SRC ?=
@@ -172,7 +173,7 @@ uvhs_write_ddr:
 
 uvhs_write_flash:
 	test -f "$(WORKLOAD)"
-	$(call uvhs_runtime_command,write_flash "$(abspath $(WORKLOAD))" B0 F2 0 0 0x0 0x8000)
+	$(call uvhs_runtime_command,write_flash "$(abspath $(WORKLOAD))" 0x0 0x8000)
 
 uvhs_ila_arm:
 	test -f "$(TRIGGER)"

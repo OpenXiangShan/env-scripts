@@ -95,23 +95,32 @@ proc uvhs_release_cpu_after_memory {} {
     query -reset
 }
 
-proc uvhs_write_flash_gbus {input_file board fpga port channel base capacity} {
+proc uvhs_find_gbus_endpoint {} {
+    set ip_info [query -ipinfo -tclobj]
+    set endpoints {}
+    foreach line [split $ip_info "\n"] {
+        if {[regexp -nocase {^\s*\S+\s+\S+\s+B([0-9]+)\.F([0-9]+)\s+[0-9]+\s+\S+\s+gbus\s+([0-9]+)} \
+            $line -> board_index fpga_index instance]} {
+            lappend endpoints [list $board_index f$fpga_index $instance]
+        }
+    }
+    set endpoints [lsort -unique $endpoints]
+    if {[llength $endpoints] != 1} {
+        error "expected one generalBus endpoint, got [llength $endpoints]: $endpoints"
+    }
+    return [lindex $endpoints 0]
+}
+
+proc uvhs_write_flash_gbus {input_file base capacity} {
     if {![file isfile $input_file]} {
         error "flash image not found: $input_file"
     }
 
-    if {[regexp -nocase {^b([0-9]+)$} $board -> board_index]} {
-        set board $board_index
-    }
-    if {![string is integer -strict $board]} {
-        error "generalBus board must be an index or B<index>: $board"
-    }
-    if {![regexp -nocase {^f([0-9]+)$} $fpga -> fpga_index]} {
-        error "generalBus FPGA must be F<index>: $fpga"
-    }
-    set fpga f$fpga_index
-    set port [uvhs_parse_integer "generalBus port" $port]
-    set channel [uvhs_parse_integer "generalBus channel" $channel]
+    lassign [uvhs_find_gbus_endpoint] board fpga instance
+    # The generated generalBus DCP has one internal AXI port and one channel.
+    # The port shown by query -ipinfo is its system-bus slot, not this port ID.
+    set port 0
+    set channel 0
     set base [uvhs_parse_integer "flash base" $base]
     set capacity [uvhs_parse_integer "flash capacity" $capacity]
     set payload [uvhs_read_binary $input_file]
@@ -135,11 +144,13 @@ proc uvhs_write_flash_gbus {input_file board fpga port channel base capacity} {
     uvhs_write_binary $write_file $payload
     file delete -force $read_file
 
-    puts [format "INFO: generalBus flash write 0x%llx, %d bytes" $base $transfer_size]
+    puts [format \
+        "INFO: generalBus B%d.%s instance %d flash write 0x%llx, %d bytes" \
+        $board $fpga $instance $base $transfer_size]
     set status [catch {
-        gbus_dma_write -board $board -fpga $fpga -port $port \
+        gbus_dma_write -board $board -fpga $fpga -instance $instance -port $port \
             -addr $base -size $transfer_size -channel $channel -file $write_file
-        gbus_dma_read -board $board -fpga $fpga -port $port \
+        gbus_dma_read -board $board -fpga $fpga -instance $instance -port $port \
             -addr $base -size $transfer_size -channel $channel -file $read_file
         set readback [uvhs_read_binary $read_file]
         if {![string equal $payload $readback]} {
@@ -322,9 +333,9 @@ proc uvhs_execute_command {args} {
             uvhs_write_ddr_pairs {*}[lrange $args 1 3]
         }
         write_flash {
-            if {[llength $args] != 8} { error "write_flash expects 7 arguments" }
+            if {[llength $args] != 4} { error "write_flash expects 3 arguments" }
             uvhs_hold_cpu_for_memory
-            uvhs_write_flash_gbus {*}[lrange $args 1 7]
+            uvhs_write_flash_gbus {*}[lrange $args 1 3]
             uvhs_release_cpu_after_memory
         }
         ila_arm {
