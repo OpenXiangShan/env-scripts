@@ -18,6 +18,13 @@ __pycache__
 .Xil/
 fpga/.Xil
 test*
+!fpga_diff/tests/
+fpga_diff/tests/*
+!fpga_diff/tests/cpu_trace_axi_ddr_tb.sv
+!fpga_diff/tests/nutshell_commit_trace_pack_tb.sv
+!fpga_diff/tests/run_cpu_trace_axi_ddr_verilator.sh
+!fpga_diff/tests/uvhs_axi_remote_link_tb.sv
+!fpga_diff/tests/run_uvhs_axi_remote_link_verilator.sh
 json/
 
 # python third-party libraries are stored temporarily

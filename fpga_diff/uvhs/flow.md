@@ -1,7 +1,8 @@
-# Hejian UVHS NutShell FPGA DiffTest Flow
+# Hejian UVHS FPGA DiffTest Flow
 
 This is the self-contained runbook for the `env-scripts/fpga_diff` Hejian
-UVHS flow. The target is the NutShell SoC with the MinJie XDMA driver and
+UVHS flow. The validated target is the NutShell SoC; the flow also provides a
+XiangShan `FpgaDiffDefaultConfig` integration with the MinJie XDMA driver and
 `fpga-host`.
 
 ## Validated Configuration
@@ -79,6 +80,8 @@ program a board, rescan PCIe, write BARs, load a driver, or reboot a host.
 | `uvhs/backend_run.tcl` | Partition, implement, route, and generate the bitstream. |
 | `uvhs/assemble_uvhs.tcl`, `uvhs/partition.tcl` | Apply the selected B0/F2 hardware assembly and partition policy. |
 | `uvhs/partition_capture_ddr_f3.tcl` | Move the complete functional DDR IP to F3 for the validated two-FPGA UHD build. |
+| `uvhs/partition_nutshell_cpu_trace_ddr.tcl` | Place the passive NutShell trace DDR channels on F2/F1 and functional DDR on F3. |
+| `uvhs/partition_xiangshan_cpu_trace_ddr.tcl` | Place XiangShan trace channels on F2/F1 and the compact-link functional DDR sink on F3. |
 | `uvhs/assign_pin_nutshell_f2.tcl`, `uvhs/async_clocks.tcl`, `uvhs/timing_common.tcl` | NutShell pin and clock constraints. |
 | `uvhs/patch_uvsyn_shell.sh`, `uvhs/uv_shell_exec_compat.sh`, `uvhs/make_compat/` | Versioned UVHS compatibility helpers. |
 | `uvhs/tools/build/patch_nutshell_cdc.sh` | Apply the required idempotent CDC fix to generated NutShell RTL. |
@@ -91,6 +94,7 @@ program a board, rescan PCIe, write BARs, load a driver, or reboot a host.
 | `src/rtl/common/uvhs_axi64_to_axi256.sv` | CPU-side 64-bit to UVHS DDR 256-bit AXI adaptation. |
 | `src/rtl/common/uvhs_axilite_cdc_bridge.sv` | Owned AXI-Lite CDC bridge for the XDMA control path. |
 | `src/rtl/common/uvhs_blackbox_stubs.v` | UVHS/Vivado IP interface declarations. |
+| `src/rtl/common/cpu_trace/` | Passive CPU trace buffering/striping, dual-DDR AXI writing, and the XiangShan functional-DDR compact AXI link. |
 | `src/tcl/common/AXI_bridge.tcl` | XDMA/DiffTest AXI bridge generation. |
 
 ### Reports, timing, CDC, and probes
