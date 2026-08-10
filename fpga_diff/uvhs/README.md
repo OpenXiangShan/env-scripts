@@ -130,10 +130,11 @@ runtime session with `uvhs_write_bitstream` so it reloads and downloads
 word width and calls `writemem -rtl`. It leaves the CPU halted until
 `uvhs_reset_cpu` is issued.
 
-`uvhs_write_flash` writes through the 64-bit generalBus and the existing
-32-bit AXI flash bridge. The generalBus view starts at offset zero; the CPU and
-normal JTAG address map are unchanged. A complete readback match is required
-before the command succeeds.
+`uvhs_write_flash` locates the compiled generalBus endpoint with
+`query -ipinfo -tclobj`, then writes through its 64-bit AXI port and the
+existing 32-bit AXI flash bridge. The generalBus view starts at offset zero;
+the CPU and normal JTAG address map are unchanged. A complete readback match
+is required before the command succeeds.
 
 The runtime implementation has two control layers:
 
@@ -154,14 +155,17 @@ from the server's global Tcl scope.
 
 ## UVHS ILA Waveform Capture
 
-The reference probe scripts describe compile-time instrumentation, not a
-runtime dump. The frontend sources `compilation/probe_ila.tcl` by default. It
-always samples the XDMA host trigger on `core_def.sys_clk_i`; add temporary
-design-specific paths to its probe and trigger lists as needed. The braces
-preserve hierarchy indexes such as `[0]`. Set `UVHS_PROBE_TCL` to use another
-file instead; an override must retain the XDMA host trigger if host-controlled
-capture is required. The template calls `probe_net` for sampled signals and
-`trigger_net` for signals that may participate in a trigger condition.
+The probe scripts describe compile-time instrumentation, not a runtime dump.
+The frontend sources `compilation/probe_ila.tcl` by default. It samples only
+the XDMA host trigger on `core_def.sys_clk_i`. `compilation/probe_kmh.tcl` is
+the larger XiangShan profile used by the 2026-08-04 and 2026-08-07 debug
+builds. Its generated hierarchy must be checked before it is reused with a
+different XiangShan RTL revision. The braces preserve hierarchy indexes such
+as `[0]`. Set `UVHS_PROBE_TCL` to select a profile or an external file; an
+override must retain the XDMA host trigger if host-controlled capture is
+required. Set it to an empty value for a build with no UHD instrumentation.
+The scripts call `probe_net` for sampled signals and `trigger_net` for signals
+that may participate in a trigger condition.
 
 ```tcl
 set uvhs_ila_clock_path [string trim {
@@ -183,11 +187,15 @@ the default file, build a new database and bitstream normally:
 make uvhs CPU=<design> CORE_DIR=/path/to/release/build SUFFIX=probe
 ```
 
-An external probe file can be selected without changing the repository:
+Select the repository KMH profile, an external profile, or no ILA as follows:
 
 ```sh
 make uvhs CPU=<design> CORE_DIR=/path/to/release/build SUFFIX=probe \
+  UVHS_PROBE_TCL=/path/to/env-scripts/fpga_diff/uvhs/compilation/probe_kmh.tcl
+make uvhs CPU=<design> CORE_DIR=/path/to/release/build SUFFIX=probe \
   UVHS_PROBE_TCL=/path/to/probe.tcl
+make uvhs CPU=<design> CORE_DIR=/path/to/release/build SUFFIX=noila \
+  UVHS_PROBE_TCL=
 ```
 
 The frontend records the probe and trigger declarations. The backend already
@@ -195,8 +203,9 @@ runs `trigger_probe -check` after runtime-data initialization and
 `trigger_probe -group` after clock transformation, which inserts and groups the
 debug hardware before partitioning.
 
-At runtime, write a trigger condition file using the group and signal names
-reported by `query -trigger`:
+At runtime, `uvhs_ila_arm` uses `runtime/trigger.ini` by default. Set `TRIGGER`
+to another condition file using the group and signal names reported by
+`query -trigger`:
 
 ```ini
 [uvhs_ila]
@@ -239,8 +248,7 @@ CPU and the requested history precedes the host trigger:
 ```sh
 export FPGA_ILA_DUMP_CMD='ssh <runtime-host> \
   "make -C /path/to/env-scripts/fpga_diff uvhs_ila_arm \
-  CPU=<design> SUFFIX=<tag> TRIGGER=/path/to/trigger.ini \
-  UVHS_ILA_POSITION=0"'
+  CPU=<design> SUFFIX=<tag> UVHS_ILA_POSITION=0"'
 
 /path/to/fpga-host <host arguments>
 
@@ -347,7 +355,10 @@ before the UVHS timing worker reads it.
 | `compilation/vivado_pre_opt.tcl` | XDMA refclock and CDC constraints. |
 | `compilation/prepare_ip.sh` | Coordinates Vivado, generalBus, and external DDR IP preparation. |
 | `compilation/export_vivado_ip.tcl` | Runs repository-owned XCI/BD exports inside Vivado. |
+| `compilation/probe_ila.tcl` | Minimal host-trigger UHD probe profile. |
+| `compilation/probe_kmh.tcl` | KMH debug UHD probe profile. |
 | `compilation/shell_compat.sh` | Generated launcher and signoff-constraint compatibility. |
 | `runtime/uv_shell_exec_compat.sh` | Runtime library wrapper for UVHS shells and generated Python workers. |
 | `runtime/runtime_server.tcl` | Download, reset, DDR, flash, capture, and command service. |
 | `runtime/runtime_session.sh` | Process lifecycle and atomic command/result transport. |
+| `runtime/trigger.ini` | Default rising-edge host trigger condition. |
