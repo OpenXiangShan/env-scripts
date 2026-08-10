@@ -1,7 +1,6 @@
 UVHS_ROOT_DIR := $(abspath $(dir $(lastword $(MAKEFILE_LIST)))/..)
 UVHS_COMPILATION_DIR := $(UVHS_ROOT_DIR)/uvhs/compilation
 UVHS_RUNTIME_DIR := $(UVHS_ROOT_DIR)/uvhs/runtime
-TRIGGER ?= $(UVHS_RUNTIME_DIR)/trigger.ini
 
 UVHS_TEMPLATE_DIR ?=
 UVHS_UVW_AXI4_TO_DDR4_SRC ?=

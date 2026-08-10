@@ -1209,7 +1209,7 @@ fpga_top_debug.core_def.U_CPU_TOP.u_XSTop.soc.core_with_l2.l2top.auto_inner_xbar
 fpga_top_debug.core_def.U_CPU_TOP.u_XSTop.soc.core_with_l2.l2top.auto_inner_xbar_in_0_e_bits_sink \
 fpga_top_debug.core_def.io_host_ila_trigger \
 }
-trigger_net -add -group uvhs_ila \
+trigger_net -add -group test0 \
 -clock fpga_top_debug.core_def.sys_clk_i \
 -signal { \
 fpga_top_debug.core_def.io_host_ila_trigger \

@@ -203,18 +203,18 @@ runs `trigger_probe -check` after runtime-data initialization and
 `trigger_probe -group` after clock transformation, which inserts and groups the
 debug hardware before partitioning.
 
-At runtime, `uvhs_ila_arm` uses `runtime/trigger.ini` by default. Set `TRIGGER`
-to another condition file using the group and signal names reported by
-`query -trigger`:
+At runtime, `runtime/trigger.ini` matches the `test0` group in
+`probe_kmh.tcl`. Use another condition file for another probe profile, based
+on the group and signal names reported by `query -trigger`:
 
 ```ini
-[uvhs_ila]
+[test0]
 LOGIC = OR
 fpga_top_debug.core_def.io_host_ila_trigger = R
 
 [UHD_FINAL_CONDITIONS_LOGIC]
 LOGIC = OR
-uvhs_ila
+test0
 ```
 
 Waveform capture is split around the host run. `uvhs_ila_arm` validates and
@@ -248,7 +248,9 @@ CPU and the requested history precedes the host trigger:
 ```sh
 export FPGA_ILA_DUMP_CMD='ssh <runtime-host> \
   "make -C /path/to/env-scripts/fpga_diff uvhs_ila_arm \
-  CPU=<design> SUFFIX=<tag> UVHS_ILA_POSITION=0"'
+  CPU=<design> SUFFIX=<tag> \
+  TRIGGER=/path/to/env-scripts/fpga_diff/uvhs/runtime/trigger.ini \
+  UVHS_ILA_POSITION=0"'
 
 /path/to/fpga-host <host arguments>
 
@@ -361,4 +363,4 @@ before the UVHS timing worker reads it.
 | `runtime/uv_shell_exec_compat.sh` | Runtime library wrapper for UVHS shells and generated Python workers. |
 | `runtime/runtime_server.tcl` | Download, reset, DDR, flash, capture, and command service. |
 | `runtime/runtime_session.sh` | Process lifecycle and atomic command/result transport. |
-| `runtime/trigger.ini` | Default rising-edge host trigger condition. |
+| `runtime/trigger.ini` | KMH rising-edge host trigger condition. |
