@@ -110,7 +110,7 @@ make uvhs_write_ddr CPU=<design> SUFFIX=<tag> WORKLOAD=/path/to/image.txt
 make uvhs_write_flash CPU=<design> SUFFIX=<tag> WORKLOAD=/path/to/image.bin
 make uvhs_reset_cpu CPU=<design> SUFFIX=<tag>
 make uvhs_ila_arm CPU=<design> SUFFIX=<tag> TRIGGER=/path/to/trigger.ini
-make uvhs_ila CPU=<design> SUFFIX=<tag>
+make uvhs_ila_upload CPU=<design> SUFFIX=<tag>
 make uvhs_vcd CPU=<design> SUFFIX=<tag>
 make uvhs_ila_clear CPU=<design> SUFFIX=<tag>
 make uvhs_runtime_stop CPU=<design> SUFFIX=<tag>
@@ -157,15 +157,19 @@ from the server's global Tcl scope.
 
 The probe scripts describe compile-time instrumentation, not a runtime dump.
 The frontend sources `compilation/probe_ila.tcl` by default. It samples only
-the XDMA host trigger on `core_def.sys_clk_i`. `compilation/probe_kmh.tcl` is
-the larger XiangShan profile used by the 2026-08-04 and 2026-08-07 debug
-builds. Its generated hierarchy must be checked before it is reused with a
-different XiangShan RTL revision. The braces preserve hierarchy indexes such
-as `[0]`. Set `UVHS_PROBE_TCL` to select a profile or an external file; an
-override must retain the XDMA host trigger if host-controlled capture is
-required. Set it to an empty value for a build with no UHD instrumentation.
-The scripts call `probe_net` for sampled signals and `trigger_net` for signals
-that may participate in a trigger condition.
+the XDMA host trigger on the free-running `core_def.sys_clk_i` parent clock.
+`compilation/probe_kmh.tcl` is the larger XiangShan profile derived from the
+2026-08-04 and 2026-08-07 debug builds. CPU and L2 signals are sampled on
+`core_def.inter_soc_clk`, the gated clock connected to `SimTop.clock`. DDR and
+host-trigger signals remain on their free-running `core_def.sys_clk_i` domain,
+so the host trigger remains observable after the CPU clock stops. Its generated
+hierarchy must be checked before it is reused with a different XiangShan RTL
+revision. The braces preserve hierarchy indexes such as `[0]`.
+Set `UVHS_PROBE_TCL` to select a profile or an external file; an override must
+retain the XDMA host trigger if host-controlled capture is required. Set it to
+an empty value for a build with no UHD instrumentation. The scripts call
+`probe_net` for sampled signals and `trigger_net` for signals that may
+participate in a trigger condition.
 
 ```tcl
 set uvhs_ila_clock_path [string trim {
@@ -219,8 +223,8 @@ test0
 
 Waveform capture is split around the host run. `uvhs_ila_arm` validates and
 installs the trigger condition, starts capture, and returns immediately. It
-does not reset or release the CPU. `uvhs_ila` waits for an armed trigger,
-uploads the UHD data, reconstructs the waveform database, and calls
+does not reset or release the CPU. `uvhs_ila_upload` waits for an armed
+trigger, uploads the UHD data, reconstructs the waveform database, and calls
 `uvhs_vcd`. The standalone `uvhs_vcd` target repeats only the USDB-to-VCD
 conversion. The commands create both files below the selected build directory:
 
@@ -233,11 +237,16 @@ The corresponding UVHS runtime sequence is:
 
 ```tcl
 trigger -ini_check /path/to/trigger.ini
+query -capture
+config -clock -name clk5_p -frequency <bandwidth-limited-frequency>
+config -clock -commit
+trigger -set -gatedclk fpga_top_debug.core_def.inter_soc_clk \
+  -frequency <bandwidth-limited-frequency> -polarity H
 trigger -set -condition /path/to/trigger.ini -position 0
 capture -enable
 trigger -enable
 trigger -status -wait 1 -timeout 60
-upload_uhd -depth 1000000 -position 0 -out uvhs_ila
+upload_uhd -depth 1000000 -position 0 -clock clk5_p -out uvhs_ila
 ```
 
 The FPGA host clears `HOST_IO_ILA_TRIGGER`, invokes `FPGA_ILA_DUMP_CMD`, and
@@ -250,12 +259,13 @@ export FPGA_ILA_DUMP_CMD='ssh <runtime-host> \
   "make -C /path/to/env-scripts/fpga_diff uvhs_ila_arm \
   CPU=<design> SUFFIX=<tag> \
   TRIGGER=/path/to/env-scripts/fpga_diff/uvhs/runtime/trigger.ini \
-  UVHS_ILA_POSITION=0"'
+  UVHS_ILA_POSITION=0 \
+  UVHS_ILA_GATED_CLOCK=fpga_top_debug.core_def.inter_soc_clk"'
 
 /path/to/fpga-host <host arguments>
 
 # Run on the runtime host after fpga-host exits.
-make uvhs_ila CPU=<design> SUFFIX=<tag>
+make uvhs_ila_upload CPU=<design> SUFFIX=<tag>
 ```
 
 The arm command must use the same runtime work directory as
@@ -279,7 +289,7 @@ debug-command latency rather than DUT cycle time. A large probe set can still
 lower the achievable clock frequency indirectly by adding routing and timing
 pressure during compilation.
 The runtime command service is serial, so `uvhs_ila_clear` is handled after an
-in-flight `uvhs_ila` wait reaches its trigger or timeout; it is not an
+in-flight `uvhs_ila_upload` wait reaches its trigger or timeout; it is not an
 asynchronous interrupt for the current wait.
 
 The USDB-to-VCD step is equivalent to:
@@ -294,8 +304,9 @@ The upload window is controlled when starting the capture:
 
 ```sh
 make uvhs_ila_arm CPU=<design> SUFFIX=<tag> TRIGGER=/path/to/trigger.ini \
-  UVHS_ILA_POSITION=0
-make uvhs_ila CPU=<design> SUFFIX=<tag> UVHS_ILA_DEPTH=1000000
+  UVHS_ILA_POSITION=0 \
+  UVHS_ILA_GATED_CLOCK=fpga_top_debug.core_def.inter_soc_clk
+make uvhs_ila_upload CPU=<design> SUFFIX=<tag> UVHS_ILA_DEPTH=1000000
 ```
 
 `UVHS_ILA_DEPTH` is the total uploaded sample count. `UVHS_ILA_POSITION` is the
@@ -303,16 +314,26 @@ percentage after the trigger, from 0 through 100. Position 0, the default,
 keeps the window before the trigger; 50 centers it; 100 keeps the window after
 the trigger. Position 0 requests no intentional post-trigger allocation, but
 the trigger-recognition and capture-stop pipeline can still leave a small tail
-after the sampled trigger edge. `UVHS_ILA_CLOCK` can select the depth-counting
-clock by a runtime-database global clock name or a frequency; when empty, the
-tool uses its 200 MHz TS clock. If the compile-time sampling path is a gated
-clock, pass
-its backend clock path through `UVHS_ILA_GATED_CLOCK`; its frequency defaults
-to 25 MHz and can be changed with `UVHS_ILA_GATED_CLOCK_FREQUENCY`. Prefer the
-ungated parent clock in new probe files so capture completion does not depend
-on DUT clock-gate state. `UVHS_ILA_TIMEOUT` defaults to 60 seconds. This is the
-UVHS UHD path; the normal Vivado flow continues to use `make dump_ila` and a
-`.ltx` file.
+after the sampled trigger edge. `UVHS_ILA_CLOCK` selects the global clock used
+to count upload depth and defaults to the CPU parent `clk5_p`.
+
+Before arming, the runtime counts enabled capture stations on each FPGA. It
+limits `UVHS_ILA_CLOCK` to 90 percent of the documented 102.336 Gbit/s per-FPGA
+UHD bandwidth, using 512 bits per capture station and clock cycle. The original
+sign-off frequency is restored after upload, after an arm failure, or by
+`uvhs_ila_clear`.
+
+If the compile-time sampling path is gated, pass its RTL path through
+`UVHS_ILA_GATED_CLOCK`. The runtime registers that path at the automatically
+selected capture frequency before installing the trigger. This makes the KMH
+capture stations advance on actual `inter_soc_clk` edges, so clock-gated
+intervals do not consume station samples. The vendor documents gated-clock
+capture as approximate when the clock stops or changes frequency; the trigger
+must also eventually receive a gated-clock edge. Use the free-running parent
+clock for trigger-only profiles that must remain observable while the CPU
+clock is stopped. `UVHS_ILA_TIMEOUT` defaults to 60 seconds. This is the UVHS
+UHD path; the normal Vivado flow continues to use `make dump_ila` and an `.ltx`
+file.
 
 UHD capture inserts its own external DDR wrapper on every FPGA containing a
 probe group. The four PDDR4DME cards on the FPGA FMC3 connectors are reserved

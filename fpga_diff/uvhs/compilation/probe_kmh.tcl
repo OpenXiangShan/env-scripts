@@ -1,4 +1,4 @@
-# KMH probe profile used by the 2026-08-04 and 2026-08-07 debug builds.
+# KMH probe paths derived from the 2026-08-04 and 2026-08-07 debug builds.
 # Signal paths must be checked when the generated XiangShan hierarchy changes.
 probe_net -clock {fpga_top_debug.core_def.sys_clk_i} -add { \
 fpga_top_debug.core_def.U_UVHS_UVW_AXI4_TO_DDR4.ddr4ip_dut_axi_awaddr \
@@ -27,8 +27,9 @@ fpga_top_debug.core_def.U_UVHS_UVW_AXI4_TO_DDR4.ddr4ip_dut_axi_rready \
 fpga_top_debug.core_def.U_UVHS_UVW_AXI4_TO_DDR4.ddr4ip_dut_axi_rresp \
 fpga_top_debug.core_def.U_UVHS_UVW_AXI4_TO_DDR4.ddr4ip_dut_axi_rvalid \
 fpga_top_debug.core_def.U_UVHS_UVW_AXI4_TO_DDR4.ddr4ip_dut_axi_rid \
+fpga_top_debug.core_def.io_host_ila_trigger \
 }
-probe_net -clock {fpga_top_debug.core_def.sys_clk_i} -add { \
+probe_net -clock {fpga_top_debug.core_def.inter_soc_clk} -add { \
 fpga_top_debug.core_def.U_CPU_TOP.u_XSTop.soc.core_with_l2.core.backend.inner_intExuBlock.exus_7.csr.io_csrio_tlb_satp_mode[3:0] \
 fpga_top_debug.core_def.U_CPU_TOP.u_XSTop.soc.core_with_l2.core.backend.inner_intExuBlock.exus_7.csr.io_csrio_tlb_satp_asid[15:0] \
 fpga_top_debug.core_def.U_CPU_TOP.u_XSTop.soc.core_with_l2.core.backend.inner_intExuBlock.exus_7.csr.io_csrio_tlb_vsatp_mode[3:0] \
@@ -1207,7 +1208,6 @@ fpga_top_debug.core_def.U_CPU_TOP.u_XSTop.soc.core_with_l2.l2top.auto_inner_xbar
 fpga_top_debug.core_def.U_CPU_TOP.u_XSTop.soc.core_with_l2.l2top.auto_inner_xbar_in_0_e_ready \
 fpga_top_debug.core_def.U_CPU_TOP.u_XSTop.soc.core_with_l2.l2top.auto_inner_xbar_in_0_e_valid \
 fpga_top_debug.core_def.U_CPU_TOP.u_XSTop.soc.core_with_l2.l2top.auto_inner_xbar_in_0_e_bits_sink \
-fpga_top_debug.core_def.io_host_ila_trigger \
 }
 trigger_net -add -group test0 \
 -clock fpga_top_debug.core_def.sys_clk_i \

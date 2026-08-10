@@ -30,9 +30,8 @@ UVHS_RUNTIME_TIMEOUT ?= 600
 UVHS_ILA_TIMEOUT ?= 60
 UVHS_ILA_DEPTH ?= 1000000
 UVHS_ILA_POSITION ?= 0
-UVHS_ILA_CLOCK ?=
+UVHS_ILA_CLOCK ?= clk5_p
 UVHS_ILA_GATED_CLOCK ?=
-UVHS_ILA_GATED_CLOCK_FREQUENCY ?= 25000000
 UVHS_ILA_DIR := $(UVHS_RUNTIME_WORK_DIR)/UHD/uvhs_ila
 UVHS_ILA_USDB := $(UVHS_ILA_DIR)/UvData.usdb
 UVHS_ILA_VCD := $(UVHS_ILA_DIR)/UvData.vcd
@@ -56,7 +55,7 @@ UVHS_FLOW_ENV = \
 .PHONY: uvhs uvhs_preflight uvhs_prepare \
 	uvhs_frontend uvhs_backend uvhs_clean uvhs_write_bitstream \
 	uvhs_halt_soc uvhs_reset_cpu uvhs_write_ddr uvhs_write_flash \
-	uvhs_ila_arm uvhs_ila uvhs_vcd uvhs_ila_clear \
+	uvhs_ila_arm uvhs_ila_upload uvhs_vcd uvhs_ila_clear \
 	uvhs_runtime_status uvhs_runtime_stop
 
 # Validate host tools and external inputs before starting a multi-hour build.
@@ -178,11 +177,10 @@ uvhs_ila_arm:
 	test -f "$(TRIGGER)"
 	$(call uvhs_runtime_command,ila_arm \
 		"$(abspath $(TRIGGER))" "$(UVHS_ILA_POSITION)" \
-		"$(UVHS_ILA_GATED_CLOCK)" \
-		"$(UVHS_ILA_GATED_CLOCK_FREQUENCY)")
+		"$(UVHS_ILA_CLOCK)" "$(UVHS_ILA_GATED_CLOCK)")
 
-uvhs_ila:
-	$(call uvhs_runtime_command,ila_wait uvhs_ila \
+uvhs_ila_upload:
+	$(call uvhs_runtime_command,ila_upload uvhs_ila \
 		"$(UVHS_ILA_TIMEOUT)" "$(UVHS_ILA_DEPTH)" \
 		"$(UVHS_ILA_CLOCK)")
 	test -s "$(UVHS_ILA_USDB)"

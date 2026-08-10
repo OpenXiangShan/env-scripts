@@ -236,8 +236,103 @@ proc uvhs_write_ddr_pairs {input_file rtl_path data_width} {
     puts "INFO: DDR backdoor write completed: $input_file"
 }
 
+proc uvhs_query_clock_frequency {clock} {
+    set frequencies {}
+    foreach line [split [query -clock -tclobj] "\n"] {
+        set fields [regexp -all -inline {\S+} $line]
+        if {[llength $fields] >= 6 && [lindex $fields 4] eq $clock &&
+            [string is double -strict [lindex $fields 3]]} {
+            lappend frequencies [expr {
+                round(double([lindex $fields 3]) * 1000000.0)
+            }]
+        }
+    }
+    set frequencies [lsort -integer -unique $frequencies]
+    if {[llength $frequencies] != 1} {
+        error "expected one frequency for capture clock $clock, got $frequencies"
+    }
+    return [lindex $frequencies 0]
+}
+
+proc uvhs_capture_station_counts {} {
+    set counts {}
+    foreach line [split [query -capture -tclobj] "\n"] {
+        set fields [regexp -all -inline {\S+} $line]
+        if {[llength $fields] < 5 ||
+            ![regexp -nocase {^B[0-9]+$} [lindex $fields 0]] ||
+            ![regexp -nocase {^F[0-9]+$} [lindex $fields 1]] ||
+            ![string is integer -strict [lindex $fields 2]] ||
+            [string tolower [lindex $fields 3]] ni {no false 0}} {
+            continue
+        }
+        set fpga [format "%s.%s" \
+            [string toupper [lindex $fields 0]] \
+            [string toupper [lindex $fields 1]]]
+        dict incr counts $fpga
+    }
+    if {[dict size $counts] == 0} {
+        error "no enabled UHD capture stations found"
+    }
+    return $counts
+}
+
+proc uvhs_restore_ila_clock {} {
+    if {![info exists ::uvhs_ila_original_clock_frequency]} {
+        return
+    }
+    set clock $::uvhs_ila_clock
+    set frequency $::uvhs_ila_original_clock_frequency
+    if {[info exists ::uvhs_ila_adjusted_clock] && $::uvhs_ila_adjusted_clock} {
+        puts "INFO: restoring $clock to $frequency Hz"
+        config -clock -name $clock -frequency $frequency
+        config -clock -commit
+        query -clock
+    }
+    unset -nocomplain ::uvhs_ila_clock ::uvhs_ila_original_clock_frequency
+    unset -nocomplain ::uvhs_ila_adjusted_clock
+}
+
+proc uvhs_prepare_ila_clock {clock} {
+    uvhs_restore_ila_clock
+    set original_frequency [uvhs_query_clock_frequency $clock]
+    set station_counts [uvhs_capture_station_counts]
+    set max_station_count 0
+    dict for {fpga station_count} $station_counts {
+        if {$station_count > $max_station_count} {
+            set max_station_count $station_count
+        }
+    }
+
+    # UVHS allows 102.336 Gbit/s per FPGA. Keep ten percent headroom for
+    # frequency rounding and runtime database differences.
+    set bandwidth_limit 102336000000
+    set target_frequency [expr {
+        ($bandwidth_limit * 9) / (10 * 512 * $max_station_count)
+    }]
+    set applied_frequency [expr {
+        $original_frequency < $target_frequency ?
+            $original_frequency : $target_frequency
+    }]
+    set ::uvhs_ila_clock $clock
+    set ::uvhs_ila_original_clock_frequency $original_frequency
+    set ::uvhs_ila_adjusted_clock [expr {
+        $applied_frequency < $original_frequency
+    }]
+
+    puts "INFO: UHD capture stations per FPGA: $station_counts"
+    puts [format \
+        "INFO: UHD capture clock %s: signoff=%d Hz, limit=%d Hz, applied=%d Hz" \
+        $clock $original_frequency $target_frequency $applied_frequency]
+    if {$::uvhs_ila_adjusted_clock} {
+        config -clock -name $clock -frequency $applied_frequency
+        config -clock -commit
+        query -clock
+    }
+    return $applied_frequency
+}
+
 proc uvhs_ila_arm {
-    trigger_file position gated_clock gated_clock_frequency
+    trigger_file position clock gated_clock
 } {
     if {![file isfile $trigger_file]} {
         error "trigger condition file not found: $trigger_file"
@@ -246,30 +341,35 @@ proc uvhs_ila_arm {
     if {$position < 0 || $position > 100} {
         error "capture position must be between 0 and 100: $position"
     }
-    if {$gated_clock ne ""} {
-        set gated_clock_frequency [uvhs_parse_integer \
-            "gated capture clock frequency" $gated_clock_frequency]
-        if {$gated_clock_frequency <= 0} {
-            error "gated capture clock frequency must be positive"
-        }
+    if {$clock eq ""} {
+        error "capture clock is empty"
     }
 
     unset -nocomplain ::uvhs_ila_position
     trigger -clear
     query -trigger
     trigger -ini_check $trigger_file
-    if {$gated_clock ne ""} {
-        trigger -set -gatedclk $gated_clock \
-            -frequency $gated_clock_frequency -polarity H
+    set status [catch {
+        set capture_frequency [uvhs_prepare_ila_clock $clock]
+        if {$gated_clock ne ""} {
+            trigger -set -gatedclk $gated_clock \
+                -frequency $capture_frequency -polarity H
+        }
+        trigger -set -condition $trigger_file -position $position
+        capture -enable
+        trigger -enable
+    } message options]
+    if {$status != 0} {
+        if {[catch {uvhs_restore_ila_clock} restore_message]} {
+            append message "\nfailed to restore capture clock: $restore_message"
+        }
+        return -options $options $message
     }
-    trigger -set -condition $trigger_file -position $position
-    capture -enable
-    trigger -enable
     set ::uvhs_ila_position $position
     puts "INFO: UVHS waveform capture armed at position $position"
 }
 
-proc uvhs_ila_wait {output_name timeout depth clock} {
+proc uvhs_ila_upload {output_name timeout depth clock} {
     if {![info exists ::uvhs_ila_position]} {
         error "UVHS waveform capture is not armed; run ila_arm first"
     }
@@ -281,34 +381,52 @@ proc uvhs_ila_wait {output_name timeout depth clock} {
     if {$timeout <= 0 || $depth <= 0} {
         error "capture timeout and depth must be positive"
     }
-
-    set trigger_status [trigger -status -wait 1 -timeout $timeout -tclobj]
-    puts "INFO: UVHS trigger status: $trigger_status"
-    if {![regexp -nocase {Waveform Data Ready\s+true} $trigger_status]} {
-        error "UVHS waveform data is not ready"
+    if {$clock eq ""} {
+        error "capture clock is empty"
+    }
+    if {[info exists ::uvhs_ila_clock] && $clock ne $::uvhs_ila_clock} {
+        error "upload clock $clock does not match armed clock $::uvhs_ila_clock"
     }
 
-    set output_dir [file join [uvhs_prepare_uhd_root] $output_name]
-    file delete -force $output_dir
-    set upload_options [list -depth $depth \
-        -position $::uvhs_ila_position]
-    if {$clock ne ""} {
-        lappend upload_options -clock $clock
-    }
-    lappend upload_options -out $output_name
-    upload_uhd {*}$upload_options
-    wavegen -bindir [file join UHD $output_name]
+    set status [catch {
+        set trigger_status [trigger -status -wait 1 -timeout $timeout -tclobj]
+        puts "INFO: UVHS trigger status: $trigger_status"
+        if {![regexp -nocase {Waveform Data Ready\s+true} $trigger_status]} {
+            error "UVHS waveform data is not ready"
+        }
 
-    set usdb [file join $output_dir UvData.usdb]
-    if {![file exists $usdb] || [file size $usdb] == 0} {
-        error "UVHS waveform database was not generated: $usdb"
+        set output_dir [file join [uvhs_prepare_uhd_root] $output_name]
+        file delete -force $output_dir
+        set upload_options [list -depth $depth \
+            -position $::uvhs_ila_position -clock $clock -out $output_name]
+        upload_uhd {*}$upload_options
+        wavegen -bindir [file join UHD $output_name]
+
+        set usdb [file join $output_dir UvData.usdb]
+        if {![file exists $usdb] || [file size $usdb] == 0} {
+            error "UVHS waveform database was not generated: $usdb"
+        }
+        puts "INFO: UVHS waveform database generated: $usdb"
+    } message options]
+    set restore_status [catch {uvhs_restore_ila_clock} restore_message restore_options]
+    if {$status != 0} {
+        return -options $options $message
     }
-    puts "INFO: UVHS waveform database generated: $usdb"
+    if {$restore_status != 0} {
+        return -options $restore_options $restore_message
+    }
 }
 
 proc uvhs_ila_clear {} {
-    trigger -clear
+    set status [catch {trigger -clear} message options]
+    set restore_status [catch {uvhs_restore_ila_clock} restore_message restore_options]
     unset -nocomplain ::uvhs_ila_position
+    if {$status != 0} {
+        return -options $options $message
+    }
+    if {$restore_status != 0} {
+        return -options $restore_options $restore_message
+    }
     puts "INFO: UVHS trigger conditions and capture are disabled"
 }
 
@@ -342,9 +460,9 @@ proc uvhs_execute_command {args} {
             if {[llength $args] != 5} { error "ila_arm expects 4 arguments" }
             uvhs_ila_arm {*}[lrange $args 1 4]
         }
-        ila_wait {
-            if {[llength $args] != 5} { error "ila_wait expects 4 arguments" }
-            uvhs_ila_wait {*}[lrange $args 1 4]
+        ila_upload {
+            if {[llength $args] != 5} { error "ila_upload expects 4 arguments" }
+            uvhs_ila_upload {*}[lrange $args 1 4]
         }
         ila_clear {
             if {[llength $args] != 1} { error "ila_clear expects no arguments" }
