@@ -88,6 +88,36 @@ moves only the complete functional AXI-to-DDR IP to F3/FMC3. The target keeps
 F2 and F3, selects `partition_capture_ddr_f3.tcl`, and localizes the gated SoC
 clock used by the CPU side of the cross-FPGA memory path.
 
+For passive NutShell commit tracing into two dedicated DDR channels, use:
+
+```sh
+make uvhs_hejian_pcie_x4_nutshell_trace_all \
+  CORE_DIR=/path/to/NutShell SUFFIX=<trace-tag>
+```
+
+This three-FPGA target keeps the CPU, XDMA, and trace channel 0 on F2, places
+trace channel 1 on F1, and moves the unchanged functional DDR IP to F3. Trace
+FIFO readiness is deliberately not connected back to NutShell: a full FIFO
+drops the current record, whose sequence number exposes the gap, instead of
+stalling CPU execution. The two trace DDRs retain the accepted records for
+UVHS runtime `readmem` access.
+
+For XiangShan `FpgaDiffDefaultConfig`, build the corresponding passive ROB
+snapshot target with:
+
+```sh
+make uvhs_hejian_pcie_x4_xiangshan_trace_all \
+  CORE_DIR=/path/to/XiangShan/FpgaDiffDefaultConfig/generated-release \
+  SUFFIX=<trace-tag>
+```
+
+This target uses the same F2/F1 trace-channel placement. XiangShan exposes a
+256-bit functional DDR AXI interface, so a lossless 80-bit ready/valid packet
+link keeps XiangShan, XDMA, and trace channel 0 on F2 while placing the
+functional DDR controller on F3. AXI backpressure is preserved by the link;
+trace readiness remains passive and cannot stall the CPU. The wrapper's ROB
+hierarchy is specific to generated `FpgaDiffDefaultConfig` RTL.
+
 The template creates the `uvhs_control` and `uvhs_c2h` trigger groups in their
 respective clock domains. Set `UVHS_ENABLE_TRIGGER_NET=0` for probes without
 trigger groups. These groups expose trigger-capable signals; runtime capture

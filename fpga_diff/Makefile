@@ -63,7 +63,9 @@ UVHS_FORWARD_TARGETS := \
 	uvhs_clean uvhs_env uvhs_preflight uvhs_hejian_pcie_x4_env \
 	uvhs_hejian_pcie_x4_preflight uvhs_hejian_pcie_x4_nutshell_all \
 	uvhs_hejian_pcie_x4_nutshell_probe_all \
+	uvhs_hejian_pcie_x4_nutshell_trace_all \
 	uvhs_hejian_pcie_x4_xiangshan_all \
+	uvhs_hejian_pcie_x4_xiangshan_trace_all \
 	uvhs_status uvhs_check_timing_clean uvhs_export_ltx \
 	uvhs_package_bitstream
 

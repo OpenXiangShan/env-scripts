@@ -51,6 +51,8 @@ UVHS_AXI_BRIDGE_DCP ?=
 UVHS_AXI_BRIDGE_DCP_SHA256 ?=
 UVHS_REQUIRED_DCP_MODULES ?= blk_mem_gen_0 AXI_bridge data_bridge vio_0 xdma_ep uvw_axi4_to_ddr4
 UVHS_UVW_AXI4_TO_DDR4_RTL_INST ?= $(UVHS_TOP).core_def.U_UVHS_UVW_AXI4_TO_DDR4
+UVHS_ENABLE_CPU_TRACE_AXI_DDR ?= 0
+UVHS_ENABLE_FUNCTIONAL_DDR_REMOTE_LINK ?= 0
 UVHS_FRONTEND_TCL ?= $(ROOT_DIR)/uvhs/frontend_run.tcl
 UVHS_SKIP_BOARD_CONSTRAINTS ?= 0
 UVHS_PIN_OVERRIDE_FILE ?=
@@ -77,6 +79,7 @@ UVHS_TARGET_PACK ?= $(UVHS_TARGET_BOARD)
 UVHS_TARGET_FPGA ?= F2
 UVHS_TARGET_FPGA_LOWER ?= $(shell printf '%s.%s' '$(UVHS_TARGET_PACK)' '$(UVHS_TARGET_FPGA)' | tr '[:upper:]' '[:lower:]')
 UVHS_FPGA_COUNT ?= 1
+UVHS_EXPECTED_FPGA_COUNT ?= 1
 UVHS_KEEP_FPGAS ?= $(UVHS_TARGET_FPGA_LOWER)
 UVHS_UART0_CONNECTOR ?= b0.F2_APC16
 UVHS_UART0_TX_INDEX ?= 117
@@ -95,7 +98,7 @@ UVHS_COMPILE_STRATEGY0 ?= uv_high_fanout_explore
 UVHS_COMPILE_STRATEGY1 ?=
 UVHS_COMPILE_STRATEGY2 ?=
 export UVHS_PNR_STRATEGY UVHS_COMPILE_STRATEGY_NUM UVHS_COMPILE_STRATEGY0 UVHS_COMPILE_STRATEGY1 UVHS_COMPILE_STRATEGY2
-UVHS_HEJIAN_FLOW_ENV = XDMA_LINK_WIDTH="$(XDMA_LINK_WIDTH)" XDMA_ENABLE_PF0_BAR1="$(XDMA_ENABLE_PF0_BAR1)" XDMA_AXILITE_MASTER_SCALE="$(XDMA_AXILITE_MASTER_SCALE)" XDMA_AXILITE_MASTER_SIZE="$(XDMA_AXILITE_MASTER_SIZE)" XDMA_EXPECTED_VENDOR="$(XDMA_EXPECTED_VENDOR)" XDMA_EXPECTED_DEVICE="$(XDMA_EXPECTED_DEVICE)" XDMA_EXPECTED_BAR0_SIZE="$(XDMA_EXPECTED_BAR0_SIZE)" XDMA_EXPECTED_BAR1_SIZE="$(XDMA_EXPECTED_BAR1_SIZE)" UVHS_BASE_ASSEMBLE_FILE="$(UVHS_BASE_ASSEMBLE_FILE)" UVHS_BASE_ASSEMBLE_SHA256="$(UVHS_BASE_ASSEMBLE_SHA256)" UVHS_XDMA_EP_EXPECTED_VIVADO="$(UVHS_XDMA_EP_EXPECTED_VIVADO)" UVHS_ALLOW_DCP_VIVADO_MISMATCH="$(UVHS_ALLOW_DCP_VIVADO_MISMATCH)" UVHS_DESIGN_NAME="$(UVHS_DESIGN_NAME)" PLATFORM="$(PLATFORM)" UVHS_TARGET_BOARD="$(UVHS_TARGET_BOARD)" UVHS_TARGET_PACK="$(UVHS_TARGET_PACK)" UVHS_TARGET_FPGA="$(UVHS_TARGET_FPGA)" UVHS_TARGET_FPGA_LOWER="$(UVHS_TARGET_FPGA_LOWER)" UVHS_FPGA_COUNT="$(UVHS_FPGA_COUNT)" UVHS_KEEP_FPGAS="$(UVHS_KEEP_FPGAS)" UVHS_UART0_CONNECTOR="$(UVHS_UART0_CONNECTOR)" UVHS_UART0_TX_INDEX="$(UVHS_UART0_TX_INDEX)" UVHS_UART0_RX_INDEX="$(UVHS_UART0_RX_INDEX)" UVHS_TIME_GROUP_IO_LOGIC="$(UVHS_TIME_GROUP_IO_LOGIC)" UVHS_LOCALIZE_CLOCKS="$(UVHS_LOCALIZE_CLOCKS)" UVHS_CPU_CLK_PERIOD_NS="$(UVHS_CPU_CLK_PERIOD_NS)" UVHS_CPU_DEBUG_CLK="$(UVHS_CPU_DEBUG_CLK)" UVHS_PNR_STRATEGY="$(UVHS_PNR_STRATEGY)" UVHS_COMPILE_STRATEGY_NUM="$(UVHS_COMPILE_STRATEGY_NUM)" UVHS_COMPILE_STRATEGY0="$(UVHS_COMPILE_STRATEGY0)" UVHS_COMPILE_STRATEGY1="$(UVHS_COMPILE_STRATEGY1)" UVHS_COMPILE_STRATEGY2="$(UVHS_COMPILE_STRATEGY2)"
+UVHS_HEJIAN_FLOW_ENV = XDMA_LINK_WIDTH="$(XDMA_LINK_WIDTH)" XDMA_ENABLE_PF0_BAR1="$(XDMA_ENABLE_PF0_BAR1)" XDMA_AXILITE_MASTER_SCALE="$(XDMA_AXILITE_MASTER_SCALE)" XDMA_AXILITE_MASTER_SIZE="$(XDMA_AXILITE_MASTER_SIZE)" XDMA_EXPECTED_VENDOR="$(XDMA_EXPECTED_VENDOR)" XDMA_EXPECTED_DEVICE="$(XDMA_EXPECTED_DEVICE)" XDMA_EXPECTED_BAR0_SIZE="$(XDMA_EXPECTED_BAR0_SIZE)" XDMA_EXPECTED_BAR1_SIZE="$(XDMA_EXPECTED_BAR1_SIZE)" UVHS_BASE_ASSEMBLE_FILE="$(UVHS_BASE_ASSEMBLE_FILE)" UVHS_BASE_ASSEMBLE_SHA256="$(UVHS_BASE_ASSEMBLE_SHA256)" UVHS_XDMA_EP_EXPECTED_VIVADO="$(UVHS_XDMA_EP_EXPECTED_VIVADO)" UVHS_ALLOW_DCP_VIVADO_MISMATCH="$(UVHS_ALLOW_DCP_VIVADO_MISMATCH)" UVHS_DESIGN_NAME="$(UVHS_DESIGN_NAME)" PLATFORM="$(PLATFORM)" UVHS_TARGET_BOARD="$(UVHS_TARGET_BOARD)" UVHS_TARGET_PACK="$(UVHS_TARGET_PACK)" UVHS_TARGET_FPGA="$(UVHS_TARGET_FPGA)" UVHS_TARGET_FPGA_LOWER="$(UVHS_TARGET_FPGA_LOWER)" UVHS_FPGA_COUNT="$(UVHS_FPGA_COUNT)" UVHS_EXPECTED_FPGA_COUNT="$(UVHS_EXPECTED_FPGA_COUNT)" UVHS_KEEP_FPGAS="$(UVHS_KEEP_FPGAS)" UVHS_UART0_CONNECTOR="$(UVHS_UART0_CONNECTOR)" UVHS_UART0_TX_INDEX="$(UVHS_UART0_TX_INDEX)" UVHS_UART0_RX_INDEX="$(UVHS_UART0_RX_INDEX)" UVHS_TIME_GROUP_IO_LOGIC="$(UVHS_TIME_GROUP_IO_LOGIC)" UVHS_LOCALIZE_CLOCKS="$(UVHS_LOCALIZE_CLOCKS)" UVHS_CPU_CLK_PERIOD_NS="$(UVHS_CPU_CLK_PERIOD_NS)" UVHS_CPU_DEBUG_CLK="$(UVHS_CPU_DEBUG_CLK)" UVHS_PNR_STRATEGY="$(UVHS_PNR_STRATEGY)" UVHS_COMPILE_STRATEGY_NUM="$(UVHS_COMPILE_STRATEGY_NUM)" UVHS_COMPILE_STRATEGY0="$(UVHS_COMPILE_STRATEGY0)" UVHS_COMPILE_STRATEGY1="$(UVHS_COMPILE_STRATEGY1)" UVHS_COMPILE_STRATEGY2="$(UVHS_COMPILE_STRATEGY2)"
 UVHS_PNR_DIR ?= $(UVHS_WORK_DIR)/hw.dat/Compile/PnR/$(UVHS_TARGET_PACK)/$(UVHS_TARGET_FPGA)/vivado/Rundir/$(UVHS_PNR_STRATEGY)
 UVHS_BITSTREAM_DIR ?= $(UVHS_PNR_DIR)/bitstream
 UVHS_LTX ?= $(UVHS_BITSTREAM_DIR)/fpga_top_debug.ltx
@@ -109,7 +112,9 @@ UVHS_RESOLVED_BITSTREAM_DIR = $$(summary="$(UVHS_BITSTREAM_DIR)/after_xtalk_fix_
 	uvhs_clean uvhs_env uvhs_preflight uvhs_hejian_pcie_x4_env \
 	uvhs_hejian_pcie_x4_preflight uvhs_hejian_pcie_x4_nutshell_all \
 	uvhs_hejian_pcie_x4_nutshell_probe_all \
+	uvhs_hejian_pcie_x4_nutshell_trace_all \
 	uvhs_hejian_pcie_x4_xiangshan_all \
+	uvhs_hejian_pcie_x4_xiangshan_trace_all \
 	uvhs_status uvhs_check_timing_clean uvhs_export_ltx uvhs_package_bitstream
 
 uvhs_tools_check:
@@ -231,6 +236,13 @@ uvhs_filelist:
 		fi; \
 			printf '+define+UVHS_EXTERNAL_UVW_AXI4_TO_DDR4\n'; \
 			printf '+define+UVHS_UVW_AXI4_TO_DDR4\n'; \
+			if [ "$(strip $(UVHS_ENABLE_CPU_TRACE_AXI_DDR))" = "1" ]; then \
+				printf '+define+UVHS_CPU_TRACE_AXI_DDR\n'; \
+				printf '+incdir+%s/src/rtl/common/cpu_trace\n' "$(ROOT_DIR)"; \
+			fi; \
+			if [ "$(strip $(UVHS_ENABLE_FUNCTIONAL_DDR_REMOTE_LINK))" = "1" ]; then \
+				printf '+define+UVHS_FUNCTIONAL_DDR_REMOTE_LINK\n'; \
+			fi; \
 			if [ "$(strip $(UVHS_CPU_DEBUG_CLK))" = "1" ]; then \
 				printf '+define+UVHS_CPU_DEBUG_CLK\n'; \
 			fi; \
@@ -247,8 +259,17 @@ uvhs_filelist:
 			test ! -d "$(CORE_DIR)/build/generated-src" || printf '+incdir+%s/build/generated-src\n' "$(CORE_DIR)"; \
 			test ! -d "$(CORE_DIR)/generated-src" || printf '+incdir+%s/generated-src\n' "$(CORE_DIR)"; \
 		fi; \
-		find "$(ROOT_DIR)/src/rtl/common" -type f \( -name "*.v" -o -name "*.sv" -o -name "*.vh" -o -name "*.svh" \) \
+		find "$(ROOT_DIR)/src/rtl/common" \
+			-path "$(ROOT_DIR)/src/rtl/common/cpu_trace" -prune -o \
+			-type f \( -name "*.v" -o -name "*.sv" -o -name "*.vh" -o -name "*.svh" \) \
 			! -name "u0_xdma.v" ! -name "jtag_ddr_subsys_wrapper.v" -printf '%p\n' | sort; \
+		if [ "$(strip $(UVHS_ENABLE_CPU_TRACE_AXI_DDR))" = "1" ]; then \
+			find "$(ROOT_DIR)/src/rtl/common/cpu_trace" -maxdepth 1 -type f -name "*.sv" \
+				! -name "uvhs_axi_remote_link.sv" -printf '%p\n' | sort; \
+		fi; \
+		if [ "$(strip $(UVHS_ENABLE_FUNCTIONAL_DDR_REMOTE_LINK))" = "1" ]; then \
+			printf '%s\n' "$(ROOT_DIR)/src/rtl/common/cpu_trace/uvhs_axi_remote_link.sv"; \
+		fi; \
 		test -z "$(strip $(CPU))" || test ! -d "$(ROOT_DIR)/src/rtl/$(CPU)" || find "$(ROOT_DIR)/src/rtl/$(CPU)" -type f \( -name "*.v" -o -name "*.sv" -o -name "*.vh" -o -name "*.svh" \) -printf '%p\n' | sort; \
 		if [ -n "$(strip $(CORE_DIR))" ] && [ -d "$(CORE_DIR)" ]; then \
 			if [ -d "$(CORE_DIR)/build/rtl" ]; then \
@@ -273,7 +294,7 @@ uvhs_check_modules: uvhs_filelist
 uvhs_frontend: UVHS_WORK_DIR = $(ENV_SCRIPTS_HOME)/fpga_diff_uvhs_$(CPU)$(if $(strip $(SUFFIX)),-$(strip $(SUFFIX)),)
 uvhs_frontend: UVHS_ASSEMBLE_FILE = $(ROOT_DIR)/uvhs/assemble_uvhs.tcl
 uvhs_frontend: uvhs_export_vivado_ip uvhs_sync_uvw_axi4_to_ddr4 uvhs_filelist uvhs_check_modules
-	bash -lc 'set -o pipefail; source "$(ROOT_DIR)/uvhs/setenv.sh" && cd "$(UVHS_WORK_DIR)" && $(UVHS_HEJIAN_FLOW_ENV) UVHS_TOP="$(UVHS_TOP)" UVHS_FILELIST="./rtl/filelist.f" UVHS_REQUIRED_DCP_MODULES="$(UVHS_REQUIRED_DCP_MODULES)" UVHS_CPU_CLK_PERIOD_NS="$(UVHS_CPU_CLK_PERIOD_NS)" UVHS_SKIP_BOARD_CONSTRAINTS="$(UVHS_SKIP_BOARD_CONSTRAINTS)" UVHS_PROBE_FILE="$(UVHS_PROBE_FILE)" UVHS_ENABLE_PROBE_NET="$(UVHS_ENABLE_PROBE_NET)" UVHS_ENABLE_TRIGGER_NET="$(UVHS_ENABLE_TRIGGER_NET)" UVHS_PROBE_TOP="$(UVHS_PROBE_TOP)" UVHS_ASSIGN_PIN_FILE="$(UVHS_ASSIGN_PIN_FILE)" UVHS_TIMING_FILE="$(UVHS_TIMING_FILE)" UVHS_PARTITION_FILE="$(UVHS_PARTITION_FILE)" UVHS_ASSEMBLE_FILE="$(UVHS_ASSEMBLE_FILE)" UVHS_USE_LSF="$(UVHS_USE_LSF)" UVHS_FRONTEND_THREADS="$(UVHS_FRONTEND_THREADS)" UVHS_FRONTEND_PROCESSES="$(UVHS_FRONTEND_PROCESSES)" UVHS_FPGA_THREADS="$(UVHS_FPGA_THREADS)" UVHS_FPGA_PROCESSES="$(UVHS_FPGA_PROCESSES)" bash "$$UV_ROOT/bin/uv_shell" -bypass_vivado_version_check -s "$(UVHS_FRONTEND_TCL)" |& tee frontend_run.log'
+	bash -lc 'set -o pipefail; source "$(ROOT_DIR)/uvhs/setenv.sh" && cd "$(UVHS_WORK_DIR)" && $(UVHS_HEJIAN_FLOW_ENV) UVHS_TOP="$(UVHS_TOP)" UVHS_FILELIST="./rtl/filelist.f" UVHS_REQUIRED_DCP_MODULES="$(UVHS_REQUIRED_DCP_MODULES)" UVHS_ENABLE_CPU_TRACE_AXI_DDR="$(UVHS_ENABLE_CPU_TRACE_AXI_DDR)" UVHS_CPU_CLK_PERIOD_NS="$(UVHS_CPU_CLK_PERIOD_NS)" UVHS_SKIP_BOARD_CONSTRAINTS="$(UVHS_SKIP_BOARD_CONSTRAINTS)" UVHS_PROBE_FILE="$(UVHS_PROBE_FILE)" UVHS_ENABLE_PROBE_NET="$(UVHS_ENABLE_PROBE_NET)" UVHS_ENABLE_TRIGGER_NET="$(UVHS_ENABLE_TRIGGER_NET)" UVHS_PROBE_TOP="$(UVHS_PROBE_TOP)" UVHS_ASSIGN_PIN_FILE="$(UVHS_ASSIGN_PIN_FILE)" UVHS_TIMING_FILE="$(UVHS_TIMING_FILE)" UVHS_PARTITION_FILE="$(UVHS_PARTITION_FILE)" UVHS_ASSEMBLE_FILE="$(UVHS_ASSEMBLE_FILE)" UVHS_USE_LSF="$(UVHS_USE_LSF)" UVHS_FRONTEND_THREADS="$(UVHS_FRONTEND_THREADS)" UVHS_FRONTEND_PROCESSES="$(UVHS_FRONTEND_PROCESSES)" UVHS_FPGA_THREADS="$(UVHS_FPGA_THREADS)" UVHS_FPGA_PROCESSES="$(UVHS_FPGA_PROCESSES)" bash "$$UV_ROOT/bin/uv_shell" -bypass_vivado_version_check -s "$(UVHS_FRONTEND_TCL)" |& tee frontend_run.log'
 
 uvhs_backend: UVHS_WORK_DIR = $(ENV_SCRIPTS_HOME)/fpga_diff_uvhs_$(CPU)$(if $(strip $(SUFFIX)),-$(strip $(SUFFIX)),)
 uvhs_backend: UVHS_ASSEMBLE_FILE = $(ROOT_DIR)/uvhs/assemble_uvhs.tcl
@@ -299,7 +320,8 @@ uvhs_hejian_pcie_x4_preflight:
 
 UVHS_NUTSHELL_X4_TARGETS := \
 	uvhs_hejian_pcie_x4_nutshell_all \
-	uvhs_hejian_pcie_x4_nutshell_probe_all
+	uvhs_hejian_pcie_x4_nutshell_probe_all \
+	uvhs_hejian_pcie_x4_nutshell_trace_all
 $(UVHS_NUTSHELL_X4_TARGETS): CPU = nutshell
 $(UVHS_NUTSHELL_X4_TARGETS): XDMA_LINK_WIDTH = X4
 $(UVHS_NUTSHELL_X4_TARGETS): XDMA_ENABLE_PF0_BAR1 = 1
@@ -338,34 +360,67 @@ uvhs_hejian_pcie_x4_nutshell_probe_all: UVHS_TIME_GROUP_IO_LOGIC = 0
 uvhs_hejian_pcie_x4_nutshell_probe_all: UVHS_LOCALIZE_CLOCKS = SOC_GATED_CLK
 uvhs_hejian_pcie_x4_nutshell_probe_all: uvhs_hejian_pcie_x4_preflight uvhs_all
 
-uvhs_hejian_pcie_x4_xiangshan_all: CPU = kmh
-uvhs_hejian_pcie_x4_xiangshan_all: XDMA_LINK_WIDTH = X4
-uvhs_hejian_pcie_x4_xiangshan_all: XDMA_ENABLE_PF0_BAR1 = 1
-uvhs_hejian_pcie_x4_xiangshan_all: XDMA_AXILITE_MASTER_SCALE = Kilobytes
-uvhs_hejian_pcie_x4_xiangshan_all: XDMA_AXILITE_MASTER_SIZE = 512
-uvhs_hejian_pcie_x4_xiangshan_all: XDMA_EXPECTED_VENDOR = 0x10ee
-uvhs_hejian_pcie_x4_xiangshan_all: XDMA_EXPECTED_DEVICE = 0x9048
-uvhs_hejian_pcie_x4_xiangshan_all: XDMA_EXPECTED_BAR0_SIZE = 0x80000
-uvhs_hejian_pcie_x4_xiangshan_all: XDMA_EXPECTED_BAR1_SIZE = 0x10000
-uvhs_hejian_pcie_x4_xiangshan_all: UVHS_DESIGN_NAME = VU19P_X4
-uvhs_hejian_pcie_x4_xiangshan_all: PLATFORM = U2.2
-uvhs_hejian_pcie_x4_xiangshan_all: UVHS_TARGET_BOARD = B0
-uvhs_hejian_pcie_x4_xiangshan_all: UVHS_TARGET_PACK = B0
-uvhs_hejian_pcie_x4_xiangshan_all: UVHS_TARGET_FPGA = F2
-uvhs_hejian_pcie_x4_xiangshan_all: UVHS_TARGET_FPGA_LOWER = b0.f2
+# Passive NutShell WBU commit-trace topology. This does not enable the UHD
+# probe/trigger network: the two extra DDRs are driven by the passive trace
+# AXI path, while the known-good functional DDR IP remains intact on F3.
+uvhs_hejian_pcie_x4_nutshell_trace_all: UVHS_ENABLE_CPU_TRACE_AXI_DDR = 1
+uvhs_hejian_pcie_x4_nutshell_trace_all: UVHS_ENABLE_PROBE_NET = 0
+uvhs_hejian_pcie_x4_nutshell_trace_all: UVHS_ENABLE_TRIGGER_NET = 0
+uvhs_hejian_pcie_x4_nutshell_trace_all: UVHS_PARTITION_FILE = $(ROOT_DIR)/uvhs/partition_nutshell_cpu_trace_ddr.tcl
+uvhs_hejian_pcie_x4_nutshell_trace_all: UVHS_FPGA_COUNT = 3
+uvhs_hejian_pcie_x4_nutshell_trace_all: UVHS_EXPECTED_FPGA_COUNT = 3
+uvhs_hejian_pcie_x4_nutshell_trace_all: UVHS_KEEP_FPGAS = b0.f1 b0.f2 b0.f3
+uvhs_hejian_pcie_x4_nutshell_trace_all: UVHS_TIME_GROUP_IO_LOGIC = 0
+uvhs_hejian_pcie_x4_nutshell_trace_all: UVHS_LOCALIZE_CLOCKS = SOC_GATED_CLK
+uvhs_hejian_pcie_x4_nutshell_trace_all: uvhs_hejian_pcie_x4_preflight uvhs_all
+
+UVHS_XIANGSHAN_X4_TARGETS := \
+	uvhs_hejian_pcie_x4_xiangshan_all \
+	uvhs_hejian_pcie_x4_xiangshan_trace_all
+$(UVHS_XIANGSHAN_X4_TARGETS): CPU = kmh
+$(UVHS_XIANGSHAN_X4_TARGETS): XDMA_LINK_WIDTH = X4
+$(UVHS_XIANGSHAN_X4_TARGETS): XDMA_ENABLE_PF0_BAR1 = 1
+$(UVHS_XIANGSHAN_X4_TARGETS): XDMA_AXILITE_MASTER_SCALE = Kilobytes
+$(UVHS_XIANGSHAN_X4_TARGETS): XDMA_AXILITE_MASTER_SIZE = 512
+$(UVHS_XIANGSHAN_X4_TARGETS): XDMA_EXPECTED_VENDOR = 0x10ee
+$(UVHS_XIANGSHAN_X4_TARGETS): XDMA_EXPECTED_DEVICE = 0x9048
+$(UVHS_XIANGSHAN_X4_TARGETS): XDMA_EXPECTED_BAR0_SIZE = 0x80000
+$(UVHS_XIANGSHAN_X4_TARGETS): XDMA_EXPECTED_BAR1_SIZE = 0x10000
+$(UVHS_XIANGSHAN_X4_TARGETS): UVHS_DESIGN_NAME = VU19P_X4
+$(UVHS_XIANGSHAN_X4_TARGETS): PLATFORM = U2.2
+$(UVHS_XIANGSHAN_X4_TARGETS): UVHS_TARGET_BOARD = B0
+$(UVHS_XIANGSHAN_X4_TARGETS): UVHS_TARGET_PACK = B0
+$(UVHS_XIANGSHAN_X4_TARGETS): UVHS_TARGET_FPGA = F2
+$(UVHS_XIANGSHAN_X4_TARGETS): UVHS_TARGET_FPGA_LOWER = b0.f2
+$(UVHS_XIANGSHAN_X4_TARGETS): UVHS_CPU_CLK_PERIOD_NS = 40
+$(UVHS_XIANGSHAN_X4_TARGETS): UVHS_CPU_DEBUG_CLK = 1
+$(UVHS_XIANGSHAN_X4_TARGETS): UVHS_PNR_STRATEGY = Strategy_uv_high_fanout_explore
+$(UVHS_XIANGSHAN_X4_TARGETS): UVHS_COMPILE_STRATEGY_NUM = 1
+$(UVHS_XIANGSHAN_X4_TARGETS): UVHS_COMPILE_STRATEGY0 = uv_high_fanout_explore
+$(UVHS_XIANGSHAN_X4_TARGETS): UVHS_LUT_FILL_RATE = 80
+$(UVHS_XIANGSHAN_X4_TARGETS): UVHS_LUT6_FILL_RATE = 30
+$(UVHS_XIANGSHAN_X4_TARGETS): UVHS_ROUTE_ENABLE_HOLD_EXPN_BAILOUT = 0
+$(UVHS_XIANGSHAN_X4_TARGETS): UVHS_ASSEMBLE_FILE = $(ROOT_DIR)/uvhs/assemble_uvhs.tcl
+$(UVHS_XIANGSHAN_X4_TARGETS): UVHS_ASSIGN_PIN_FILE = $(ROOT_DIR)/uvhs/assign_pin_nutshell_f2.tcl
+
 uvhs_hejian_pcie_x4_xiangshan_all: UVHS_FPGA_COUNT = 1
 uvhs_hejian_pcie_x4_xiangshan_all: UVHS_KEEP_FPGAS = b0.f2
-uvhs_hejian_pcie_x4_xiangshan_all: UVHS_CPU_CLK_PERIOD_NS = 40
-uvhs_hejian_pcie_x4_xiangshan_all: UVHS_CPU_DEBUG_CLK = 1
-uvhs_hejian_pcie_x4_xiangshan_all: UVHS_PNR_STRATEGY = Strategy_uv_high_fanout_explore
-uvhs_hejian_pcie_x4_xiangshan_all: UVHS_COMPILE_STRATEGY_NUM = 1
-uvhs_hejian_pcie_x4_xiangshan_all: UVHS_COMPILE_STRATEGY0 = uv_high_fanout_explore
-uvhs_hejian_pcie_x4_xiangshan_all: UVHS_LUT_FILL_RATE = 80
-uvhs_hejian_pcie_x4_xiangshan_all: UVHS_LUT6_FILL_RATE = 30
-uvhs_hejian_pcie_x4_xiangshan_all: UVHS_ROUTE_ENABLE_HOLD_EXPN_BAILOUT = 0
-uvhs_hejian_pcie_x4_xiangshan_all: UVHS_ASSEMBLE_FILE = $(ROOT_DIR)/uvhs/assemble_uvhs.tcl
-uvhs_hejian_pcie_x4_xiangshan_all: UVHS_ASSIGN_PIN_FILE = $(ROOT_DIR)/uvhs/assign_pin_nutshell_f2.tcl
 uvhs_hejian_pcie_x4_xiangshan_all: uvhs_hejian_pcie_x4_preflight uvhs_all
+
+# FpgaDiffDefaultConfig core-0 ROB trace. F2 keeps XiangShan/XDMA and trace
+# CH0, F1 owns trace CH1, and the lossless compact AXI link reaches functional
+# DDR on F3 without exposing the full 256-bit AXI interface to partition TDM.
+uvhs_hejian_pcie_x4_xiangshan_trace_all: UVHS_ENABLE_CPU_TRACE_AXI_DDR = 1
+uvhs_hejian_pcie_x4_xiangshan_trace_all: UVHS_ENABLE_FUNCTIONAL_DDR_REMOTE_LINK = 1
+uvhs_hejian_pcie_x4_xiangshan_trace_all: UVHS_ENABLE_PROBE_NET = 0
+uvhs_hejian_pcie_x4_xiangshan_trace_all: UVHS_ENABLE_TRIGGER_NET = 0
+uvhs_hejian_pcie_x4_xiangshan_trace_all: UVHS_PARTITION_FILE = $(ROOT_DIR)/uvhs/partition_xiangshan_cpu_trace_ddr.tcl
+uvhs_hejian_pcie_x4_xiangshan_trace_all: UVHS_FPGA_COUNT = 3
+uvhs_hejian_pcie_x4_xiangshan_trace_all: UVHS_EXPECTED_FPGA_COUNT = 3
+uvhs_hejian_pcie_x4_xiangshan_trace_all: UVHS_KEEP_FPGAS = b0.f1 b0.f2 b0.f3
+uvhs_hejian_pcie_x4_xiangshan_trace_all: UVHS_TIME_GROUP_IO_LOGIC = 0
+uvhs_hejian_pcie_x4_xiangshan_trace_all: UVHS_LOCALIZE_CLOCKS = SOC_GATED_CLK
+uvhs_hejian_pcie_x4_xiangshan_trace_all: uvhs_hejian_pcie_x4_preflight uvhs_all
 
 uvhs_preflight:
 	test -f "$(UVHS_TARBALL)"

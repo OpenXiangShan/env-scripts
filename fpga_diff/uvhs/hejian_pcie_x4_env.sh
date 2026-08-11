@@ -34,6 +34,7 @@ export UVHS_TARGET_PACK="${UVHS_TARGET_PACK:-$UVHS_TARGET_BOARD}"
 export UVHS_TARGET_FPGA="${UVHS_TARGET_FPGA:-F2}"
 export UVHS_TARGET_FPGA_LOWER="${UVHS_TARGET_FPGA_LOWER:-$(printf '%s.%s' "$UVHS_TARGET_PACK" "$UVHS_TARGET_FPGA" | tr '[:upper:]' '[:lower:]')}"
 export UVHS_FPGA_COUNT="${UVHS_FPGA_COUNT:-1}"
+export UVHS_EXPECTED_FPGA_COUNT="${UVHS_EXPECTED_FPGA_COUNT:-1}"
 export UVHS_CPU_CLK_PERIOD_NS="${UVHS_CPU_CLK_PERIOD_NS:-40}"
 export UVHS_CPU_DEBUG_CLK="${UVHS_CPU_DEBUG_CLK:-1}"
 export UVHS_PNR_STRATEGY="${UVHS_PNR_STRATEGY:-Strategy_uv_high_fanout_explore}"
@@ -214,7 +215,7 @@ uvhs_hejian_pcie_check_env() {
   check_equal UVHS_TARGET_PACK B0
   check_equal UVHS_TARGET_FPGA F2
   check_equal UVHS_TARGET_FPGA_LOWER b0.f2
-  check_equal UVHS_FPGA_COUNT 1
+  check_equal UVHS_FPGA_COUNT "$UVHS_EXPECTED_FPGA_COUNT"
   check_equal UVHS_CPU_CLK_PERIOD_NS 40
   check_equal UVHS_CPU_DEBUG_CLK 1
   check_equal UVHS_PNR_STRATEGY Strategy_uv_high_fanout_explore
@@ -248,16 +249,16 @@ uvhs_hejian_pcie_check_env() {
   check_grep "fpga_diff UVHS Makefile has explicit Hejian x4 UVHS environment" 'UVHS_HEJIAN_FLOW_ENV.*XDMA_LINK_WIDTH=.*UVHS_DESIGN_NAME=.*PLATFORM=' "$_uvhs_hejian_pcie_root_dir/uvhs/Makefile"
   check_grep "fpga_diff UVHS frontend passes Hejian x4 environment to uv_shell" 'UVHS_HEJIAN_FLOW_ENV.*UVHS_FILELIST=.*uv_shell.*UVHS_FRONTEND_TCL' "$_uvhs_hejian_pcie_root_dir/uvhs/Makefile"
   check_grep "fpga_diff UVHS backend passes Hejian x4 environment to uv_shell" 'UVHS_HEJIAN_FLOW_ENV.*UVHS_TOP=.*uv_shell.*backend_run[.]tcl' "$_uvhs_hejian_pcie_root_dir/uvhs/Makefile"
-  check_grep "Hejian x4 target pins official U2.2 platform" '^uvhs_hejian_pcie_x4_nutshell_all:[[:space:]]+PLATFORM[[:space:]]*=[[:space:]]*U2[.]2' "$_uvhs_hejian_pcie_root_dir/uvhs/Makefile"
+  check_grep "Hejian x4 target pins official U2.2 platform" '^[$][(]UVHS_NUTSHELL_X4_TARGETS[)]:[[:space:]]+PLATFORM[[:space:]]*=[[:space:]]*U2[.]2' "$_uvhs_hejian_pcie_root_dir/uvhs/Makefile"
   check_grep "fpga_diff UVHS Makefile skips xdma_ep export when DCP is selected" 'UVHS_EFFECTIVE_SKIP_VIVADO_EXPORT.*UVHS_XDMA_EP_DCP' "$_uvhs_hejian_pcie_root_dir/uvhs/Makefile"
   check_grep "fpga_diff UVHS Makefile passes base assemble into UVHS scripts" 'UVHS_HEJIAN_FLOW_ENV.*UVHS_BASE_ASSEMBLE_FILE=' "$_uvhs_hejian_pcie_root_dir/uvhs/Makefile"
   check_grep "fpga_diff UVHS Makefile defaults official PnR strategy" 'UVHS_PNR_STRATEGY[[:space:]]+[?]?=[[:space:]]+Strategy_uv_high_fanout_explore' "$_uvhs_hejian_pcie_root_dir/uvhs/Makefile"
   check_grep "fpga_diff UVHS Makefile has Hejian x4 NutShell build target" '^uvhs_hejian_pcie_x4_nutshell_all:' "$_uvhs_hejian_pcie_root_dir/uvhs/Makefile"
   check_grep "fpga_diff UVHS Makefile has Hejian x4 XiangShan build target" '^uvhs_hejian_pcie_x4_xiangshan_all:' "$_uvhs_hejian_pcie_root_dir/uvhs/Makefile"
-  check_grep "fpga_diff UVHS x4 target uses 25 MHz NutShell CPU clock" '^uvhs_hejian_pcie_x4_nutshell_all:[[:space:]]+UVHS_CPU_CLK_PERIOD_NS[[:space:]]*=[[:space:]]*40' "$_uvhs_hejian_pcie_root_dir/uvhs/Makefile"
-  check_grep "fpga_diff UVHS x4 target selects the 25 MHz clock input" '^uvhs_hejian_pcie_x4_nutshell_all:[[:space:]]+UVHS_CPU_DEBUG_CLK[[:space:]]*=[[:space:]]*1' "$_uvhs_hejian_pcie_root_dir/uvhs/Makefile"
-  check_grep "fpga_diff UVHS XiangShan target selects kmh" '^uvhs_hejian_pcie_x4_xiangshan_all:[[:space:]]+CPU[[:space:]]*=[[:space:]]*kmh' "$_uvhs_hejian_pcie_root_dir/uvhs/Makefile"
-  check_grep "fpga_diff UVHS XiangShan target uses 25 MHz CPU clock" '^uvhs_hejian_pcie_x4_xiangshan_all:[[:space:]]+UVHS_CPU_CLK_PERIOD_NS[[:space:]]*=[[:space:]]*40' "$_uvhs_hejian_pcie_root_dir/uvhs/Makefile"
+  check_grep "fpga_diff UVHS x4 target uses 25 MHz NutShell CPU clock" '^[$][(]UVHS_NUTSHELL_X4_TARGETS[)]:[[:space:]]+UVHS_CPU_CLK_PERIOD_NS[[:space:]]*=[[:space:]]*40' "$_uvhs_hejian_pcie_root_dir/uvhs/Makefile"
+  check_grep "fpga_diff UVHS x4 target selects the 25 MHz clock input" '^[$][(]UVHS_NUTSHELL_X4_TARGETS[)]:[[:space:]]+UVHS_CPU_DEBUG_CLK[[:space:]]*=[[:space:]]*1' "$_uvhs_hejian_pcie_root_dir/uvhs/Makefile"
+  check_grep "fpga_diff UVHS XiangShan targets select kmh" '^[$][(]UVHS_XIANGSHAN_X4_TARGETS[)]:[[:space:]]+CPU[[:space:]]*=[[:space:]]*kmh' "$_uvhs_hejian_pcie_root_dir/uvhs/Makefile"
+  check_grep "fpga_diff UVHS XiangShan targets use 25 MHz CPU clock" '^[$][(]UVHS_XIANGSHAN_X4_TARGETS[)]:[[:space:]]+UVHS_CPU_CLK_PERIOD_NS[[:space:]]*=[[:space:]]*40' "$_uvhs_hejian_pcie_root_dir/uvhs/Makefile"
   check_grep "fpga_diff backend defaults official compile strategy" 'uv_high_fanout_explore' "$_uvhs_hejian_pcie_root_dir/uvhs/backend_run.tcl"
 
   if [[ "$failures" -ne 0 ]]; then

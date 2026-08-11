@@ -219,6 +219,11 @@ module SimTop_wrapper(
   output [1:0]    difftest_cfg_axilite_rresp,
   output          difftest_cfg_axilite_rvalid,
   input           difftest_cfg_axilite_rready
+`ifdef UVHS_CPU_TRACE_AXI_DDR
+  ,output [691:0] cpu_trace_data
+  ,output         cpu_trace_valid
+  ,input          cpu_trace_ready
+`endif
 );
 
   wire          cpu_clock       ;
@@ -503,4 +508,49 @@ SimTop  u_XSTop(
   .io_traceCoreInterface_0_toEncoder_iretire  (trace_iretire),
   .io_traceCoreInterface_0_toEncoder_ilastsize(trace_ilastsize)
 );
+
+`ifdef UVHS_CPU_TRACE_AXI_DDR
+// FpgaDiffDefaultConfig hierarchy. Keep generated-RTL knowledge local to the
+// XiangShan wrapper; the shared transport only sees a 692-bit passive record.
+`define UVHS_CORE0_ROB u_XSTop.soc.core_with_l2.core.backend.inner_ctrlBlock.rob
+assign cpu_trace_data = {
+  7'b0,
+  `UVHS_CORE0_ROB.state,
+  `UVHS_CORE0_ROB.enqPtrVec_0_flag,
+  `UVHS_CORE0_ROB.enqPtrVec_0_value[7:0],
+  `UVHS_CORE0_ROB.deqPtrVec_0_flag,
+  `UVHS_CORE0_ROB.deqPtrVec_0_value[7:0],
+  `UVHS_CORE0_ROB.io_commits_info_0_debug_pc[49:0],
+  `UVHS_CORE0_ROB.io_commits_info_1_debug_pc[49:0],
+  `UVHS_CORE0_ROB.io_commits_info_2_debug_pc[49:0],
+  `UVHS_CORE0_ROB.io_commits_info_3_debug_pc[49:0],
+  `UVHS_CORE0_ROB.io_commits_info_4_debug_pc[49:0],
+  `UVHS_CORE0_ROB.io_commits_info_5_debug_pc[49:0],
+  `UVHS_CORE0_ROB.io_commits_info_6_debug_pc[49:0],
+  `UVHS_CORE0_ROB.io_commits_info_7_debug_pc[49:0],
+  `UVHS_CORE0_ROB.io_commits_info_0_debug_instr[31:0],
+  `UVHS_CORE0_ROB.io_commits_info_1_debug_instr[31:0],
+  `UVHS_CORE0_ROB.io_commits_info_2_debug_instr[31:0],
+  `UVHS_CORE0_ROB.io_commits_info_3_debug_instr[31:0],
+  `UVHS_CORE0_ROB.io_commits_info_4_debug_instr[31:0],
+  `UVHS_CORE0_ROB.io_commits_info_5_debug_instr[31:0],
+  `UVHS_CORE0_ROB.io_commits_info_6_debug_instr[31:0],
+  `UVHS_CORE0_ROB.io_commits_info_7_debug_instr[31:0],
+  `UVHS_CORE0_ROB.io_commits_commitValid_0,
+  `UVHS_CORE0_ROB.io_commits_commitValid_1,
+  `UVHS_CORE0_ROB.io_commits_commitValid_2,
+  `UVHS_CORE0_ROB.io_commits_commitValid_3,
+  `UVHS_CORE0_ROB.io_commits_commitValid_4,
+  `UVHS_CORE0_ROB.io_commits_commitValid_5,
+  `UVHS_CORE0_ROB.io_commits_commitValid_6,
+  `UVHS_CORE0_ROB.io_commits_commitValid_7,
+  `UVHS_CORE0_ROB.io_commits_isCommit,
+  `UVHS_CORE0_ROB.hasWFI
+};
+// XiangShan records one ROB snapshot per running CPU cycle. Readiness remains
+// informational so trace storage can never stall the observed core.
+assign cpu_trace_valid = sys_rstn_i;
+wire _unused_cpu_trace_ready = cpu_trace_ready;
+`undef UVHS_CORE0_ROB
+`endif
 endmodule
