@@ -258,16 +258,33 @@ proc uvhs_capture_station_counts {} {
     set counts {}
     foreach line [split [query -capture -tclobj] "\n"] {
         set fields [regexp -all -inline {\S+} $line]
-        if {[llength $fields] < 5 ||
-            ![regexp -nocase {^B[0-9]+$} [lindex $fields 0]] ||
-            ![regexp -nocase {^F[0-9]+$} [lindex $fields 1]] ||
-            ![string is integer -strict [lindex $fields 2]] ||
-            [string tolower [lindex $fields 3]] ni {no false 0}} {
+        if {[llength $fields] < 5} {
             continue
         }
-        set fpga [format "%s.%s" \
-            [string toupper [lindex $fields 0]] \
-            [string toupper [lindex $fields 1]]]
+
+        set fpga ""
+        set port_index 2
+        set enable_index 3
+        set enabled_values {yes true 1 enable enabled}
+        if {[regexp -nocase {^(B[0-9]+)\.(F[0-9]+)$} \
+                [lindex $fields 1] -> board fpga_id]} {
+            set fpga [format "%s.%s" \
+                [string toupper $board] [string toupper $fpga_id]]
+        } elseif {[regexp -nocase {^B[0-9]+$} [lindex $fields 0]] &&
+                  [regexp -nocase {^F[0-9]+$} [lindex $fields 1]]} {
+            set fpga [format "%s.%s" \
+                [string toupper [lindex $fields 0]] \
+                [string toupper [lindex $fields 1]]]
+            # Older UVHS Tcl objects expose an isDisable field here.
+            set enabled_values {no false 0}
+        } else {
+            continue
+        }
+
+        if {![string is integer -strict [lindex $fields $port_index]] ||
+            [string tolower [lindex $fields $enable_index]] ni $enabled_values} {
+            continue
+        }
         dict incr counts $fpga
     }
     if {[dict size $counts] == 0} {
@@ -332,7 +349,7 @@ proc uvhs_prepare_ila_clock {clock} {
 }
 
 proc uvhs_ila_arm {
-    trigger_file position clock gated_clock
+    trigger_file position clock gated_clocks
 } {
     if {![file isfile $trigger_file]} {
         error "trigger condition file not found: $trigger_file"
@@ -351,7 +368,11 @@ proc uvhs_ila_arm {
     trigger -ini_check $trigger_file
     set status [catch {
         set capture_frequency [uvhs_prepare_ila_clock $clock]
-        if {$gated_clock ne ""} {
+        foreach gated_clock [split $gated_clocks ","] {
+            set gated_clock [string trim $gated_clock]
+            if {$gated_clock eq ""} {
+                continue
+            }
             trigger -set -gatedclk $gated_clock \
                 -frequency $capture_frequency -polarity H
         }

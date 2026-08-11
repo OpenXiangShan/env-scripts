@@ -260,7 +260,7 @@ export FPGA_ILA_DUMP_CMD='ssh <runtime-host> \
   CPU=<design> SUFFIX=<tag> \
   TRIGGER=/path/to/env-scripts/fpga_diff/uvhs/runtime/trigger.ini \
   UVHS_ILA_POSITION=0 \
-  UVHS_ILA_GATED_CLOCK=fpga_top_debug.core_def.inter_soc_clk"'
+  UVHS_ILA_GATED_CLOCK=<capture-clock-0>,<capture-clock-1>"'
 
 /path/to/fpga-host <host arguments>
 
@@ -305,7 +305,7 @@ The upload window is controlled when starting the capture:
 ```sh
 make uvhs_ila_arm CPU=<design> SUFFIX=<tag> TRIGGER=/path/to/trigger.ini \
   UVHS_ILA_POSITION=0 \
-  UVHS_ILA_GATED_CLOCK=fpga_top_debug.core_def.inter_soc_clk
+  UVHS_ILA_GATED_CLOCK=<capture-clock-0>,<capture-clock-1>
 make uvhs_ila_upload CPU=<design> SUFFIX=<tag> UVHS_ILA_DEPTH=1000000
 ```
 
@@ -323,17 +323,18 @@ UHD bandwidth, using 512 bits per capture station and clock cycle. The original
 sign-off frequency is restored after upload, after an arm failure, or by
 `uvhs_ila_clear`.
 
-If the compile-time sampling path is gated, pass its RTL path through
-`UVHS_ILA_GATED_CLOCK`. The runtime registers that path at the automatically
-selected capture frequency before installing the trigger. This makes the KMH
-capture stations advance on actual `inter_soc_clk` edges, so clock-gated
-intervals do not consume station samples. The vendor documents gated-clock
-capture as approximate when the clock stops or changes frequency; the trigger
-must also eventually receive a gated-clock edge. Use the free-running parent
-clock for trigger-only profiles that must remain observable while the CPU
-clock is stopped. `UVHS_ILA_TIMEOUT` defaults to 60 seconds. This is the UVHS
-UHD path; the normal Vivado flow continues to use `make dump_ila` and an `.ltx`
-file.
+If the compile-time sampling path is gated, pass the exact clock name shown by
+`query -capture` through `UVHS_ILA_GATED_CLOCK`. Use a comma-separated list
+when stations use multiple post-partition clock replicas. The runtime registers
+each clock at the automatically selected capture frequency before installing
+the trigger. This makes the KMH capture stations advance on actual
+`inter_soc_clk` edges, so clock-gated intervals do not consume station samples.
+The vendor documents gated-clock capture as approximate when the clock stops or
+changes frequency; the trigger must also eventually receive a gated-clock edge.
+Use the free-running parent clock for trigger-only profiles that must remain
+observable while the CPU clock is stopped. `UVHS_ILA_TIMEOUT` defaults to 60
+seconds. This is the UVHS UHD path; the normal Vivado flow continues to use
+`make dump_ila` and an `.ltx` file.
 
 UHD capture inserts its own external DDR wrapper on every FPGA containing a
 probe group. The four PDDR4DME cards on the FPGA FMC3 connectors are reserved
