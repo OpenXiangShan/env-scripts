@@ -190,6 +190,7 @@ proc create_root_design { parentCell } {
   # Set parent object as current
   current_bd_instance $parentObj
 
+  set uvhs_flow [expr {[info exists ::env(UVHS_FLOW)] && $::env(UVHS_FLOW) eq "1"}]
 
   # Create interface ports
   set S00_AXI [ create_bd_intf_port -mode Slave -vlnv xilinx.com:interface:aximm_rtl:1.0 S00_AXI ]
@@ -224,6 +225,40 @@ proc create_root_design { parentCell } {
    CONFIG.WUSER_WIDTH {0} \
    ] $S00_AXI
 
+  if {$uvhs_flow} {
+    set UVHS_FLASH_AXI [ create_bd_intf_port -mode Slave -vlnv xilinx.com:interface:aximm_rtl:1.0 UVHS_FLASH_AXI ]
+    set_property -dict [ list \
+     CONFIG.ADDR_WIDTH {32} \
+     CONFIG.ARUSER_WIDTH {0} \
+     CONFIG.AWUSER_WIDTH {0} \
+     CONFIG.BUSER_WIDTH {0} \
+     CONFIG.DATA_WIDTH {64} \
+     CONFIG.FREQ_HZ {25000000} \
+     CONFIG.HAS_BRESP {1} \
+     CONFIG.HAS_BURST {1} \
+     CONFIG.HAS_CACHE {1} \
+     CONFIG.HAS_LOCK {1} \
+     CONFIG.HAS_PROT {1} \
+     CONFIG.HAS_QOS {1} \
+     CONFIG.HAS_REGION {0} \
+     CONFIG.HAS_RRESP {1} \
+     CONFIG.HAS_WSTRB {1} \
+     CONFIG.ID_WIDTH {8} \
+     CONFIG.MAX_BURST_LENGTH {16} \
+     CONFIG.NUM_READ_OUTSTANDING {2} \
+     CONFIG.NUM_READ_THREADS {1} \
+     CONFIG.NUM_WRITE_OUTSTANDING {2} \
+     CONFIG.NUM_WRITE_THREADS {1} \
+     CONFIG.PROTOCOL {AXI3} \
+     CONFIG.READ_WRITE_MODE {READ_WRITE} \
+     CONFIG.RUSER_BITS_PER_BYTE {0} \
+     CONFIG.RUSER_WIDTH {0} \
+     CONFIG.SUPPORTS_NARROW_BURST {1} \
+     CONFIG.WUSER_BITS_PER_BYTE {0} \
+     CONFIG.WUSER_WIDTH {0} \
+     ] $UVHS_FLASH_AXI
+  }
+
   set SYS_CFG_APB [ create_bd_intf_port -mode Master -vlnv xilinx.com:interface:apb_rtl:1.0 SYS_CFG_APB ]
 
   set UART_0 [ create_bd_intf_port -mode Master -vlnv xilinx.com:interface:uart_rtl:1.0 UART_0 ]
@@ -247,14 +282,29 @@ proc create_root_design { parentCell } {
 
   # Create ports
   set ACLK [ create_bd_port -dir I -type clk -freq_hz 25000000 ACLK ]
+  set aclk_busif rom_axi
+  if {$uvhs_flow} {
+    append aclk_busif :UVHS_FLASH_AXI
+  }
   set_property -dict [ list \
-   CONFIG.ASSOCIATED_BUSIF {rom_axi} \
- ] $ACLK
+   CONFIG.ASSOCIATED_BUSIF $aclk_busif \
+  ] $ACLK
   set ARESETN [ create_bd_port -dir I -type rst ARESETN ]
   set SYS_INTER_CLK [ create_bd_port -dir I -type clk -freq_hz 25000000 SYS_INTER_CLK ]
   set_property -dict [ list \
    CONFIG.ASSOCIATED_BUSIF {S00_AXI} \
- ] $SYS_INTER_CLK
+  ] $SYS_INTER_CLK
+  if {$uvhs_flow} {
+    set_property CONFIG.ASSOCIATED_RESET {ARESETN} $ACLK
+    set_property CONFIG.POLARITY {ACTIVE_LOW} $ARESETN
+    set_property CONFIG.ASSOCIATED_RESET {SYS_INTER_ARESETN} $SYS_INTER_CLK
+    set SYS_INTER_ARESETN [ create_bd_port -dir I -type rst SYS_INTER_ARESETN ]
+    set_property CONFIG.POLARITY {ACTIVE_LOW} $SYS_INTER_ARESETN
+    set UART_ACLK [ create_bd_port -dir I -type clk -freq_hz 50000000 UART_ACLK ]
+    set UART_ARESETN [ create_bd_port -dir I -type rst UART_ARESETN ]
+    set_property CONFIG.ASSOCIATED_RESET {UART_ARESETN} $UART_ACLK
+    set_property CONFIG.POLARITY {ACTIVE_LOW} $UART_ARESETN
+  }
   set uart0_intc [ create_bd_port -dir O -type intr uart0_intc ]
 
   # Create instance: axi_apb_bridge_0, and set properties
@@ -266,9 +316,10 @@ proc create_root_design { parentCell } {
 
   # Create instance: axi_interconnect_0, and set properties
   set axi_interconnect_0 [ create_bd_cell -type ip -vlnv xilinx.com:ip:axi_interconnect:2.1 axi_interconnect_0 ]
+  set axi_slave_count [expr {$uvhs_flow ? 3 : 2}]
   set_property -dict [ list \
    CONFIG.NUM_MI {4} \
-   CONFIG.NUM_SI {2} \
+   CONFIG.NUM_SI $axi_slave_count \
  ] $axi_interconnect_0
 
   # Create instance: extllc_bram_ctrl, and set properties
@@ -322,12 +373,59 @@ proc create_root_design { parentCell } {
   connect_bd_intf_net -intf_net axi_interconnect_0_M03_AXI [get_bd_intf_pins axi_interconnect_0/M03_AXI] [get_bd_intf_pins extllc_bram_ctrl/S_AXI]
   connect_bd_intf_net -intf_net extllc_bram_ctrl_BRAM_PORTA [get_bd_intf_pins extllc_bram_ctrl/BRAM_PORTA] [get_bd_intf_pins extllc_bram/BRAM_PORTA]
   connect_bd_intf_net -intf_net jtag_axi_flash_M_AXI [get_bd_intf_pins axi_interconnect_0/S01_AXI] [get_bd_intf_pins jtag_axi_flash/M_AXI]
+  if {$uvhs_flow} {
+    connect_bd_intf_net -intf_net UVHS_FLASH_AXI_0_1 [get_bd_intf_ports UVHS_FLASH_AXI] [get_bd_intf_pins axi_interconnect_0/S02_AXI]
+  }
   connect_bd_intf_net -intf_net axi_uart16550_0_UART [get_bd_intf_ports UART_0] [get_bd_intf_pins axi_uart16550_0/UART]
 
   # Create port connections
-  connect_bd_net -net ACLK_0_1 [get_bd_ports ACLK] [get_bd_pins axi_apb_bridge_0/s_axi_aclk] [get_bd_pins axi_interconnect_0/ACLK] [get_bd_pins axi_interconnect_0/M00_ACLK] [get_bd_pins axi_interconnect_0/M01_ACLK] [get_bd_pins axi_interconnect_0/M02_ACLK] [get_bd_pins axi_interconnect_0/M03_ACLK] [get_bd_pins axi_interconnect_0/S01_ACLK] [get_bd_pins axi_uart16550_0/s_axi_aclk] [get_bd_pins extllc_bram_ctrl/s_axi_aclk] [get_bd_pins jtag_axi_flash/aclk]
-  connect_bd_net -net ARESETN_0_1 [get_bd_ports ARESETN] [get_bd_pins axi_apb_bridge_0/s_axi_aresetn] [get_bd_pins axi_interconnect_0/ARESETN] [get_bd_pins axi_interconnect_0/M00_ARESETN] [get_bd_pins axi_interconnect_0/M01_ARESETN] [get_bd_pins axi_interconnect_0/M02_ARESETN] [get_bd_pins axi_interconnect_0/M03_ARESETN] [get_bd_pins axi_interconnect_0/S00_ARESETN] [get_bd_pins axi_interconnect_0/S01_ARESETN] [get_bd_pins axi_uart16550_0/s_axi_aresetn] [get_bd_pins extllc_bram_ctrl/s_axi_aresetn] [get_bd_pins jtag_axi_flash/aresetn]
+  set aclk_pins [list \
+    [get_bd_pins axi_apb_bridge_0/s_axi_aclk] \
+    [get_bd_pins axi_interconnect_0/ACLK] \
+    [get_bd_pins axi_interconnect_0/M00_ACLK] \
+    [get_bd_pins axi_interconnect_0/M02_ACLK] \
+    [get_bd_pins axi_interconnect_0/M03_ACLK] \
+    [get_bd_pins axi_interconnect_0/S01_ACLK] \
+    [get_bd_pins extllc_bram_ctrl/s_axi_aclk] \
+    [get_bd_pins jtag_axi_flash/aclk] \
+  ]
+  if {$uvhs_flow} {
+    lappend aclk_pins [get_bd_pins axi_interconnect_0/S02_ACLK]
+  } else {
+    lappend aclk_pins \
+      [get_bd_pins axi_interconnect_0/M01_ACLK] \
+      [get_bd_pins axi_uart16550_0/s_axi_aclk]
+  }
+  connect_bd_net -net ACLK_0_1 [get_bd_ports ACLK] {*}$aclk_pins
+  set aresetn_pins [list \
+    [get_bd_pins axi_apb_bridge_0/s_axi_aresetn] \
+    [get_bd_pins axi_interconnect_0/ARESETN] \
+    [get_bd_pins axi_interconnect_0/M00_ARESETN] \
+    [get_bd_pins axi_interconnect_0/M02_ARESETN] \
+    [get_bd_pins axi_interconnect_0/M03_ARESETN] \
+    [get_bd_pins axi_interconnect_0/S01_ARESETN] \
+    [get_bd_pins extllc_bram_ctrl/s_axi_aresetn] \
+    [get_bd_pins jtag_axi_flash/aresetn] \
+  ]
+  if {!$uvhs_flow} {
+    lappend aresetn_pins \
+      [get_bd_pins axi_interconnect_0/S00_ARESETN] \
+      [get_bd_pins axi_interconnect_0/M01_ARESETN] \
+      [get_bd_pins axi_uart16550_0/s_axi_aresetn]
+  } else {
+    lappend aresetn_pins [get_bd_pins axi_interconnect_0/S02_ARESETN]
+  }
+  connect_bd_net -net ARESETN_0_1 [get_bd_ports ARESETN] {*}$aresetn_pins
   connect_bd_net -net SYS_INTER_CLK_1 [get_bd_ports SYS_INTER_CLK] [get_bd_pins axi_interconnect_0/S00_ACLK]
+  if {$uvhs_flow} {
+    connect_bd_net -net SYS_INTER_ARESETN_1 [get_bd_ports SYS_INTER_ARESETN] [get_bd_pins axi_interconnect_0/S00_ARESETN]
+    connect_bd_net -net UART_ACLK_1 [get_bd_ports UART_ACLK] \
+      [get_bd_pins axi_interconnect_0/M01_ACLK] \
+      [get_bd_pins axi_uart16550_0/s_axi_aclk]
+    connect_bd_net -net UART_ARESETN_1 [get_bd_ports UART_ARESETN] \
+      [get_bd_pins axi_interconnect_0/M01_ARESETN] \
+      [get_bd_pins axi_uart16550_0/s_axi_aresetn]
+  }
   connect_bd_net -net axi_uart16550_0_ip2intc_irpt [get_bd_ports uart0_intc] [get_bd_pins axi_uart16550_0/ip2intc_irpt]
   connect_bd_net -net xlconstant_0_dout [get_bd_pins axi_uart16550_0/freeze] [get_bd_pins xlconstant_0/dout]
 
@@ -340,6 +438,12 @@ proc create_root_design { parentCell } {
   exclude_bd_addr_seg -target_address_space [get_bd_addr_spaces jtag_axi_flash/Data] [get_bd_addr_segs SYS_CFG_APB/Reg]
   exclude_bd_addr_seg -target_address_space [get_bd_addr_spaces jtag_axi_flash/Data] [get_bd_addr_segs axi_uart16550_0/S_AXI/Reg]
   exclude_bd_addr_seg -target_address_space [get_bd_addr_spaces jtag_axi_flash/Data] [get_bd_addr_segs extllc_bram_ctrl/S_AXI/Mem0]
+  if {$uvhs_flow} {
+    assign_bd_address -offset 0x00000000 -range 0x00100000 -target_address_space [get_bd_addr_spaces UVHS_FLASH_AXI] [get_bd_addr_segs rom_axi/Reg] -force
+    exclude_bd_addr_seg -target_address_space [get_bd_addr_spaces UVHS_FLASH_AXI] [get_bd_addr_segs SYS_CFG_APB/Reg]
+    exclude_bd_addr_seg -target_address_space [get_bd_addr_spaces UVHS_FLASH_AXI] [get_bd_addr_segs axi_uart16550_0/S_AXI/Reg]
+    exclude_bd_addr_seg -target_address_space [get_bd_addr_spaces UVHS_FLASH_AXI] [get_bd_addr_segs extllc_bram_ctrl/S_AXI/Mem0]
+  }
 
 
   # Restore current instance

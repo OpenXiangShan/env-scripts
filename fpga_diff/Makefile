@@ -29,7 +29,8 @@ PRJ_NAME = fpga_$(CPU)$(if $(strip $(SUFFIX)),-$(strip $(SUFFIX)),)
 PRJ_DIR ?= $(ENV_SCRIPTS_HOME)/$(PRJ_NAME)
 PRJ ?= $(PRJ_DIR)/$(PRJ_NAME).xpr
 
-.PHONY: bitstream vivado dump_ila write_jtag_flash update_core_flist
+.PHONY: bitstream vivado dump_ila update_core_flist \
+	write_bitstream halt_soc write_jtag_ddr write_jtag_flash reset_cpu
 
 # Get Vivado version
 VIVADO_VERSION := $(shell vivado -version 2>/dev/null | head -1 | grep -o '[0-9]\{4\}\.[0-9]' || echo "unknown")
@@ -47,7 +48,7 @@ bitstream:
 
 # RTL_INCLUDE accepts RTL files, directories, and .f/.flist/.list file lists.
 update_core_flist:
-	@./tools/update_core_flist.sh "$(CORE_DIR)" -- $(RTL_INCLUDE)
+	@./tools/update_core_flist.sh vivado "$(CORE_DIR)" -- $(RTL_INCLUDE)
 
 # Launch Vivado with FPGA project configuration
 vivado: check_vivado_version
@@ -109,3 +110,7 @@ get_synth_log:
 all:
 	$(MAKE) update_core_flist CORE_DIR="$(CORE_DIR)" RTL_INCLUDE="$(RTL_INCLUDE)"
 	$(MAKE) vivado CPU=$(CPU) SUFFIX="$(SUFFIX)"
+
+# UVHS targets use an explicit uvhs_* namespace and do not replace the normal
+# Vivado/JTAG targets above.
+include uvhs/uvhs.mk

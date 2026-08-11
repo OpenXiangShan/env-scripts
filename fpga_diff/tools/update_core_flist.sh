@@ -2,206 +2,169 @@
 
 set -euo pipefail
 
-fail() {
-  echo "ERROR: $*" >&2
-  exit 1
-}
-
 usage() {
-  echo "Usage: $0 CORE_DIR [--] [RTL_INCLUDE ...]" >&2
+  cat >&2 <<'EOF'
+Usage:
+  update_core_flist.sh vivado CORE_DIR [--] [RTL_INCLUDE ...]
+  update_core_flist.sh uvhs CORE_DIR WORK_DIR CPU OUTPUT [--] [RTL_INCLUDE ...]
+EOF
   exit 2
 }
 
-[[ $# -ge 1 ]] || usage
+script_dir=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)
+fpga_diff_dir=$(cd -- "$script_dir/.." && pwd)
+source "$script_dir/rtl_filelist_lib.sh"
 
-core_dir=$1
-shift
-if [[ ${1:-} == -- ]]; then
+generate_vivado_filelist() {
+  local core_dir=$1
+  local output=$fpga_diff_dir/src/tcl/cpu_files.tcl
+  local top_module=SimTop
+  local tmp_dir
+  local tmp_output
   shift
-fi
 
-[[ -d $core_dir ]] || fail "CORE_DIR is not a directory: $core_dir"
-
-fpga_diff_dir=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)
-awk_script="$fpga_diff_dir/core_flist.awk"
-output_tcl="$fpga_diff_dir/src/tcl/cpu_files.tcl"
-tmp_dir=$(mktemp -d)
-trap 'rm -rf "$tmp_dir"' EXIT
-
-declare -a rtl_files=()
-declare -a rtl_include_dirs=()
-declare -A seen_files=()
-declare -A seen_dirs=()
-declare -A active_filelists=()
-
-resolve_path() {
-  local base_dir=$1
-  local path=$2
-
-  if [[ $path != /* ]]; then
-    path="$base_dir/$path"
+  [[ -d $core_dir ]] || rtl_flist_fail "CORE_DIR is not a directory: $core_dir"
+  core_dir=$(realpath -e -- "$core_dir")
+  if [[ ${NO_DIFF:-0} == 1 ]]; then
+    top_module=XSTop
   fi
-  realpath -e -- "$path"
+  rtl_flist_parse_inputs "$PWD" "$@"
+
+  tmp_dir=$(mktemp -d)
+  trap 'rm -rf "$tmp_dir"' RETURN
+  find "$core_dir" -path "$core_dir/rtl/verification" -prune -o \
+    -type f \( -name '*.v' -o -name '*.sv' -o -name '*.vh' -o -name '*.svh' \) \
+    -print | LC_ALL=C sort > "$tmp_dir/cpu_files"
+  : > "$tmp_dir/rtl_files"
+  : > "$tmp_dir/rtl_include_dirs"
+  if ((${#rtl_flist_files[@]})); then
+    printf '%s\n' "${rtl_flist_files[@]}" > "$tmp_dir/rtl_files"
+  fi
+  if ((${#rtl_flist_include_dirs[@]})); then
+    printf '%s\n' "${rtl_flist_include_dirs[@]}" > "$tmp_dir/rtl_include_dirs"
+  fi
+
+  tmp_output=$tmp_dir/cpu_files.tcl
+  awk -v var=cpu_files -v detect_simtop_dma=1 -v top_module="$top_module" \
+    -f "$fpga_diff_dir/core_flist.awk" \
+    "$tmp_dir/cpu_files" > "$tmp_output"
+  awk -v var=rtl_include_files -f "$fpga_diff_dir/core_flist.awk" \
+    "$tmp_dir/rtl_files" >> "$tmp_output"
+  awk -v var=rtl_include_dirs -f "$fpga_diff_dir/core_flist.awk" \
+    "$tmp_dir/rtl_include_dirs" >> "$tmp_output"
+  mkdir -p "$(dirname -- "$output")"
+  mv -- "$tmp_output" "$output"
+  echo "INFO: generated $output with ${#rtl_flist_files[@]} external RTL files"
 }
 
-add_include_dir() {
-  local base_dir=$1
-  local path=$2
-  local resolved
+generate_uvhs_filelist() {
+  local core_dir=$1
+  local work_dir=$2
+  local cpu=$3
+  local output=$4
+  local core_rtl_dir
+  local core_generated_dir
+  local module_name
+  local source_file
+  local found
+  local tmp_dir
+  local tmp_output
+  local -a required_modules=()
+  shift 4
 
-  resolved=$(resolve_path "$base_dir" "$path") ||
-    fail "RTL include directory not found: $path"
-  [[ -d $resolved ]] || fail "RTL include path is not a directory: $path"
-  if [[ -z ${seen_dirs[$resolved]+x} ]]; then
-    seen_dirs[$resolved]=1
-    rtl_include_dirs+=("$resolved")
-  fi
-}
+  core_dir=$(realpath -e -- "$core_dir")
+  work_dir=$(realpath -e -- "$work_dir")
+  core_rtl_dir=$core_dir/rtl
+  core_generated_dir=$core_dir/generated-src
+  [[ -d $core_rtl_dir ]] || rtl_flist_fail "FPGA release RTL not found: $core_rtl_dir"
+  rtl_flist_parse_inputs "$PWD" "$@"
 
-add_rtl_file() {
-  local base_dir=$1
-  local path=$2
-  local resolved
+  mkdir -p "$(dirname -- "$output")"
+  tmp_dir=$(mktemp -d)
+  trap 'rm -rf "$tmp_dir"' RETURN
+  tmp_output=$tmp_dir/filelist.f
 
-  resolved=$(resolve_path "$base_dir" "$path") || fail "RTL source not found: $path"
-  [[ -f $resolved ]] || fail "RTL source is not a file: $path"
-  case $resolved in
-    *.v|*.sv|*.vh|*.svh) ;;
-    *)
-      fail "unsupported RTL source: $path"
-      ;;
-  esac
+  {
+    printf '+define+SYNTHESIS\n+define+XIANGSHAN_FPGA\n+define+UVHS\n'
+    printf '+define+DDR4_16G_X8\n+define+DQ64\n+define+DDR4_2400\n'
+    printf '+define+DQ=64\n+define+MICRON_DDR\n+define+DDR4_16Gbx8\n'
+    printf '+define+DDR4\n+define+SRAM_SYN\n+define+DATA_VERSION=0\n'
+    if [[ $cpu == nutshell ]]; then
+      printf '+define+CPU_NUTSHELL\n'
+    fi
+    if [[ $cpu == kmh ]] &&
+      grep -Eq '^[[:space:]]*(input|output)[[:space:]].*dma_awready' "$core_rtl_dir/SimTop.sv"; then
+      printf '+define+CONFIG_SIMTOP_HAS_DMA\n'
+    fi
 
-  if [[ -z ${seen_files[$resolved]+x} ]]; then
-    seen_files[$resolved]=1
-    rtl_files+=("$resolved")
-  fi
-  add_include_dir / "$(dirname -- "$resolved")"
-}
+    printf '+incdir+%s\n' "$core_dir" "$core_rtl_dir"
+    if [[ -d $core_generated_dir ]]; then
+      printf '+incdir+%s\n' "$core_generated_dir"
+    fi
+    printf '+incdir+%s/src/rtl/common\n' "$fpga_diff_dir"
 
-add_rtl_dir() {
-  local base_dir=$1
-  local path=$2
-  local recursive=$3
-  local resolved
-  local -a find_depth=()
-
-  resolved=$(resolve_path "$base_dir" "$path") || fail "RTL directory not found: $path"
-  [[ -d $resolved ]] || fail "RTL path is not a directory: $path"
-  add_include_dir / "$resolved"
-  if [[ $recursive == 0 ]]; then
-    find_depth=(-maxdepth 1)
-  fi
-  while IFS= read -r -d '' rtl_file; do
-    add_rtl_file / "$rtl_file"
-  done < <(
-    find "$resolved" "${find_depth[@]}" -type f \
+    find "$fpga_diff_dir/src/rtl/common" -type f \
       \( -name '*.v' -o -name '*.sv' -o -name '*.vh' -o -name '*.svh' \) \
-      -print0 | LC_ALL=C sort -z
-  )
-}
+      ! -name 'u0_xdma.v' -print | LC_ALL=C sort
+    if [[ -d $work_dir/rtl/stubs ]]; then
+      find "$work_dir/rtl/stubs" -type f -name '*.v' -print | LC_ALL=C sort
+    fi
+    if [[ -d $fpga_diff_dir/src/rtl/$cpu ]]; then
+      find "$fpga_diff_dir/src/rtl/$cpu" -type f \
+        \( -name '*.v' -o -name '*.sv' -o -name '*.vh' -o -name '*.svh' \) \
+        -print | LC_ALL=C sort
+    fi
+    find "$core_rtl_dir" -type f \
+      \( -name '*.v' -o -name '*.sv' -o -name '*.vh' -o -name '*.svh' \) \
+      -print | LC_ALL=C sort
+    if ((${#rtl_flist_include_dirs[@]})); then
+      printf '+incdir+%s\n' "${rtl_flist_include_dirs[@]}"
+    fi
+    if ((${#rtl_flist_files[@]})); then
+      printf '%s\n' "${rtl_flist_files[@]}"
+    fi
+  } > "$tmp_output"
 
-parse_filelist() {
-  local caller_dir=$1
-  local path=$2
-  local filelist
-  local filelist_dir
-  local line
-  local token
-  local pending=""
-  local value
-  local -a tokens=()
-  local -a values=()
-
-  filelist=$(resolve_path "$caller_dir" "$path") ||
-    fail "RTL file list not found: $path"
-  [[ -f $filelist ]] || fail "RTL file list is not a file: $path"
-  if [[ -n ${active_filelists[$filelist]+x} ]]; then
-    fail "recursive RTL file list: $filelist"
-  fi
-
-  active_filelists[$filelist]=1
-  filelist_dir=$(dirname -- "$filelist")
-  # Match -F semantics: relative entries belong to the containing file list.
-  while IFS= read -r line || [[ -n $line ]]; do
-    line=${line%$'\r'}
-    line=${line%%//*}
-    line=${line%%#*}
-    read -r -a tokens <<< "$line"
-    for token in "${tokens[@]}"; do
-      if [[ -n $pending ]]; then
-        case $pending in
-          filelist) parse_filelist "$filelist_dir" "$token" ;;
-          library) add_rtl_dir "$filelist_dir" "$token" 0 ;;
-          source) add_rtl_file "$filelist_dir" "$token" ;;
-          include) add_include_dir "$filelist_dir" "$token" ;;
-        esac
-        pending=""
-        continue
+  mv -- "$tmp_output" "$output"
+  case $cpu in
+    kmh|nutshell) required_modules=(SimTop) ;;
+    nanhu) required_modules=(XlnFpgaTop) ;;
+  esac
+  for module_name in "${required_modules[@]}"; do
+    found=0
+    while IFS= read -r source_file; do
+      [[ $source_file != +* && -f $source_file ]] || continue
+      if grep -Eq "^[[:space:]]*module[[:space:]]+$module_name([[:space:]#(]|$)" "$source_file"; then
+        found=1
+        break
       fi
-
-      case $token in
-        -f|-F) pending=filelist ;;
-        -y) pending=library ;;
-        -v) pending=source ;;
-        -I) pending=include ;;
-        -f*|-F*) parse_filelist "$filelist_dir" "${token:2}" ;;
-        -y*) add_rtl_dir "$filelist_dir" "${token:2}" 0 ;;
-        -v*) add_rtl_file "$filelist_dir" "${token:2}" ;;
-        -I*) add_include_dir "$filelist_dir" "${token:2}" ;;
-        +incdir+*)
-          IFS=+ read -r -a values <<< "${token#+incdir+}"
-          for value in "${values[@]}"; do
-            [[ -n $value ]] && add_include_dir "$filelist_dir" "$value"
-          done
-          ;;
-        +libext+*) ;;
-        *.v|*.sv|*.vh|*.svh) add_rtl_file "$filelist_dir" "$token" ;;
-        *) fail "unsupported option in $filelist: $token" ;;
-      esac
-    done
-  done < "$filelist"
-  [[ -z $pending ]] || fail "missing argument after file-list option in $filelist"
-  unset 'active_filelists[$filelist]'
+    done < "$output"
+    [[ $found == 1 ]] || rtl_flist_fail "required module not found: $module_name"
+    echo "INFO: found required module: $module_name"
+  done
+  echo "INFO: generated UVHS file list $output"
 }
 
-for rtl_include in "$@"; do
-  if [[ -d $rtl_include ]]; then
-    add_rtl_dir "$PWD" "$rtl_include" 1
-  elif [[ -f $rtl_include ]]; then
-    case $rtl_include in
-      *.f|*.flist|*.list) parse_filelist "$PWD" "$rtl_include" ;;
-      *) add_rtl_file "$PWD" "$rtl_include" ;;
-    esac
-  else
-    fail "RTL_INCLUDE path not found: $rtl_include"
-  fi
-done
-
-core_dir=$(realpath -e -- "$core_dir")
-top_module=SimTop
-if [[ ${NO_DIFF:-0} == 1 ]]; then
-  top_module=XSTop
-fi
-find "$core_dir" -path "$core_dir/rtl/verification" -prune -o \
-  -type f \( -name '*.v' -o -name '*.sv' -o -name '*.vh' -o -name '*.svh' \) \
-  -print | LC_ALL=C sort > "$tmp_dir/cpu_files"
-: > "$tmp_dir/rtl_files"
-: > "$tmp_dir/rtl_include_dirs"
-if ((${#rtl_files[@]})); then
-  printf '%s\n' "${rtl_files[@]}" > "$tmp_dir/rtl_files"
-fi
-if ((${#rtl_include_dirs[@]})); then
-  printf '%s\n' "${rtl_include_dirs[@]}" > "$tmp_dir/rtl_include_dirs"
-fi
-
-tmp_output="$tmp_dir/cpu_files.tcl"
-awk -v var=cpu_files -v detect_simtop_dma=1 -v top_module="$top_module" -f "$awk_script" \
-  "$tmp_dir/cpu_files" > "$tmp_output"
-awk -v var=rtl_include_files -f "$awk_script" \
-  "$tmp_dir/rtl_files" >> "$tmp_output"
-awk -v var=rtl_include_dirs -f "$awk_script" \
-  "$tmp_dir/rtl_include_dirs" >> "$tmp_output"
-mv -- "$tmp_output" "$output_tcl"
-
-echo "INFO: generated $output_tcl with ${#rtl_files[@]} external RTL files"
+mode=${1:-}
+[[ -n $mode ]] || usage
+shift
+case $mode in
+  vivado)
+    [[ $# -ge 1 ]] || usage
+    core_dir=$1
+    shift
+    [[ ${1:-} != -- ]] || shift
+    generate_vivado_filelist "$core_dir" "$@"
+    ;;
+  uvhs)
+    [[ $# -ge 4 ]] || usage
+    core_dir=$1
+    work_dir=$2
+    cpu=$3
+    output=$4
+    shift 4
+    [[ ${1:-} != -- ]] || shift
+    generate_uvhs_filelist "$core_dir" "$work_dir" "$cpu" "$output" "$@"
+    ;;
+  *) usage ;;
+esac

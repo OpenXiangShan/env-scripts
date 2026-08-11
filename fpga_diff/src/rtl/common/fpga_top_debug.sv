@@ -15,7 +15,7 @@ module fpga_top_debug
    input                 clk8_n,
    input                 clk7_p, // ddr 80MHz
    input                 clk7_n, 
-   input                 clk6_p, // system 200MHz
+   input                 clk6_p, // system 200MHz / UVHS UART 50MHz
    input                 clk6_n,
    input                 clk5_p, // debug 25MHz
    input                 clk5_n,
@@ -35,14 +35,18 @@ module fpga_top_debug
    input                 uart2_sin,
 `endif
    //PCIE
+`ifndef UVHS
 `ifdef XS_XDMA_EP
    input                 refclk_p, // pcie 100MHz
    input                 refclk_n,
    output                PERST_N,
-   
+
    input                 refclk2_p, // pcie 100MHz
    input                 refclk2_n,
    output                PERST2_N,
+`endif
+`endif
+`ifdef XS_XDMA_EP
    input    [`XDMA_PCIE_LANES-1:0] pci_ep_rxn,
    input    [`XDMA_PCIE_LANES-1:0] pci_ep_rxp,
    output   [`XDMA_PCIE_LANES-1:0] pci_ep_txn,
@@ -53,6 +57,7 @@ module fpga_top_debug
    input                 pcie_ep_perstn,
 `endif 
    //DDR
+`ifndef UVHS
    output    [`CONFIG_RANK_WIDTH-1:0] DDR0_CK_T,
    output    [`CONFIG_RANK_WIDTH-1:0] DDR0_CK_C,
    output    [`CONFIG_RANK_WIDTH-1:0] DDR0_CKE,
@@ -67,6 +72,7 @@ module fpga_top_debug
    inout     [63:0]      DDR0_DQ,
    inout     [7:0]       DDR0_DQS_T,
    inout     [7:0]       DDR0_DQS_C,
+`endif
    
 `ifdef XS_GMAC
    input                RGMII_RXCLK,
@@ -108,10 +114,20 @@ wire vio_sw4;
 wire sys_rstn;
 wire cpu_setn_buf;
 wire sys_clk_i, dev_clk_i;
+wire sys_rstn_to_core;
+wire cpu_rstn_to_core;
+wire ddr_rstn_to_core;
 wire pcie_rstn;
 (*mark_debug = "true"*) wire cpu_setn_rflag;
 (*mark_debug = "true"*) reg  cpu_rstn;
 
+`ifdef UVHS
+assign sys_rstn = rstn_sw6;
+assign cpu_setn_buf = rstn_sw5;
+assign sys_rstn_to_core = rstn_sw6;
+assign cpu_rstn_to_core = rstn_sw5;
+assign ddr_rstn_to_core = rstn_sw4;
+`else
 IBUF sys_rstn_ibuf (.O(sys_rstn), .I(rstn_sw6));
 IBUF cpu_rstn_ibuf (.O(cpu_setn_buf), .I(rstn_sw5));
 `ifdef XS_XDMA_EP
@@ -135,13 +151,28 @@ always@(posedge sys_clk_i) begin
       cpu_rstn <= cpu_rstn;
 end
 
+assign sys_rstn_to_core = sys_rstn && vio_sw6;
+assign cpu_rstn_to_core = cpu_rstn;
+assign ddr_rstn_to_core = rstn_sw4 && vio_sw4;
+`endif
+
+`ifdef XS_GMAC
 // Suppose PHY_RESET_B active high.
 // Although 88E1116R pin10 resetn is active low.
 // But this pin is on connector, which might not have current by default?
-assign PHY_RESET_B = cpu_rstn;
+assign PHY_RESET_B = cpu_rstn_to_core;
+`endif
 
-wire   tmclk;
 wire   tmclk_buf;
+wire   cqetmclk_buf;
+wire   dbg_clk_buf;
+
+`ifdef UVHS
+assign tmclk_buf = clk8_p;
+assign cqetmclk_buf = clk6_p;
+assign dbg_clk_buf = clk5_p;
+`else
+wire   tmclk;
 IBUFGDS ibufgds_tmclk_1MHz
 (
 	.I              (clk8_p),
@@ -155,7 +186,6 @@ BUFG bufg_tmclk
 );
 
 wire    cqetmclk;
-wire    cqetmclk_buf;
 IBUFGDS ibufgds_tmclk_200MHz
 (
 	.I              (clk6_p),
@@ -170,7 +200,6 @@ BUFG bufg_cqetmclk
 );
 
 wire    dbg_clk;
-wire    dbg_clk_buf;
 IBUFGDS ibufgds_dbgclk_25MHz
 (
 	.I              (clk5_p),
@@ -183,31 +212,39 @@ BUFG bufg_dbgclk
     .I              (dbg_clk),
     .O              (dbg_clk_buf)
 );
+`endif
 
+`ifndef UVHS
 `ifdef XS_XDMA_EP
 wire    pcie_sysclk_gt;
 wire    pcie_sysclk;
 
 IBUFDS_GTE4 refclk_ibuf (
-    .O(pcie_sysclk_gt), 
-    .ODIV2(pcie_sysclk), 
-    .I(refclk_p), 
-    .CEB(1'b0), 
+    .O(pcie_sysclk_gt),
+    .ODIV2(pcie_sysclk),
+    .I(refclk_p),
+    .CEB(1'b0),
     .IB(refclk_n)
 );
 
 IBUFDS_GTE4 refclk2_ibuf (
-    .O(pcie2_sysclk_gt), 
-    .ODIV2(pcie2_sysclk), 
-    .I(refclk2_p), 
-    .CEB(1'b0), 
+    .O(pcie2_sysclk_gt),
+    .ODIV2(pcie2_sysclk),
+    .I(refclk2_p),
+    .CEB(1'b0),
     .IB(refclk2_n)
 );
 `endif
+`endif
 
 assign        sys_clk_i = dbg_clk_buf;
+`ifdef UVHS
+assign        dev_clk_i = cqetmclk_buf;
+`else
 assign        dev_clk_i = dbg_clk_buf;
+`endif
 
+`ifndef UVHS
 vio_0 u_vio(
    .clk        (dbg_clk_buf),
 
@@ -215,6 +252,7 @@ vio_0 u_vio(
    .probe_out1 (vio_sw5),
    .probe_out2 (vio_sw4)
 );
+`endif
 //------------led test------------------
 
 wire                sdmmc_cclk_card;
@@ -335,9 +373,9 @@ core_def core_def
   .cpu_wr_ddr_valid     (led0),
   .sys_clk_i            (sys_clk_i),
   .dev_clk_i            (dev_clk_i),
-  .sys_rstn             (sys_rstn && vio_sw6),
-  .cpu_rstn             (cpu_rstn),
-  .rstn_sw4             (rstn_sw4 && vio_sw4),
+  .sys_rstn             (sys_rstn_to_core),
+  .cpu_rstn             (cpu_rstn_to_core),
+  .rstn_sw4             (ddr_rstn_to_core),
   .dft_lgc_rst_n        (1'b1),
   .dft_se               (1'b0),
   .chip_mode_i          (2'b00), // normal mode
@@ -383,24 +421,8 @@ core_def core_def
 //  .qspi_mi2(qspi_mi2),
 //  .qspi_mi3(qspi_mi3),
 
-   // sdmmc
-  .sd_card_clk_out      (sdmmc_cclk_card),
-  .sd_cmd_out           (sdmmc_sd_cmd_out),
-  .sd_cmd_out_oe        (sdmmc_sd_cmd_out_en),
-  .sd_dat_out           (sdmmc_sd_dat_out),
-  .sd_dat_out_oe        (sdmmc_sd_dat_out_en),
-  .uhs1_drv_sth         (sdmmc_uhs1_drv_sth),
-  .uhs1_swvolt_en       (sdmmc_uhs1_swvolt_en),
-  .sd_vdd1_on           (sdmmc_sd_vdd1_on),
-  .sd_vdd1_sel          (sdmmc_sd_vdd1_sel),
-  .sd_card_det_in       (sdmmc_card_detect_n),
-  .sd_card_wp_in        (sdmmc_card_write_prot),
-  .sd_cmd_in            (sdmmc_sd_cmd_in),
-  .sd_dat_in            (sdmmc_sd_dat_in),
-  .sd_led_control       (          ),
-  
-  `ifdef XS_GMAC
-  // gmac
+`ifdef XS_GMAC
+  // GMAC
   .io_gmac_mdo_oe  ( io_gmac_mdo_oe  ),
   .io_gmac_mdo     ( io_gmac_mdo     ),
   .io_gmac_mck_out ( io_gmac_mck_out ),
@@ -411,9 +433,10 @@ core_def core_def
   .io_gmac_rxd_vld ( io_gmac_rxd_vld ),
   .io_gmac_rxd     ( io_gmac_rxd     ),
   .io_gmac_txd     ( io_gmac_txd     ),
-  `endif
+`endif
 
-  // ddr
+`ifndef UVHS
+  // DDR
   .DDR_CK_T             (DDR0_CK_T        ),   
   .DDR_CK_C             (DDR0_CK_C        ),   
   .DDR_CKE              (DDR0_CKE         ),    
@@ -427,31 +450,24 @@ core_def core_def
   .DDR_DM_N             (DDR0_DM          ),     
   .DDR_DQ               (DDR0_DQ          ),     
   .DDR_DQS_T            (DDR0_DQS_T       ),  
-  .DDR_DQS_C            (DDR0_DQS_C       )/*,  
-  .DDR_ZQ               (DDR0_ZQ),
-  .gmac_gmii_mdc_o(gmac_gmii_mdc_o),
-  .gmac_gmii_mdo_o(gmac_gmii_mdo_o),
-  .gmac_gmii_mdo_o_e(gmac_gmii_mdo_o_e),
-  .gmac_clk_tx_o(gmac_clk_tx_o),
-  .gmac_phy_txd(gmac_phy_txd),
-  .gmac_phy_txen(gmac_phy_txen),
-  .gmac_gmii_mdi_i(gmac_gmii_mdi_i),
-  .gmac_clk_rx_i(gmac_clk_rx_i),
-  .gmac_phy_rxd(gmac_phy_rxd),
-  .gmac_phy_rxdv(gmac_phy_rxdv),
-  
-  .gpio_porta_ddr(gpio_porta_ddr),
-  .gpio_porta_dr(gpio_porta_dr),
-  .gpio_ext_porta(gpio_ext_porta),
-  
-  .jtag_tck(jtag_tck), 
-  .jtag_tdi(jtag_tdi), 
-  .jtag_tms(jtag_tms), 
-  .jtag_trstn(jtag_trstn),
-  .jtag_tdo(jtag_tdo), 
-  
-  */
+  .DDR_DQS_C            (DDR0_DQS_C       ),
+`endif
 
+  // SDMMC
+  .sd_card_clk_out      (sdmmc_cclk_card),
+  .sd_cmd_out           (sdmmc_sd_cmd_out),
+  .sd_cmd_out_oe        (sdmmc_sd_cmd_out_en),
+  .sd_dat_out           (sdmmc_sd_dat_out),
+  .sd_dat_out_oe        (sdmmc_sd_dat_out_en),
+  .uhs1_drv_sth         (sdmmc_uhs1_drv_sth),
+  .uhs1_swvolt_en       (sdmmc_uhs1_swvolt_en),
+  .sd_vdd1_on           (sdmmc_sd_vdd1_on),
+  .sd_vdd1_sel          (sdmmc_sd_vdd1_sel),
+  .sd_card_det_in       (sdmmc_card_detect_n),
+  .sd_card_wp_in        (sdmmc_card_write_prot),
+  .sd_cmd_in            (sdmmc_sd_cmd_in),
+  .sd_dat_in            (sdmmc_sd_dat_in),
+  .sd_led_control       ()
 );
 
 //---
