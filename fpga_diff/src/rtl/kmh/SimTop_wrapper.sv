@@ -265,6 +265,13 @@ wire [149:0] trace_iaddr;
 wire [11:0]  trace_itype;
 wire [20:0]  trace_iretire;
 wire [2:0]   trace_ilastsize;
+`ifndef NO_DIFF
+wire [47:0]  difftest_mem_awaddr_int;
+wire [47:0]  difftest_mem_araddr_int;
+
+assign mem_core_awaddr = difftest_mem_awaddr_int[35:0];
+assign mem_core_araddr = difftest_mem_araddr_int[35:0];
+`endif
 
 `ifndef CONFIG_SIMTOP_HAS_DMA
 assign dma_core_awready = 1'b0;
@@ -295,7 +302,7 @@ assign dma_core_rlast   = 1'b0;
   .peripheral_awready            (peri_awready  ),
   .peripheral_awvalid            (peri_awvalid  ),
   .peripheral_awid               (peri_awid     ),
-  .peripheral_awaddr             ({16'd0, peri_awaddr}),
+  .peripheral_awaddr             (peri_awaddr  ),
   .peripheral_awlen              (peri_awlen    ),
   .peripheral_awsize             (peri_awsize   ),
   .peripheral_awburst            (peri_awburst  ),
@@ -315,7 +322,7 @@ assign dma_core_rlast   = 1'b0;
   .peripheral_arready            (peri_arready  ),
   .peripheral_arvalid            (peri_arvalid  ),
   .peripheral_arid               (peri_arid     ),
-  .peripheral_araddr             ({16'd0, peri_araddr}),
+  .peripheral_araddr             (peri_araddr  ),
   .peripheral_arlen              (peri_arlen    ),
   .peripheral_arsize             (peri_arsize   ),
   .peripheral_arburst            (peri_arburst  ),
@@ -333,7 +340,7 @@ assign dma_core_rlast   = 1'b0;
   .dma_awready                   (dma_core_awready ),
   .dma_awvalid                   (dma_core_awvalid ),
   .dma_awid                      (dma_core_awid    ),
-  .dma_awaddr                    (dma_core_awaddr[35:0]  ),
+  .dma_awaddr                    ({12'b0, dma_core_awaddr}),
   .dma_awlen                     (dma_core_awlen   ),
   .dma_awsize                    (dma_core_awsize  ),
   .dma_awburst                   (dma_core_awburst ),
@@ -353,7 +360,7 @@ assign dma_core_rlast   = 1'b0;
   .dma_arready                   (dma_core_arready ),
   .dma_arvalid                   (dma_core_arvalid ),
   .dma_arid                      (dma_core_arid    ),
-  .dma_araddr                    (dma_core_araddr[35:0]  ),
+  .dma_araddr                    ({12'b0, dma_core_araddr}),
   .dma_arlen                     (dma_core_arlen   ),
   .dma_arsize                    (dma_core_arsize  ),
   .dma_arburst                   (dma_core_arburst ),
@@ -368,9 +375,16 @@ assign dma_core_rlast   = 1'b0;
   .dma_rresp                     (dma_core_rresp   ),
   .dma_rlast                     (dma_core_rlast   ),
 `endif
+`ifdef UVHS
+  // UVHS does not expose XiangShan's SystemJTAG pins.
+  .io_systemjtag_jtag_TCK          (1'b0),
+  .io_systemjtag_jtag_TMS          (1'b1),
+  .io_systemjtag_jtag_TDI          (1'b0),
+`else
   .io_systemjtag_jtag_TCK          (io_systemjtag_jtag_TCK),
   .io_systemjtag_jtag_TMS          (io_systemjtag_jtag_TMS),
   .io_systemjtag_jtag_TDI          (io_systemjtag_jtag_TDI),
+`endif
   .io_systemjtag_jtag_TDO_data     (io_systemjtag_jtag_TDO_data),
   .io_systemjtag_jtag_TDO_driven   (io_systemjtag_jtag_TDO_driven),
   .io_systemjtag_reset             (io_systemjtag_reset),
@@ -390,7 +404,7 @@ assign dma_core_rlast   = 1'b0;
   .io_pll0_ctrl_5                  (io_pll0_ctrl_5),
   .io_extIntrs                     (io_extIntrs  ),
   .io_rtc_clock                    (tmclk),
-  .io_riscv_rst_vec_0              (38'h10000000),
+  .io_riscv_rst_vec_0              (48'h0000_1000_0000),
 
 
 `ifndef NO_DIFF
@@ -437,7 +451,11 @@ assign dma_core_rlast   = 1'b0;
 `ifndef NO_DIFF
   `MEM_PORT(`MEM_PREFIX, awuser)  (),
 `endif
+`ifdef NO_DIFF
   `MEM_PORT(`MEM_PREFIX, awaddr)  ({12'd0, mem_core_awaddr}),
+`else
+  `MEM_PORT(`MEM_PREFIX, awaddr)  (difftest_mem_awaddr_int),
+`endif
   `MEM_PORT(`MEM_PREFIX, awlen)   (mem_core_awlen   ),
   `MEM_PORT(`MEM_PREFIX, awsize)  (mem_core_awsize  ),
   `MEM_PORT(`MEM_PREFIX, awburst) (mem_core_awburst ),
@@ -463,7 +481,11 @@ assign dma_core_rlast   = 1'b0;
 `ifndef NO_DIFF
   `MEM_PORT(`MEM_PREFIX, aruser)  (),
 `endif
+`ifdef NO_DIFF
   `MEM_PORT(`MEM_PREFIX, araddr)  ({12'd0, mem_core_araddr}),
+`else
+  `MEM_PORT(`MEM_PREFIX, araddr)  (difftest_mem_araddr_int),
+`endif
   `MEM_PORT(`MEM_PREFIX, arlen)   (mem_core_arlen   ),
   `MEM_PORT(`MEM_PREFIX, arsize)  (mem_core_arsize  ),
   `MEM_PORT(`MEM_PREFIX, arburst) (mem_core_arburst ),

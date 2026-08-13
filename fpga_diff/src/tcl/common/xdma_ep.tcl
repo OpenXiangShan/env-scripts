@@ -174,6 +174,18 @@ proc env_choice {name default allowed} {
   return $value
 }
 
+proc env_positive_integer {name default} {
+  set value $default
+  if {[info exists ::env($name)] && [string trim $::env($name)] ne ""} {
+    set value [string trim $::env($name)]
+  }
+  if {![string is integer -strict $value] || $value <= 0} {
+    error "$name must be a positive integer, got '$value'"
+  }
+  puts "INFO: $name=$value"
+  return $value
+}
+
 if { $bCheckIPs == 1 } {
   common::send_gid_msg -ssname BD::TCL -id 2058 -severity "INFO" "Current scripts_vivado_version value: '$::vivado_version'"
   
@@ -221,6 +233,13 @@ proc create_root_design { parentCell } {
   variable xdma_vlnv
   variable util_vlnv
   set xdma_link_width [env_choice XDMA_LINK_WIDTH X4 {X4 X8}]
+  set uvhs_flow [expr {[info exists ::env(UVHS_FLOW)] && $::env(UVHS_FLOW) eq "1"}]
+  if {$uvhs_flow} {
+    set xdma_enable_pf0_bar1 [env_choice XDMA_ENABLE_PF0_BAR1 1 {0 1}]
+    set xdma_axilite_master_scale [env_choice XDMA_AXILITE_MASTER_SCALE Kilobytes {Kilobytes Megabytes Gigabytes}]
+    set xdma_axilite_master_size [env_positive_integer XDMA_AXILITE_MASTER_SIZE 512]
+    set xdma_pf0_bar1_enabled [expr {$xdma_enable_pf0_bar1 eq "1" ? "true" : "false"}]
+  }
   set xdma_lane_count [string range $xdma_link_width 1 end]
   set xdma_lane_msb [expr {$xdma_lane_count - 1}]
   if {$xdma_link_width eq "X4"} {
@@ -376,6 +395,16 @@ proc create_root_design { parentCell } {
     ] $xdma_0
   } else {
     error "Unsupported XDMA IP version: $xdma_vlnv (only 4.1 or 4.2 supported)"
+  }
+
+  if {$uvhs_flow} {
+    set_property -dict [list \
+      CONFIG.axilite_master_scale $xdma_axilite_master_scale \
+      CONFIG.axilite_master_size $xdma_axilite_master_size \
+      CONFIG.pf0_bar1_enabled $xdma_pf0_bar1_enabled \
+      CONFIG.pf0_bar1_scale {Kilobytes} \
+      CONFIG.pf0_bar1_size {64} \
+    ] $xdma_0
   }
 
   puts "INFO: wiring XDMA ST interfaces directly on axi_aclk"
