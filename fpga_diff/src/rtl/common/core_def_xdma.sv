@@ -1420,7 +1420,11 @@ wire [0:0]    br2cfg_wvalid;
   assign xdma_cpu_clk = difftest_pcie_clock;
   assign xdma_cpu_rstn = 1'b1;
 
+`ifdef CONFIG_DIFFTEST_HOSTIF_GBUS
+  uvhs_gbus_host_adapter xdma_ep_i(
+`else
   xdma_ep xdma_ep_i(
+`endif
     .cpu_clk              (xdma_cpu_clk),
     .cpu_rstn             (xdma_cpu_rstn),
     .S00_AXIS_0_tdata     (xdma_s00_axis_tdata),
