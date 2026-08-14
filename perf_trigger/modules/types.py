@@ -57,6 +57,10 @@ class PendingTask:
     name: str
     free: FreeCoreInfo
     started: float = field(default_factory=time.time)
+    command: tuple[str, ...] = ()
+    stdout_path: Path | None = None
+    stderr_path: Path | None = None
 
+    @property
     def elapsed(self) -> float:
         return time.time() - self.started
