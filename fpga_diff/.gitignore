@@ -28,3 +28,7 @@ uvhs/*.local.sh
 *.rpt
 *.rpx
 hw.dat/
+
+# Bundled UVHS protected-IP release artifacts are intentional source assets.
+!third_party/gbus_ip/**/*.dcp
+!third_party/gbus_ip/**/*.v
