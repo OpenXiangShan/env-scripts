@@ -28,16 +28,19 @@ query -voltage
 # runtimes reject the complete default table in that case. Allow a caller to
 # provide the one used clock explicitly, but never guess its index/frequency.
 if {[catch {query -clock -default} uvhs_clock_default_error]} {
-    if {![info exists ::env(UVHS_CLOCK_INDEX)] ||
-        ![info exists ::env(UVHS_CLOCK_FREQUENCY_HZ)] ||
-        $::env(UVHS_CLOCK_INDEX) eq "" ||
-        $::env(UVHS_CLOCK_FREQUENCY_HZ) eq ""} {
-        error "query -clock -default failed and explicit UVHS_CLOCK_INDEX/UVHS_CLOCK_FREQUENCY_HZ are not set: $uvhs_clock_default_error"
+    # Some released databases omit sign-off defaults while retaining the
+    # replay clock values used by the compiled design. Keep those values active.
+    if {[info exists ::env(UVHS_CLOCK_INDEX)] &&
+        [info exists ::env(UVHS_CLOCK_FREQUENCY_HZ)] &&
+        $::env(UVHS_CLOCK_INDEX) ne "" &&
+        $::env(UVHS_CLOCK_FREQUENCY_HZ) ne ""} {
+        puts "WARNING: default ClockHub table unavailable: $uvhs_clock_default_error"
+        puts "INFO: configuring ClockHub index $::env(UVHS_CLOCK_INDEX) to $::env(UVHS_CLOCK_FREQUENCY_HZ) Hz"
+        config -clock -index $::env(UVHS_CLOCK_INDEX) \
+            -frequency $::env(UVHS_CLOCK_FREQUENCY_HZ)
+    } else {
+        puts "WARNING: no sign-off ClockHub default; retaining database replay clocks: $uvhs_clock_default_error"
     }
-    puts "WARNING: default ClockHub table unavailable: $uvhs_clock_default_error"
-    puts "INFO: configuring ClockHub index $::env(UVHS_CLOCK_INDEX) to $::env(UVHS_CLOCK_FREQUENCY_HZ) Hz"
-    config -clock -index $::env(UVHS_CLOCK_INDEX) \
-        -frequency $::env(UVHS_CLOCK_FREQUENCY_HZ)
 } else {
     config -clock -default
 }
