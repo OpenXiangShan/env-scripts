@@ -249,13 +249,13 @@ trigger -status -wait 1 -timeout 60
 upload_uhd -depth 1000000 -position 0 -clock clk5_p -out uvhs_ila
 ```
 
-The FPGA host clears `HOST_IO_ILA_TRIGGER`, invokes `FPGA_ILA_DUMP_CMD`, and
+The FPGA host clears `HOST_IO_ILA_TRIGGER`, invokes `FPGA_ILA_ARM_CMD`, and
 then releases the CPU. It raises that signal at Good Trap or DiffTest failure.
 Use `uvhs_ila_arm` as the hook so capture starts before the host releases the
 CPU and the requested history precedes the host trigger:
 
 ```sh
-export FPGA_ILA_DUMP_CMD='ssh <runtime-host> \
+export FPGA_ILA_ARM_CMD='ssh <runtime-host> \
   "make -C /path/to/env-scripts/fpga_diff uvhs_ila_arm \
   CPU=<design> SUFFIX=<tag> \
   TRIGGER=/path/to/env-scripts/fpga_diff/uvhs/runtime/trigger.ini \
