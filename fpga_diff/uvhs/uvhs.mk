@@ -32,6 +32,8 @@ UVHS_ILA_DEPTH ?= 1000000
 UVHS_ILA_POSITION ?= 0
 UVHS_ILA_CLOCK ?= clk5_p
 UVHS_ILA_GATED_CLOCK ?=
+UVHS_ILA_RUNTIME_HOST ?=
+UVHS_ILA_RUNTIME_DIR ?= $(CURDIR)
 UVHS_ILA_DIR := $(UVHS_RUNTIME_WORK_DIR)/UHD/uvhs_ila
 UVHS_ILA_USDB := $(UVHS_ILA_DIR)/UvData.usdb
 UVHS_ILA_VCD := $(UVHS_ILA_DIR)/UvData.vcd
@@ -56,6 +58,7 @@ UVHS_FLOW_ENV = \
 	uvhs_frontend uvhs_backend uvhs_clean uvhs_write_bitstream \
 	uvhs_halt_soc uvhs_reset_cpu uvhs_write_ddr uvhs_write_flash \
 	uvhs_ila_arm uvhs_ila_upload uvhs_vcd uvhs_ila_clear \
+	uvhs_ila_host_env \
 	uvhs_runtime_status uvhs_runtime_stop
 
 # Validate host tools and external inputs before starting a multi-hour build.
@@ -186,6 +189,29 @@ uvhs_ila_upload:
 	test -s "$(UVHS_ILA_USDB)"
 	$(MAKE) uvhs_vcd
 	@echo "UVHS_ILA_USDB=$(UVHS_ILA_USDB)"
+
+# Print sourceable hooks for an fpga-host process. Set UVHS_ILA_RUNTIME_HOST
+# when the runtime is remote; its shell loads ~/.bashrc before running Make.
+uvhs_ila_host_env:
+	@bash -c 'set -euo pipefail; \
+		runtime_host=$$1; runtime_dir=$$2; cpu=$$3; suffix=$$4; trigger=$$5; position=$$6; \
+		clock=$$7; gated_clock=$$8; timeout=$$9; depth=$${10}; \
+		[[ -n $$cpu ]] || { echo "ERROR: CPU is not set" >&2; exit 1; }; \
+		[[ -f $$trigger ]] || { echo "ERROR: trigger condition file not found: $$trigger" >&2; exit 1; }; \
+		quote_arg() { printf "%q" "$$1"; }; \
+		arm_cmd="make -C $$(quote_arg "$$runtime_dir") uvhs_ila_arm"; \
+		for argument in "CPU=$$cpu" "SUFFIX=$$suffix" "TRIGGER=$$trigger" "UVHS_ILA_POSITION=$$position" "UVHS_ILA_CLOCK=$$clock" "UVHS_ILA_GATED_CLOCK=$$gated_clock"; do arm_cmd+=" $$(quote_arg "$$argument")"; done; \
+		upload_cmd="make -C $$(quote_arg "$$runtime_dir") uvhs_ila_upload"; \
+		for argument in "CPU=$$cpu" "SUFFIX=$$suffix" "UVHS_ILA_TIMEOUT=$$timeout" "UVHS_ILA_DEPTH=$$depth" "UVHS_ILA_CLOCK=$$clock"; do upload_cmd+=" $$(quote_arg "$$argument")"; done; \
+		if [[ -n $$runtime_host ]]; then \
+			printf -v arm_cmd "ssh %q %q" "$$runtime_host" "source ~/.bashrc && $$arm_cmd"; \
+			printf -v upload_cmd "ssh %q %q" "$$runtime_host" "source ~/.bashrc && $$upload_cmd"; \
+		fi; \
+		printf "export FPGA_ILA_ARM_CMD=%q\\n" "$$arm_cmd"; \
+		printf "export FPGA_ILA_UPLOAD_CMD=%q\\n" "$$upload_cmd"' _ \
+		"$(UVHS_ILA_RUNTIME_HOST)" "$(UVHS_ILA_RUNTIME_DIR)" "$(CPU)" "$(SUFFIX)" "$(abspath $(TRIGGER))" \
+		"$(UVHS_ILA_POSITION)" "$(UVHS_ILA_CLOCK)" "$(UVHS_ILA_GATED_CLOCK)" \
+		"$(UVHS_ILA_TIMEOUT)" "$(UVHS_ILA_DEPTH)"
 
 uvhs_vcd:
 	test -x "$$UV_ROOT/uvd/uvs/bin/usdb2vcd"

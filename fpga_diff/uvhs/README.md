@@ -251,8 +251,10 @@ upload_uhd -depth 1000000 -position 0 -clock clk5_p -out uvhs_ila
 
 The FPGA host clears `HOST_IO_ILA_TRIGGER`, invokes `FPGA_ILA_ARM_CMD`, and
 then releases the CPU. It raises that signal at Good Trap or DiffTest failure.
-Use `uvhs_ila_arm` as the hook so capture starts before the host releases the
-CPU and the requested history precedes the host trigger:
+After it has closed XDMA and completed `difftest_finish`, it invokes
+`FPGA_ILA_UPLOAD_CMD` only when it raised that trigger. Use the arm hook so
+capture starts before the host releases the CPU and the requested history
+precedes the host trigger:
 
 ```sh
 export FPGA_ILA_ARM_CMD='ssh <runtime-host> \
@@ -262,11 +264,34 @@ export FPGA_ILA_ARM_CMD='ssh <runtime-host> \
   UVHS_ILA_POSITION=0 \
   UVHS_ILA_GATED_CLOCK=<capture-clock-0>,<capture-clock-1>"'
 
+export FPGA_ILA_UPLOAD_CMD='ssh <runtime-host> \
+  "make -C /path/to/env-scripts/fpga_diff uvhs_ila_upload \
+  CPU=<design> SUFFIX=<tag> UVHS_ILA_DEPTH=1000000"'
+
 /path/to/fpga-host <host arguments>
 
 # Run on the runtime host after fpga-host exits.
 make uvhs_ila_upload CPU=<design> SUFFIX=<tag>
 ```
+
+To generate both hooks for a host shell, use `uvhs_ila_host_env`. Its default
+runtime is local; set `UVHS_ILA_RUNTIME_HOST` and `UVHS_ILA_RUNTIME_DIR` when
+the host and runtime are separate. The generated SSH commands source the
+runtime user's `.bashrc` before invoking Make:
+
+```sh
+eval "$(make -C /path/to/env-scripts/fpga_diff uvhs_ila_host_env \
+  CPU=<design> SUFFIX=<tag> TRIGGER=/path/to/trigger.ini \
+  UVHS_ILA_RUNTIME_HOST=<runtime-host> \
+  UVHS_ILA_RUNTIME_DIR=/path/to/env-scripts/fpga_diff)"
+
+/path/to/fpga-host <host arguments>
+```
+
+The upload hook logs a warning on failure without replacing the host's original
+Good Trap or DiffTest result. It is skipped if the host exits before raising the
+ILA trigger; in that case, use `make uvhs_ila_upload` or `uvhs_ila_clear`
+explicitly while the runtime remains active.
 
 The arm command must use the same runtime work directory as
 `uvhs_write_bitstream`. If the FPGA host and UVHS runtime are on one machine,
