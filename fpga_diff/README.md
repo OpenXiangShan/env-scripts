@@ -48,6 +48,27 @@ FPGA_DDR_LOAD_CMD="bash -lc ' \
 ./fpga-host --diff <nemu> -i <workload>.bin
 ```
 
+Remote UART for fpga-host
+=========================
+
+When fpga-host runs on a machine other than the FPGA USB-UART host, bridge
+the remote UART to a local pseudo-terminal. Install socat on both hosts, then
+start the bridge:
+
+    make bind_uart REMOTE=<user@fpga-host>
+
+The target bridges remote /dev/ttyUSB0 at 115200 baud to
+/tmp/fpga-remote-uart locally, exports FPGA_UART_PORT, and starts an
+interactive shell. Run fpga-host in that shell; leaving it stops the bridge.
+Override REMOTE_UART_PORT, REMOTE_UART_BAUD, or FPGA_UART_PORT when needed.
+For a scripted invocation, obtain the same environment assignment with:
+
+    eval "$(make -s uart_env REMOTE=<user@fpga-host>)"
+
+The bridge is bidirectional, so interactive UART input is also forwarded. It
+deliberately uses a /tmp pseudo-terminal rather than overwriting local
+/dev/ttyUSB0.
+
 UVHS Flow
 =========
 
