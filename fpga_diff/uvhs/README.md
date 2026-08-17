@@ -100,6 +100,14 @@ reported frequency. The fixed UART clock matches the 50 MHz clock declared by
 the XiangShan FPGA device tree and keeps UART baud timing independent of CPU
 clock gating.
 
+`UVHS_TMCLK_CPU_RATIO` is an opt-in runtime setting for systems that require a
+fixed CPU-to-timer ratio. For example, `UVHS_TMCLK_CPU_RATIO=50` derives
+`clk8_p` from the sign-off `clk5_p` value while retaining the CPU frequency
+selected by the runtime database. `clk8_p` drives `TMCLK`; update the Linux
+device-tree `timebase-frequency` to its derived value before treating Linux
+timestamps as wall-clock time. The DDR reference `clk7_p` and the DDR IP user
+clock are not runtime PLL outputs and remain fixed by the selected DDR DCP.
+
 ## Runtime
 
 ```sh
