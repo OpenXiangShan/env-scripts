@@ -26,6 +26,8 @@ UVHS_RUNTIME_PID_FILE := $(UVHS_RUNTIME_WORK_DIR)/uv_shell.pid
 UVHS_RUNTIME_READY_FILE := $(UVHS_RUNTIME_WORK_DIR)/uv_shell.ready
 UVHS_RUNTIME_LOG := $(UVHS_RUNTIME_WORK_DIR)/uv_shell.log
 UVHS_RUNTIME_TIMEOUT ?= 600
+# Optional runtime override for the clock shared by CPU/SoC and DDR AXI.
+UVHS_DDR_FRONTEND_CLK_HZ ?=
 # When set, derive clk8_p from the sign-off clk5_p runtime frequency.
 UVHS_TMCLK_CPU_RATIO ?=
 
@@ -43,6 +45,7 @@ UVHS_TOOL_ENV = \
 	MAKEFLAGS="$${MAKEFLAGS:+$$MAKEFLAGS }SHELL=/bin/bash" \
 	UVHS_RUNTIME_LIB_DIR="$(UVHS_RUNTIME_LIB_DIR)" \
 	UVHS_COMPAT_BIN="$(UVHS_COMPAT_BIN)" \
+	UVHS_DDR_FRONTEND_CLK_HZ="$(UVHS_DDR_FRONTEND_CLK_HZ)" \
 	UVHS_TMCLK_CPU_RATIO="$(UVHS_TMCLK_CPU_RATIO)" \
 	UVSHELL_EXEC_NAME="$(UVHS_RUNTIME_DIR)/uv_shell_exec_compat.sh"
 

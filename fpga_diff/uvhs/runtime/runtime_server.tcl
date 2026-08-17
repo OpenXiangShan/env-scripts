@@ -278,6 +278,25 @@ proc uvhs_configure_tmclk_from_cpu {} {
     config -clock -name clk8_p -frequency $tmclk_frequency
 }
 
+proc uvhs_configure_ddr_frontend_clock {} {
+    if {![info exists ::env(UVHS_DDR_FRONTEND_CLK_HZ)] ||
+        [string trim $::env(UVHS_DDR_FRONTEND_CLK_HZ)] eq ""} {
+        return
+    }
+
+    set frequency [uvhs_parse_integer \
+        "DDR AXI frontend clock frequency" \
+        $::env(UVHS_DDR_FRONTEND_CLK_HZ)]
+    if {$frequency <= 0} {
+        error "DDR AXI frontend clock frequency must be positive: $frequency"
+    }
+
+    puts [format \
+        "INFO: setting DDR AXI frontend clk5_p/sys_clk_i to %d Hz" \
+        $frequency]
+    config -clock -name clk5_p -frequency $frequency
+}
+
 proc uvhs_capture_station_counts {} {
     set counts {}
     foreach line [split [query -capture -tclobj] "\n"] {
@@ -607,6 +626,9 @@ proc uvhs_initialize_runtime {} {
     # Keep clk5_p at the system sign-off frequency committed in this runtime DB.
     # It varies with the partition and PnR result, so it must not be hard-coded.
     config -clock -name clk6_p -frequency 50000000
+    # The DDR AXI frontend and CPU/SoC share clk5_p/sys_clk_i. Apply an
+    # optional override before deriving TMCLK from the CPU frequency.
+    uvhs_configure_ddr_frontend_clock
     uvhs_configure_tmclk_from_cpu
     config -clock -commit
     query -clock

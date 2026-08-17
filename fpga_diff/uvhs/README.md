@@ -108,6 +108,26 @@ device-tree `timebase-frequency` to its derived value before treating Linux
 timestamps as wall-clock time. The DDR reference `clk7_p` and the DDR IP user
 clock are not runtime PLL outputs and remain fixed by the selected DDR DCP.
 
+`UVHS_DDR_FRONTEND_CLK_HZ` is an optional startup override for the clock that
+actually drives the DDR AXI frontend. It configures the existing ClockHub
+clock `clk5_p`, which is wired to `sys_clk_i` and is shared by the CPU/SoC and
+the DDR AXI interface. It does not change the physical DDR reference input
+`clk7_p`, the fixed `FP_CLK_200M_P/N` pins, or the DDR IP-generated user clock.
+For example:
+
+```sh
+make uvhs_write_bitstream CPU=<design> SUFFIX=<tag> \
+  UVHS_DDR_FRONTEND_CLK_HZ=14000000
+```
+
+The setting is applied before `download` and is not a hot clock switch. The
+requested value must be supported by the generated timing/sign-off result and
+the board/runtime clock limits. Because `clk5_p` is also the CPU clock, this
+override changes both CPU/SoC and DDR AXI frontend frequency; when
+`UVHS_TMCLK_CPU_RATIO` is set, TMCLK is derived from the overridden value.
+No frontend or bitstream rebuild is needed for a database that already exposes
+`clk5_p`; the selected runtime database still must contain that ClockHub clock.
+
 ## Runtime
 
 ```sh
