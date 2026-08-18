@@ -254,7 +254,7 @@ proc uvhs_query_clock_frequency {clock} {
     return [lindex $frequencies 0]
 }
 
-proc uvhs_configure_tmclk_from_cpu {} {
+proc uvhs_configure_tmclk_from_cpu {{cpu_frequency ""}} {
     if {![info exists ::env(UVHS_TMCLK_CPU_RATIO)] ||
         [string trim $::env(UVHS_TMCLK_CPU_RATIO)] eq ""} {
         return
@@ -266,7 +266,9 @@ proc uvhs_configure_tmclk_from_cpu {} {
         error "TMCLK-to-CPU clock ratio must be positive: $ratio"
     }
 
-    set cpu_frequency [uvhs_query_clock_frequency clk5_p]
+    if {$cpu_frequency eq ""} {
+        set cpu_frequency [uvhs_query_clock_frequency clk5_p]
+    }
     set tmclk_frequency [expr {round(double($cpu_frequency) / $ratio)}]
     if {$tmclk_frequency <= 0} {
         error "derived TMCLK frequency is invalid: $tmclk_frequency"
@@ -281,7 +283,7 @@ proc uvhs_configure_tmclk_from_cpu {} {
 proc uvhs_configure_ddr_frontend_clock {} {
     if {![info exists ::env(UVHS_DDR_FRONTEND_CLK_HZ)] ||
         [string trim $::env(UVHS_DDR_FRONTEND_CLK_HZ)] eq ""} {
-        return
+        return ""
     }
 
     set frequency [uvhs_parse_integer \
@@ -295,6 +297,7 @@ proc uvhs_configure_ddr_frontend_clock {} {
         "INFO: setting DDR AXI frontend clk5_p/sys_clk_i to %d Hz" \
         $frequency]
     config -clock -name clk5_p -frequency $frequency
+    return $frequency
 }
 
 proc uvhs_capture_station_counts {} {
@@ -628,8 +631,8 @@ proc uvhs_initialize_runtime {} {
     config -clock -name clk6_p -frequency 50000000
     # The DDR AXI frontend and CPU/SoC share clk5_p/sys_clk_i. Apply an
     # optional override before deriving TMCLK from the CPU frequency.
-    uvhs_configure_ddr_frontend_clock
-    uvhs_configure_tmclk_from_cpu
+    set ddr_frontend_frequency [uvhs_configure_ddr_frontend_clock]
+    uvhs_configure_tmclk_from_cpu $ddr_frontend_frequency
     config -clock -commit
     query -clock
 
