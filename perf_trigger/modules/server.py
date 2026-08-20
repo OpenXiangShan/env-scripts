@@ -403,7 +403,6 @@ class Server:
                     shlex.quote(str(gcpt.bin_path / gcpt_file)),
                     "-s",
                     str(random.randint(0, 9999)),
-                    "-F", "test"
                 ]
                 + (
                     ["--diff", str(self.nemu_so_path)]
