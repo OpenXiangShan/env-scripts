@@ -1,4 +1,5 @@
 import logging
+import os
 from pathlib import Path
 import random
 import re
@@ -97,6 +98,7 @@ def is_epyc():
 """
 
 MIN_ALLOC_CORES = 8
+LOG_TRUNCATE_LIMIT = 256
 
 
 class Server:
@@ -179,6 +181,80 @@ class Server:
 
         return info
 
+    def __log_str(self, s: str) -> str:
+        if len(s) >= LOG_TRUNCATE_LIMIT:
+            half = LOG_TRUNCATE_LIMIT // 2
+            return f"{s[:half]}\n... truncated ...\n{s[-half:]}"
+        return s
+
+    def __read_output(self, source: IO[Any] | Path) -> str:
+        """Read process output without assuming that its original handle is readable."""
+        try:
+            if isinstance(source, Path):
+                size = source.stat().st_size
+                marker = b"\n... truncated ...\n"
+                read_size = (LOG_TRUNCATE_LIMIT - len(marker)) // 2
+                with source.open("rb") as output_file:
+                    if size <= LOG_TRUNCATE_LIMIT:
+                        output = output_file.read()
+                    else:
+                        head = output_file.read(read_size)
+                        output_file.seek(-read_size, os.SEEK_END)
+                        output = head + marker + output_file.read(read_size)
+            else:
+                output = source.read()
+        except (OSError, ValueError) as e:
+            return f"<unable to read output: {type(e).__name__}: {e}>"
+
+        if isinstance(output, bytes):
+            return output.decode(errors="replace")
+        return str(output)
+
+    def __format_output(
+        self,
+        name: str,
+        stream: IO[Any] | None,
+        destination: int | IO[Any] | None = None,
+        path: Path | None = None,
+    ) -> str:
+        source: IO[Any] | Path | None = stream
+        location = ""
+
+        if path is not None:
+            source = path
+            location = f" ({path})"
+        elif source is None and destination is not None:
+            if isinstance(destination, int):
+                if destination == subprocess.DEVNULL:
+                    return f"=== {name} ===\n<redirected to /dev/null>\n"
+                if destination == subprocess.STDOUT:
+                    return f"=== {name} ===\n<redirected to stdout>\n"
+                if destination == subprocess.PIPE:
+                    return f"=== {name} ===\n<capture pipe unavailable>\n"
+                return (
+                    f"=== {name} ===\n"
+                    f"<redirected to file descriptor {destination}; output unavailable>\n"
+                )
+
+            try:
+                destination.flush()
+            except (OSError, ValueError):
+                pass
+
+            destination_name = getattr(destination, "name", None)
+            if isinstance(destination_name, (str, os.PathLike)):
+                output_path = Path(destination_name)
+                source = output_path
+                location = f" ({output_path})"
+            else:
+                source = destination
+
+        if source is None:
+            return f"=== {name} ===\n<not captured>\n"
+
+        output = self.__log_str(self.__read_output(source))
+        return f"=== {name}{location} ===\n{output}\n"
+
     def poll(self) -> tuple[list[str], list[str], list[str]]:
         still_pending: list[PendingTask] = []
         failed: list[str] = []
@@ -192,18 +268,43 @@ class Server:
             # process finished, check result and call .wait() to cleanup
             if result != 0:
                 self.tracker.error(
-                    "%s failed with code %d on %s",
+                    "%s failed with code %d on %s in %s\n" "=== Command ===\n%s\n%s%s",
                     task.name,
                     task.proc.returncode,
                     self.hostname,
+                    time.strftime("%Hh %Mm %Ss", time.gmtime(task.elapsed)),
+                    (
+                        self.__log_str(shlex.join(task.command))
+                        if task.command
+                        else "<unknown>"
+                    ),
+                    self.__format_output(
+                        "stdout", task.proc.stdout, path=task.stdout_path
+                    ),
+                    self.__format_output(
+                        "stderr", task.proc.stderr, path=task.stderr_path
+                    ),
                 )
                 failed.append(task.name)
             else:
-                self.tracker.info("%s succeeded on %s", task.name, self.hostname)
+                self.tracker.info(
+                    "%s succeeded on %s in %s",
+                    task.name,
+                    self.hostname,
+                    time.strftime("%Hh %Mm %Ss", time.gmtime(task.elapsed)),
+                )
                 success.append(task.name)
-            self.tracker.debug("... elapsed: %.3f", task.elapsed())
             task.proc.wait()
         self.pending_task = still_pending
+        self.tracker.debug(
+            "Pending tasks on %s: %s",
+            self.hostname,
+            (
+                ", ".join([t.name for t in self.pending_task])
+                if self.pending_task
+                else "None"
+            ),
+        )
         return success, failed, [t.name for t in self.pending_task]
 
     def run(
@@ -237,18 +338,10 @@ class Server:
             p.wait()
         if check and p.returncode != 0:
             raise RuntimeError(
-                f"Remote command failed({p.returncode})\n"
-                + f"=== Command ===\n{' '.join(cmd)}\n"
-                + (
-                    f"=== stdout ===\n{p.stdout.read().decode()}\n"
-                    if p.stdout is not None
-                    else ""
-                )
-                + (
-                    f"=== stderr ===\n{p.stderr.read().decode()}\n"
-                    if p.stderr is not None
-                    else ""
-                )
+                f"Remote command failed({p.returncode}) on {self.hostname}\n"
+                + f"=== Command ===\n{self.__log_str(shlex.join(cmd))}\n"
+                + self.__format_output("stdout", p.stdout, destination=stdout)
+                + self.__format_output("stderr", p.stderr, destination=stderr)
             )
         return p
 
@@ -310,6 +403,7 @@ class Server:
                     shlex.quote(str(gcpt.bin_path / gcpt_file)),
                     "-s",
                     str(random.randint(0, 9999)),
+                    "-F", "test"
                 ]
                 + (
                     ["--diff", str(self.nemu_so_path)]
@@ -340,7 +434,16 @@ class Server:
                 stderr=ferr,
                 block=False,
             )
-        self.pending_task.append(PendingTask(proc=p, name=str(gcpt), free=free_cores))
+        self.pending_task.append(
+            PendingTask(
+                proc=p,
+                name=str(gcpt),
+                free=free_cores,
+                command=tuple(run_cmd),
+                stdout_path=gcpt.stdout_path,
+                stderr_path=gcpt.stderr_path,
+            )
+        )
         self.tracker.info("Started %s on %s", gcpt, self.hostname)
         self.tracker.debug(
             "Assigned cores %d-%d (total %d) on mem node %d",
@@ -356,7 +459,9 @@ class Server:
 
         if self.pending_task:
             # send kill signal to all remaining emu processes
-            p = self.run(["pkill", "-e", "-f", shlex.quote(str(self.emu_path))], check=False)
+            p = self.run(
+                ["pkill", "-e", "-f", shlex.quote(str(self.emu_path))], check=False
+            )
 
             if p.stdout is not None:
                 logging.info(

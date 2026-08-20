@@ -189,15 +189,23 @@ class XiangShan:
             "Server list: %s", ", ".join(map(lambda s: s.hostname, self.servers))
         )
         failed_checkpoints: list[str] = []
+        all_assigned = False
 
         def poll_servers() -> bool:
             pending = False
+            all_pending = []
             for server in self.servers:
                 success, fail, pending_list = server.poll()
                 failed_checkpoints.extend(fail)
+                all_pending.extend(pending_list)
                 self.tracker.step("completed", len(success) + len(fail))
                 if len(pending_list) > 0:
                     pending = True
+
+            if all_assigned and 0 < len(all_pending) <= 3:
+                self.tracker.info(
+                    "Remaining checkpoints: %s", ", ".join(all_pending)
+                )
             return pending
 
         for gcpt in self.checkpoints:
@@ -261,6 +269,7 @@ class XiangShan:
 
         # wait for all servers to complete
         self.tracker.info("All checkpoints assigned, waiting for completion...")
+        all_assigned = True
         pending = poll_servers()
         while pending:
             self.tracker.debug("Still running, checking again in 60 seconds...")
@@ -641,6 +650,9 @@ def main():
             HEARTBEAT_INTERVAL,
         )
         time.sleep(HEARTBEAT_INTERVAL)
+
+    if need_lock:
+        logging.info("Lock %s acquired for %s", gcpt_hash, result_path)
 
     try:
         xiangshan = XiangShan(
