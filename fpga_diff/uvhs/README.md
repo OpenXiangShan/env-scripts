@@ -406,6 +406,7 @@ before the UVHS timing worker reads it.
 | `compilation/export_vivado_ip.tcl` | Runs repository-owned XCI/BD exports inside Vivado. |
 | `compilation/probe_ila.tcl` | Minimal host-trigger UHD probe profile. |
 | `compilation/probe_kmh.tcl` | KMH debug UHD probe profile. |
+| `compilation/probe_timer.tcl` | KMH timer transport and time-consumer probe profile. |
 | `compilation/shell_compat.sh` | Generated launcher and signoff-constraint compatibility. |
 | `runtime/uv_shell_exec_compat.sh` | Runtime library wrapper for UVHS shells and generated Python workers. |
 | `runtime/runtime_server.tcl` | Download, reset, DDR, flash, capture, and command service. |
