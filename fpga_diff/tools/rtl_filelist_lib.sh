@@ -108,6 +108,7 @@ rtl_flist_parse_filelist() {
     line=${line%%//*}
     line=${line%%#*}
     read -r -a tokens <<< "$line"
+    ((${#tokens[@]})) || continue
     for token in "${tokens[@]}"; do
       if [[ -n $pending ]]; then
         case $pending in
