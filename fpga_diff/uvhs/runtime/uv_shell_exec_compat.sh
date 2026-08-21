@@ -8,6 +8,14 @@ find_library() {
   ldconfig -p | awk -v soname="$1" '$1 == soname && !found { print $NF; found = 1 }'
 }
 
+install_library_link() {
+  local target=$1 destination=$2 temporary
+  [[ -L $destination && $(readlink "$destination") == "$target" ]] && return
+  temporary=$destination.tmp.$$.$RANDOM
+  ln -s "$target" "$temporary"
+  mv -Tf "$temporary" "$destination"
+}
+
 mkdir -p "$UVHS_RUNTIME_LIB_DIR"
 
 ffi=$(find_library libffi.so.6)
@@ -18,7 +26,7 @@ fi
   echo "ERROR: libffi.so.6 or libffi.so.8 is required by uv_shell_exec" >&2
   exit 1
 }
-ln -sfn "$ffi" "$UVHS_RUNTIME_LIB_DIR/libffi.so.6"
+install_library_link "$ffi" "$UVHS_RUNTIME_LIB_DIR/libffi.so.6"
 
 if ldd "$UV_ROOT/bin/uv_shell_exec" 2>/dev/null | grep -q 'libpcre[.]so[.]1 => not found'; then
   pcre=
@@ -37,7 +45,7 @@ if ldd "$UV_ROOT/bin/uv_shell_exec" 2>/dev/null | grep -q 'libpcre[.]so[.]1 => n
     exit 1
   }
   if [[ $pcre != "$UVHS_RUNTIME_LIB_DIR/libpcre.so.1" ]]; then
-    ln -sfn "$pcre" "$UVHS_RUNTIME_LIB_DIR/libpcre.so.1"
+    install_library_link "$pcre" "$UVHS_RUNTIME_LIB_DIR/libpcre.so.1"
   fi
 fi
 
