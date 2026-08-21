@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-[[ $# == 9 ]] || {
-  echo "Usage: $0 ORIGIN_DIR WORK_DIR CORE_DIR JOBS FORCE DDR_SOURCE DDR_WIDTH DDR_ADDR_WIDTH DDR_ID_WIDTH" >&2
+[[ $# == 7 ]] || {
+  echo "Usage: $0 ORIGIN_DIR WORK_DIR CORE_DIR JOBS FORCE DDR_SOURCE DDR_WIDTH" >&2
   exit 64
 }
 : "${UV_ROOT:?UV_ROOT is not set}"
@@ -15,8 +15,6 @@ jobs=$4
 force=$5
 ddr_source=$6
 ddr_width=$7
-ddr_addr_width=$8
-ddr_id_width=$9
 script_dir=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)
 
 require_file() {
@@ -31,12 +29,41 @@ generalbus_stub_is_64() {
     grep -Eq 'input[[:space:]]+\[63:0\][[:space:]]*dut_axi_rdata' "$1"
 }
 
-ddr_files=(
-  rtl/soc/uvw_axi4_to_ddr4.dcp rtl/soc/uvw_axi4_to_ddr4_Stub.v
-  script/uvw_axi4_to_ddr4_pblock.tcl script/custom_parts_ddr4_KSM26SES8_2666.csv
-)
-"$script_dir/validate_ddr_asset.sh" \
-  "$ddr_source" "$ddr_width" "$ddr_addr_width" "$ddr_id_width"
+resolve_ddr_file() {
+  local rel=$1 base candidate
+  base=${rel##*/}
+  for candidate in "$ddr_source/$rel" "$ddr_source/$base"; do
+    [[ ! -s $candidate ]] || { printf '%s\n' "$candidate"; return; }
+  done
+  find "$ddr_source" -type f -name "$base" -size +0c -print -quit
+}
+
+# Reject an incompatible DDR IP before starting Vivado IP export.
+[[ $ddr_width == 64 || $ddr_width == 256 ]] || {
+  echo "ERROR: unsupported UVHS DDR AXI data width: $ddr_width" >&2
+  exit 1
+}
+ddr_stub=$(resolve_ddr_file rtl/soc/uvw_axi4_to_ddr4_Stub.v)
+require_file "$ddr_stub"
+if gzip -t "$ddr_stub" 2>/dev/null; then
+  ddr_stub_text=$(gzip -dc "$ddr_stub")
+else
+  ddr_stub_text=$(<"$ddr_stub")
+fi
+last_bit=$((ddr_width - 1))
+if ! grep -Eq "uv_axi2ddr.*ADDR_WIDTH:34,DATA_WIDTH:$ddr_width" <<<"$ddr_stub_text" ||
+   ! grep -Eq "UV_HW_IP.*ADDR_WIDTH:<34>,DATA_WIDTH:<$ddr_width>" <<<"$ddr_stub_text" ||
+   ! grep -Eq 'input[[:space:]]+\[33:0\][[:space:]]*ddr4ip_dut_axi_awaddr' <<<"$ddr_stub_text" ||
+   ! grep -Eq 'input[[:space:]]+\[13:0\][[:space:]]*ddr4ip_dut_axi_awid' <<<"$ddr_stub_text" ||
+   ! grep -Eq "input[[:space:]]+\[$last_bit:0\][[:space:]]*ddr4ip_dut_axi_wdata" <<<"$ddr_stub_text"; then
+  echo "ERROR: incompatible UVHS DDR IP: $ddr_stub" >&2
+  echo "ERROR: expected ADDR=34 DATA=$ddr_width ID=14 with uv_axi2ddr and UV_HW_IP metadata" >&2
+  echo "ERROR: regenerate uvw_axi4_to_ddr4 with the UVHS axi2ddr flow:" >&2
+  echo "ERROR:   $UV_ROOT/platform/U2.2/Prototype/ips/axi2ddr" >&2
+  echo "ERROR: set ADDR_WIDTH=34 DATA_WIDTH=$ddr_width ID_WIDTH=14" >&2
+  exit 1
+fi
+echo "INFO: verified UVHS DDR AXI contract: ADDR=34 DATA=$ddr_width ID=14"
 
 # Export the Vivado IP owned by this repository.
 vivado=$UV_XILINX_VIVADO/bin/vivado
@@ -85,16 +112,20 @@ cp -a "$gbus_release" "$work_dir/rtl/soc/uvw_general_bus"
 cp -f "$gbus_release/uvw_general_bus_Stub.v" "$work_dir/rtl/stubs/uvw_general_bus.v"
 echo "INFO: prepared 64-bit UVHS generalBus DCP"
 
-# Import the validated external DDR asset using canonical work-tree names.
+# Import the externally generated DDR DCP using its canonical work-tree names.
+ddr_files=(
+  rtl/soc/uvw_axi4_to_ddr4.dcp rtl/soc/uvw_axi4_to_ddr4_Stub.v
+  script/uvw_axi4_to_ddr4_pblock.tcl script/custom_parts_ddr4_KSM26SES8_2666.csv
+)
 for rel in "${ddr_files[@]}"; do
   destination=$work_dir/$rel
-  mkdir -p "$(dirname "$destination")"
-  cp -f "$ddr_source/$rel" "$destination"
+  source_file=$(resolve_ddr_file "$rel")
+  [[ -z $source_file ]] || { mkdir -p "$(dirname "$destination")"; cp -f "$source_file" "$destination"; }
 done
-for rel in "${ddr_files[@]}"; do require_file "$work_dir/$rel"; done
+for rel in "${ddr_files[@]:0:3}"; do require_file "$work_dir/$rel"; done
 ddr_stub=$work_dir/rtl/soc/uvw_axi4_to_ddr4_Stub.v
 if gzip -t "$ddr_stub" 2>/dev/null; then
   gzip -dc "$ddr_stub" >"$ddr_stub.decompressed"
   mv -f "$ddr_stub.decompressed" "$ddr_stub"
 fi
-echo "INFO: prepared validated UVHS DDR asset"
+echo "INFO: prepared UVHS DDR IP"

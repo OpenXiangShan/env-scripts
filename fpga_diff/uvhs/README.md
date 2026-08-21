@@ -35,9 +35,7 @@ FPGA-Diff wrappers in `filelist.f`.
 
 ```sh
 make uvhs CPU=<design> CORE_DIR=/path/to/release/build \
-  RTL_INCLUDE=/path/to/extra.f SUFFIX=<tag> \
-  UVHS_TEMPLATE_DIR=/path/to/board-template \
-  UVHS_UVW_AXI4_TO_DDR4_SRC=/path/to/ddr-asset
+  RTL_INCLUDE=/path/to/extra.f SUFFIX=<tag>
 ```
 
 `RTL_INCLUDE` is optional. `uvhs` is the stable build entry point: it runs the
@@ -51,7 +49,7 @@ when build outputs should live elsewhere.
 
 1. Copies the vendor board template into an isolated work directory.
 2. Prepares repository-owned Vivado IP and the 64-bit generalBus DCP.
-3. Validates and imports the selected DDR DCP asset package.
+3. Validates and imports the selected DDR DCP.
 4. Builds the complete RTL file list and checks the expected top module.
 5. Sources an optional `UVHS_PROBE_TCL`, then elaborates and synthesizes the
    design with uvsyn.
@@ -60,36 +58,11 @@ when build outputs should live elsewhere.
 `uvhs_preflight` is an early prerequisite check, not a synthesis or hardware
 test. Its loops check the three required environment variables, host commands,
 the selected CPU and release directory, UVHS/Vivado executables, repository
-helper scripts, board-template files, and the external DDR package. The DDR
-check runs before Vivado export and verifies the package checksums, UVHS
-metadata, and AXI address, data, and ID widths. This keeps an incompatible or
-mixed-version input from being discovered after a multi-hour run has started.
-
-The external DDR package must use this exact layout:
-
-```text
-SHA256SUMS
-rtl/soc/uvw_axi4_to_ddr4.dcp
-rtl/soc/uvw_axi4_to_ddr4_Stub.v
-script/uvw_axi4_to_ddr4_pblock.tcl
-script/custom_parts_ddr4_KSM26SES8_2666.csv
-```
-
-Generate `SHA256SUMS` from the package root with all four relative paths:
-
-```sh
-sha256sum \
-  rtl/soc/uvw_axi4_to_ddr4.dcp \
-  rtl/soc/uvw_axi4_to_ddr4_Stub.v \
-  script/uvw_axi4_to_ddr4_pblock.tcl \
-  script/custom_parts_ddr4_KSM26SES8_2666.csv > SHA256SUMS
-```
-
-Both supported DDR data widths use 34-bit addresses and 14-bit IDs. XiangShan
-uses 256-bit data and NutShell uses 64-bit data. Override
-`UVHS_DDR_AXI_ADDR_WIDTH` or `UVHS_DDR_AXI_ID_WIDTH` only for a separately
-validated platform contract. Files outside the canonical package paths are not
-searched.
+helper scripts, board-template files, and the external DDR directory. Before
+Vivado export, IP preparation checks the DDR Stub metadata and AXI contract:
+XiangShan uses `34/256/14` address/data/ID widths and NutShell uses
+`34/64/14`. An incompatible Stub fails with the UVHS `axi2ddr` regeneration
+path and required parameters.
 
 IP preparation intentionally retains two files. `prepare_ip.sh` is the outer
 orchestrator for three different sources: repository Vivado IP, the vendor
@@ -408,7 +381,6 @@ before the UVHS timing worker reads it.
 | `compilation/timing.tcl` | External clock and asynchronous-group constraints. |
 | `compilation/vivado_pre_opt.tcl` | XDMA refclock and CDC constraints. |
 | `compilation/prepare_ip.sh` | Coordinates Vivado, generalBus, and external DDR IP preparation. |
-| `compilation/validate_ddr_asset.sh` | Verifies the external DDR package checksums and AXI contract. |
 | `compilation/export_vivado_ip.tcl` | Runs repository-owned XCI/BD exports inside Vivado. |
 | `compilation/probe_ila.tcl` | Minimal host-trigger UHD probe profile. |
 | `compilation/probe_kmh.tcl` | KMH debug UHD probe profile. |
