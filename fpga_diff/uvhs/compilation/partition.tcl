@@ -27,12 +27,10 @@ set uvhs_nocmisc_f0_children {
     axi4buf
     axi4buf_1
     axi4buf_2
-    axi4index
     axi4yank
     axi4deint
     xbar_1
     axi4yank_1
-    axi4index_1
     axi4buf_3
     axi4buf_4
     axi4buf_5
@@ -49,7 +47,6 @@ set uvhs_nocmisc_f0_children {
     axi4yank_3
     xbar_2
     plic
-    plicSource
     aplic
     tl2axi4_1
     fragmenter
