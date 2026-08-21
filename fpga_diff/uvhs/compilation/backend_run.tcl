@@ -108,6 +108,11 @@ list_partition_constraints -all
 partition_design -tdc -tdss true \
     -bs_max_blk_ratio 0.96 -bs_min_blk_ratio 0.005 -effort high
 report_resource -depth 4
+if {[uvhs::env_or_default UVHS_STOP_AFTER_PARTITION 0] eq "1"} {
+    report_system_resource
+    puts "UVHS_PARTITION_SUCCESS"
+    exit
+}
 
 instrument_design
 localize_design -replicate_cell -clock -self_check
