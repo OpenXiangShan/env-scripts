@@ -135,7 +135,7 @@ set shell_helper [uvhs::path shell_compat.sh]
 if {![file isfile $shell_helper]} {
     error "UVHS shell compatibility helper not found: $shell_helper"
 }
-exec bash $shell_helper patch-pnr hw.dat/Compile/PnR
+puts [exec bash $shell_helper patch-pnr hw.dat/Compile/PnR 2>@1]
 compile_fpga -parallel_option fpga -runOnly -explore
 
 report_path -max_path 100
