@@ -7,6 +7,8 @@ UVHS_UVW_AXI4_TO_DDR4_SRC ?=
 UVHS_PROBE_TCL ?= $(UVHS_COMPILATION_DIR)/probe_ila.tcl
 UVHS_PROBE_PATH := $(if $(strip $(UVHS_PROBE_TCL)),$(abspath $(UVHS_PROBE_TCL)),)
 UVHS_DDR_AXI_WIDTH := $(if $(filter nutshell,$(CPU)),64,256)
+UVHS_DDR_AXI_ADDR_WIDTH ?= 34
+UVHS_DDR_AXI_ID_WIDTH ?= 14
 UVHS_WORK_DIR := $(ENV_SCRIPTS_HOME)/fpga_diff_uvhs_$(CPU)$(if $(strip $(SUFFIX)),-$(strip $(SUFFIX)),)
 UVHS_FILELIST := $(UVHS_WORK_DIR)/rtl/filelist.f
 
@@ -74,6 +76,7 @@ uvhs_preflight:
 			"$(UVHS_RUNTIME_DIR)/uv_shell_exec_compat.sh" \
 			"$(UVHS_COMPILATION_DIR)/shell_compat.sh" \
 			"$(UVHS_COMPILATION_DIR)/prepare_ip.sh" \
+			"$(UVHS_COMPILATION_DIR)/validate_ddr_asset.sh" \
 			"$(UVHS_ROOT_DIR)/tools/update_core_flist.sh"; do \
 			[[ -x "$$executable" ]] || { echo "ERROR: executable not found: $$executable" >&2; exit 1; }; \
 		done; \
@@ -90,6 +93,9 @@ uvhs_preflight:
 		if [[ -n "$(UVHS_PROBE_PATH)" && ! -f "$(UVHS_PROBE_PATH)" ]]; then \
 			echo "ERROR: UVHS probe script not found: $(UVHS_PROBE_PATH)" >&2; exit 1; \
 		fi'
+	bash "$(UVHS_COMPILATION_DIR)/validate_ddr_asset.sh" \
+		"$(UVHS_UVW_AXI4_TO_DDR4_SRC)" "$(UVHS_DDR_AXI_WIDTH)" \
+		"$(UVHS_DDR_AXI_ADDR_WIDTH)" "$(UVHS_DDR_AXI_ID_WIDTH)"
 
 uvhs_prepare: uvhs_preflight
 	test -n "$(UVHS_WORK_DIR)"
@@ -106,7 +112,8 @@ uvhs_prepare: uvhs_preflight
 	$(UVHS_FLOW_ENV) bash "$(UVHS_COMPILATION_DIR)/prepare_ip.sh" \
 		"$(UVHS_ROOT_DIR)" "$(UVHS_WORK_DIR)" "$(CORE_DIR)" \
 		"$(UVHS_EXPORT_IP_JOBS)" "$(UVHS_EXPORT_IP_FORCE)" \
-		"$(UVHS_UVW_AXI4_TO_DDR4_SRC)" "$(UVHS_DDR_AXI_WIDTH)"
+		"$(UVHS_UVW_AXI4_TO_DDR4_SRC)" "$(UVHS_DDR_AXI_WIDTH)" \
+		"$(UVHS_DDR_AXI_ADDR_WIDTH)" "$(UVHS_DDR_AXI_ID_WIDTH)"
 
 uvhs_frontend: uvhs_prepare
 	bash "$(UVHS_ROOT_DIR)/tools/update_core_flist.sh" uvhs \

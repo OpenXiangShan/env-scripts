@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-[[ $# == 7 ]] || {
-  echo "Usage: $0 ORIGIN_DIR WORK_DIR CORE_DIR JOBS FORCE DDR_SOURCE DDR_WIDTH" >&2
+[[ $# == 9 ]] || {
+  echo "Usage: $0 ORIGIN_DIR WORK_DIR CORE_DIR JOBS FORCE DDR_SOURCE DDR_WIDTH DDR_ADDR_WIDTH DDR_ID_WIDTH" >&2
   exit 64
 }
 : "${UV_ROOT:?UV_ROOT is not set}"
@@ -15,6 +15,8 @@ jobs=$4
 force=$5
 ddr_source=$6
 ddr_width=$7
+ddr_addr_width=$8
+ddr_id_width=$9
 script_dir=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)
 
 require_file() {
@@ -28,6 +30,13 @@ generalbus_stub_is_64() {
   grep -Eq 'output[[:space:]]+\[63:0\][[:space:]]*dut_axi_wdata' "$1" &&
     grep -Eq 'input[[:space:]]+\[63:0\][[:space:]]*dut_axi_rdata' "$1"
 }
+
+ddr_files=(
+  rtl/soc/uvw_axi4_to_ddr4.dcp rtl/soc/uvw_axi4_to_ddr4_Stub.v
+  script/uvw_axi4_to_ddr4_pblock.tcl script/custom_parts_ddr4_KSM26SES8_2666.csv
+)
+"$script_dir/validate_ddr_asset.sh" \
+  "$ddr_source" "$ddr_width" "$ddr_addr_width" "$ddr_id_width"
 
 # Export the Vivado IP owned by this repository.
 vivado=$UV_XILINX_VIVADO/bin/vivado
@@ -76,32 +85,16 @@ cp -a "$gbus_release" "$work_dir/rtl/soc/uvw_general_bus"
 cp -f "$gbus_release/uvw_general_bus_Stub.v" "$work_dir/rtl/stubs/uvw_general_bus.v"
 echo "INFO: prepared 64-bit UVHS generalBus DCP"
 
-# Import the externally generated DDR DCP using its canonical work-tree names.
-[[ $ddr_width == 64 || $ddr_width == 256 ]] || {
-  echo "ERROR: unsupported UVHS DDR AXI width: $ddr_width" >&2
-  exit 1
-}
-ddr_files=(
-  rtl/soc/uvw_axi4_to_ddr4.dcp rtl/soc/uvw_axi4_to_ddr4_Stub.v
-  script/uvw_axi4_to_ddr4_pblock.tcl script/custom_parts_ddr4_KSM26SES8_2666.csv
-)
+# Import the validated external DDR asset using canonical work-tree names.
 for rel in "${ddr_files[@]}"; do
-  base=${rel##*/}
   destination=$work_dir/$rel
-  source_file=
-  for candidate in "$ddr_source/$rel" "$ddr_source/$base"; do
-    [[ ! -f $candidate ]] || { source_file=$candidate; break; }
-  done
-  [[ -n $source_file ]] || source_file=$(find "$ddr_source" -type f -name "$base" -size +0c -print -quit)
-  [[ -z $source_file ]] || { mkdir -p "$(dirname "$destination")"; cp -f "$source_file" "$destination"; }
+  mkdir -p "$(dirname "$destination")"
+  cp -f "$ddr_source/$rel" "$destination"
 done
-for rel in "${ddr_files[@]:0:3}"; do require_file "$work_dir/$rel"; done
+for rel in "${ddr_files[@]}"; do require_file "$work_dir/$rel"; done
 ddr_stub=$work_dir/rtl/soc/uvw_axi4_to_ddr4_Stub.v
 if gzip -t "$ddr_stub" 2>/dev/null; then
   gzip -dc "$ddr_stub" >"$ddr_stub.decompressed"
   mv -f "$ddr_stub.decompressed" "$ddr_stub"
 fi
-last_bit=$((ddr_width - 1))
-grep -Eq "input[[:space:]]+\[$last_bit:0\][[:space:]]*ddr4ip_dut_axi_wdata" "$ddr_stub"
-grep -Eq "output[[:space:]]+\[$last_bit:0\][[:space:]]*ddr4ip_dut_axi_rdata" "$ddr_stub"
-echo "INFO: verified UVHS DDR DCP AXI data width: $ddr_width"
+echo "INFO: prepared validated UVHS DDR asset"
