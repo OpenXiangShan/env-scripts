@@ -133,10 +133,21 @@ if {[llength $uvhs_xiangshan_cell] == 1} {
     }
     assign_route -signals $uvhs_clock_enable_net -path {b0.f2 b0.f0}
     puts "INFO: constrain DiffTest clock enable to direct b0.f2-b0.f0 route"
+
+    set uvhs_syscnt_path core_def/U_CPU_TOP/u_XSTop/soc/nocMisc/syscnt
+    set uvhs_syscnt_time_nets [concat \
+        [get_nets -quiet ${uvhs_syscnt_path}/time_0*] \
+        [get_nets -quiet ${uvhs_syscnt_path}/time_en]]
+    if {[llength $uvhs_syscnt_time_nets] != 65} {
+        error "expected 65 syscnt time nets, got [llength $uvhs_syscnt_time_nets]"
+    }
+    assign_route -signals $uvhs_syscnt_time_nets -path {b0.f2 b0.f0}
+    puts "INFO: constrain syscnt time bus to direct b0.f2-b0.f0 route"
 }
 unset -nocomplain uvhs_ddr_cell uvhs_ddr_connector \
     uvhs_bound_ddr_connector uvhs_f0_cells uvhs_memory_path_names \
     uvhs_memory_path_cells uvhs_config_path_names uvhs_config_path_cells \
     uvhs_host_path_names uvhs_host_path_cells \
     uvhs_nocmisc_path uvhs_nocmisc_f0_children uvhs_nocmisc_child \
-    uvhs_xiangshan_cell uvhs_clock_enable_net
+    uvhs_xiangshan_cell uvhs_clock_enable_net uvhs_syscnt_path \
+    uvhs_syscnt_time_nets
