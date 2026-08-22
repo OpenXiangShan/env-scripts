@@ -98,7 +98,7 @@ def is_epyc():
 """
 
 MIN_ALLOC_CORES = 8
-LOG_TRUNCATE_LIMIT = 256
+LOG_TRUNCATE_LIMIT = 2048
 
 
 class Server:
@@ -184,7 +184,7 @@ class Server:
     def __log_str(self, s: str) -> str:
         if len(s) >= LOG_TRUNCATE_LIMIT:
             half = LOG_TRUNCATE_LIMIT // 2
-            return f"{s[:half]}\n... truncated ...\n{s[-half:]}"
+            return f"{s[:half]} ... truncated ... {s[-half:]}"
         return s
 
     def __read_output(self, source: IO[Any] | Path) -> str:
@@ -268,7 +268,7 @@ class Server:
             # process finished, check result and call .wait() to cleanup
             if result != 0:
                 self.tracker.error(
-                    "%s failed with code %d on %s in %s\n" "=== Command ===\n%s\n%s%s",
+                    "%s failed \twith code %d \ton %s \tin %s\n" "=== Command ===\n%s\n%s%s",
                     task.name,
                     task.proc.returncode,
                     self.hostname,
@@ -288,7 +288,7 @@ class Server:
                 failed.append(task.name)
             else:
                 self.tracker.info(
-                    "%s succeeded on %s in %s",
+                    "%s succeeded \ton %s \tin %s",
                     task.name,
                     self.hostname,
                     time.strftime("%Hh %Mm %Ss", time.gmtime(task.elapsed)),
