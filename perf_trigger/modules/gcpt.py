@@ -17,7 +17,7 @@ class GCPT:
         benchmark: str,
         checkpoint: str,
         weight: float,
-        eta: float = 0.0,
+        eta: int = 0,
     ):
         self.__gcpt_path = gcpt_path
         self.__benchmark = benchmark

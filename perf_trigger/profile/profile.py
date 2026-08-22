@@ -14,8 +14,12 @@ DEFAULT_PROFILE_PATH = (
     Path(__file__).resolve().parent / "spec06_gcc15_rv64gcb_base_260604.json"
 )
 
+NEW_SUCCESS_RE = re.compile(
+    r"\[(?P<progress>[^\]]+)\]\s+(?P<checkpoint>\S+)\s+succeeded\s+on\s+\S+\s+in\s+"
+    r"(?P<hours>\d+)h\s+(?P<minutes>\d+)m\s+(?P<seconds>\d+(?:\.\d+)?)s\b"
+)
 SUCCESS_RE = re.compile(
-    r"\[(?P<progress>[^\]]+)\]\s+" r"(?P<checkpoint>\S+)\s+succeeded\s+on\b"
+    r"\[(?P<progress>[^\]]+)\]\s+(?P<checkpoint>\S+)\s+succeeded\s+on\b"
 )
 ELAPSED_RE = re.compile(
     r"\[(?P<progress>[^\]]+)\]\s+\.\.\.\s+elapsed:\s+"
@@ -64,12 +68,23 @@ def get_runtimes(
 
         with log_path.open("r", encoding="utf-8", errors="replace") as log_file:
             for line in log_file:
-                # Match a success line first.
+                # New runner logs include the elapsed time on the success line.
+                match = NEW_SUCCESS_RE.search(line)
+                if match:
+                    checkpoint = parse_checkpoint_name(match.group("checkpoint"), known)
+                    if checkpoint is not None:
+                        elapsed = (
+                            int(match.group("hours")) * 3600
+                            + int(match.group("minutes")) * 60
+                            + float(match.group("seconds"))
+                        )
+                        runtimes[checkpoint].append(elapsed)
+                    continue
+
+                # Old runner logs put the elapsed time on the following line.
                 match = SUCCESS_RE.search(line)
                 if match:
-                    checkpoint = parse_checkpoint_name(
-                        match.group("checkpoint"), known
-                    )
+                    checkpoint = parse_checkpoint_name(match.group("checkpoint"), known)
                     pending[match.group("progress")].append(checkpoint)
                     continue
 
@@ -99,10 +114,11 @@ def update_profile(profile_path: Path, log_files: list[Path]) -> tuple[int, int]
     runtimes = get_runtimes(log_files, known)
 
     for (benchmark, point), samples in runtimes.items():
-        profile[benchmark][point] = sum(samples) / len(samples)
+        # keep integer seconds is enough
+        profile[benchmark][point] = int(sum(samples) // len(samples))
 
     with profile_path.open("w", encoding="utf-8") as profile_file:
-        json.dump(profile, profile_file, indent=4, ensure_ascii=False)
+        json.dump(profile, profile_file, indent=2, ensure_ascii=False)
 
     return len(runtimes), sum(len(samples) for samples in runtimes.values())
 
@@ -171,11 +187,7 @@ def format_seconds(value: float) -> str:
 def show_profile(profile_path: Path) -> None:
     profile = load_profile(profile_path)
     benchmark_runtimes = get_profile_runtimes(profile)
-    runtimes = [
-        runtime
-        for values in benchmark_runtimes.values()
-        for runtime in values
-    ]
+    runtimes = [runtime for values in benchmark_runtimes.values() for runtime in values]
     measured = [runtime for runtime in runtimes if runtime > 0]
     unmeasured = sum(runtime == 0 for runtime in runtimes)
 
