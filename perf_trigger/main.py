@@ -115,7 +115,7 @@ class XiangShan:
                         benchmark=benchmark_name,
                         checkpoint=point,
                         weight=float(weight),
-                        eta=benchmark_profile.get(point, 0.0),
+                        eta=benchmark_profile.get(point, 0),
                     )
                 )
 
@@ -130,12 +130,12 @@ class XiangShan:
             )
             self.tracker.debug(
                 "Origin first 5:\n\t%s",
-                "\n\t".join([f"{str(c)} ({c.eta:.2f})" for c in self.checkpoints[:5]]),
+                "\n\t".join([f"{str(c)} ({c.eta})" for c in self.checkpoints[:5]]),
             )
             self.checkpoints.sort(key=lambda x: x.eta, reverse=True)
             self.tracker.debug(
                 "Sorted first 5:\n\t%s",
-                "\n\t".join([f"{str(c)} ({c.eta:.2f})" for c in self.checkpoints[:5]]),
+                "\n\t".join([f"{str(c)} ({c.eta})" for c in self.checkpoints[:5]]),
             )
         else:
             self.tracker.info(
@@ -418,15 +418,18 @@ class XiangShan:
         while not failed_queue.empty():
             failed_checkpoints.append(failed_queue.get())
 
-        benchmark_times = {
-            benchmark: (  # weighted_avg_cpi * inst / freq
+        benchmark_times = {}
+        for benchmark, weight in benchmark_weights.items():
+            if weight == 0:
+                benchmark_times[benchmark] = float("nan")
+                continue
+
+            benchmark_times[benchmark] = (  # weighted_avg_cpi * inst / freq
                 benchmark_weighted_cpis[benchmark]
-                / benchmark_weights[benchmark]
+                / weight
                 * float(self.benchmarks[benchmark]["insts"])
                 / (frequency * 1e9)
             )
-            for benchmark in self.benchmarks.keys()
-        }
 
         def collect_benchmark_group(
             group: str,

@@ -12,89 +12,78 @@ from .gcpt import GCPT
 from .types import EmuConfig, FreeCoreInfo, PendingTask
 from .tracker import Tracker
 
-# NOTE: This script is directly copied from env-scripts/perf/cpuutil.py,
-#       and will be sent to remote servers through stdin.
+# NOTE: This script is from OpenXiangShan/XiangShan/scripts/xiangshan.py get_free_cores()
+#       with comments removed, will be sent to remote servers through stdin.
 GET_FREE_CORE_SCRIPT = """
-import psutil
 import os
-import time
+import pathlib
+import psutil
 import random
+import time
 
-percpu_use_thres = 30
+def get_numa_count():
+    node_dir = pathlib.Path("/sys/devices/system/node/")
+    return len(list(node_dir.glob("node*")))
 
-def numa_count():
-    node_dir = "/sys/devices/system/node/"
-    nodes = [node for node in os.listdir(node_dir) if node.startswith("node")]
-    return len(nodes)
+def get_cpu_usage():
+    return psutil.cpu_percent(interval=0.5, percpu=True)
 
-def get_unset_cores(cpu_count=None, core_usage=None) -> list[int]:
-    # FIXME: SMT is not considered temporaryly
-    if cpu_count is None:
-        cpu_count = psutil.cpu_count(logical=False)
-    if core_usage is None:
-        core_usage = psutil.cpu_percent(interval=0.5, percpu=True)
+def get_physical_cores():
+    count = psutil.cpu_count(logical=False)
+    if count is None:
+        raise RuntimeError("Failed to get physical core count")
+    return set(range(count))
 
-    cpu_affinity_count = {i: 0 for i in range(cpu_count)}
+def get_usable_cores():
+    return os.sched_getaffinity(0)
+
+def get_bound_cores():
     valid_list = ["running", "disk-sleep", "waking", "waiting"]
+    cores = set()
     for proc in psutil.process_iter(["pid", "name", "cpu_affinity", "status"]):
         try:
-            affinity = proc.info["cpu_affinity"]
-            valid = proc.info["status"] in valid_list
-            if affinity and max(affinity) < cpu_count and len(affinity) > 1 and valid:
-                for cpu in affinity:
-                    cpu_affinity_count[cpu] += 1
+            if not proc.info["status"] in valid_list or len(proc.info["cpu_affinity"]) > 16:
+                continue
+            cores |= set(proc.info["cpu_affinity"])
         except (psutil.NoSuchProcess, psutil.AccessDenied, psutil.ZombieProcess):
             pass
+    return cores
 
-    unset_cores = [cpu for cpu, count in cpu_affinity_count.items() if count == 0]
-    return unset_cores
-
-def get_free_cores(n):
-    # SMT is not allowed
-    num_core = psutil.cpu_count(logical=False)
-    num_window = max(num_core // n - 1, 0)
-    numa_node = numa_count()  # default 2
-
+def detect(n):
+    numa_count = get_numa_count()
+    phy_cores = get_physical_cores() # invariant, get once
+    num_core = len(phy_cores)
+    num_window = num_core // n
     def check(i):
-        core_usage = psutil.cpu_percent(interval=0.5, percpu=True)
-        unset_cores = get_unset_cores(num_core, core_usage)
-
-        window_cores = range(i * n, i * n + n)
+        window = range(i * n, i * n + n)
+        candidates = phy_cores & get_usable_cores()
+        if not set(window).issubset(candidates): # fail-fast
+            return False
+        candidates -= get_bound_cores()
+        if not set(window).issubset(candidates): # fail-fast
+            return False
+        core_usage = get_cpu_usage()
         window_usage = core_usage[i * n : i * n + n]
-
-        # average unsage of window_cores less than percpu_use_thres
-        cond1 = sum(window_usage) < percpu_use_thres * n
-        # less than 1 core has high usage in window_cores
-        cond2 = (
-            sum(map(lambda x: x > 80, window_usage if is_epyc() else core_usage)) < 1
+        return (
+            sum(window_usage) < 30 * n and
+            sum(map(lambda x: x > 80, window_usage)) < 1
         )
-        # window_cores is unset
-        cond3 = set(window_cores).issubset(unset_cores)
-        return cond1 and cond2 and cond3
-
     for i in random.sample(range(num_window), num_window):
         if not check(i):
             continue
-
-        # sleep random time to avoid contention, then re-check
-        time.sleep(random.uniform(1, 30))
+        time.sleep(random.uniform(0, 10))
         if not check(i):
             continue
-
-        # return (Success?, memory node, start_core, end_core)
         return (
             True,
-            (int)(((i * n) % num_core) // (num_core // numa_node)),
+            (int)(((i * n) % num_core) // (num_core // numa_count)),
             (int)(i * n),
             (int)(i * n + n - 1),
             num_core,
         )
-
     return (False, 0, 0, 0, num_core)
 
-def is_epyc():
-    num_core = psutil.cpu_count(logical=False)
-    return num_core > 16
+print(detect({n}))
 """
 
 MIN_ALLOC_CORES = 8
@@ -140,8 +129,7 @@ class Server:
                     "python3",
                     "-c",
                     shlex.quote(
-                        GET_FREE_CORE_SCRIPT
-                        + f"\nprint(get_free_cores({max(threads, MIN_ALLOC_CORES)}))"
+                        GET_FREE_CORE_SCRIPT.format(n=max(threads, MIN_ALLOC_CORES))
                     ),
                 ],
                 check=True,
