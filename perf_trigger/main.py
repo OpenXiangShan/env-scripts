@@ -62,6 +62,7 @@ SERVER_POOL = [
 ]
 
 HEARTBEAT_INTERVAL = 60
+PROFILE_DIR = Path(__file__).parent / "profile"
 
 
 class XiangShan:
@@ -76,8 +77,17 @@ class XiangShan:
         self.json_path = json_path
         self.result_path = result_path
 
+        self.ckpt_version = self.__infer_ckpt_version()
+
         with json_path.open("r", encoding="utf-8") as f:
             self.benchmarks = json.load(f)
+
+        profile_path = PROFILE_DIR / f"{self.ckpt_version}.json"
+        if profile_path.is_file():
+            with profile_path.open("r", encoding="utf-8") as f:
+                profile = json.load(f)
+        else:
+            profile = {}
 
         if benchmarks != "":
             benchmark_filter = benchmarks.replace(" ", "").split(",")
@@ -96,6 +106,7 @@ class XiangShan:
 
         self.checkpoints: list[GCPT] = []
         for benchmark_name, benchmark_config in self.benchmarks.items():
+            benchmark_profile = profile.get(benchmark_name, {})
             for point, weight in benchmark_config["points"].items():
                 self.checkpoints.append(
                     GCPT(
@@ -104,14 +115,40 @@ class XiangShan:
                         benchmark=benchmark_name,
                         checkpoint=point,
                         weight=float(weight),
+                        eta=benchmark_profile.get(point, 0.0),
                     )
                 )
-
-        self.servers: list[Server] = []
 
         self.tracker = Tracker(
             total=len(self.checkpoints), keys=["assigned", "completed"], with_keys=False
         )
+
+        # run checkpoints with higher ETA first, to avoid long-running checkpoints blocking the whole run
+        if profile:
+            self.tracker.info(
+                "Profile found for %s, sorting checkpoints by ETA", self.ckpt_version
+            )
+            self.tracker.debug(
+                "Origin first 5:\n\t%s",
+                "\n\t".join([f"{str(c)} ({c.eta:.2f})" for c in self.checkpoints[:5]]),
+            )
+            self.checkpoints.sort(key=lambda x: x.eta, reverse=True)
+            self.tracker.debug(
+                "Sorted first 5:\n\t%s",
+                "\n\t".join([f"{str(c)} ({c.eta:.2f})" for c in self.checkpoints[:5]]),
+            )
+        else:
+            self.tracker.info(
+                "No profile found for %s, running checkpoints in json order",
+                self.ckpt_version,
+            )
+
+        self.servers: list[Server] = []
+
+    def __infer_ckpt_version(self) -> str | None:
+        if m := re.search(r"(spec\d\d[0-9a-zA-Z_]+)", str(self.gcpt_path)):
+            return m.group(1)
+        return None
 
     def __infer_spec_version(self) -> Spec.Version | None:
         # try infer from gcpt_path name
@@ -190,8 +227,10 @@ class XiangShan:
         )
         failed_checkpoints: list[str] = []
         all_assigned = False
+        last_pending_count = 0
 
         def poll_servers() -> bool:
+            nonlocal last_pending_count
             pending = False
             all_pending = []
             for server in self.servers:
@@ -202,10 +241,14 @@ class XiangShan:
                 if len(pending_list) > 0:
                     pending = True
 
-            if all_assigned and 0 < len(all_pending) <= 3:
-                self.tracker.info(
-                    "Remaining checkpoints: %s", ", ".join(all_pending)
-                )
+            pending_count = len(all_pending)
+            if (
+                all_assigned
+                and 0 < len(all_pending) <= 5
+                and last_pending_count != pending_count
+            ):
+                self.tracker.info("Remaining checkpoints: %s", ", ".join(all_pending))
+            last_pending_count = pending_count
             return pending
 
         for gcpt in self.checkpoints:
@@ -616,7 +659,7 @@ def main():
     )
     for handler in logging.root.handlers:
         if isinstance(handler, logging.StreamHandler):
-            handler.setLevel(logging.INFO)
+            handler.setLevel(args.log_level.upper())
         if isinstance(handler, logging.FileHandler):
             handler.setLevel(logging.DEBUG)
 

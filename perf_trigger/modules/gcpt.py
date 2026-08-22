@@ -17,11 +17,13 @@ class GCPT:
         benchmark: str,
         checkpoint: str,
         weight: float,
+        eta: float = 0.0,
     ):
         self.__gcpt_path = gcpt_path
         self.__benchmark = benchmark
         self.__checkpoint = checkpoint
         self.__weight = weight
+        self.__eta = eta
         self.__state = GCPT.State.NONE
         self.__result_path = result_path / str(self)
 
@@ -43,6 +45,10 @@ class GCPT:
     @property
     def weight(self) -> float:
         return self.__weight
+
+    @property
+    def eta(self) -> float:
+        return self.__eta
 
     @property
     def state(self) -> "GCPT.State":
