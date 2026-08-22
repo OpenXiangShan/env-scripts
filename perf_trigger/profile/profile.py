@@ -35,10 +35,7 @@ def load_profile(profile_path: Path) -> dict:
 def get_known_checkpoints(profile: dict) -> set[tuple[str, str]]:
     """Return checkpoint identifiers represented by the profile."""
     checkpoints: set[tuple[str, str]] = set()
-    for benchmark, benchmark_profile in profile.items():
-        if not isinstance(benchmark_profile, dict):
-            continue
-        points = benchmark_profile.get("points")
+    for benchmark, points in profile.items():
         if not isinstance(points, dict):
             continue
         checkpoints.update((str(benchmark), str(point)) for point in points)
@@ -102,7 +99,7 @@ def update_profile(profile_path: Path, log_files: list[Path]) -> tuple[int, int]
     runtimes = get_runtimes(log_files, known)
 
     for (benchmark, point), samples in runtimes.items():
-        profile[benchmark]["points"][point] = sum(samples) / len(samples)
+        profile[benchmark][point] = sum(samples) / len(samples)
 
     with profile_path.open("w", encoding="utf-8") as profile_file:
         json.dump(profile, profile_file, indent=4, ensure_ascii=False)
@@ -113,10 +110,7 @@ def update_profile(profile_path: Path, log_files: list[Path]) -> tuple[int, int]
 def get_profile_runtimes(profile: dict) -> dict[str, list[float]]:
     """Return numeric point runtimes grouped by benchmark."""
     runtimes: dict[str, list[float]] = {}
-    for benchmark, benchmark_profile in profile.items():
-        if not isinstance(benchmark_profile, dict):
-            continue
-        points = benchmark_profile.get("points")
+    for benchmark, points in profile.items():
         if not isinstance(points, dict):
             continue
 
