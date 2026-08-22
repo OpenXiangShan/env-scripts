@@ -190,8 +190,10 @@ class XiangShan:
         )
         failed_checkpoints: list[str] = []
         all_assigned = False
+        last_pending_count = 0
 
         def poll_servers() -> bool:
+            nonlocal last_pending_count
             pending = False
             all_pending = []
             for server in self.servers:
@@ -202,10 +204,14 @@ class XiangShan:
                 if len(pending_list) > 0:
                     pending = True
 
-            if all_assigned and 0 < len(all_pending) <= 3:
-                self.tracker.info(
-                    "Remaining checkpoints: %s", ", ".join(all_pending)
-                )
+            pending_count = len(all_pending)
+            if (
+                all_assigned
+                and 0 < len(all_pending) <= 5
+                and last_pending_count != pending_count
+            ):
+                self.tracker.info("Remaining checkpoints: %s", ", ".join(all_pending))
+            last_pending_count = pending_count
             return pending
 
         for gcpt in self.checkpoints:
