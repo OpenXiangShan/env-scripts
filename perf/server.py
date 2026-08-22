@@ -1,4 +1,5 @@
 import os
+import sys
 import subprocess
 import time
 import ast
@@ -29,7 +30,7 @@ class Server(object):
 
     def remote_get_free_cores(self, threads):
         pwd = os.path.dirname(os.path.abspath(__file__))
-        cmd = ["python3", f"{pwd}/get_free_core.py", f"{threads}"]
+        cmd = [sys.executable, f"{pwd}/get_free_core.py", f"{threads}"]
         ssh_cmd_str = " ".join(self.remote_cmd + cmd)
         # print(ssh_cmd_str)
         proc = os.popen(ssh_cmd_str)
@@ -221,7 +222,7 @@ class Server(object):
         # os.killpg(os.getpgid(proc[1].pid), signal.SIGINT)
         # kill emu by ssh kill 'emu.pid'
         pwd = os.path.dirname(os.path.abspath(__file__))
-        os.popen(" ".join(self.remote_cmd) + f" python3 {pwd}/stop_emu.py")
+        os.popen(" ".join(self.remote_cmd) + f" {sys.executable} {pwd}/stop_emu.py")
 
     def is_epyc(self, num_cores):
         return num_cores > 16
