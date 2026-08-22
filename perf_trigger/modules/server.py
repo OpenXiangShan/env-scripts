@@ -268,7 +268,8 @@ class Server:
             # process finished, check result and call .wait() to cleanup
             if result != 0:
                 self.tracker.error(
-                    "%s failed \twith code %d \ton %s \tin %s\n" "=== Command ===\n%s\n%s%s",
+                    "%s failed \twith code %d \ton %s \tin %s\n"
+                    "=== Command ===\n%s\n%s%s",
                     task.name,
                     task.proc.returncode,
                     self.hostname,
@@ -300,7 +301,12 @@ class Server:
             "Pending tasks on %s: %s",
             self.hostname,
             (
-                ", ".join([t.name for t in self.pending_task])
+                ", ".join([t.name for t in self.pending_task[:5]])
+                + (
+                    f" ({len(self.pending_task) - 5}) hidden)"
+                    if len(self.pending_task) > 5
+                    else ""
+                )
                 if self.pending_task
                 else "None"
             ),
