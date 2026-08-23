@@ -1,5 +1,5 @@
 proc usage {} {
-  puts "Usage: vivado -mode tcl -source tools/jtag_write_flash.tcl -tclargs <bin>"
+  puts "Usage: vivado -mode tcl -source vivado/scripts/jtag_write_flash.tcl -tclargs <bin>"
   puts "  flash base is 0x10000000, capacity is 32 KiB, max burst is 256 words."
 }
 

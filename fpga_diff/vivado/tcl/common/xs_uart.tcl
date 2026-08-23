@@ -20,6 +20,8 @@
 
 set cpu "kmh"
 set cpu_candidates [list "kmh" "nanhu" "dualcore" "nutshell"]
+set cpu_files_tcl ""
+set project_dir ""
 set vivado_version ""
 set no_diff 0
 if {[info exists ::env(NO_DIFF)] && [string trim $::env(NO_DIFF)] ne ""} {
@@ -74,6 +76,8 @@ proc print_help { cpu_candidates } {
   puts "$script_file -tclargs \[--cpu {$cpu_candidates}\]"
   puts "$script_file -tclargs \[--origin_dir <path>\]"
   puts "$script_file -tclargs \[--project_name <name>\]"
+  puts "$script_file -tclargs \[--project_dir <path>\]"
+  puts "$script_file -tclargs \[--cpu_files <path>\]"
   puts "$script_file -tclargs \[--vivado_version <version>\]"
   puts "$script_file -tclargs \[--help\]\n"
   puts "Usage:"
@@ -92,6 +96,8 @@ proc print_help { cpu_candidates } {
   puts "\[--project_name <name>\] Create project with the specified name. Default"
   puts "                       name is the name of the project from where this"
   puts "                       script was generated.\n"
+  puts "\[--project_dir <path>\] Create the Vivado project in this directory.\n"
+  puts "\[--cpu_files <path>\] Read the generated CPU RTL list from this path.\n"
   puts "\[--vivado_version <version>\] Pass in the Vivado version from environment.\n"
   puts "\[--help\]               Print help information for this script"
   puts "-------------------------------------------------------------------------\n"
@@ -105,6 +111,8 @@ if { $::argc > 0 } {
       "--cpu"          { incr i; set cpu [lindex $::argv $i] }
       "--origin_dir"   { incr i; set origin_dir [lindex $::argv $i] }
       "--project_name" { incr i; set _xil_proj_name_ [lindex $::argv $i] }
+      "--project_dir"  { incr i; set project_dir [lindex $::argv $i] }
+      "--cpu_files"    { incr i; set cpu_files_tcl [lindex $::argv $i] }
       "--vivado_version" { incr i; set vivado_version [lindex $::argv $i] }
       "--help"         { print_help "$cpu_candidates" }
       default {
@@ -132,9 +140,20 @@ if { $vivado_version ne "" } {
 
 # Set the directory path for the original project from where this script was exported
 set orig_proj_dir "[file normalize "$origin_dir/"]"
-set tcl_dir "[file normalize "$origin_dir/src/tcl"]"
+set tcl_dir "[file normalize "$origin_dir/vivado/tcl"]"
+set shared_tcl_dir "[file normalize "$origin_dir/src/tcl"]"
 set rtl_dir "[file normalize "$origin_dir/src/rtl"]"
-set constr_dir "[file normalize "$origin_dir/src/constr/common"]"
+set constr_dir "[file normalize "$origin_dir/vivado/constr/common"]"
+if {$project_dir eq ""} {
+  set project_dir [file normalize $_xil_proj_name_]
+} else {
+  set project_dir [file normalize $project_dir]
+}
+if {$cpu_files_tcl eq ""} {
+  set cpu_files_tcl [file join $project_dir cpu_files.tcl]
+} else {
+  set cpu_files_tcl [file normalize $cpu_files_tcl]
+}
 
 source "$tcl_dir/common/ip_files.tcl"
 source "$tcl_dir/common/rtl_files.tcl"
@@ -156,7 +175,7 @@ if {[string equal $cpu_hit "no"]} {
   puts "ERROR: Unknown cpu target '$cpu' specified by '--cpu', please select one from {$cpu_candidates}.\n"
   return 1
 } else {
-  source "$tcl_dir/cpu_files.tcl"
+  source $cpu_files_tcl
 }
 
 foreach rtl_include_dir $rtl_include_dirs {
@@ -177,7 +196,7 @@ if { $validate_required } {
 }
 
 # Create project
-create_project ${_xil_proj_name_} ./${_xil_proj_name_} -part xcvu19p-fsva3824-2-e
+create_project ${_xil_proj_name_} $project_dir -part xcvu19p-fsva3824-2-e
 
 # Set the directory path for the new project
 set proj_dir [get_property directory [current_project]]
@@ -315,16 +334,16 @@ source "$tcl_dir/common/jtag_ddr_subsys.tcl"
 
 # Create IP for Debug
 # source "$tcl_dir/ahblite_axi_bridge_0.tcl"
-source "$tcl_dir/common/blk_mem_gen_0.tcl"
+source "$shared_tcl_dir/common/blk_mem_gen_0.tcl"
 source "$tcl_dir/common/vio_0.tcl"
 if {!$no_diff} {
-  source "$tcl_dir/common/xdma_ep.tcl"
+  source "$shared_tcl_dir/common/xdma_ep.tcl"
 } else {
   puts "INFO: NO_DIFF=1; skipping xdma_ep IP"
 }
-source "$tcl_dir/common/AXI_bridge.tcl"
+source "$shared_tcl_dir/common/AXI_bridge.tcl"
 if {!$no_diff} {
-  source "$tcl_dir/common/data_bridge.tcl"
+  source "$shared_tcl_dir/common/data_bridge.tcl"
 } else {
   puts "INFO: NO_DIFF=1; skipping PCIe/DMA data_bridge IP"
 }

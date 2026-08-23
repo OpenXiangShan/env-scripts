@@ -7,7 +7,7 @@ UVHS_UVW_AXI4_TO_DDR4_SRC ?=
 UVHS_PROBE_TCL ?= $(UVHS_COMPILATION_DIR)/probe_ila.tcl
 UVHS_PROBE_PATH := $(if $(strip $(UVHS_PROBE_TCL)),$(abspath $(UVHS_PROBE_TCL)),)
 UVHS_DDR_AXI_WIDTH := $(if $(filter nutshell,$(CPU)),64,256)
-UVHS_WORK_DIR := $(ENV_SCRIPTS_HOME)/fpga_diff_uvhs_$(CPU)$(if $(strip $(SUFFIX)),-$(strip $(SUFFIX)),)
+UVHS_WORK_DIR := $(ENV_SCRIPTS_HOME)/$(PRJ_NAME)
 UVHS_FILELIST := $(UVHS_WORK_DIR)/rtl/filelist.f
 
 UVHS_EXPORT_IP_FORCE ?= 0
@@ -32,9 +32,13 @@ UVHS_ILA_DEPTH ?= 1000000
 UVHS_ILA_POSITION ?= 0
 UVHS_ILA_CLOCK ?= clk5_p
 UVHS_ILA_GATED_CLOCK ?=
-UVHS_ILA_DIR := $(UVHS_RUNTIME_WORK_DIR)/UHD/uvhs_ila
-UVHS_ILA_USDB := $(UVHS_ILA_DIR)/UvData.usdb
-UVHS_ILA_VCD := $(UVHS_ILA_DIR)/UvData.vcd
+UVHS_ILA_RUNTIME ?=
+UVHS_ILA_DIR ?= $(CURDIR)
+UVHS_ILA_ENV ?= source ~/.bashrc &&
+UVHS_ILA_TRIGGER ?= $(UVHS_ILA_DIR)/uvhs/runtime/trigger.ini
+UVHS_ILA_OUTPUT_DIR := $(UVHS_RUNTIME_WORK_DIR)/UHD/uvhs_ila
+UVHS_ILA_USDB := $(UVHS_ILA_OUTPUT_DIR)/UvData.usdb
+UVHS_ILA_VCD := $(UVHS_ILA_OUTPUT_DIR)/UvData.vcd
 
 UVHS_TOOL_ENV = \
 	PATH="$$UV_ROOT/bin:$$UV_ROOT/lib/venv3.8/bin:$$UV_ROOT/lib/gcc10.3/bin:$$PATH" \
@@ -52,14 +56,15 @@ UVHS_FLOW_ENV = \
 	UVHS_LUT_FILL_RATE="$(UVHS_LUT_FILL_RATE)" \
 	UVHS_LUT6_FILL_RATE="$(UVHS_LUT6_FILL_RATE)"
 
-.PHONY: uvhs uvhs_preflight uvhs_prepare \
+.PHONY: uvhs uvhs_project uvhs_preflight uvhs_prepare \
 	uvhs_frontend uvhs_backend uvhs_clean uvhs_write_bitstream \
 	uvhs_halt_soc uvhs_reset_cpu uvhs_write_ddr uvhs_write_flash \
 	uvhs_ila_arm uvhs_ila_upload uvhs_vcd uvhs_ila_clear \
-	uvhs_runtime_status uvhs_runtime_stop
+	uvhs_runtime_status uvhs_runtime_stop uvhs_bitstream \
+	uvhs_stage_bitstream uvhs_ila_host_env
 
 # Validate host tools and external inputs before starting a multi-hour build.
-uvhs_preflight:
+uvhs_preflight: check_project_name
 	@bash -c 'set -euo pipefail; \
 		for variable in UV_ROOT UV_XILINX_VIVADO UV_LICENSE; do \
 			[[ -n "$${!variable:-}" ]] || { echo "ERROR: $$variable is not set" >&2; exit 1; }; \
@@ -108,10 +113,12 @@ uvhs_prepare: uvhs_preflight
 		"$(UVHS_EXPORT_IP_JOBS)" "$(UVHS_EXPORT_IP_FORCE)" \
 		"$(UVHS_UVW_AXI4_TO_DDR4_SRC)" "$(UVHS_DDR_AXI_WIDTH)"
 
-uvhs_frontend: uvhs_prepare
+uvhs_project: uvhs_prepare
 	bash "$(UVHS_ROOT_DIR)/tools/update_core_flist.sh" uvhs \
 		"$(CORE_DIR)" "$(UVHS_WORK_DIR)" "$(CPU)" "$(UVHS_FILELIST)" \
 		-- $(RTL_INCLUDE)
+
+uvhs_frontend: uvhs_project
 	bash -c 'set -euo pipefail; cd "$(UVHS_WORK_DIR)"; \
 		$(UVHS_FLOW_ENV) \
 		bash "$$UV_ROOT/bin/uv_shell" -bypass_vivado_version_check \
@@ -121,6 +128,8 @@ uvhs_frontend: uvhs_prepare
 # Keep frontend and backend serialized even when the caller enables parallel make.
 uvhs: uvhs_frontend
 	$(MAKE) uvhs_backend
+
+uvhs_bitstream: uvhs
 
 uvhs_backend:
 	bash -c 'set -euo pipefail; cd "$(UVHS_WORK_DIR)"; \
@@ -173,10 +182,13 @@ uvhs_write_flash:
 	test -f "$(WORKLOAD)"
 	$(call uvhs_runtime_command,write_flash "$(abspath $(WORKLOAD))" 0x0 0x8000)
 
+uvhs_stage_bitstream:
+	@echo "UVHS implementation database: $(UVHS_RUNTIME_DB)"
+
 uvhs_ila_arm:
-	test -f "$(TRIGGER)"
+	test -f "$(UVHS_ILA_TRIGGER)"
 	$(call uvhs_runtime_command,ila_arm \
-		"$(abspath $(TRIGGER))" "$(UVHS_ILA_POSITION)" \
+		"$(abspath $(UVHS_ILA_TRIGGER))" "$(UVHS_ILA_POSITION)" \
 		"$(UVHS_ILA_CLOCK)" "$(UVHS_ILA_GATED_CLOCK)")
 
 uvhs_ila_upload:
@@ -186,6 +198,15 @@ uvhs_ila_upload:
 	test -s "$(UVHS_ILA_USDB)"
 	$(MAKE) uvhs_vcd
 	@echo "UVHS_ILA_USDB=$(UVHS_ILA_USDB)"
+
+# Print sourceable hooks for fpga-host. The generated commands use the public
+# backend targets so callers do not depend on UVHS implementation names.
+uvhs_ila_host_env:
+	@bash "$(UVHS_RUNTIME_DIR)/ila_host_env.sh" \
+		"$(UVHS_ILA_RUNTIME)" "$(UVHS_ILA_DIR)" \
+		"$(UVHS_ILA_ENV)" "$(CPU)" "$(SUFFIX)" "$(PRJ_NAME)" \
+		"$(UVHS_ILA_TRIGGER)" "$(UVHS_ILA_POSITION)" "$(UVHS_ILA_CLOCK)" \
+		"$(UVHS_ILA_GATED_CLOCK)" "$(UVHS_ILA_TIMEOUT)" "$(UVHS_ILA_DEPTH)"
 
 uvhs_vcd:
 	test -x "$$UV_ROOT/uvd/uvs/bin/usdb2vcd"
@@ -205,7 +226,7 @@ uvhs_runtime_stop:
 		"$(UVHS_RUNTIME_PID_FILE)" "$(UVHS_RUNTIME_READY_FILE)" \
 		"$(UVHS_RUNTIME_COMMAND_FILE)" "$(UVHS_RUNTIME_TIMEOUT)"
 
-uvhs_clean:
+uvhs_clean: check_project_name
 	@! bash "$(UVHS_RUNTIME_DIR)/runtime_session.sh" check \
 		"$(UVHS_RUNTIME_PID_FILE)" >/dev/null 2>&1 || \
 		{ echo "ERROR: stop the UVHS runtime before cleaning" >&2; exit 1; }

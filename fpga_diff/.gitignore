@@ -6,4 +6,6 @@
 !*.tcl
 
 fpga_*/
-src/tcl/cpu_files.tcl
+*/cpu_files.tcl
+# Keep stale output from revisions that generated the list beside Vivado Tcl.
+vivado/tcl/cpu_files.tcl
