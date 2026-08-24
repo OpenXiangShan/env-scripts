@@ -45,7 +45,8 @@ generate_vivado_filelist() {
   fi
 
   tmp_output=$tmp_dir/cpu_files.tcl
-  awk -v var=cpu_files -v detect_simtop_dma=1 -v top_module="$top_module" \
+  awk -v var=cpu_files -v detect_simtop_dma=1 \
+    -v detect_simtop_riscv_halt=1 -v top_module="$top_module" \
     -f "$fpga_diff_dir/core_flist.awk" \
     "$tmp_dir/cpu_files" > "$tmp_output"
   awk -v var=rtl_include_files -f "$fpga_diff_dir/core_flist.awk" \
@@ -95,6 +96,10 @@ generate_uvhs_filelist() {
     if [[ $cpu == kmh ]] &&
       grep -Eq '^[[:space:]]*(input|output)[[:space:]].*dma_awready' "$core_rtl_dir/SimTop.sv"; then
       printf '+define+CONFIG_SIMTOP_HAS_DMA\n'
+    fi
+    if [[ $cpu == kmh ]] &&
+      grep -Eq '^[[:space:]]*output[[:space:]].*io_riscv_halt_0' "$core_rtl_dir/SimTop.sv"; then
+      printf '+define+CPU_XIANGSHAN_KMHV2\n'
     fi
 
     printf '+incdir+%s\n' "$core_dir" "$core_rtl_dir"

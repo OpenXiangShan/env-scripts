@@ -28,13 +28,31 @@ set uvhs_config_path_names {
     core_def/U_SYS_CFG
     core_def/u_rom
 }
+set uvhs_cpu_is_kmhv2 0
+set uvhs_filelist ./rtl/filelist.f
+if {[file isfile $uvhs_filelist]} {
+    set uvhs_filelist_handle [open $uvhs_filelist r]
+    set uvhs_filelist_data [read $uvhs_filelist_handle]
+    close $uvhs_filelist_handle
+    set uvhs_cpu_is_kmhv2 [regexp -line \
+        {^\+define\+CPU_XIANGSHAN_KMHV2$} $uvhs_filelist_data]
+}
 set uvhs_host_path_names {
-    core_def/U_CPU_TOP/u_XSTop/soc/core_with_l2
     core_def/U_CPU_TOP/u_XSTop/endpoint
     core_def/U_CPU_TOP/u_XSTop/difftest_cfg
     core_def/U_CPU_TOP/u_XSTop/difftest_host
     core_def/U_CPU_TOP/u_XSTop/difftest_memCtrl
     core_def/xdma_ep_i
+}
+if {$uvhs_cpu_is_kmhv2} {
+    lappend uvhs_host_path_names \
+        core_def/U_CPU_TOP/u_XSTop/soc/core_with_l2
+} else {
+    set uvhs_l2_path_names {
+        core_def/U_CPU_TOP/u_XSTop/soc/core_with_l2/l2top
+    }
+    lappend uvhs_host_path_names \
+        core_def/U_CPU_TOP/u_XSTop/soc/core_with_l2/core
 }
 set uvhs_xiangshan_cell [get_cells -quiet {core_def/U_CPU_TOP/u_XSTop}]
 if {[llength $uvhs_xiangshan_cell] == 1} {
@@ -50,6 +68,14 @@ if {[llength $uvhs_xiangshan_cell] == 1} {
             [llength $uvhs_config_path_names] \
             [llength $uvhs_config_path_cells]]
     }
+    if {!$uvhs_cpu_is_kmhv2} {
+        set uvhs_l2_path_cells [get_cells -quiet $uvhs_l2_path_names]
+        if {[llength $uvhs_l2_path_cells] != [llength $uvhs_l2_path_names]} {
+            error [format "incomplete XiangShan L2 path: expected %d cells, got %d" \
+                [llength $uvhs_l2_path_names] \
+                [llength $uvhs_l2_path_cells]]
+        }
+    }
     set uvhs_host_path_cells [get_cells -quiet $uvhs_host_path_names]
     if {[llength $uvhs_host_path_cells] != [llength $uvhs_host_path_names]} {
         error [format "incomplete XiangShan host path: expected %d cells, got %d" \
@@ -58,6 +84,10 @@ if {[llength $uvhs_xiangshan_cell] == 1} {
     }
     set uvhs_f0_cells [concat $uvhs_f0_cells $uvhs_memory_path_cells \
         $uvhs_config_path_cells]
+    if {!$uvhs_cpu_is_kmhv2} {
+        create_fpga -name b0.f1 -cells $uvhs_l2_path_cells
+        puts "INFO: constrain XiangShan V3 L2 path to b0.f1: $uvhs_l2_path_cells"
+    }
     create_fpga -name b0.f2 -cells $uvhs_host_path_cells
     puts "INFO: constrain XiangShan host path to b0.f2: $uvhs_host_path_cells"
 } elseif {[llength $uvhs_xiangshan_cell]} {
@@ -85,11 +115,18 @@ if {[llength $uvhs_xiangshan_cell] == 1} {
     if {[llength $uvhs_clock_enable_net] != 1} {
         error "expected one DiffTest clock-enable net, got [llength $uvhs_clock_enable_net]"
     }
-    assign_route -signals $uvhs_clock_enable_net -path {b0.f2 b0.f0}
-    puts "INFO: constrain DiffTest clock enable to direct b0.f2-b0.f0 route"
+    if {$uvhs_cpu_is_kmhv2} {
+        set uvhs_clock_enable_path {b0.f2 b0.f0}
+    } else {
+        set uvhs_clock_enable_path {b0.f2 b0.f0 b0.f1}
+    }
+    assign_route -signals $uvhs_clock_enable_net -path $uvhs_clock_enable_path
+    puts "INFO: constrain DiffTest clock enable route: $uvhs_clock_enable_path"
 }
 unset -nocomplain uvhs_ddr_cell uvhs_ddr_connector \
     uvhs_bound_ddr_connector uvhs_f0_cells uvhs_memory_path_names \
     uvhs_memory_path_cells uvhs_config_path_names uvhs_config_path_cells \
+    uvhs_cpu_is_kmhv2 uvhs_filelist uvhs_filelist_handle uvhs_filelist_data \
+    uvhs_l2_path_names uvhs_l2_path_cells uvhs_clock_enable_path \
     uvhs_host_path_names uvhs_host_path_cells \
     uvhs_xiangshan_cell uvhs_clock_enable_net

@@ -521,7 +521,9 @@ assign dma_core_rlast   = 1'b0;
   .io_cacheable_check_resp_1_instr   (),
   .io_cacheable_check_resp_1_mmio    (),
   .io_cacheable_check_resp_1_atomic    (),
+`ifdef CPU_XIANGSHAN_KMHV2
   .io_riscv_halt_0                     (),
+`endif
   .io_riscv_critical_error_0           (io_riscv_critical_error_0_int),
   .io_traceCoreInterface_0_fromEncoder_enable (trace_en),
   .io_traceCoreInterface_0_fromEncoder_stall  (trace_stall),
