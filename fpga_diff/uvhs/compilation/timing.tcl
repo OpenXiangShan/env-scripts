@@ -31,4 +31,3 @@ proc fpga_diff_set_async_clock_groups {} {
     lappend groups -group [lsort -unique $pcie_clocks]
     set_clock_groups -asynchronous {*}$groups
 }
-fpga_diff_set_async_clock_groups

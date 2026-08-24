@@ -81,6 +81,31 @@ foreach {label patterns} {
 }
 puts "INFO: XDMA CDC total ASYNC_REG count=[llength $fpga_diff_xdma_cdc_cells]"
 
+# UVHS emits replicated clock cones as primary clocks in each FPGA constraint
+# file. Rebuild their source relationship after Vivado links the partition so
+# CDC signoff still recognizes the original master clock.
+foreach {fpga_diff_clock fpga_diff_master fpga_diff_gate} {
+    SOC_GATED_CLK CPU_CLK_IN SOC_CLK_CTRL_UVin_bufgce_1
+    RTC_GATED_CLK TMCLK      RTC_CLK_CTRL_UVin_bufgce_1
+} {
+    set fpga_diff_gate_input [get_pins -hierarchical -quiet -filter \
+        "NAME =~ */UV_REPLICATED_CLOCKCONE/${fpga_diff_gate}/I"]
+    set fpga_diff_gate_output [get_pins -hierarchical -quiet -filter \
+        "NAME =~ */UV_REPLICATED_CLOCKCONE/${fpga_diff_gate}/O"]
+    if {![llength $fpga_diff_gate_input] && ![llength $fpga_diff_gate_output]} {
+        continue
+    }
+    set fpga_diff_master_clock [get_clocks -quiet $fpga_diff_master]
+    if {[llength $fpga_diff_master_clock] != 1 ||
+        [llength $fpga_diff_gate_input] != 1 ||
+        [llength $fpga_diff_gate_output] != 1} {
+        error "required replicated clock path not found for $fpga_diff_clock"
+    }
+    create_generated_clock -add -name $fpga_diff_clock \
+        -master_clock $fpga_diff_master_clock -source $fpga_diff_gate_input \
+        -divide_by 1 $fpga_diff_gate_output
+}
+
 set fpga_diff_async_groups [list]
 foreach fpga_diff_clock {TMCLK ddr_ref_clk CPU_CLK_IN jtag_vclk pcie_ep_refclk} {
     lappend fpga_diff_async_groups -group \
