@@ -150,6 +150,7 @@ foreach cpu_candidate $cpu_candidates {
 }
 # Legacy generated lists predate DMA capability metadata and expose DMA ports.
 set cpu_files_has_dma 1
+set cpu_files_has_riscv_halt 0
 set rtl_include_files [list]
 set rtl_include_dirs [list]
 if {[string equal $cpu_hit "no"]} {
@@ -232,6 +233,10 @@ if {$cpu_files_has_dma} {
     puts "INFO: SimTop DMA ports detected"
 } else {
     puts "INFO: SimTop DMA ports not present; wrapper DMA is tied off"
+}
+if {[string equal $cpu "kmh"] && $cpu_files_has_riscv_halt} {
+    fpga_append_unique defines "CPU_XIANGSHAN_KMHV2"
+    puts "INFO: Kunminghu V2 SimTop halt port detected"
 }
 if {!$no_diff} {
   set xdma_pcie_lanes 4
