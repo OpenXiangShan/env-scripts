@@ -18,18 +18,8 @@ conversion. The UVHS flow only consumes that result.
 
 `RTL_INCLUDE` accepts RTL files, directories, and nested `.f`, `.flist`, or
 `.list` files. Relative entries are resolved from the file list that contains
-them. Both build flows call `tools/update_core_flist.sh`, which uses
-`tools/rtl_filelist_lib.sh` for parsing. Vivado mode generates
-`cpu_files.tcl` inside the selected Vivado project directory; UVHS mode combines
-the parsed additions with release RTL and FPGA-Diff wrappers in `filelist.f`.
-
-| File-list stage | Vivado | UVHS |
-| --- | --- | --- |
-| Shared input | `CORE_DIR` and optional `RTL_INCLUDE` | `CORE_DIR` and optional `RTL_INCLUDE` |
-| Core files | Scans the complete release build, excluding `rtl/verification` | Reads release `rtl/` and optional `generated-src/` headers |
-| Board wrappers and IP | Added later by `xs_uart.tcl` from Tcl lists | Written directly into the complete UVHS `filelist.f` |
-| Output | Tcl variables in `<project>/cpu_files.tcl` | Flat uvsyn input in `<work>/rtl/filelist.f` |
-| Consumer | Vivado project creation | UVHS `read_verilog -f` |
+them. `uvhs_project` combines those inputs with the release RTL and FPGA-Diff
+wrappers in `<work>/rtl/filelist.f`, which the UVHS frontend reads directly.
 
 ## Build
 
@@ -40,15 +30,7 @@ make uvhs CPU=<design> CORE_DIR=/path/to/release/build \
 
 `RTL_INCLUDE` is optional. `uvhs` is the stable build entry point: it runs the
 frontend and backend in order, generates the per-FPGA bitstreams, and commits
-the runtime database. `uvhs_project` completes preflight, copies the vendor
-template, prepares the IP checkpoints, and generates the RTL file list without
-running the frontend. The lower-level `uvhs_frontend` and `uvhs_backend` targets
-remain available for stage reuse and debugging. `ENV_SCRIPTS_HOME` defaults to
-the current `fpga_diff` directory. `PRJ_NAME` defaults to
-`fpga_uvhs_<cpu>[-<suffix>]` and selects the work directory used by both build
-and runtime targets. `PRJ_NAME` must be a name rather than a path; set
-`ENV_SCRIPTS_HOME` to change its parent directory. Project names may contain
-only letters, digits, `.`, `_`, and `-`.
+the runtime database.
 
 `uvhs_project` performs these steps:
 
@@ -341,8 +323,7 @@ The vendor documents gated-clock capture as approximate when the clock stops or
 changes frequency; the trigger must also eventually receive a gated-clock edge.
 Use the free-running parent clock for trigger-only profiles that must remain
 observable while the CPU clock is stopped. `UVHS_ILA_TIMEOUT` defaults to 60
-seconds. This is the UVHS UHD path; the normal Vivado flow continues to use
-`make dump_ila` and an `.ltx` file.
+seconds.
 
 UHD capture inserts its own external DDR wrapper on every FPGA containing a
 probe group. The four PDDR4DME cards on the FPGA FMC3 connectors are reserved
@@ -378,8 +359,6 @@ before the UVHS timing worker reads it.
 | `../tools/update_core_flist.sh` | Shared Vivado/UVHS RTL file-list entry point. |
 | `../tools/rtl_filelist_lib.sh` | Nested file-list parsing and path resolution. |
 | `../src/tcl/common/{blk_mem_gen_0,AXI_bridge,data_bridge,xdma_ep}.tcl` | Shared Vivado IP/BD generators used by UVHS IP export and Vivado project creation. |
-| `../vivado/tcl/common/` | Vivado project-generation Tcl that is not consumed by UVHS. |
-| `../vivado/constr/common/` | Vivado project constraints; UVHS uses its own compilation timing/signoff constraints. |
 | `compilation/flow_common.tcl` | Shared UVHS path, environment, and source helpers. |
 | `compilation/frontend_run.tcl` | RTL/IP import, elaboration, and uvsyn frontend. |
 | `compilation/backend_run.tcl` | Fill-rate setup, partition, routing, PnR, and database commit. |

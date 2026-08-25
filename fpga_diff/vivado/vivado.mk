@@ -21,9 +21,8 @@ VIVADO_VERSION := $(shell vivado -version 2>/dev/null | head -1 | grep -o '[0-9]
 	vivado_write_bitstream vivado_halt_soc vivado_write_ddr \
 	vivado_write_flash vivado_reset_cpu vivado_runtime_status \
 	vivado_runtime_stop vivado_ila_arm vivado_ila_upload vivado_ila_clear \
-	vivado_ila_host_env write_jtag_ddr write_jtag_flash vivado synth \
-	check_vivado_version check_version update_core_flist dump_ila \
-	add_sys_option get_impl_log get_synth_log
+	vivado_ila_host_env vivado synth check_vivado_version check_version \
+	update_core_flist get_impl_log get_synth_log
 
 check_vivado_version:
 	@vivado -version 2>/dev/null | head -1 | grep -o '[0-9]\{4\}\.[0-9]' || echo "unknown"
@@ -85,31 +84,29 @@ vivado_write_flash:
 	vivado -mode tcl -source "$(VIVADO_SCRIPT_DIR)/jtag_write_flash.tcl" \
 		-tclargs $(WORKLOAD)
 
-# Legacy Vivado-only target names.
-write_jtag_ddr: vivado_write_ddr
-
-write_jtag_flash: vivado_write_flash
-
 vivado_reset_cpu:
 	@test -n "$(FPGA_BIT_HOME)" || { echo "ERROR: please set FPGA_BIT_HOME=..." >&2; exit 2; }
 	vivado -mode tcl -source "$(VIVADO_SCRIPT_DIR)/reset_cpu.tcl" \
 		-tclargs $(FPGA_BIT_HOME)/fpga_top_debug.ltx
 
-vivado_runtime_status vivado_runtime_stop vivado_ila_arm \
-vivado_ila_upload vivado_ila_clear:
+vivado_runtime_status vivado_runtime_stop vivado_ila_arm:
 	@echo "ERROR: $(@:vivado_%=%) requires FPGA_BACKEND=uvhs" >&2
 	@exit 2
 
 vivado_ila_host_env:
 	@:
 
-dump_ila:
-	mkdir -p $(ILA_OUT)
-	vivado -mode tcl -source "$(VIVADO_SCRIPT_DIR)/dump_ila.tcl" \
-		-tclargs $(FPGA_BIT_HOME)/fpga_top_debug.ltx $(ILA_OUT) $(TIMEOUT_MIN)
+vivado_ila_upload:
+	@test -n "$(FPGA_BIT_HOME)" || { echo "ERROR: please set FPGA_BIT_HOME=..." >&2; exit 2; }
+	mkdir -p "$(ILA_OUT)"
+	vivado -mode tcl -source "$(VIVADO_SCRIPT_DIR)/ila.tcl" \
+		-tclargs upload "$(FPGA_BIT_HOME)/fpga_top_debug.ltx" \
+		"$(ILA_OUT)" "$(TIMEOUT_MIN)"
 
-add_sys_option:
-	sed -i "s/reg \(\[[0-9]*:[0-9]*\]\) ram \[\([4-9][0-9]\{3,\}\|[1-9][0-9]\{4,\}\):0\];/(\* ram_style = \"ultra\" \*)\treg \1 ram \[\2:0\];/g" $(CORE_DIR)/rtl/array_*.v
+vivado_ila_clear:
+	@test -n "$(FPGA_BIT_HOME)" || { echo "ERROR: please set FPGA_BIT_HOME=..." >&2; exit 2; }
+	vivado -mode tcl -source "$(VIVADO_SCRIPT_DIR)/ila.tcl" \
+		-tclargs clear "$(FPGA_BIT_HOME)/fpga_top_debug.ltx"
 
 get_impl_log:
 	cat $(PRJ_DIR)/$(PRJ_NAME).runs/impl_1/runme.log

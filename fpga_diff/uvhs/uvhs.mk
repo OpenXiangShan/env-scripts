@@ -32,10 +32,13 @@ UVHS_ILA_DEPTH ?= 1000000
 UVHS_ILA_POSITION ?= 0
 UVHS_ILA_CLOCK ?= clk5_p
 UVHS_ILA_GATED_CLOCK ?=
+# Settings used to construct fpga-host hooks. UVHS_ILA_DIR is the fpga_diff
+# checkout on the runtime host, not a waveform output directory.
 UVHS_ILA_RUNTIME ?=
-UVHS_ILA_DIR ?= $(CURDIR)
+UVHS_ILA_DIR ?= $(UVHS_ROOT_DIR)
 UVHS_ILA_ENV ?= source ~/.bashrc &&
 UVHS_ILA_TRIGGER ?= $(UVHS_ILA_DIR)/uvhs/runtime/trigger.ini
+# uv_shell writes UHD output below its project-local runtime work directory.
 UVHS_ILA_OUTPUT_DIR := $(UVHS_RUNTIME_WORK_DIR)/UHD/uvhs_ila
 UVHS_ILA_USDB := $(UVHS_ILA_OUTPUT_DIR)/UvData.usdb
 UVHS_ILA_VCD := $(UVHS_ILA_OUTPUT_DIR)/UvData.vcd

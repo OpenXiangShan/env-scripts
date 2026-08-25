@@ -57,18 +57,31 @@ proc configure_hw_ila {hw_ila probe_name compare_value tag} {
 }
 
 if {[llength $argv] < 2} {
-  puts stderr "Usage: vivado -mode tcl -source dump_ila.tcl -tclargs <ltx_path> <out_dir> ?timeout_min?"
+  puts stderr "Usage: vivado -mode tcl -source ila.tcl -tclargs upload <ltx_path> <out_dir> ?timeout_min?"
+  puts stderr "       vivado -mode tcl -source ila.tcl -tclargs clear <ltx_path>"
   exit 1
 }
 
-set ltx_path [lindex $argv 0]
-set out_dir [lindex $argv 1]
-set timeout_min 2
-if {[llength $argv] >= 3} {
-  set timeout_min [lindex $argv 2]
+set action [lindex $argv 0]
+set ltx_path [lindex $argv 1]
+if {$action ni {upload clear}} {
+  puts stderr "ERROR: unsupported ILA action: $action"
+  exit 1
 }
 
-file mkdir $out_dir
+set out_dir ""
+set timeout_min 2
+if {$action eq "upload"} {
+  if {[llength $argv] < 3} {
+    puts stderr "ERROR: upload requires an output directory"
+    exit 1
+  }
+  set out_dir [lindex $argv 2]
+  if {[llength $argv] >= 4} {
+    set timeout_min [lindex $argv 3]
+  }
+  file mkdir $out_dir
+}
 
 open_hw_manager
 connect_hw_server
@@ -84,6 +97,12 @@ set hw_ila [find_hw_ila $hw_device u_ila_xdma_ctrl]
 if {$hw_ila eq ""} {
   puts stderr "ERROR: required ILA u_ila_xdma_ctrl not found on hardware"
   exit 3
+}
+
+if {$action eq "clear"} {
+  reset_hw_ila $hw_ila
+  puts "CLEARED_ILA=u_ila_xdma_ctrl"
+  exit
 }
 
 if {[catch {configure_hw_ila $hw_ila core_def/io_host_ila_trigger {eq1'b1} u_ila_xdma_ctrl} err]} {
@@ -107,5 +126,5 @@ set data_obj [upload_hw_ila_data $hw_ila]
 write_hw_ila_data -force "${out_dir}/u_ila_xdma_ctrl.ila" $data_obj
 write_hw_ila_data -force -csv_file "${out_dir}/u_ila_xdma_ctrl.csv" $data_obj
 write_hw_ila_data -force -vcd_file "${out_dir}/u_ila_xdma_ctrl.vcd" $data_obj
-puts "DUMP_DONE=$out_dir"
+puts "UPLOAD_DONE=$out_dir"
 exit
