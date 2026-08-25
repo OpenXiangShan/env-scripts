@@ -61,11 +61,11 @@ check_version:
 vivado_write_bitstream:
 	@test -n "$(FPGA_BIT_HOME)" || { echo "ERROR: please set FPGA_BIT_HOME=..." >&2; exit 2; }
 ifneq ($(NO_DIFF),1)
-	sh "$(VIVADO_SCRIPT_DIR)/pcie-remove.sh"
+	sh "$(VIVADO_ROOT_DIR)/tools/pcie-remove.sh"
 endif
 	vivado -mode tcl -source "$(VIVADO_SCRIPT_DIR)/write_bitstream.tcl" -tclargs $(FPGA_BIT_HOME)
 ifneq ($(NO_DIFF),1)
-	sh "$(VIVADO_SCRIPT_DIR)/pcie-rescan.sh"
+	sh "$(VIVADO_ROOT_DIR)/tools/pcie-rescan.sh"
 endif
 	vivado -mode tcl -source "$(VIVADO_SCRIPT_DIR)/reset_ddr.tcl" \
 		-tclargs $(FPGA_BIT_HOME)/fpga_top_debug.ltx

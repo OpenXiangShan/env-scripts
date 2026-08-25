@@ -15,8 +15,8 @@ Core RTL to FPGA Steps
   (wait for bitstream gen to finish)
 
 5. (first) Add file execution permission
-  chmod u+x vivado/scripts/pcie-remove.sh
-  chmod u+x vivado/scripts/pcie-rescan.sh
+  chmod u+x tools/pcie-remove.sh
+  chmod u+x tools/pcie-rescan.sh
 
 6. make write_bitstream
 
