@@ -32,9 +32,10 @@ UVHS_ILA_DEPTH ?= 1000000
 UVHS_ILA_POSITION ?= 0
 UVHS_ILA_CLOCK ?= clk5_p
 UVHS_ILA_GATED_CLOCK ?=
-# Settings used to construct fpga-host hooks. UVHS_ILA_DIR is the fpga_diff
-# checkout on the runtime host, not a waveform output directory.
-UVHS_ILA_RUNTIME ?=
+# Settings used to construct fpga-host hooks.
+UVHS_RUNTIME ?=
+# This must name the fpga_diff checkout visible on UVHS_RUNTIME; it cannot be
+# inferred when the runtime host has multiple checkouts.
 UVHS_ILA_DIR ?= $(UVHS_ROOT_DIR)
 UVHS_ILA_ENV ?= source ~/.bashrc &&
 UVHS_ILA_TRIGGER ?= $(UVHS_ILA_DIR)/uvhs/runtime/trigger.ini
@@ -206,7 +207,7 @@ uvhs_ila_upload:
 # backend targets so callers do not depend on UVHS implementation names.
 uvhs_ila_host_env:
 	@bash "$(UVHS_RUNTIME_DIR)/ila_host_env.sh" \
-		"$(UVHS_ILA_RUNTIME)" "$(UVHS_ILA_DIR)" \
+		"$(UVHS_RUNTIME)" "$(UVHS_ILA_DIR)" \
 		"$(UVHS_ILA_ENV)" "$(CPU)" "$(SUFFIX)" "$(PRJ_NAME)" \
 		"$(UVHS_ILA_TRIGGER)" "$(UVHS_ILA_POSITION)" "$(UVHS_ILA_CLOCK)" \
 		"$(UVHS_ILA_GATED_CLOCK)" "$(UVHS_ILA_TIMEOUT)" "$(UVHS_ILA_DEPTH)"

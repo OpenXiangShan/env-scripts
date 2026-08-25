@@ -29,7 +29,7 @@ endif
 endif
 PRJ_NAME ?= fpga_$(FPGA_BACKEND)_$(CPU)$(if $(strip $(SUFFIX)),-$(strip $(SUFFIX)),)
 export PRJ_NAME
-FPGA_DISPATCH_TARGETS := bitstream stage_bitstream write_bitstream halt_soc \
+FPGA_DISPATCH_TARGETS := project bitstream stage_bitstream write_bitstream halt_soc \
 	write_ddr write_flash reset_cpu runtime_status runtime_stop \
 	ila_arm ila_upload ila_clear ila_host_env
 
