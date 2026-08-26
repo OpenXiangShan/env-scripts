@@ -12,8 +12,16 @@ if {[llength $uvhs_ddr_cell] != 1} {
 # core and DiffTest host path with XDMA. UART pins remain on the physical F1
 # daughter card.
 set uvhs_f0_cells $uvhs_ddr_cell
-set uvhs_memory_path_names {
+# The LLC wrapper name depends on the XiangShan configuration: external-LLC
+# builds instantiate chi_extllc_opt, while the default OpenLLC build uses
+# chi_openllc_opt. Keep the variable root separate from the shared memory path
+# so one partition script works for either netlist and rejects an ambiguous one.
+set uvhs_memory_root_names {
     core_def/U_CPU_TOP/u_XSTop/soc/chi_extllc_opt
+    core_def/U_CPU_TOP/u_XSTop/soc/chi_openllc_opt
+}
+# These blocks are shared memory-path siblings of either LLC root.
+set uvhs_memory_path_names {
     core_def/U_CPU_TOP/u_XSTop/soc/imsic_bus_tops
     core_def/U_CPU_TOP/u_XSTop/soc/widget
     core_def/U_CPU_TOP/u_XSTop/soc/fragmenter
@@ -100,10 +108,17 @@ if {[llength $uvhs_xiangshan_cell] == 1} {
         error "incomplete nocMisc direct-child partition"
     }
 
-    set uvhs_memory_path_cells [get_cells -quiet $uvhs_memory_path_names]
-    if {[llength $uvhs_memory_path_cells] != [llength $uvhs_memory_path_names]} {
+    set uvhs_memory_root_cells [get_cells -quiet $uvhs_memory_root_names]
+    if {[llength $uvhs_memory_root_cells] != 1} {
+        error [format "expected exactly one XiangShan LLC path, got %d: %s" \
+            [llength $uvhs_memory_root_cells] $uvhs_memory_root_cells]
+    }
+    set uvhs_memory_path_cells [concat $uvhs_memory_root_cells \
+        [get_cells -quiet $uvhs_memory_path_names]]
+    if {[llength $uvhs_memory_path_cells] !=
+        [expr {[llength $uvhs_memory_path_names] + 1}]} {
         error [format "incomplete XiangShan memory path: expected %d cells, got %d" \
-            [llength $uvhs_memory_path_names] \
+            [expr {[llength $uvhs_memory_path_names] + 1}] \
             [llength $uvhs_memory_path_cells]]
     }
     set uvhs_memory_path_cells [concat $uvhs_memory_path_cells \
@@ -125,6 +140,7 @@ if {[llength $uvhs_xiangshan_cell] == 1} {
     set uvhs_f0_cells [concat $uvhs_f0_cells $uvhs_memory_path_cells \
         $uvhs_config_path_cells]
     create_fpga -name b0.f2 -cells $uvhs_host_path_cells
+    puts "INFO: selected XiangShan LLC path: $uvhs_memory_root_cells"
     puts "INFO: nocMisc direct children on b0.f0: $uvhs_nocmisc_f0_names"
     puts "INFO: nocMisc direct children on b0.f2: $uvhs_nocmisc_f2_names"
     puts "INFO: constrain XiangShan host path to b0.f2: $uvhs_host_path_cells"
@@ -168,8 +184,9 @@ if {[llength $uvhs_xiangshan_cell] == 1} {
     puts "INFO: constrain syscnt time bus to direct b0.f2-b0.f0 route"
 }
 unset -nocomplain uvhs_ddr_cell uvhs_ddr_connector \
-    uvhs_bound_ddr_connector uvhs_f0_cells uvhs_memory_path_names \
-    uvhs_memory_path_cells uvhs_config_path_names uvhs_config_path_cells \
+    uvhs_bound_ddr_connector uvhs_f0_cells uvhs_memory_root_names \
+    uvhs_memory_root_cells uvhs_memory_path_names uvhs_memory_path_cells \
+    uvhs_config_path_names uvhs_config_path_cells \
     uvhs_host_path_names uvhs_host_path_cells \
     uvhs_nocmisc_path uvhs_nocmisc_prefix uvhs_nocmisc_f0_anchors \
     uvhs_nocmisc_f2_children uvhs_nocmisc_direct_cells \

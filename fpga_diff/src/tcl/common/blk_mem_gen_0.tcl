@@ -65,7 +65,17 @@ proc write_blk_mem_gen_qspi { blk_mem_gen_qspi_filepath } {
 
   puts $blk_mem_gen_qspi {MEMORY_INITIALIZATION_RADIX=16;}
   puts $blk_mem_gen_qspi {MEMORY_INITIALIZATION_VECTOR=}
+  # The six words below match difftest/src/test/csrc/common/flash.cpp:
+  # csrrsi x0, mnstatus, 8     # 0x74446073 set mnstatus.nmie
+  # addiw  t0, zero, 1         # 0x0010029b
+  # slli   t1, t0, 42          # 0x02a29313
+  # csrrc  x0, mstatus, t1     # 0x30033073 clear mstatus.mdt
+  # slli   t0, t0, 31          # 0x01f29293
+  # jr     t0                  # 0x00028067 jump 0x80000000
+  puts $blk_mem_gen_qspi {74446073,}
   puts $blk_mem_gen_qspi {0010029b,}
+  puts $blk_mem_gen_qspi {02a29313,}
+  puts $blk_mem_gen_qspi {30033073,}
   puts $blk_mem_gen_qspi {01f29293,}
   puts $blk_mem_gen_qspi {00028067;}
 
