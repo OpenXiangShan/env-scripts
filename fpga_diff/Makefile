@@ -1,19 +1,17 @@
 ENV_SCRIPTS_HOME ?= $(CURDIR)
 
+FPGA_BACKEND ?= $(if $(filter uvhs%,$(MAKECMDGOALS)),uvhs,vivado)
+SUPPORTED_FPGA_BACKENDS := vivado uvhs
 CORE_DIR ?=
 RTL_INCLUDE ?=
 FPGA_BIT_HOME ?=
+FPGA_BIT_ARTIFACT_DIR ?=
 WORKLOAD ?=
 AXI_WIDTH ?= 64
 NO_DIFF ?= 0
-# Host-trigger ILA capture is opt-in. Keep the trigger mark_debug net in RTL,
-# but avoid instantiating the ILA core by default to reduce routing pressure.
-ENABLE_ILA ?= 0
-ILA_DEPTH ?= 16384
 XDMA_LINK_WIDTH ?= X4
 VIVADO_JOBS ?=
-DDR_RANK_WIDTH ?= 2
-export ENABLE_ILA ILA_DEPTH XDMA_LINK_WIDTH VIVADO_JOBS DDR_RANK_WIDTH NO_DIFF
+export XDMA_LINK_WIDTH VIVADO_JOBS NO_DIFF
 REMOTE ?=
 REMOTE_UART_PORT ?= /dev/ttyUSB0
 REMOTE_UART_BAUD ?= 115200
@@ -29,13 +27,28 @@ ifeq ($(filter nodiff nodiff-%,$(SUFFIX)),)
 override SUFFIX := nodiff$(if $(strip $(SUFFIX)),-$(strip $(SUFFIX)),)
 endif
 endif
-PRJ_NAME = fpga_$(CPU)$(if $(strip $(SUFFIX)),-$(strip $(SUFFIX)),)
-PRJ_DIR ?= $(ENV_SCRIPTS_HOME)/$(PRJ_NAME)
-PRJ ?= $(PRJ_DIR)/$(PRJ_NAME).xpr
+PRJ_NAME ?= fpga_$(FPGA_BACKEND)_$(CPU)$(if $(strip $(SUFFIX)),-$(strip $(SUFFIX)),)
+export PRJ_NAME
+FPGA_DISPATCH_TARGETS := project bitstream stage_bitstream write_bitstream halt_soc \
+	write_ddr write_flash reset_cpu runtime_status runtime_stop \
+	ila_arm ila_upload ila_clear ila_host_env
 
-.PHONY: bitstream vivado dump_ila update_core_flist \
-	write_bitstream halt_soc write_jtag_ddr write_jtag_flash reset_cpu \
-	bind_uart uart_env
+.PHONY: $(FPGA_DISPATCH_TARGETS) check_project_name bind_uart uart_env
+
+check_project_name:
+	@case "$$PRJ_NAME" in \
+		"") echo "ERROR: PRJ_NAME is empty" >&2; exit 2 ;; \
+		.|..|*[!A-Za-z0-9_.-]*) \
+			echo "ERROR: invalid PRJ_NAME: $$PRJ_NAME" >&2; \
+			echo "Use only letters, digits, '.', '_', and '-'." >&2; exit 2 ;; \
+	esac
+
+$(FPGA_DISPATCH_TARGETS): check_project_name
+	@test -n "$(filter $(FPGA_BACKEND),$(SUPPORTED_FPGA_BACKENDS))" || { \
+		echo "ERROR: FPGA_BACKEND must be one of: $(SUPPORTED_FPGA_BACKENDS)" >&2; \
+		exit 2; \
+	}
+	+@$(MAKE) --no-print-directory $(FPGA_BACKEND)_$@
 
 # Print the environment assignment consumed by fpga-host.
 uart_env:
@@ -55,85 +68,5 @@ bind_uart:
 	printf 'FPGA_UART_PORT=%s\n' "$$FPGA_UART_PORT"; \
 	$(SHELL) -i
 
-# Get Vivado version
-VIVADO_VERSION := $(shell vivado -version 2>/dev/null | head -1 | grep -o '[0-9]\{4\}\.[0-9]' || echo "unknown")
-
-check_vivado_version:
-	@vivado -version 2>/dev/null | head -1 | grep -o '[0-9]\{4\}\.[0-9]' || echo "unknown"
-
-# Run synthesis using Vivado
-synth:
-	vivado -mode batch -source ./tools/gen_synth.tcl -tclargs $(PRJ)
-
-# Generate FPGA bitstream
-bitstream:
-	vivado -mode batch -source ./tools/gen_bitstream.tcl -tclargs $(PRJ) impl_1 $(VIVADO_JOBS)
-
-# RTL_INCLUDE accepts RTL files, directories, and .f/.flist/.list file lists.
-update_core_flist:
-	@./tools/update_core_flist.sh vivado "$(CORE_DIR)" -- $(RTL_INCLUDE)
-
-# Launch Vivado with FPGA project configuration
-vivado: check_vivado_version
-	vivado -mode batch -source src/tcl/common/xs_uart.tcl -tclargs --cpu $(CPU) --project_name $(PRJ_NAME) --vivado_version $(VIVADO_VERSION)
-
-# Check Vivado version compatibility
-check_version:
-	vivado -mode batch -source src/tcl/common/check_version.tcl -tclargs --vivado_version $(VIVADO_VERSION) --cpu $(CPU) --project_name $(PRJ_NAME)
-
-# Write bitstream to FPGA via PCIe
-write_bitstream:
-ifneq ($(NO_DIFF),1)
-	sh tools/pcie-remove.sh
-endif
-	vivado -mode tcl -source tools/write_bitstream.tcl -tclargs $(FPGA_BIT_HOME)
-ifneq ($(NO_DIFF),1)
-	sh tools/pcie-rescan.sh
-endif
-	vivado -mode tcl -source tools/reset_ddr.tcl -tclargs $(FPGA_BIT_HOME)/fpga_top_debug.ltx
-	$(MAKE) reset_cpu
-
-# Halt the FPGA SoC (for Write Jtag DDR)
-halt_soc:
-	vivado -mode tcl -source tools/halt_soc.tcl -tclargs $(FPGA_BIT_HOME)/fpga_top_debug.ltx
-
-# Write workload to FPGA DDR via JTAG
-write_jtag_ddr:
-	vivado -mode tcl -source tools/jtag_write_ddr.tcl -tclargs $(WORKLOAD) $(AXI_WIDTH)
-
-# Write a raw binary image to the BRAM-backed flash via the flash-only JTAG AXI
-write_jtag_flash:
-	vivado -mode tcl -source tools/jtag_write_flash.tcl -tclargs $(WORKLOAD)
-
-# Reset CPU on FPGA
-reset_cpu:
-	vivado -mode tcl -source tools/reset_cpu.tcl -tclargs $(FPGA_BIT_HOME)/fpga_top_debug.ltx
-
-ILA_OUT ?= $(ENV_SCRIPTS_HOME)/ila-dump
-TIMEOUT_MIN ?= 2
-
-# Dump host-trigger ILA data to ila/csv/vcd files
-dump_ila:
-	mkdir -p $(ILA_OUT)
-	vivado -mode tcl -source tools/dump_ila.tcl -tclargs $(FPGA_BIT_HOME)/fpga_top_debug.ltx $(ILA_OUT) $(TIMEOUT_MIN)
-
-# Add system options for memory optimization
-add_sys_option:
-	sed -i "s/reg \(\[[0-9]*:[0-9]*\]\) ram \[\([4-9][0-9]\{3,\}\|[1-9][0-9]\{4,\}\):0\];/(\* ram_style = \"ultra\" \*)\treg \1 ram \[\2:0\];/g" $(CORE_DIR)/rtl/array_*.v
-
-# Display implementation log
-get_impl_log:
-	cat $(PRJ_DIR)/$(PRJ_NAME).runs/impl_1/runme.log
-
-# Display synthesis log
-get_synth_log:
-	cat $(PRJ_DIR)/$(PRJ_NAME).runs/synth_1/runme.log
-
-# Build complete FPGA project
-all:
-	$(MAKE) update_core_flist CORE_DIR="$(CORE_DIR)" RTL_INCLUDE="$(RTL_INCLUDE)"
-	$(MAKE) vivado CPU=$(CPU) SUFFIX="$(SUFFIX)"
-
-# UVHS targets use an explicit uvhs_* namespace and do not replace the normal
-# Vivado/JTAG targets above.
+include vivado/vivado.mk
 include uvhs/uvhs.mk

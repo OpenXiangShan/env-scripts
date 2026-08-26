@@ -26,13 +26,13 @@ case 1: No fpga-host
 stty -F /dev/ttyUSB0 raw 115200 ...
 <New terminal>
 make halt_soc
-make write_jtag_ddr
+make write_ddr FPGA_BACKEND=vivado
 make reset_cpu
 
 case 2: With fpga-host (no-diff mode)
 FPGA_DDR_LOAD_CMD="bash -lc ' \
   source ~/.bash_profile && \
-  make -C /path/to/fpga_diff write_jtag_ddr \
+  make -C /path/to/fpga_diff write_ddr FPGA_BACKEND=vivado \
     FPGA_BIT_HOME=... \
     WORKLOAD=<workload>.txt \
 '" \
@@ -41,7 +41,7 @@ FPGA_DDR_LOAD_CMD="bash -lc ' \
 case 3: With fpga-host (diff mode)
 FPGA_DDR_LOAD_CMD="bash -lc ' \
   source ~/.bash_profile && \
-  make -C /path/to/fpga_diff write_jtag_ddr \
+  make -C /path/to/fpga_diff write_ddr FPGA_BACKEND=vivado \
     FPGA_BIT_HOME=... \
     WORKLOAD=<workload>.txt \
 '" \

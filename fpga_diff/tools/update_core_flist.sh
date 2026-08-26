@@ -5,7 +5,7 @@ set -euo pipefail
 usage() {
   cat >&2 <<'EOF'
 Usage:
-  update_core_flist.sh vivado CORE_DIR [--] [RTL_INCLUDE ...]
+  update_core_flist.sh vivado CORE_DIR OUTPUT [--] [RTL_INCLUDE ...]
   update_core_flist.sh uvhs CORE_DIR WORK_DIR CPU OUTPUT [--] [RTL_INCLUDE ...]
 EOF
   exit 2
@@ -17,14 +17,15 @@ source "$script_dir/rtl_filelist_lib.sh"
 
 generate_vivado_filelist() {
   local core_dir=$1
-  local output=$fpga_diff_dir/src/tcl/cpu_files.tcl
+  local output=$2
   local top_module=SimTop
   local tmp_dir
   local tmp_output
-  shift
+  shift 2
 
   [[ -d $core_dir ]] || rtl_flist_fail "CORE_DIR is not a directory: $core_dir"
   core_dir=$(realpath -e -- "$core_dir")
+  output=$(realpath -m -- "$output")
   if [[ ${NO_DIFF:-0} == 1 ]]; then
     top_module=XSTop
   fi
@@ -150,11 +151,12 @@ mode=${1:-}
 shift
 case $mode in
   vivado)
-    [[ $# -ge 1 ]] || usage
+    [[ $# -ge 2 ]] || usage
     core_dir=$1
-    shift
+    output=$2
+    shift 2
     [[ ${1:-} != -- ]] || shift
-    generate_vivado_filelist "$core_dir" "$@"
+    generate_vivado_filelist "$core_dir" "$output" "$@"
     ;;
   uvhs)
     [[ $# -ge 4 ]] || usage
