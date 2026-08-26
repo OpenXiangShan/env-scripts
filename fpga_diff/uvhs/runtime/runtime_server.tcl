@@ -254,6 +254,32 @@ proc uvhs_query_clock_frequency {clock} {
     return [lindex $frequencies 0]
 }
 
+proc uvhs_configure_tmclk_from_cpu {} {
+    # Keep the CPU-to-TMCLK relationship stable across sign-off frequencies.
+    # The environment variable remains available for controlled experiments,
+    # while the normal Make/runtime path supplies the fixed 50:1 default.
+    set ratio_value 50
+    if {[info exists ::env(UVHS_TMCLK_CPU_RATIO)] &&
+        [string trim $::env(UVHS_TMCLK_CPU_RATIO)] ne ""} {
+        set ratio_value $::env(UVHS_TMCLK_CPU_RATIO)
+    }
+    set ratio [uvhs_parse_integer "TMCLK-to-CPU clock ratio" $ratio_value]
+    if {$ratio <= 0} {
+        error "TMCLK-to-CPU clock ratio must be positive: $ratio"
+    }
+
+    set cpu_frequency [uvhs_query_clock_frequency clk5_p]
+    set tmclk_frequency [expr {round(double($cpu_frequency) / $ratio)}]
+    if {$tmclk_frequency <= 0} {
+        error "derived TMCLK frequency is invalid: $tmclk_frequency"
+    }
+
+    puts [format \
+        "INFO: setting clk8_p to %d Hz from clk5_p %d Hz at %d:1" \
+        $tmclk_frequency $cpu_frequency $ratio]
+    config -clock -name clk8_p -frequency $tmclk_frequency
+}
+
 proc uvhs_capture_station_counts {} {
     set counts {}
     foreach line [split [query -capture -tclobj] "\n"] {
@@ -583,6 +609,7 @@ proc uvhs_initialize_runtime {} {
     # Keep clk5_p at the system sign-off frequency committed in this runtime DB.
     # It varies with the partition and PnR result, so it must not be hard-coded.
     config -clock -name clk6_p -frequency 50000000
+    uvhs_configure_tmclk_from_cpu
     config -clock -commit
     query -clock
 

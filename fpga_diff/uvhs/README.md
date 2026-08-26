@@ -79,7 +79,10 @@ while its runtime session is active.
 The default topology keeps the XiangShan CHI/CMN memory path, configuration
 bridge, runtime flash interface, syscfg, and boot ROM with user DDR on B0/F0.
 The physical UV_FMCH_FLASH USB-UART remains on B0/F1, while the core, DiffTest
-endpoint, and XDMA host path stay on B0/F2. The remaining logic is partitioned
+endpoint, and XDMA host path stay on B0/F2. The timer source/sink CDC boundary
+also stays with the CPU-side path, while the 65-bit `syscnt` time bus and the
+DiffTest clock-enable signal use explicit direct F2-to-F0 routes. This avoids
+per-bit TDM skew on the time value. The remaining logic is partitioned
 automatically. XiangShan uses these path constraints together with high
 partition effort and the `uv_placer_balance_slrs` PnR strategy.
 
@@ -89,6 +92,15 @@ selected runtime database, so each partition and PnR result runs at its own
 reported frequency. The fixed UART clock matches the 50 MHz clock declared by
 the XiangShan FPGA device tree and keeps UART baud timing independent of CPU
 clock gating.
+
+At runtime, `clk5_p` is restored to the sign-off frequency stored in the
+selected runtime database. `clk8_p` is then derived at a fixed 50:1 CPU-to-TMCLK
+ratio, so a 14 MHz CPU clock uses approximately 280 kHz TMCLK. The optional
+`UVHS_TMCLK_CPU_RATIO` environment variable is retained only for controlled
+clock-sweep experiments. Update the Linux device-tree `timebase-frequency` to
+the derived TMCLK value before treating Linux timestamps as wall-clock time.
+The DDR reference `clk7_p` and the DDR IP user clock are not runtime PLL
+outputs and remain fixed by the selected DDR DCP.
 
 ## Runtime
 
