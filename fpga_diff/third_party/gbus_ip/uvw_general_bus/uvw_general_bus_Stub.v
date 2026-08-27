@@ -13,18 +13,18 @@
 // This empty module with port declaration file causes synthesis tools to infer a black box for IP.
 // The synthesis directives are for Synopsys Synplify support to prevent IO buffer insertion.
 // Please paste the declaration into a Verilog source file or add the file as an additional source.
-(* ADDR_WIDTH = "32" *) (* DATA_WIDTH = "256" *) (* DUT_IO_NUM = "1" *) 
-(* ID_WIDTH = "8" *) (* RDI_HAS_ANNOTATION = "1" *) (* STRB_WIDTH = "32" *) 
+(* ADDR_WIDTH = "32" *) (* DATA_WIDTH = "256" *) (* DUT_IO_NUM = "1" *)
+(* ID_WIDTH = "8" *) (* RDI_HAS_ANNOTATION = "1" *) (* STRB_WIDTH = "32" *)
 (* uvw_generalBus = 1 *)
 (* UV_HW_IP = "type:<GENERALBUS>,toSysbus:<uvw_generalHBD>,targetPlatform:<U2>" *)
-module uvw_general_bus(dut_axi_aclk, dut_axi_aclk_en, 
-  dut_axi_aresetn, dut_axi_awid, dut_axi_awaddr, dut_axi_awlen, dut_axi_awsize, 
-  dut_axi_awburst, dut_axi_awlock, dut_axi_awcache, dut_axi_awprot, dut_axi_awqos, 
-  dut_axi_awvalid, dut_axi_awready, dut_axi_wid, dut_axi_wdata, dut_axi_wstrb, dut_axi_wlast, 
-  dut_axi_wvalid, dut_axi_wready, dut_axi_bid, dut_axi_bresp, dut_axi_bvalid, dut_axi_bready, 
-  dut_axi_arid, dut_axi_araddr, dut_axi_arlen, dut_axi_arsize, dut_axi_arburst, 
-  dut_axi_arlock, dut_axi_arcache, dut_axi_arprot, dut_axi_arqos, dut_axi_arvalid, 
-  dut_axi_arready, dut_axi_rid, dut_axi_rdata, dut_axi_rresp, dut_axi_rlast, dut_axi_rvalid, 
+module uvw_general_bus(dut_axi_aclk, dut_axi_aclk_en,
+  dut_axi_aresetn, dut_axi_awid, dut_axi_awaddr, dut_axi_awlen, dut_axi_awsize,
+  dut_axi_awburst, dut_axi_awlock, dut_axi_awcache, dut_axi_awprot, dut_axi_awqos,
+  dut_axi_awvalid, dut_axi_awready, dut_axi_wid, dut_axi_wdata, dut_axi_wstrb, dut_axi_wlast,
+  dut_axi_wvalid, dut_axi_wready, dut_axi_bid, dut_axi_bresp, dut_axi_bvalid, dut_axi_bready,
+  dut_axi_arid, dut_axi_araddr, dut_axi_arlen, dut_axi_arsize, dut_axi_arburst,
+  dut_axi_arlock, dut_axi_arcache, dut_axi_arprot, dut_axi_arqos, dut_axi_arvalid,
+  dut_axi_arready, dut_axi_rid, dut_axi_rdata, dut_axi_rresp, dut_axi_rlast, dut_axi_rvalid,
   dut_axi_rready, sysbus_ghbd_o, sysbus_ghbd_i)
 /* synthesis syn_black_box black_box_pad_pin="dut_axi_aclk_en,dut_axi_aresetn,dut_axi_awid[7:0],dut_axi_awaddr[31:0],dut_axi_awlen[3:0],dut_axi_awsize[2:0],dut_axi_awburst[1:0],dut_axi_awlock[1:0],dut_axi_awcache[3:0],dut_axi_awprot[2:0],dut_axi_awqos[3:0],dut_axi_awvalid,dut_axi_awready,dut_axi_wid[7:0],dut_axi_wdata[255:0],dut_axi_wstrb[31:0],dut_axi_wlast,dut_axi_wvalid,dut_axi_wready,dut_axi_bid[7:0],dut_axi_bresp[1:0],dut_axi_bvalid,dut_axi_bready,dut_axi_arid[7:0],dut_axi_araddr[31:0],dut_axi_arlen[3:0],dut_axi_arsize[2:0],dut_axi_arburst[1:0],dut_axi_arlock[1:0],dut_axi_arcache[3:0],dut_axi_arprot[2:0],dut_axi_arqos[3:0],dut_axi_arvalid,dut_axi_arready,dut_axi_rid[7:0],dut_axi_rdata[255:0],dut_axi_rresp[1:0],dut_axi_rlast,dut_axi_rvalid,dut_axi_rready,sysbus_ghbd_o[255:0],sysbus_ghbd_i[255:0]" */
 /* synthesis syn_force_seq_prim="dut_axi_aclk" */;

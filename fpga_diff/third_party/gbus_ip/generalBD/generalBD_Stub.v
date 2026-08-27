@@ -14,7 +14,7 @@
 // Please paste the declaration into a Verilog source file or add the file as an additional source.
 (* uvw_generalBD = 1 *)
 (* UV_HW_IP="type:<GENERALBD>,toSysbus:<uvw_generalBD>,targetPlatform:<U2>" *)
-module generalBD(i_clk, i_rstn, i_clk_en, o_wr_en, o_wr_addr, 
+module generalBD(i_clk, i_rstn, i_clk_en, o_wr_en, o_wr_addr,
   o_wdata, o_rd_en, o_rd_addr, i_rdata, i_rdata_vld, gbd_sysbus_i, gbd_sysbus_o)
 /* synthesis syn_black_box black_box_pad_pin="i_clk,i_rstn,i_clk_en,o_wr_en,o_wr_addr[15:0],o_wdata[31:0],o_rd_en,o_rd_addr[15:0],i_rdata[31:0],i_rdata_vld,gbd_sysbus_i[255:0],gbd_sysbus_o[255:0]" */;
   input i_clk;
