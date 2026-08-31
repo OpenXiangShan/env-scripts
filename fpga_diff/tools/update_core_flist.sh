@@ -86,7 +86,9 @@ generate_uvhs_filelist() {
   tmp_output=$tmp_dir/filelist.f
 
   {
-    printf '+define+SYNTHESIS\n+define+XIANGSHAN_FPGA\n+define+UVHS\n'
+    if [[ ${DIFFTEST_HOSTIF:-XDMA} == GBUS ]]; then
+      printf '+define+CONFIG_DIFFTEST_HOSTIF_GBUS\n'
+    fi
     printf '+define+DDR4_16G_X8\n+define+DQ64\n+define+DDR4_2400\n'
     printf '+define+DQ=64\n+define+MICRON_DDR\n+define+DDR4_16Gbx8\n'
     printf '+define+DDR4\n+define+SRAM_SYN\n+define+DATA_VERSION=0\n'
