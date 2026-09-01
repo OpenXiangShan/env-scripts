@@ -35,7 +35,6 @@ SERVER_POOL = [
     "node026",
     "node027",
     "node028",
-    "node033",
     "node034",
     "node036",
     "node037",
