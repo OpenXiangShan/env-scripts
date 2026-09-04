@@ -1,6 +1,4 @@
-# KMH probe paths derived from the 2026-08-04 and 2026-08-07 debug builds.
 # Signal paths must be checked when the generated XiangShan hierarchy changes.
-# DiffTrapEvent's hitTrap and instrCnt RHS values use generated trap-net names.
 probe_net -clock {fpga_top_debug.core_def.sys_clk_i} -add { \
 fpga_top_debug.core_def.U_UVHS_UVW_AXI4_TO_DDR4.ddr4ip_dut_axi_awaddr \
 fpga_top_debug.core_def.U_UVHS_UVW_AXI4_TO_DDR4.ddr4ip_dut_axi_awlen \

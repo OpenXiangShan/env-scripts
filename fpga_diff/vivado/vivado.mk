@@ -6,9 +6,9 @@ PRJ_DIR ?= $(ENV_SCRIPTS_HOME)/$(PRJ_NAME)
 PRJ ?= $(PRJ_DIR)/$(PRJ_NAME).xpr
 CPU_FILES_TCL ?= $(PRJ_DIR)/cpu_files.tcl
 
-# Host-trigger ILA is enabled by default for XiangShan/KMH. Other CPU targets
-# retain the timing-friendly opt-in default and can override this variable.
-ENABLE_ILA ?= $(if $(filter kmh xiangshan,$(CPU)),1,0)
+# Host-trigger ILA capture is opt-in. Keep the trigger mark_debug net in RTL,
+# but avoid instantiating the ILA core by default to reduce routing pressure.
+ENABLE_ILA ?= 0
 ILA_DEPTH ?= 16384
 DDR_RANK_WIDTH ?= 2
 export ENABLE_ILA ILA_DEPTH DDR_RANK_WIDTH

@@ -159,8 +159,7 @@ from the server's global Tcl scope.
 
 The probe scripts describe compile-time instrumentation, not a runtime dump.
 For XiangShan/KMH builds, the frontend sources `compilation/probe_kmh.tcl` by
-default. It is the larger XiangShan profile derived from the 2026-08-04 and
-2026-08-07 debug builds; CPU and L2 signals are sampled on
+default. CPU and L2 signals are sampled on
 `core_def.inter_soc_clk`, the gated clock connected to `SimTop.clock`. DDR and
 host-trigger signals remain on their free-running `core_def.sys_clk_i` domain,
 so the host trigger remains observable after the CPU clock stops. Its generated
