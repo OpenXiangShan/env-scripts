@@ -81,10 +81,8 @@ vivado_write_ddr:
 		-tclargs $(WORKLOAD) $(AXI_WIDTH)
 
 vivado_write_flash:
-	$(MAKE) vivado_halt_soc
 	vivado -mode tcl -source "$(VIVADO_SCRIPT_DIR)/jtag_write_flash.tcl" \
 		-tclargs $(WORKLOAD)
-	$(MAKE) vivado_reset_cpu
 
 vivado_reset_cpu:
 	@test -n "$(FPGA_BIT_HOME)" || { echo "ERROR: please set FPGA_BIT_HOME=..." >&2; exit 2; }

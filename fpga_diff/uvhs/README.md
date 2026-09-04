@@ -128,12 +128,12 @@ database and calling `initialize` without `download` fails. Start the next
 runtime session with `uvhs_write_bitstream` so it reloads and downloads
 `hw.dat`.
 
-The UVHS runtime host does not control the Linux PCIe endpoint on the XDMA host.
-Around every runtime download, remove `10ee:9048` on the XDMA host before this
-target and rescan it afterward. The playground-level `write_bitstream` target
-performs this cross-host sequence when `FPGA_HOST_REMOTE` is set. The rescan
-waits for `xdma-chr`, prints the endpoint and device nodes, and verifies access;
-an installed XDMA udev rule avoids a separate `sudo chmod`.
+`$UVHS_RUNTIME` does not control the Linux PCIe endpoint on `$UVHS_HOST`. Around
+every runtime download, remove `10ee:9048` on `$UVHS_HOST` before this target
+and rescan it afterward. The playground-level `write_bitstream` target performs
+this cross-host sequence when `UVHS_HOST` is set. The rescan waits for
+`xdma-chr`, prints the endpoint and device nodes, and verifies access; an
+installed XDMA udev rule avoids a separate `sudo chmod`.
 
 `uvhs_write_ddr` converts the Vivado address/data-pair format to the DDR DCP
 word width and calls `writemem -rtl`. It leaves the CPU halted until
@@ -270,15 +270,16 @@ by trigger/capture cleanup:
 
 ```sh
 eval "$(make -s ila_host_env FPGA_BACKEND=uvhs \
-  CPU=<design> SUFFIX=<tag> UVHS_RUNTIME=<runtime-host>)"
+  CPU=<design> SUFFIX=<tag> UVHS_RUNTIME=$UVHS_RUNTIME)"
 
 /path/to/fpga-host <host arguments>
 ```
 
 The arm command must use the same runtime work directory as
-`uvhs_write_bitstream`. If the FPGA host and UVHS runtime are on one machine,
-omit `ssh <runtime-host>`. The trigger signal must be listed in the compile-time
-`trigger_net` group; adding it to RTL with `mark_debug` alone is not sufficient.
+`uvhs_write_bitstream`. If `$UVHS_HOST` and `$UVHS_RUNTIME` name the same
+machine, omit the generated SSH wrapper. The trigger signal must be listed in
+the compile-time `trigger_net` group; adding it to RTL with `mark_debug` alone
+is not sufficient.
 
 The generated upload hook clears the trigger after a normal host-triggered
 capture. Clear it explicitly after an interrupted or independently armed
