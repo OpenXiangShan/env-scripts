@@ -206,8 +206,8 @@ uvhs_ila_upload:
 	$(MAKE) uvhs_vcd
 	@echo "UVHS_ILA_USDB=$(UVHS_ILA_USDB)"
 
-# Print sourceable hooks for fpga-host. The generated commands use the public
-# backend targets so callers do not depend on UVHS implementation names.
+# Print sourceable host/runtime lifecycle commands. They use the public backend
+# targets so callers do not depend on UVHS implementation names.
 uvhs_ila_host_env:
 	@bash "$(UVHS_RUNTIME_DIR)/ila_host_env.sh" \
 		"$(UVHS_RUNTIME)" "$(UVHS_ILA_DIR)" \

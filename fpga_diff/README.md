@@ -51,11 +51,13 @@ FPGA_DDR_LOAD_CMD="bash -lc ' \
 Remote UART for fpga-host
 =========================
 
-When fpga-host runs on a machine other than the FPGA USB-UART host, bridge
-the remote UART to a local pseudo-terminal. Install socat on both hosts, then
-start the bridge:
+When `fpga-host` runs on a machine other than the FPGA USB-UART host, bridge
+the remote UART to a local pseudo-terminal. In the Hejian flow,
+`hejian-runtime` owns UVHS and the physical UART while `hejian-host` owns XDMA
+and runs `fpga-host`. Install socat on both hosts, then start the bridge from
+the host machine:
 
-    make bind_uart REMOTE=<user@fpga-host>
+    make bind_uart REMOTE=<user@runtime-host>
 
 The target bridges remote /dev/ttyUSB0 at 115200 baud to
 /tmp/fpga-remote-uart locally, exports FPGA_UART_PORT, and starts an
@@ -63,7 +65,7 @@ interactive shell. Run fpga-host in that shell; leaving it stops the bridge.
 Override REMOTE_UART_PORT, REMOTE_UART_BAUD, or FPGA_UART_PORT when needed.
 For a scripted invocation, obtain the same environment assignment with:
 
-    eval "$(make -s uart_env REMOTE=<user@fpga-host>)"
+    eval "$(make -s uart_env REMOTE=<user@runtime-host>)"
 
 The bridge is bidirectional, so interactive UART input is also forwarded. It
 deliberately uses a /tmp pseudo-terminal rather than overwriting local
@@ -81,4 +83,5 @@ make uvhs CPU=<design> CORE_DIR=/path/to/release/build SUFFIX=<tag>
 ```
 
 See [`uvhs/README.md`](uvhs/README.md) for the board-template and vendor-DDR
-inputs, build stages, and runtime commands.
+inputs, build stages, runtime commands, and the XDMA host refresh required for
+each runtime download.

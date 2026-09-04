@@ -128,6 +128,13 @@ database and calling `initialize` without `download` fails. Start the next
 runtime session with `uvhs_write_bitstream` so it reloads and downloads
 `hw.dat`.
 
+The UVHS runtime host does not control the Linux PCIe endpoint on the XDMA host.
+Around every runtime download, remove `10ee:9048` on the XDMA host before this
+target and rescan it afterward. The playground-level `write_bitstream` target
+performs this cross-host sequence when `FPGA_HOST_REMOTE` is set. The rescan
+waits for `xdma-chr`, prints the endpoint and device nodes, and verifies access;
+an installed XDMA udev rule avoids a separate `sudo chmod`.
+
 `uvhs_write_ddr` converts the Vivado address/data-pair format to the DDR DCP
 word width and calls `writemem -rtl`. It leaves the CPU halted until
 `uvhs_reset_cpu` is issued.
@@ -136,7 +143,9 @@ word width and calls `writemem -rtl`. It leaves the CPU halted until
 `query -ipinfo -tclobj`, then writes through its 64-bit AXI port and the
 existing 32-bit AXI flash bridge. The generalBus view starts at offset zero;
 the CPU and normal JTAG address map are unchanged. A complete readback match
-is required before the command succeeds.
+is required before the command succeeds. The command holds the CPU while the
+boot image changes and releases it after the verified write; callers do not
+need a separate `uvhs_halt_soc` command.
 
 The runtime implementation has two control layers:
 
@@ -226,8 +235,10 @@ test0
 Waveform capture is split around the host run. `uvhs_ila_arm` validates and
 installs the trigger condition, starts capture, and returns immediately. It
 does not reset or release the CPU. `uvhs_ila_upload` waits for an armed
-trigger, uploads the UHD data, reconstructs the waveform database, and calls
-`uvhs_vcd`. The standalone `uvhs_vcd` target repeats only the USDB-to-VCD
+trigger, uploads the UHD data, reconstructs the waveform database, calls
+`uvhs_vcd`, and restores any clock reduced for capture bandwidth. The
+host-generated upload hook then calls `uvhs_ila_clear`, including after an
+upload failure. The standalone `uvhs_vcd` target repeats only the USDB-to-VCD
 conversion. The commands create both files below the selected build directory:
 
 ```text
@@ -251,23 +262,17 @@ trigger -status -wait 1 -timeout 60
 upload_uhd -depth 1000000 -position 0 -clock clk5_p -out uvhs_ila
 ```
 
-The FPGA host clears `HOST_IO_ILA_TRIGGER`, invokes `FPGA_ILA_DUMP_CMD`, and
-then releases the CPU. It raises that signal at Good Trap or DiffTest failure.
-Use `uvhs_ila_arm` as the hook so capture starts before the host releases the
-CPU and the requested history precedes the host trigger:
+The FPGA host clears `HOST_IO_ILA_TRIGGER`, invokes `FPGA_ILA_ARM_CMD`, and then
+releases the CPU. It raises that signal at Good Trap or DiffTest failure, then
+invokes `FPGA_ILA_UPLOAD_CMD` during normal host cleanup. Generate both hooks
+with `ila_host_env` so capture starts before CPU release and upload is followed
+by trigger/capture cleanup:
 
 ```sh
-export FPGA_ILA_DUMP_CMD='ssh <runtime-host> \
-  "make -C /path/to/env-scripts/fpga_diff uvhs_ila_arm \
-  CPU=<design> SUFFIX=<tag> \
-  TRIGGER=/path/to/env-scripts/fpga_diff/uvhs/runtime/trigger.ini \
-  UVHS_ILA_POSITION=0 \
-  UVHS_ILA_GATED_CLOCK=<capture-clock-0>,<capture-clock-1>"'
+eval "$(make -s ila_host_env FPGA_BACKEND=uvhs \
+  CPU=<design> SUFFIX=<tag> UVHS_RUNTIME=<runtime-host>)"
 
 /path/to/fpga-host <host arguments>
-
-# Run on the runtime host after fpga-host exits.
-make uvhs_ila_upload CPU=<design> SUFFIX=<tag>
 ```
 
 The arm command must use the same runtime work directory as
@@ -275,7 +280,9 @@ The arm command must use the same runtime work directory as
 omit `ssh <runtime-host>`. The trigger signal must be listed in the compile-time
 `trigger_net` group; adding it to RTL with `mark_debug` alone is not sufficient.
 
-Clear the trigger configuration after a timed-out or unwanted capture with:
+The generated upload hook clears the trigger after a normal host-triggered
+capture. Clear it explicitly after an interrupted or independently armed
+capture with:
 
 ```sh
 make uvhs_ila_clear CPU=<design> SUFFIX=<tag>
