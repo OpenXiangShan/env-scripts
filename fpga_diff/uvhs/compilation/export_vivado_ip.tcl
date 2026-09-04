@@ -7,11 +7,12 @@ set out_dir "./uvhs_ip"
 set force 0
 set jobs 8
 set core_dir ""
+set hostif "XDMA"
 
 proc print_help {} {
     puts "Usage:"
     puts "  vivado -mode batch -source uvhs/compilation/export_vivado_ip.tcl -tclargs \\"
-    puts "    --origin_dir <fpga_diff> --out_dir <uvhs_work_dir> \[--core_dir <dir>\] \[--force\] \[--jobs N\]"
+    puts "    --origin_dir <fpga_diff> --out_dir <uvhs_work_dir> \[--core_dir <dir>\] \[--hostif XDMA|GBUS\] \[--force\] \[--jobs N\]"
     exit 0
 }
 
@@ -21,6 +22,7 @@ for {set i 0} {$i < $::argc} {incr i} {
         "--origin_dir"     { incr i; set origin_dir [lindex $::argv $i] }
         "--out_dir"        { incr i; set out_dir [lindex $::argv $i] }
         "--core_dir"       { incr i; set core_dir [lindex $::argv $i] }
+        "--hostif"         { incr i; set hostif [string toupper [lindex $::argv $i]] }
         "--force"          { set force 1 }
         "--jobs"           { incr i; set jobs [lindex $::argv $i] }
         "--help"           { print_help }
@@ -29,6 +31,9 @@ for {set i 0} {$i < $::argc} {incr i} {
             print_help
         }
     }
+}
+if {$hostif ni {XDMA GBUS}} {
+    error "unsupported DiffTest host interface: $hostif"
 }
 
 set origin_dir [file normalize $origin_dir]
@@ -316,8 +321,13 @@ set exports [list \
     [list xci blk_mem_gen_0 [file join $tcl_dir blk_mem_gen_0.tcl] [file join $out_dir rtl soc blk_mem_gen_0.dcp]] \
     [list bd  AXI_bridge    [file join $tcl_dir AXI_bridge.tcl]    [file join $out_dir rtl soc AXI_bridge.dcp]] \
     [list bd  data_bridge   [file join $tcl_dir data_bridge.tcl]   [file join $out_dir rtl soc data_bridge.dcp]] \
-    [list bd  xdma_ep       [file join $tcl_dir xdma_ep.tcl]       [file join $out_dir rtl device pcie xdma_ep.dcp]] \
 ]
+if {$hostif eq "XDMA"} {
+    lappend exports [list bd xdma_ep [file join $tcl_dir xdma_ep.tcl] \
+        [file join $out_dir rtl device pcie xdma_ep.dcp]]
+} else {
+    puts "INFO: skip xdma_ep export for DiffTest host interface $hostif"
+}
 
 set failed_exports [list]
 foreach item $exports {

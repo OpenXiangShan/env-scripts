@@ -1313,7 +1313,11 @@ wire [0:0]    br2cfg_wvalid;
   assign difftest_to_host_axis_tready = difftest_to_host_axis_tready_io & difftest_stream_enable_pcie;
   assign difftest_to_host_axis_tvalid_io = difftest_to_host_axis_tvalid & difftest_stream_enable_pcie;
 
+`ifdef CONFIG_DIFFTEST_HOSTIF_GBUS
+  uvhs_gbus_host_adapter xdma_ep_i(
+`else
   xdma_ep xdma_ep_i(
+`endif
     .cpu_clk              (sys_clk_i),
     .cpu_rstn             (sys_rstn),
     .S00_AXIS_0_tdata     (difftest_to_host_axis_tdata),

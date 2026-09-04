@@ -34,6 +34,7 @@ vivado=$UV_XILINX_VIVADO/bin/vivado
 vivado_args=(
   --origin_dir "$origin_dir" --out_dir "$work_dir"
   --core_dir "$core_dir" --jobs "$jobs"
+  --hostif "${DIFFTEST_HOSTIF:-XDMA}"
 )
 [[ $force != 1 ]] || vivado_args+=(--force)
 export VIVADO_HOME=$UV_XILINX_VIVADO XILINX_VIVADO=$UV_XILINX_VIVADO
@@ -93,7 +94,12 @@ for rel in "${ddr_files[@]}"; do
     [[ ! -f $candidate ]] || { source_file=$candidate; break; }
   done
   [[ -n $source_file ]] || source_file=$(find "$ddr_source" -type f -name "$base" -size +0c -print -quit)
-  [[ -z $source_file ]] || { mkdir -p "$(dirname "$destination")"; cp -f "$source_file" "$destination"; }
+  if [[ -n $source_file ]]; then
+    mkdir -p "$(dirname "$destination")"
+    if [[ "$(realpath -m "$source_file")" != "$(realpath -m "$destination")" ]]; then
+      cp -f "$source_file" "$destination"
+    fi
+  fi
 done
 for rel in "${ddr_files[@]:0:3}"; do require_file "$work_dir/$rel"; done
 ddr_stub=$work_dir/rtl/soc/uvw_axi4_to_ddr4_Stub.v

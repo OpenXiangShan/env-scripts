@@ -4,6 +4,10 @@ UVHS_RUNTIME_DIR := $(UVHS_ROOT_DIR)/uvhs/runtime
 
 UVHS_TEMPLATE_DIR ?=
 UVHS_UVW_AXI4_TO_DDR4_SRC ?=
+DIFFTEST_HOSTIF ?= XDMA
+ifeq ($(filter XDMA GBUS,$(DIFFTEST_HOSTIF)),)
+$(error DIFFTEST_HOSTIF must be XDMA or GBUS, got $(DIFFTEST_HOSTIF))
+endif
 UVHS_PROBE_TCL ?= $(UVHS_COMPILATION_DIR)/probe_ila.tcl
 UVHS_PROBE_PATH := $(if $(strip $(UVHS_PROBE_TCL)),$(abspath $(UVHS_PROBE_TCL)),)
 UVHS_DDR_AXI_WIDTH := $(if $(filter nutshell,$(CPU)),64,256)
