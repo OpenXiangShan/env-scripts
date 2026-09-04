@@ -158,15 +158,16 @@ from the server's global Tcl scope.
 ## UVHS ILA Waveform Capture
 
 The probe scripts describe compile-time instrumentation, not a runtime dump.
-The frontend sources `compilation/probe_ila.tcl` by default. It samples only
-the XDMA host trigger on the free-running `core_def.sys_clk_i` parent clock.
-`compilation/probe_kmh.tcl` is the larger XiangShan profile derived from the
-2026-08-04 and 2026-08-07 debug builds. CPU and L2 signals are sampled on
+For XiangShan/KMH builds, the frontend sources `compilation/probe_kmh.tcl` by
+default. It is the larger XiangShan profile derived from the 2026-08-04 and
+2026-08-07 debug builds; CPU and L2 signals are sampled on
 `core_def.inter_soc_clk`, the gated clock connected to `SimTop.clock`. DDR and
 host-trigger signals remain on their free-running `core_def.sys_clk_i` domain,
 so the host trigger remains observable after the CPU clock stops. Its generated
 hierarchy must be checked before it is reused with a different XiangShan RTL
 revision. The braces preserve hierarchy indexes such as `[0]`.
+Other CPU builds continue to use the minimal `compilation/probe_ila.tcl`
+profile by default.
 Set `UVHS_PROBE_TCL` to select a profile or an external file; an override must
 retain the XDMA host trigger if host-controlled capture is required. Set it to
 an empty value for a build with no UHD instrumentation. The scripts call

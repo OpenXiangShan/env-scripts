@@ -4,7 +4,8 @@ UVHS_RUNTIME_DIR := $(UVHS_ROOT_DIR)/uvhs/runtime
 
 UVHS_TEMPLATE_DIR ?=
 UVHS_UVW_AXI4_TO_DDR4_SRC ?=
-UVHS_PROBE_TCL ?= $(UVHS_COMPILATION_DIR)/probe_ila.tcl
+# KMH is the XiangShan target; keep the larger CPU profile enabled by default.
+UVHS_PROBE_TCL ?= $(if $(filter kmh xiangshan,$(CPU)),$(UVHS_COMPILATION_DIR)/probe_kmh.tcl,$(UVHS_COMPILATION_DIR)/probe_ila.tcl)
 UVHS_PROBE_PATH := $(if $(strip $(UVHS_PROBE_TCL)),$(abspath $(UVHS_PROBE_TCL)),)
 UVHS_DDR_AXI_WIDTH := $(if $(filter nutshell,$(CPU)),64,256)
 UVHS_WORK_DIR := $(ENV_SCRIPTS_HOME)/$(PRJ_NAME)
