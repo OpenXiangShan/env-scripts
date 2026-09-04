@@ -705,6 +705,7 @@ fpga_top_debug.core_def.U_CPU_TOP.u_XSTop.soc.core_with_l2.core.backend.inner_ct
 fpga_top_debug.core_def.U_CPU_TOP.u_XSTop.soc.core_with_l2.core.backend.inner_ctrlBlock.rob.timer \
 fpga_top_debug.core_def.U_CPU_TOP.u_XSTop.soc.core_with_l2.core.backend.inner_ctrlBlock.rob.difftest_trap_instrCnt \
 fpga_top_debug.core_def.U_CPU_TOP.u_XSTop.soc.core_with_l2.core.backend.inner_ctrlBlock.rob.hasWFI \
+fpga_top_debug.core_def.U_CPU_TOP.u_XSTop.soc.core_with_l2.core.backend.inner_ctrlBlock.rob.difftest_trap_coreid \
 fpga_top_debug.core_def.U_CPU_TOP.u_XSTop.soc.core_with_l2.core.backend.io_frontend_toFtq_redirect_valid \
 fpga_top_debug.core_def.U_CPU_TOP.u_XSTop.soc.core_with_l2.core.backend.io_frontend_toFtq_redirect_bits_cfiUpdate_target[49:0] \
 fpga_top_debug.core_def.U_CPU_TOP.u_XSTop.soc.core_with_l2.core.backend.io_frontend_cfVec_0_valid \
