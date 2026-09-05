@@ -57,7 +57,7 @@ uart_env:
 # Bridge REMOTE_UART_PORT through SSH to a local PTY for fpga-host.
 # Start an interactive shell with FPGA_UART_PORT exported after the bridge starts.
 bind_uart:
-	@test -n "$(REMOTE)" || { echo "REMOTE is required (for example: REMOTE=fpga-runtime)" >&2; exit 2; }
+	@test -n "$(REMOTE)" || { echo "REMOTE is required (for example: REMOTE=<user@fpga-runtime>)" >&2; exit 2; }
 	@command -v socat >/dev/null || { echo "socat is required on the local host" >&2; exit 2; }
 	@set -e; \
 	socat -d -d pty,link="$(FPGA_UART_PORT)",rawer,echo=0,waitslave \
