@@ -1,23 +1,38 @@
 #!/bin/bash
-set -e
+set -euo pipefail
 
-# Find BDF id of first xdma PCIE
-BDF=$(lspci -D | grep -i xilinx | awk '{print $1}' | head -n 1)
+# xdma_ep.tcl configures PF0 as 10ee:9048 for both supported XDMA IP versions.
+XDMA_PCI_ID=${XDMA_PCI_ID:-10ee:9048}
 
-if [ -z "$BDF" ]; then
-  echo "Warning: No Xilinx PCI device found."
-  exit 0
+mapfile -t FPGA_HOST_PROCESSES < <(
+  ps -eo pid=,comm=,args= | awk \
+    '$2 == "fpga-host" || $0 ~ /(^|[[:space:]\/])fpga-host([[:space:]]|$)/'
+)
+if ((${#FPGA_HOST_PROCESSES[@]} != 0)); then
+  echo "ERROR: fpga-host is still running; stop it before removing the XDMA endpoint:" >&2
+  printf '  %s\n' "${FPGA_HOST_PROCESSES[@]}" >&2
+  exit 1
 fi
 
-# Unbind xdma driver first to avoid kernel oops in remove_one callback
-if [ -e "/sys/bus/pci/devices/$BDF/driver" ]; then
+mapfile -t BDFS < <(lspci -D -d "$XDMA_PCI_ID" | awk '{print $1}')
+if ((${#BDFS[@]} == 0)); then
+  echo "WARNING: no XDMA PCI device found for $XDMA_PCI_ID"
+  exit 0
+fi
+if ((${#BDFS[@]} != 1)); then
+  echo "ERROR: expected one XDMA PCI device for $XDMA_PCI_ID, found ${#BDFS[@]}:" >&2
+  printf '  %s\n' "${BDFS[@]}" >&2
+  exit 1
+fi
+BDF=${BDFS[0]}
+
+# Unbind first so the driver does not retain state across FPGA reprogramming.
+if [[ -e /sys/bus/pci/devices/$BDF/driver ]]; then
   DRIVER=$(basename "$(readlink /sys/bus/pci/devices/$BDF/driver)")
   echo "Unbinding driver '$DRIVER' from $BDF"
-  echo "$BDF" | sudo tee /sys/bus/pci/drivers/$DRIVER/unbind >/dev/null
+  printf '%s\n' "$BDF" | sudo -n tee "/sys/bus/pci/drivers/$DRIVER/unbind" >/dev/null
   sleep 1
 fi
 
-# Remove PCIE of xdma
-echo "PCI device BDF id: $BDF"
-echo 1 | sudo tee /sys/bus/pci/devices/$BDF/remove
-echo "Removing PCI device at $BDF"
+echo "Removing XDMA PCI device $BDF ($XDMA_PCI_ID)"
+printf '1\n' | sudo -n tee "/sys/bus/pci/devices/$BDF/remove" >/dev/null
