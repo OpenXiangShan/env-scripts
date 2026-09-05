@@ -33,7 +33,8 @@ make write_bitstream \
 normally needs only one host setting; set both for a split-host UVHS setup.
 The target validates runtime inputs before removing XDMA, programs on
 `FPGA_RUNTIME`, then attempts to rescan `$FPGA_HOST` on success, backend failure,
-or interruption. Set `NO_DIFF=1` to skip the XDMA steps.
+or interruption. Rescan also rejects an all-`ff` PCI configuration read even if
+stale device nodes still exist. Set `NO_DIFF=1` to skip the XDMA steps.
 
 7. write DDR and run with diff/no-diff
 ```shell
