@@ -18,7 +18,8 @@ TIMEOUT_MIN ?= 2
 VIVADO_VERSION := $(shell vivado -version 2>/dev/null | head -1 | grep -o '[0-9]\{4\}\.[0-9]' || echo "unknown")
 
 .PHONY: vivado_bitstream vivado_project vivado_stage_bitstream \
-	vivado_write_bitstream vivado_halt_soc vivado_write_ddr \
+	vivado_write_bitstream_preflight vivado_write_bitstream \
+	vivado_runtime_cleanup vivado_halt_soc vivado_write_ddr \
 	vivado_write_flash vivado_reset_cpu vivado_runtime_status \
 	vivado_runtime_stop vivado_ila_arm vivado_ila_upload vivado_ila_clear \
 	vivado_ila_host_env vivado synth check_vivado_version check_version \
@@ -58,18 +59,19 @@ check_version:
 		-tclargs --vivado_version $(VIVADO_VERSION) --cpu $(CPU) \
 		--project_name $(PRJ_NAME)
 
-vivado_write_bitstream:
+vivado_write_bitstream_preflight:
 	@test -n "$(FPGA_BIT_HOME)" || { echo "ERROR: please set FPGA_BIT_HOME=..." >&2; exit 2; }
-ifneq ($(NO_DIFF),1)
-	sh "$(VIVADO_ROOT_DIR)/tools/pcie-remove.sh"
-endif
+	@test -d "$(FPGA_BIT_HOME)" || { \
+		echo "ERROR: FPGA_BIT_HOME does not exist: $(FPGA_BIT_HOME)" >&2; exit 2; }
+
+vivado_write_bitstream: vivado_write_bitstream_preflight
 	vivado -mode tcl -source "$(VIVADO_SCRIPT_DIR)/write_bitstream.tcl" -tclargs $(FPGA_BIT_HOME)
-ifneq ($(NO_DIFF),1)
-	sh "$(VIVADO_ROOT_DIR)/tools/pcie-rescan.sh"
-endif
 	vivado -mode tcl -source "$(VIVADO_SCRIPT_DIR)/reset_ddr.tcl" \
 		-tclargs $(FPGA_BIT_HOME)/fpga_top_debug.ltx
 	$(MAKE) reset_cpu
+
+vivado_runtime_cleanup:
+	@:
 
 vivado_halt_soc:
 	@test -n "$(FPGA_BIT_HOME)" || { echo "ERROR: please set FPGA_BIT_HOME=..." >&2; exit 2; }

@@ -36,8 +36,7 @@ UVHS_ILA_POSITION ?= 0
 UVHS_ILA_CLOCK ?= clk5_p
 UVHS_ILA_GATED_CLOCK ?=
 # Settings used to construct fpga-host hooks.
-UVHS_RUNTIME ?=
-# This must name the fpga_diff checkout visible on UVHS_RUNTIME; it cannot be
+# This must name the fpga_diff checkout visible on FPGA_RUNTIME; it cannot be
 # inferred when the runtime host has multiple checkouts.
 UVHS_ILA_DIR ?= $(UVHS_ROOT_DIR)
 UVHS_ILA_ENV ?= source ~/.bashrc &&
@@ -65,7 +64,8 @@ UVHS_FLOW_ENV = \
 	UVHS_LUT6_FILL_RATE="$(UVHS_LUT6_FILL_RATE)"
 
 .PHONY: uvhs uvhs_project uvhs_preflight uvhs_prepare \
-	uvhs_frontend uvhs_backend uvhs_clean uvhs_write_bitstream \
+	uvhs_frontend uvhs_backend uvhs_clean uvhs_write_bitstream_preflight \
+	uvhs_write_bitstream uvhs_runtime_cleanup \
 	uvhs_halt_soc uvhs_reset_cpu uvhs_write_ddr uvhs_write_flash \
 	uvhs_ila_arm uvhs_ila_upload uvhs_vcd uvhs_ila_clear \
 	uvhs_runtime_status uvhs_runtime_stop uvhs_bitstream \
@@ -147,10 +147,15 @@ uvhs_backend:
 		grep -Fxq UVHS_BACKEND_SUCCESS backend_run.log'
 
 # The process that downloads the database must retain its runtime ownership.
-uvhs_write_bitstream:
+uvhs_write_bitstream_preflight:
 	test -d "$(UVHS_RUNTIME_DB)"
 	test -f "$(UVHS_RUNTIME_DIR)/runtime_server.tcl"
 	test -x "$(UVHS_RUNTIME_DIR)/runtime_session.sh"
+	@! bash "$(UVHS_RUNTIME_DIR)/runtime_session.sh" check \
+		"$(UVHS_RUNTIME_PID_FILE)" >/dev/null 2>&1 || \
+		{ echo "ERROR: stop the UVHS runtime before programming again" >&2; exit 2; }
+
+uvhs_write_bitstream: uvhs_write_bitstream_preflight
 	mkdir -p "$(UVHS_RUNTIME_WORK_DIR)"
 	$(UVHS_TOOL_ENV) UVHS_DB_PATH="$(UVHS_RUNTIME_DB)" \
 	UVHS_RUNTIME_WORK_DIR="$(UVHS_RUNTIME_WORK_DIR)" \
@@ -211,7 +216,7 @@ uvhs_ila_upload:
 # targets so callers do not depend on UVHS implementation names.
 uvhs_ila_host_env:
 	@bash "$(UVHS_RUNTIME_DIR)/ila_host_env.sh" \
-		"$(UVHS_RUNTIME)" "$(UVHS_ILA_DIR)" \
+		"$(FPGA_RUNTIME)" "$(UVHS_ILA_DIR)" \
 		"$(UVHS_ILA_ENV)" "$(CPU)" "$(SUFFIX)" "$(PRJ_NAME)" \
 		"$(UVHS_ILA_TRIGGER)" "$(UVHS_ILA_POSITION)" "$(UVHS_ILA_CLOCK)" \
 		"$(UVHS_ILA_GATED_CLOCK)" "$(UVHS_ILA_TIMEOUT)" "$(UVHS_ILA_DEPTH)"
@@ -233,6 +238,16 @@ uvhs_runtime_stop:
 	bash "$(UVHS_RUNTIME_DIR)/runtime_session.sh" wait \
 		"$(UVHS_RUNTIME_PID_FILE)" "$(UVHS_RUNTIME_READY_FILE)" \
 		"$(UVHS_RUNTIME_COMMAND_FILE)" "$(UVHS_RUNTIME_TIMEOUT)"
+
+uvhs_runtime_cleanup:
+	@clear_status=0; \
+		stop_status=0; \
+		$(MAKE) --no-print-directory uvhs_ila_clear || clear_status=$$?; \
+		if [ "$(FPGA_KEEP_RUNTIME)" = 0 ]; then \
+			$(MAKE) --no-print-directory uvhs_runtime_stop || stop_status=$$?; \
+		fi; \
+		if ((clear_status != 0)); then exit $$clear_status; fi; \
+		exit $$stop_status
 
 uvhs_clean: check_project_name
 	@! bash "$(UVHS_RUNTIME_DIR)/runtime_session.sh" check \

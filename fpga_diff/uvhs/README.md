@@ -128,10 +128,15 @@ database and calling `initialize` without `download` fails. Start the next
 runtime session with `uvhs_write_bitstream` so it reloads and downloads
 `hw.dat`.
 
-`$UVHS_RUNTIME` does not control the Linux PCIe endpoint on `$UVHS_HOST`. Around
-every runtime download, remove `10ee:9048` on `$UVHS_HOST` before this target
-and rescan it afterward. The playground-level `write_bitstream` target performs
-this cross-host sequence when `UVHS_HOST` is set. The rescan waits for
+The public `runtime_cleanup` target clears ILA state and then stops the UVHS
+session. Set `FPGA_KEEP_RUNTIME=1` to clear ILA while retaining the session for
+another host run. This keeps backend cleanup policy in env-scripts while the
+caller that launched `fpga-host` decides when cleanup is triggered.
+
+`$FPGA_RUNTIME` does not control the Linux PCIe endpoint on `$FPGA_HOST`.
+Around every runtime download, the public `write_bitstream` target removes
+`10ee:9048` on `$FPGA_HOST`, runs this backend target on `$FPGA_RUNTIME`, and
+then rescans `$FPGA_HOST`. The rescan waits for
 `xdma-chr`, prints the endpoint and device nodes, and verifies access; an
 installed XDMA udev rule avoids a separate `sudo chmod`.
 
@@ -270,13 +275,13 @@ by trigger/capture cleanup:
 
 ```sh
 eval "$(make -s ila_host_env FPGA_BACKEND=uvhs \
-  CPU=<design> SUFFIX=<tag> UVHS_RUNTIME=$UVHS_RUNTIME)"
+  CPU=<design> SUFFIX=<tag> FPGA_RUNTIME=$FPGA_RUNTIME)"
 
 /path/to/fpga-host <host arguments>
 ```
 
 The arm command must use the same runtime work directory as
-`uvhs_write_bitstream`. If `$UVHS_HOST` and `$UVHS_RUNTIME` name the same
+`uvhs_write_bitstream`. If `$FPGA_HOST` and `$FPGA_RUNTIME` name the same
 machine, omit the generated SSH wrapper. The trigger signal must be listed in
 the compile-time `trigger_net` group; adding it to RTL with `mark_debug` alone
 is not sufficient.

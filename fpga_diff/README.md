@@ -18,7 +18,22 @@ Core RTL to FPGA Steps
   chmod u+x tools/pcie-remove.sh
   chmod u+x tools/pcie-rescan.sh
 
-6. make write_bitstream
+6. Program the FPGA and refresh XDMA:
+
+```shell
+make write_bitstream \
+  FPGA_BACKEND=<vivado-or-uvhs> \
+  FPGA_HOST=<user@fpga-host> \
+  FPGA_RUNTIME=<user@fpga-runtime> \
+  FPGA_REMOTE_DIR=/path/to/fpga_diff \
+  FPGA_BIT_HOME=/path/to/bitstream
+```
+
+`FPGA_HOST` is required. `FPGA_RUNTIME` defaults to `FPGA_HOST`, so Vivado
+normally needs only one host setting; set both for a split-host UVHS setup.
+The target validates runtime inputs before removing XDMA, programs on
+`FPGA_RUNTIME`, then attempts to rescan `$FPGA_HOST` on success, backend failure,
+or interruption. Set `NO_DIFF=1` to skip the XDMA steps.
 
 7. write DDR and run with diff/no-diff
 ```shell
@@ -52,17 +67,19 @@ Remote UART for fpga-host
 =========================
 
 When `fpga-host` runs on a machine other than the FPGA USB-UART host, bridge
-the remote UART to a local pseudo-terminal. `$UVHS_RUNTIME` owns UVHS and the
-physical UART while `$UVHS_HOST` owns XDMA and runs `fpga-host`. Install socat
-on both hosts, then start the bridge from `$UVHS_HOST`:
+the remote UART to a local pseudo-terminal. `$FPGA_RUNTIME` owns the physical
+UART while `$FPGA_HOST` owns XDMA and runs `fpga-host`. Install socat on both
+hosts, then start the bridge from `$FPGA_HOST`:
 
-    make bind_uart REMOTE=<user@fpga-runtime>
+    make bind_uart FPGA_RUNTIME=<user@fpga-runtime>
 
 The target bridges remote /dev/ttyUSB0 at 115200 baud to
 /tmp/fpga-remote-uart locally, exports FPGA_UART_PORT, and starts an
 interactive shell. Run fpga-host in that shell; leaving it stops the bridge.
-Replace the REMOTE placeholder with an SSH target resolvable from $UVHS_HOST;
-it may be a configured alias or a user@hostname destination.
+Replace the FPGA_RUNTIME placeholder with an SSH target resolvable from
+$FPGA_HOST; it may be a configured alias or a user@hostname destination.
+The FPGA host must also have a usable key or forwarded SSH agent for that
+target.
 Override REMOTE_UART_PORT, REMOTE_UART_BAUD, or FPGA_UART_PORT when needed.
 For a scripted invocation, obtain the same environment assignment with:
 
