@@ -1,4 +1,3 @@
-# KMH probe paths derived from the 2026-08-04 and 2026-08-07 debug builds.
 # Signal paths must be checked when the generated XiangShan hierarchy changes.
 probe_net -clock {fpga_top_debug.core_def.sys_clk_i} -add { \
 fpga_top_debug.core_def.U_UVHS_UVW_AXI4_TO_DDR4.ddr4ip_dut_axi_awaddr \
@@ -702,7 +701,11 @@ fpga_top_debug.core_def.U_CPU_TOP.u_XSTop.soc.core_with_l2.core.backend.inner_ct
 fpga_top_debug.core_def.U_CPU_TOP.u_XSTop.soc.core_with_l2.core.backend.inner_ctrlBlock.rob.io_commits_commitValid_6 \
 fpga_top_debug.core_def.U_CPU_TOP.u_XSTop.soc.core_with_l2.core.backend.inner_ctrlBlock.rob.io_commits_commitValid_7 \
 fpga_top_debug.core_def.U_CPU_TOP.u_XSTop.soc.core_with_l2.core.backend.inner_ctrlBlock.rob.io_commits_isCommit \
+fpga_top_debug.core_def.U_CPU_TOP.u_XSTop.soc.core_with_l2.core.backend.inner_ctrlBlock.rob.difftest_trap_hasTrap \
+fpga_top_debug.core_def.U_CPU_TOP.u_XSTop.soc.core_with_l2.core.backend.inner_ctrlBlock.rob.timer \
+fpga_top_debug.core_def.U_CPU_TOP.u_XSTop.soc.core_with_l2.core.backend.inner_ctrlBlock.rob.difftest_trap_instrCnt \
 fpga_top_debug.core_def.U_CPU_TOP.u_XSTop.soc.core_with_l2.core.backend.inner_ctrlBlock.rob.hasWFI \
+fpga_top_debug.core_def.U_CPU_TOP.u_XSTop.soc.core_with_l2.core.backend.inner_ctrlBlock.rob.difftest_trap_coreid \
 fpga_top_debug.core_def.U_CPU_TOP.u_XSTop.soc.core_with_l2.core.backend.io_frontend_toFtq_redirect_valid \
 fpga_top_debug.core_def.U_CPU_TOP.u_XSTop.soc.core_with_l2.core.backend.io_frontend_toFtq_redirect_bits_cfiUpdate_target[49:0] \
 fpga_top_debug.core_def.U_CPU_TOP.u_XSTop.soc.core_with_l2.core.backend.io_frontend_cfVec_0_valid \
