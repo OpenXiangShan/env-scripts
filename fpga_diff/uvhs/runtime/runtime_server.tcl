@@ -254,7 +254,25 @@ proc uvhs_query_clock_frequency {clock} {
     return [lindex $frequencies 0]
 }
 
-proc uvhs_configure_tmclk_from_cpu {} {
+proc uvhs_query_default_clock_frequency {clock} {
+    set frequencies {}
+    foreach line [split [query -clock -default -tclobj] "\n"] {
+        set fields [regexp -all -inline {\S+} $line]
+        if {[llength $fields] >= 6 && [lindex $fields 4] eq $clock &&
+            [string is double -strict [lindex $fields 3]]} {
+            lappend frequencies [expr {
+                round(double([lindex $fields 3]) * 1000000.0)
+            }]
+        }
+    }
+    set frequencies [lsort -integer -unique $frequencies]
+    if {[llength $frequencies] != 1} {
+        error "expected one default frequency for clock $clock, got $frequencies"
+    }
+    return [lindex $frequencies 0]
+}
+
+proc uvhs_configure_tmclk_from_cpu {{cpu_frequency ""}} {
     # Keep the CPU-to-TMCLK relationship stable across sign-off frequencies.
     # The environment variable remains available for controlled experiments,
     # while the normal Make/runtime path supplies the fixed 50:1 default.
@@ -268,7 +286,9 @@ proc uvhs_configure_tmclk_from_cpu {} {
         error "TMCLK-to-CPU clock ratio must be positive: $ratio"
     }
 
-    set cpu_frequency [uvhs_query_clock_frequency clk5_p]
+    if {$cpu_frequency eq ""} {
+        set cpu_frequency [uvhs_query_clock_frequency clk5_p]
+    }
     set tmclk_frequency [expr {round(double($cpu_frequency) / $ratio)}]
     if {$tmclk_frequency <= 0} {
         error "derived TMCLK frequency is invalid: $tmclk_frequency"
@@ -609,7 +629,9 @@ proc uvhs_initialize_runtime {} {
     # Keep clk5_p at the system sign-off frequency committed in this runtime DB.
     # It varies with the partition and PnR result, so it must not be hard-coded.
     config -clock -name clk6_p -frequency 50000000
-    uvhs_configure_tmclk_from_cpu
+    set signoff_cpu_frequency [uvhs_query_default_clock_frequency clk5_p]
+    config -clock -name clk5_p -frequency $signoff_cpu_frequency
+    uvhs_configure_tmclk_from_cpu $signoff_cpu_frequency
     config -clock -commit
     query -clock
 
