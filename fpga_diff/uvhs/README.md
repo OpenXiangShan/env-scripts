@@ -123,11 +123,10 @@ the hardware, and keeps a detached UVHS session alive. Later reset and memory
 commands must use that same session. Its PID, command files, and log are stored
 under `runtime-work` in the selected build directory. The session has no idle
 timeout; use `uvhs_runtime_stop` after testing to release it cleanly.
-Set `FPGA_RUNTIME_HOME` to a copied UVHS project directory to load its `hw.dat`
-and keep the corresponding runtime state there. If it is empty, the directory
-is derived locally from `FPGA_BACKEND`, `CPU`, and `SUFFIX`.
-`uvhs_stage_bitstream` copies `hw.dat` into the bit archive's clean `runtime/`
-directory and prints that directory as `FPGA_RUNTIME_HOME` for deployment.
+`uvhs_stage_bitstream` copies `hw.dat` into
+`runtime/<derived-project-name>/` inside the bit archive. It prints both the
+source artifact and its relative destination under `env-scripts/fpga_diff` so
+the runtime checkout can locate it without another path variable.
 After the session stops, the released FPGA reports link down; loading the same
 database and calling `initialize` without `download` fails. Start the next
 runtime session with `uvhs_write_bitstream` so it reloads and downloads

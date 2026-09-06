@@ -8,7 +8,7 @@ UVHS_UVW_AXI4_TO_DDR4_SRC ?=
 UVHS_PROBE_TCL ?= $(if $(filter kmh xiangshan,$(CPU)),$(UVHS_COMPILATION_DIR)/probe_kmh.tcl,$(UVHS_COMPILATION_DIR)/probe_ila.tcl)
 UVHS_PROBE_PATH := $(if $(strip $(UVHS_PROBE_TCL)),$(abspath $(UVHS_PROBE_TCL)),)
 UVHS_DDR_AXI_WIDTH := $(if $(filter nutshell,$(CPU)),64,256)
-UVHS_WORK_DIR := $(if $(strip $(FPGA_RUNTIME_HOME)),$(abspath $(FPGA_RUNTIME_HOME)),$(ENV_SCRIPTS_HOME)/$(PRJ_NAME))
+UVHS_WORK_DIR := $(ENV_SCRIPTS_HOME)/$(PRJ_NAME)
 UVHS_FILELIST := $(UVHS_WORK_DIR)/rtl/filelist.f
 
 UVHS_EXPORT_IP_FORCE ?= 0
@@ -35,12 +35,7 @@ UVHS_ILA_DEPTH ?= 1000000
 UVHS_ILA_POSITION ?= 0
 UVHS_ILA_CLOCK ?= clk5_p
 UVHS_ILA_GATED_CLOCK ?= $(if $(filter kmh xiangshan,$(CPU)),fpga_top_debug.core_def.inter_soc_clk,)
-# Settings used to construct fpga-host hooks.
-# This must name the fpga_diff checkout visible on FPGA_RUNTIME; it cannot be
-# inferred when the runtime host has multiple checkouts.
-UVHS_ILA_DIR ?= $(UVHS_ROOT_DIR)
-UVHS_ILA_ENV ?= source ~/.bashrc &&
-UVHS_ILA_TRIGGER ?= $(UVHS_ILA_DIR)/uvhs/runtime/trigger.ini
+UVHS_ILA_TRIGGER ?= $(UVHS_RUNTIME_DIR)/trigger.ini
 # uv_shell writes UHD output below its project-local runtime work directory.
 UVHS_ILA_OUTPUT_DIR := $(UVHS_RUNTIME_WORK_DIR)/UHD/uvhs_ila
 UVHS_ILA_USDB := $(UVHS_ILA_OUTPUT_DIR)/UvData.usdb
@@ -195,12 +190,14 @@ uvhs_stage_bitstream:
 	}
 	@test -d "$(UVHS_RUNTIME_DB)"
 	@mkdir -p "$(FPGA_BIT_ARTIFACT_DIR)/runtime"
-	@test ! -e "$(FPGA_BIT_ARTIFACT_DIR)/runtime/hw.dat" || { \
+	@test ! -e "$(FPGA_BIT_ARTIFACT_DIR)/runtime/$(PRJ_NAME)" || { \
 		echo "ERROR: runtime artifact already exists; clean the bit archive first" >&2; exit 2; \
 	}
-	@cp -a --reflink=auto "$(UVHS_RUNTIME_DB)" "$(FPGA_BIT_ARTIFACT_DIR)/runtime/"
-	@echo "UVHS implementation database: $(FPGA_BIT_ARTIFACT_DIR)/runtime/hw.dat"
-	@echo "FPGA_RUNTIME_HOME=$(FPGA_BIT_ARTIFACT_DIR)/runtime"
+	@mkdir -p "$(FPGA_BIT_ARTIFACT_DIR)/runtime/$(PRJ_NAME)"
+	@cp -a --reflink=auto "$(UVHS_RUNTIME_DB)" \
+		"$(FPGA_BIT_ARTIFACT_DIR)/runtime/$(PRJ_NAME)/"
+	@echo "FPGA_RUNTIME_ARTIFACT=$(FPGA_BIT_ARTIFACT_DIR)/runtime/$(PRJ_NAME)"
+	@echo "FPGA_RUNTIME_DEST=env-scripts/fpga_diff/$(PRJ_NAME)"
 
 uvhs_ila_arm:
 	test -f "$(UVHS_ILA_TRIGGER)"
@@ -220,8 +217,7 @@ uvhs_ila_upload:
 # targets so callers do not depend on UVHS implementation names.
 uvhs_ila_host_env:
 	@bash "$(UVHS_RUNTIME_DIR)/ila_host_env.sh" \
-		"$(FPGA_RUNTIME)" "$(UVHS_ILA_DIR)" \
-		"$(UVHS_ILA_ENV)" "$(FPGA_RUNTIME_HOME)" \
+		"$(FPGA_RUNTIME)" "$(UVHS_ROOT_DIR)" \
 		"$(CPU)" "$(SUFFIX)" \
 		"$(UVHS_ILA_TRIGGER)" "$(UVHS_ILA_POSITION)" "$(UVHS_ILA_CLOCK)" \
 		"$(UVHS_ILA_GATED_CLOCK)" "$(UVHS_ILA_TIMEOUT)" "$(UVHS_ILA_DEPTH)"

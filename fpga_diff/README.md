@@ -23,8 +23,7 @@ endpoint around programming:
 
 ```shell
 make write_bitstream FPGA_BACKEND=<vivado-or-uvhs> \
-  FPGA_BIT_HOME=/path/to/vivado-bitstream \
-  FPGA_RUNTIME_HOME=/path/to/uvhs-runtime-artifact
+  FPGA_BIT_HOME=/path/to/vivado-bitstream
 ```
 
 For a split-host backend, env-scripts also exposes local `pcie_remove` and
@@ -32,9 +31,9 @@ For a split-host backend, env-scripts also exposes local `pcie_remove` and
 `write_bitstream` on the runtime host. Rescan rejects an all-`ff` PCI
 configuration read even if stale device nodes still exist.
 
-`PRJ_NAME` is derived from `FPGA_BACKEND`, `CPU`, and `SUFFIX`. For UVHS,
-`FPGA_RUNTIME_HOME` optionally points to a copied project directory containing
-`hw.dat`; otherwise the derived project directory under this checkout is used.
+`PRJ_NAME` is derived from `FPGA_BACKEND`, `CPU`, and `SUFFIX`. A staged UVHS
+runtime artifact must be copied to the printed relative destination under this
+checkout so the derived project directory contains `hw.dat`.
 
 7. write DDR and run with diff/no-diff
 ```shell
@@ -46,21 +45,9 @@ make write_ddr FPGA_BACKEND=vivado
 make reset_cpu
 
 case 2: With fpga-host (no-diff mode)
-FPGA_DDR_LOAD_CMD="bash -lc ' \
-  source ~/.bash_profile && \
-  make -C /path/to/fpga_diff write_ddr FPGA_BACKEND=vivado \
-    FPGA_BIT_HOME=... \
-    WORKLOAD=<workload>.txt \
-'" \
 ./fpga-host --no-diff
 
 case 3: With fpga-host (diff mode)
-FPGA_DDR_LOAD_CMD="bash -lc ' \
-  source ~/.bash_profile && \
-  make -C /path/to/fpga_diff write_ddr FPGA_BACKEND=vivado \
-    FPGA_BIT_HOME=... \
-    WORKLOAD=<workload>.txt \
-'" \
 ./fpga-host --diff <nemu> -i <workload>.bin
 ```
 
@@ -81,7 +68,6 @@ Replace the FPGA_RUNTIME placeholder with an SSH target resolvable from
 $FPGA_HOST; it may be a configured alias or a user@hostname destination.
 The FPGA host must also have a usable key or forwarded SSH agent for that
 target.
-Override REMOTE_UART_PORT, REMOTE_UART_BAUD, or FPGA_UART_PORT when needed.
 For a scripted invocation, obtain the same environment assignment with:
 
     eval "$(make -s uart_env)"
