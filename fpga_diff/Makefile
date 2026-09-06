@@ -1,5 +1,3 @@
-SHELL := /bin/bash
-
 ENV_SCRIPTS_HOME ?= $(CURDIR)
 
 FPGA_BACKEND ?= $(if $(filter uvhs%,$(MAKECMDGOALS)),uvhs,vivado)
@@ -15,8 +13,6 @@ XDMA_LINK_WIDTH ?= X4
 VIVADO_JOBS ?=
 export XDMA_LINK_WIDTH VIVADO_JOBS NO_DIFF
 FPGA_RUNTIME ?=
-FPGA_KEEP_RUNTIME ?= 0
-FPGA_WRITE_PREFLIGHT_DONE ?= 0
 REMOTE_UART_PORT ?= /dev/ttyUSB0
 REMOTE_UART_BAUD ?= 115200
 FPGA_UART_PORT ?= /tmp/fpga-remote-uart
@@ -33,13 +29,12 @@ endif
 endif
 PRJ_NAME ?= fpga_$(FPGA_BACKEND)_$(CPU)$(if $(strip $(SUFFIX)),-$(strip $(SUFFIX)),)
 export PRJ_NAME
-FPGA_DISPATCH_TARGETS := project bitstream stage_bitstream \
-	write_bitstream_preflight write_bitstream runtime_cleanup halt_soc \
+FPGA_DISPATCH_TARGETS := project bitstream stage_bitstream write_bitstream halt_soc \
 	write_ddr write_flash reset_cpu runtime_status runtime_stop \
 	ila_arm ila_upload ila_clear ila_host_env
 
-.PHONY: $(FPGA_DISPATCH_TARGETS) check_project_name check_fpga_backend \
-	check_fpga_keep_runtime pcie_remove pcie_rescan bind_uart uart_env
+.PHONY: $(FPGA_DISPATCH_TARGETS) check_project_name pcie_remove pcie_rescan \
+	bind_uart uart_env
 
 check_project_name:
 	@case "$$PRJ_NAME" in \
@@ -49,21 +44,11 @@ check_project_name:
 			echo "Use only letters, digits, '.', '_', and '-'." >&2; exit 2 ;; \
 	esac
 
-check_fpga_backend:
+$(FPGA_DISPATCH_TARGETS): check_project_name
 	@test -n "$(filter $(FPGA_BACKEND),$(SUPPORTED_FPGA_BACKENDS))" || { \
 		echo "ERROR: FPGA_BACKEND must be one of: $(SUPPORTED_FPGA_BACKENDS)" >&2; \
 		exit 2; \
 	}
-
-check_fpga_keep_runtime:
-	@case "$(FPGA_KEEP_RUNTIME)" in \
-		0|1) ;; \
-		*) echo "ERROR: FPGA_KEEP_RUNTIME must be 0 or 1" >&2; exit 2 ;; \
-	esac
-
-runtime_cleanup: check_fpga_keep_runtime
-
-$(FPGA_DISPATCH_TARGETS): check_project_name check_fpga_backend
 	+@$(MAKE) --no-print-directory $(FPGA_BACKEND)_$@
 
 pcie_remove:

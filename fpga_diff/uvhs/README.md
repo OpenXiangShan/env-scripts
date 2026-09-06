@@ -128,10 +128,10 @@ database and calling `initialize` without `download` fails. Start the next
 runtime session with `uvhs_write_bitstream` so it reloads and downloads
 `hw.dat`.
 
-The local `runtime_cleanup` target clears ILA state and then stops the UVHS
-session. Set `FPGA_KEEP_RUNTIME=1` to clear ILA while retaining the session for
-another host run. The caller that launched `fpga-host` decides when and on which
-runtime machine to invoke this target.
+`ila_host_env` exports ILA arm/upload/clear commands and the runtime stop
+command. The upload command clears ILA after an upload; the separate clear
+command lets the caller clean up an interrupted or non-upload path before it
+optionally invokes the stop command.
 
 `$FPGA_RUNTIME` does not control the Linux PCIe endpoint on `$FPGA_HOST`.
 Around every runtime download, the caller runs `pcie_remove` on `$FPGA_HOST`,
@@ -139,9 +139,6 @@ runs `write_bitstream` on `$FPGA_RUNTIME`, and then runs `pcie_rescan` on
 `$FPGA_HOST`. The rescan waits for
 `xdma-chr`, prints the endpoint and device nodes, and verifies access; an
 installed XDMA udev rule avoids a separate `sudo chmod`.
-Before removal, `write_bitstream_preflight` runs `query -fpgas -all` and rejects
-the operation when any FPGA selected by `UVHS_KEEP_FPGAS` is occupied or booked,
-including sessions created outside this checkout.
 
 `uvhs_write_ddr` converts the Vivado address/data-pair format to the DDR DCP
 word width and calls `writemem -rtl`. It leaves the CPU halted until
@@ -322,8 +319,7 @@ The upload window is controlled when starting the capture:
 
 ```sh
 make uvhs_ila_arm CPU=<design> SUFFIX=<tag> TRIGGER=/path/to/trigger.ini \
-  UVHS_ILA_POSITION=0 \
-  UVHS_ILA_GATED_CLOCK=<capture-clock-0>,<capture-clock-1>
+  UVHS_ILA_POSITION=0
 make uvhs_ila_upload CPU=<design> SUFFIX=<tag> UVHS_ILA_DEPTH=1000000
 ```
 
@@ -341,12 +337,14 @@ UHD bandwidth, using 512 bits per capture station and clock cycle. The original
 sign-off frequency is restored after upload, after an arm failure, or by
 `uvhs_ila_clear`.
 
-If the compile-time sampling path is gated, pass the exact clock name shown by
-`query -capture` through `UVHS_ILA_GATED_CLOCK`. Use a comma-separated list
-when stations use multiple post-partition clock replicas. The runtime registers
-each clock at the automatically selected capture frequency before installing
-the trigger. This makes the KMH capture stations advance on actual
-`inter_soc_clk` edges, so clock-gated intervals do not consume station samples.
+KMH/XiangShan defaults `UVHS_ILA_GATED_CLOCK` to
+`fpga_top_debug.core_def.inter_soc_clk`; other profiles default to no gated
+capture clock. Override it with the exact comma-separated names shown by
+`query -capture` when stations use additional post-partition clock replicas.
+The runtime registers each clock at the automatically selected capture
+frequency before installing the trigger. This makes the KMH capture stations
+advance on actual `inter_soc_clk` edges, so clock-gated intervals do not consume
+station samples.
 The vendor documents gated-clock capture as approximate when the clock stops or
 changes frequency; the trigger must also eventually receive a gated-clock edge.
 Use the free-running parent clock for trigger-only profiles that must remain

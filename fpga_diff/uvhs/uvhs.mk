@@ -27,8 +27,6 @@ UVHS_RUNTIME_PID_FILE := $(UVHS_RUNTIME_WORK_DIR)/uv_shell.pid
 UVHS_RUNTIME_READY_FILE := $(UVHS_RUNTIME_WORK_DIR)/uv_shell.ready
 UVHS_RUNTIME_LOG := $(UVHS_RUNTIME_WORK_DIR)/uv_shell.log
 UVHS_RUNTIME_TIMEOUT ?= 600
-UVHS_RUNTIME_PREFLIGHT_DIR := $(UVHS_WORK_DIR)/runtime-preflight
-UVHS_RUNTIME_PREFLIGHT_LOG := $(UVHS_RUNTIME_PREFLIGHT_DIR)/query-fpgas.log
 # Derive clk8_p from the sign-off clk5_p runtime frequency.
 UVHS_TMCLK_CPU_RATIO ?= 50
 
@@ -36,7 +34,7 @@ UVHS_ILA_TIMEOUT ?= 60
 UVHS_ILA_DEPTH ?= 1000000
 UVHS_ILA_POSITION ?= 0
 UVHS_ILA_CLOCK ?= clk5_p
-UVHS_ILA_GATED_CLOCK ?=
+UVHS_ILA_GATED_CLOCK ?= $(if $(filter kmh xiangshan,$(CPU)),fpga_top_debug.core_def.inter_soc_clk,)
 # Settings used to construct fpga-host hooks.
 # This must name the fpga_diff checkout visible on FPGA_RUNTIME; it cannot be
 # inferred when the runtime host has multiple checkouts.
@@ -66,8 +64,7 @@ UVHS_FLOW_ENV = \
 	UVHS_LUT6_FILL_RATE="$(UVHS_LUT6_FILL_RATE)"
 
 .PHONY: uvhs uvhs_project uvhs_preflight uvhs_prepare \
-	uvhs_frontend uvhs_backend uvhs_clean uvhs_write_bitstream_inputs \
-	uvhs_write_bitstream_preflight uvhs_write_bitstream uvhs_runtime_cleanup \
+	uvhs_frontend uvhs_backend uvhs_clean uvhs_write_bitstream \
 	uvhs_halt_soc uvhs_reset_cpu uvhs_write_ddr uvhs_write_flash \
 	uvhs_ila_arm uvhs_ila_upload uvhs_vcd uvhs_ila_clear \
 	uvhs_runtime_status uvhs_runtime_stop uvhs_bitstream \
@@ -149,29 +146,10 @@ uvhs_backend:
 		grep -Fxq UVHS_BACKEND_SUCCESS backend_run.log'
 
 # The process that downloads the database must retain its runtime ownership.
-uvhs_write_bitstream_inputs:
+uvhs_write_bitstream:
 	test -d "$(UVHS_RUNTIME_DB)"
 	test -f "$(UVHS_RUNTIME_DIR)/runtime_server.tcl"
 	test -x "$(UVHS_RUNTIME_DIR)/runtime_session.sh"
-	@! bash "$(UVHS_RUNTIME_DIR)/runtime_session.sh" check \
-		"$(UVHS_RUNTIME_PID_FILE)" >/dev/null 2>&1 || \
-		{ echo "ERROR: stop the UVHS runtime before programming again" >&2; exit 2; }
-
-uvhs_write_bitstream_preflight: uvhs_write_bitstream_inputs
-	mkdir -p "$(UVHS_RUNTIME_PREFLIGHT_DIR)"
-	@set -o pipefail; \
-		$(UVHS_TOOL_ENV) bash "$$UV_ROOT/bin/uv_shell" -rt_shell \
-			-workdir "$(UVHS_RUNTIME_PREFLIGHT_DIR)" \
-			-script "$(UVHS_RUNTIME_DIR)/query_fpgas.tcl" \
-			|& tee "$(UVHS_RUNTIME_PREFLIGHT_LOG)"
-	bash "$(UVHS_RUNTIME_DIR)/check_fpga_ownership.sh" \
-		"$(UVHS_KEEP_FPGAS)" "$(UVHS_RUNTIME_PREFLIGHT_LOG)"
-
-UVHS_WRITE_BITSTREAM_PREREQUISITE := $(if \
-	$(filter 1,$(FPGA_WRITE_PREFLIGHT_DONE)),\
-	uvhs_write_bitstream_inputs,uvhs_write_bitstream_preflight)
-
-uvhs_write_bitstream: $(UVHS_WRITE_BITSTREAM_PREREQUISITE)
 	mkdir -p "$(UVHS_RUNTIME_WORK_DIR)"
 	$(UVHS_TOOL_ENV) UVHS_DB_PATH="$(UVHS_RUNTIME_DB)" \
 	UVHS_RUNTIME_WORK_DIR="$(UVHS_RUNTIME_WORK_DIR)" \
@@ -254,16 +232,6 @@ uvhs_runtime_stop:
 	bash "$(UVHS_RUNTIME_DIR)/runtime_session.sh" wait \
 		"$(UVHS_RUNTIME_PID_FILE)" "$(UVHS_RUNTIME_READY_FILE)" \
 		"$(UVHS_RUNTIME_COMMAND_FILE)" "$(UVHS_RUNTIME_TIMEOUT)"
-
-uvhs_runtime_cleanup:
-	@clear_status=0; \
-		stop_status=0; \
-		$(MAKE) --no-print-directory uvhs_ila_clear || clear_status=$$?; \
-		if [ "$(FPGA_KEEP_RUNTIME)" = 0 ]; then \
-			$(MAKE) --no-print-directory uvhs_runtime_stop || stop_status=$$?; \
-		fi; \
-		if ((clear_status != 0)); then exit $$clear_status; fi; \
-		exit $$stop_status
 
 uvhs_clean: check_project_name
 	@! bash "$(UVHS_RUNTIME_DIR)/runtime_session.sh" check \

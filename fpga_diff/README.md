@@ -18,27 +18,18 @@ Core RTL to FPGA Steps
   chmod u+x tools/pcie-remove.sh
   chmod u+x tools/pcie-rescan.sh
 
-6. Program the FPGA and refresh XDMA. Each env-scripts target runs locally on
-the machine where it is invoked:
+6. Program the FPGA. The Vivado backend removes and rescans its local XDMA
+endpoint around programming:
 
 ```shell
-make write_bitstream_preflight FPGA_BACKEND=<vivado-or-uvhs> \
-  FPGA_BIT_HOME=/path/to/bitstream    # runtime machine
-make pcie_remove                      # XDMA host
 make write_bitstream FPGA_BACKEND=<vivado-or-uvhs> \
-  FPGA_BIT_HOME=/path/to/bitstream    # runtime machine
-make pcie_rescan                      # XDMA host
+  FPGA_BIT_HOME=/path/to/bitstream
 ```
 
-The caller must run preflight before taking XDMA down and must attempt
-`pcie_rescan` after `pcie_remove`, including when programming fails or is
-interrupted. Minjie provides this cross-machine orchestration. Rescan rejects an
-all-`ff` PCI configuration read even if stale device nodes still exist. Skip the
-XDMA targets for a `NO_DIFF=1` image.
-
-UVHS preflight also queries the global FPGA status and requires every FPGA in
-`UVHS_KEEP_FPGAS` to be available. This catches sessions owned outside the
-current checkout before the host endpoint is removed.
+For a split-host backend, env-scripts also exposes local `pcie_remove` and
+`pcie_rescan` targets. The caller runs them on the XDMA host before and after
+`write_bitstream` on the runtime host. Rescan rejects an all-`ff` PCI
+configuration read even if stale device nodes still exist.
 
 7. write DDR and run with diff/no-diff
 ```shell
