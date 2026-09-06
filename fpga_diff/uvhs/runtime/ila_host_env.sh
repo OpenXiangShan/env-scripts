@@ -5,9 +5,9 @@ set -euo pipefail
 runtime_host=${1-}
 runtime_dir=${2-}
 runtime_env=${3-}
-cpu=${4-}
-suffix=${5-}
-project_name=${6-}
+runtime_home=${4-}
+cpu=${5-}
+suffix=${6-}
 trigger=${7-}
 position=${8-}
 clock=${9-}
@@ -42,18 +42,18 @@ make_command() {
 }
 
 arm_command=$(make_command ila_arm \
-  "CPU=$cpu" "SUFFIX=$suffix" "PRJ_NAME=$project_name" \
+  "CPU=$cpu" "SUFFIX=$suffix" "FPGA_RUNTIME_HOME=$runtime_home" \
   "UVHS_ILA_TRIGGER=$trigger" \
   "UVHS_ILA_POSITION=$position" "UVHS_ILA_CLOCK=$clock" \
   "UVHS_ILA_GATED_CLOCK=$gated_clock")
 upload_command=$(make_command ila_upload \
-  "CPU=$cpu" "SUFFIX=$suffix" "PRJ_NAME=$project_name" \
+  "CPU=$cpu" "SUFFIX=$suffix" "FPGA_RUNTIME_HOME=$runtime_home" \
   "UVHS_ILA_TIMEOUT=$timeout" \
   "UVHS_ILA_DEPTH=$depth" "UVHS_ILA_CLOCK=$clock")
 clear_command=$(make_command ila_clear \
-  "CPU=$cpu" "SUFFIX=$suffix" "PRJ_NAME=$project_name")
+  "CPU=$cpu" "SUFFIX=$suffix" "FPGA_RUNTIME_HOME=$runtime_home")
 runtime_stop_command=$(make_command runtime_stop \
-  "CPU=$cpu" "SUFFIX=$suffix" "PRJ_NAME=$project_name")
+  "CPU=$cpu" "SUFFIX=$suffix" "FPGA_RUNTIME_HOME=$runtime_home")
 
 # Preserve an upload failure while always releasing the capture and restoring
 # any clock temporarily reduced for UHD bandwidth.

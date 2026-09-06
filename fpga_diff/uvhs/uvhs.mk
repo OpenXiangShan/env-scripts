@@ -8,7 +8,7 @@ UVHS_UVW_AXI4_TO_DDR4_SRC ?=
 UVHS_PROBE_TCL ?= $(if $(filter kmh xiangshan,$(CPU)),$(UVHS_COMPILATION_DIR)/probe_kmh.tcl,$(UVHS_COMPILATION_DIR)/probe_ila.tcl)
 UVHS_PROBE_PATH := $(if $(strip $(UVHS_PROBE_TCL)),$(abspath $(UVHS_PROBE_TCL)),)
 UVHS_DDR_AXI_WIDTH := $(if $(filter nutshell,$(CPU)),64,256)
-UVHS_WORK_DIR := $(ENV_SCRIPTS_HOME)/$(PRJ_NAME)
+UVHS_WORK_DIR := $(if $(strip $(FPGA_RUNTIME_HOME)),$(abspath $(FPGA_RUNTIME_HOME)),$(ENV_SCRIPTS_HOME)/$(PRJ_NAME))
 UVHS_FILELIST := $(UVHS_WORK_DIR)/rtl/filelist.f
 
 UVHS_EXPORT_IP_FORCE ?= 0
@@ -190,7 +190,17 @@ uvhs_write_flash:
 	$(call uvhs_runtime_command,write_flash "$(abspath $(WORKLOAD))" 0x0 0x8000)
 
 uvhs_stage_bitstream:
-	@echo "UVHS implementation database: $(UVHS_RUNTIME_DB)"
+	@test -n "$(FPGA_BIT_ARTIFACT_DIR)" && test "$(FPGA_BIT_ARTIFACT_DIR)" != "/" || { \
+		echo "ERROR: please set a safe FPGA_BIT_ARTIFACT_DIR=..." >&2; exit 2; \
+	}
+	@test -d "$(UVHS_RUNTIME_DB)"
+	@mkdir -p "$(FPGA_BIT_ARTIFACT_DIR)/runtime"
+	@test ! -e "$(FPGA_BIT_ARTIFACT_DIR)/runtime/hw.dat" || { \
+		echo "ERROR: runtime artifact already exists; clean the bit archive first" >&2; exit 2; \
+	}
+	@cp -a --reflink=auto "$(UVHS_RUNTIME_DB)" "$(FPGA_BIT_ARTIFACT_DIR)/runtime/"
+	@echo "UVHS implementation database: $(FPGA_BIT_ARTIFACT_DIR)/runtime/hw.dat"
+	@echo "FPGA_RUNTIME_HOME=$(FPGA_BIT_ARTIFACT_DIR)/runtime"
 
 uvhs_ila_arm:
 	test -f "$(UVHS_ILA_TRIGGER)"
@@ -211,7 +221,8 @@ uvhs_ila_upload:
 uvhs_ila_host_env:
 	@bash "$(UVHS_RUNTIME_DIR)/ila_host_env.sh" \
 		"$(FPGA_RUNTIME)" "$(UVHS_ILA_DIR)" \
-		"$(UVHS_ILA_ENV)" "$(CPU)" "$(SUFFIX)" "$(PRJ_NAME)" \
+		"$(UVHS_ILA_ENV)" "$(FPGA_RUNTIME_HOME)" \
+		"$(CPU)" "$(SUFFIX)" \
 		"$(UVHS_ILA_TRIGGER)" "$(UVHS_ILA_POSITION)" "$(UVHS_ILA_CLOCK)" \
 		"$(UVHS_ILA_GATED_CLOCK)" "$(UVHS_ILA_TIMEOUT)" "$(UVHS_ILA_DEPTH)"
 

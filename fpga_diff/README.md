@@ -23,13 +23,18 @@ endpoint around programming:
 
 ```shell
 make write_bitstream FPGA_BACKEND=<vivado-or-uvhs> \
-  FPGA_BIT_HOME=/path/to/bitstream
+  FPGA_BIT_HOME=/path/to/vivado-bitstream \
+  FPGA_RUNTIME_HOME=/path/to/uvhs-runtime-artifact
 ```
 
 For a split-host backend, env-scripts also exposes local `pcie_remove` and
 `pcie_rescan` targets. The caller runs them on the XDMA host before and after
 `write_bitstream` on the runtime host. Rescan rejects an all-`ff` PCI
 configuration read even if stale device nodes still exist.
+
+`PRJ_NAME` is derived from `FPGA_BACKEND`, `CPU`, and `SUFFIX`. For UVHS,
+`FPGA_RUNTIME_HOME` optionally points to a copied project directory containing
+`hw.dat`; otherwise the derived project directory under this checkout is used.
 
 7. write DDR and run with diff/no-diff
 ```shell

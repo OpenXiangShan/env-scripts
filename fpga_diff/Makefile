@@ -6,6 +6,7 @@ CORE_DIR ?=
 RTL_INCLUDE ?=
 FPGA_BIT_HOME ?=
 FPGA_BIT_ARTIFACT_DIR ?=
+FPGA_RUNTIME_HOME ?=
 WORKLOAD ?=
 AXI_WIDTH ?= 64
 NO_DIFF ?= 0
@@ -27,7 +28,7 @@ ifeq ($(filter nodiff nodiff-%,$(SUFFIX)),)
 override SUFFIX := nodiff$(if $(strip $(SUFFIX)),-$(strip $(SUFFIX)),)
 endif
 endif
-PRJ_NAME ?= fpga_$(FPGA_BACKEND)_$(CPU)$(if $(strip $(SUFFIX)),-$(strip $(SUFFIX)),)
+override PRJ_NAME := fpga_$(FPGA_BACKEND)_$(CPU)$(if $(strip $(SUFFIX)),-$(strip $(SUFFIX)),)
 export PRJ_NAME
 FPGA_DISPATCH_TARGETS := project bitstream stage_bitstream write_bitstream halt_soc \
 	write_ddr write_flash reset_cpu runtime_status runtime_stop \
