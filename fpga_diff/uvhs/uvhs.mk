@@ -27,6 +27,8 @@ UVHS_RUNTIME_PID_FILE := $(UVHS_RUNTIME_WORK_DIR)/uv_shell.pid
 UVHS_RUNTIME_READY_FILE := $(UVHS_RUNTIME_WORK_DIR)/uv_shell.ready
 UVHS_RUNTIME_LOG := $(UVHS_RUNTIME_WORK_DIR)/uv_shell.log
 UVHS_RUNTIME_TIMEOUT ?= 600
+UVHS_RUNTIME_PREFLIGHT_DIR := $(UVHS_WORK_DIR)/runtime-preflight
+UVHS_RUNTIME_PREFLIGHT_LOG := $(UVHS_RUNTIME_PREFLIGHT_DIR)/query-fpgas.log
 # Derive clk8_p from the sign-off clk5_p runtime frequency.
 UVHS_TMCLK_CPU_RATIO ?= 50
 
@@ -64,8 +66,8 @@ UVHS_FLOW_ENV = \
 	UVHS_LUT6_FILL_RATE="$(UVHS_LUT6_FILL_RATE)"
 
 .PHONY: uvhs uvhs_project uvhs_preflight uvhs_prepare \
-	uvhs_frontend uvhs_backend uvhs_clean uvhs_write_bitstream_preflight \
-	uvhs_write_bitstream uvhs_runtime_cleanup \
+	uvhs_frontend uvhs_backend uvhs_clean uvhs_write_bitstream_inputs \
+	uvhs_write_bitstream_preflight uvhs_write_bitstream uvhs_runtime_cleanup \
 	uvhs_halt_soc uvhs_reset_cpu uvhs_write_ddr uvhs_write_flash \
 	uvhs_ila_arm uvhs_ila_upload uvhs_vcd uvhs_ila_clear \
 	uvhs_runtime_status uvhs_runtime_stop uvhs_bitstream \
@@ -147,7 +149,7 @@ uvhs_backend:
 		grep -Fxq UVHS_BACKEND_SUCCESS backend_run.log'
 
 # The process that downloads the database must retain its runtime ownership.
-uvhs_write_bitstream_preflight:
+uvhs_write_bitstream_inputs:
 	test -d "$(UVHS_RUNTIME_DB)"
 	test -f "$(UVHS_RUNTIME_DIR)/runtime_server.tcl"
 	test -x "$(UVHS_RUNTIME_DIR)/runtime_session.sh"
@@ -155,7 +157,21 @@ uvhs_write_bitstream_preflight:
 		"$(UVHS_RUNTIME_PID_FILE)" >/dev/null 2>&1 || \
 		{ echo "ERROR: stop the UVHS runtime before programming again" >&2; exit 2; }
 
-uvhs_write_bitstream: uvhs_write_bitstream_preflight
+uvhs_write_bitstream_preflight: uvhs_write_bitstream_inputs
+	mkdir -p "$(UVHS_RUNTIME_PREFLIGHT_DIR)"
+	@set -o pipefail; \
+		$(UVHS_TOOL_ENV) bash "$$UV_ROOT/bin/uv_shell" -rt_shell \
+			-workdir "$(UVHS_RUNTIME_PREFLIGHT_DIR)" \
+			-script "$(UVHS_RUNTIME_DIR)/query_fpgas.tcl" \
+			|& tee "$(UVHS_RUNTIME_PREFLIGHT_LOG)"
+	bash "$(UVHS_RUNTIME_DIR)/check_fpga_ownership.sh" \
+		"$(UVHS_KEEP_FPGAS)" "$(UVHS_RUNTIME_PREFLIGHT_LOG)"
+
+UVHS_WRITE_BITSTREAM_PREREQUISITE := $(if \
+	$(filter 1,$(FPGA_WRITE_PREFLIGHT_DONE)),\
+	uvhs_write_bitstream_inputs,uvhs_write_bitstream_preflight)
+
+uvhs_write_bitstream: $(UVHS_WRITE_BITSTREAM_PREREQUISITE)
 	mkdir -p "$(UVHS_RUNTIME_WORK_DIR)"
 	$(UVHS_TOOL_ENV) UVHS_DB_PATH="$(UVHS_RUNTIME_DB)" \
 	UVHS_RUNTIME_WORK_DIR="$(UVHS_RUNTIME_WORK_DIR)" \

@@ -128,17 +128,20 @@ database and calling `initialize` without `download` fails. Start the next
 runtime session with `uvhs_write_bitstream` so it reloads and downloads
 `hw.dat`.
 
-The public `runtime_cleanup` target clears ILA state and then stops the UVHS
+The local `runtime_cleanup` target clears ILA state and then stops the UVHS
 session. Set `FPGA_KEEP_RUNTIME=1` to clear ILA while retaining the session for
-another host run. This keeps backend cleanup policy in env-scripts while the
-caller that launched `fpga-host` decides when cleanup is triggered.
+another host run. The caller that launched `fpga-host` decides when and on which
+runtime machine to invoke this target.
 
 `$FPGA_RUNTIME` does not control the Linux PCIe endpoint on `$FPGA_HOST`.
-Around every runtime download, the public `write_bitstream` target removes
-`10ee:9048` on `$FPGA_HOST`, runs this backend target on `$FPGA_RUNTIME`, and
-then rescans `$FPGA_HOST`. The rescan waits for
+Around every runtime download, the caller runs `pcie_remove` on `$FPGA_HOST`,
+runs `write_bitstream` on `$FPGA_RUNTIME`, and then runs `pcie_rescan` on
+`$FPGA_HOST`. The rescan waits for
 `xdma-chr`, prints the endpoint and device nodes, and verifies access; an
 installed XDMA udev rule avoids a separate `sudo chmod`.
+Before removal, `write_bitstream_preflight` runs `query -fpgas -all` and rejects
+the operation when any FPGA selected by `UVHS_KEEP_FPGAS` is occupied or booked,
+including sessions created outside this checkout.
 
 `uvhs_write_ddr` converts the Vivado address/data-pair format to the DDR DCP
 word width and calls `writemem -rtl`. It leaves the CPU halted until

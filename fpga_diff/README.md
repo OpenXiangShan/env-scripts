@@ -18,23 +18,27 @@ Core RTL to FPGA Steps
   chmod u+x tools/pcie-remove.sh
   chmod u+x tools/pcie-rescan.sh
 
-6. Program the FPGA and refresh XDMA:
+6. Program the FPGA and refresh XDMA. Each env-scripts target runs locally on
+the machine where it is invoked:
 
 ```shell
-make write_bitstream \
-  FPGA_BACKEND=<vivado-or-uvhs> \
-  FPGA_HOST=<user@fpga-host> \
-  FPGA_RUNTIME=<user@fpga-runtime> \
-  FPGA_REMOTE_DIR=/path/to/fpga_diff \
-  FPGA_BIT_HOME=/path/to/bitstream
+make write_bitstream_preflight FPGA_BACKEND=<vivado-or-uvhs> \
+  FPGA_BIT_HOME=/path/to/bitstream    # runtime machine
+make pcie_remove                      # XDMA host
+make write_bitstream FPGA_BACKEND=<vivado-or-uvhs> \
+  FPGA_BIT_HOME=/path/to/bitstream    # runtime machine
+make pcie_rescan                      # XDMA host
 ```
 
-`FPGA_HOST` is required. `FPGA_RUNTIME` defaults to `FPGA_HOST`, so Vivado
-normally needs only one host setting; set both for a split-host UVHS setup.
-The target validates runtime inputs before removing XDMA, programs on
-`FPGA_RUNTIME`, then attempts to rescan `$FPGA_HOST` on success, backend failure,
-or interruption. Rescan also rejects an all-`ff` PCI configuration read even if
-stale device nodes still exist. Set `NO_DIFF=1` to skip the XDMA steps.
+The caller must run preflight before taking XDMA down and must attempt
+`pcie_rescan` after `pcie_remove`, including when programming fails or is
+interrupted. Minjie provides this cross-machine orchestration. Rescan rejects an
+all-`ff` PCI configuration read even if stale device nodes still exist. Skip the
+XDMA targets for a `NO_DIFF=1` image.
+
+UVHS preflight also queries the global FPGA status and requires every FPGA in
+`UVHS_KEEP_FPGAS` to be available. This catches sessions owned outside the
+current checkout before the host endpoint is removed.
 
 7. write DDR and run with diff/no-diff
 ```shell
