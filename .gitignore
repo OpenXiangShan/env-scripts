@@ -18,6 +18,8 @@ __pycache__
 .Xil/
 fpga/.Xil
 test*
+!dingtalk_robot/tests/
+!dingtalk_robot/tests/*.py
 json/
 
 # python third-party libraries are stored temporarily
@@ -25,3 +27,9 @@ psutil/
 
 # python virtual environment
 .venv/
+
+# Local robot credentials and generated reports
+dingtalk_robot/config.json
+dingtalk_robot/token
+dingtalk_robot/oss_stats/reports/*.json
+dingtalk_robot/oss_stats/reports/*.xlsx
