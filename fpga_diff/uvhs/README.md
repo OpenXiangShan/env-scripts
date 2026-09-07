@@ -123,15 +123,27 @@ the hardware, and keeps a detached UVHS session alive. Later reset and memory
 commands must use that same session. Its PID, command files, and log are stored
 under `runtime-work` in the selected build directory. The session has no idle
 timeout; use `uvhs_runtime_stop` after testing to release it cleanly.
+`uvhs_stage_bitstream` copies `hw.dat` into
+`runtime/<derived-project-name>/` inside the bit archive. It prints both the
+source artifact and its relative destination under `env-scripts/fpga_diff` so
+the runtime checkout can locate it without another path variable.
 After the session stops, the released FPGA reports link down; loading the same
 database and calling `initialize` without `download` fails. Start the next
 runtime session with `uvhs_write_bitstream` so it reloads and downloads
 `hw.dat`.
 
-`$UVHS_RUNTIME` does not control the Linux PCIe endpoint on `$UVHS_HOST`. Around
-every runtime download, remove `10ee:9048` on `$UVHS_HOST` before this target
-and rescan it afterward. The playground-level `write_bitstream` target performs
-this cross-host sequence when `UVHS_HOST` is set. The rescan waits for
+`host_env` exports ILA arm/upload and DDR fallback settings for `fpga-host`.
+With `BIND_UART=1` (the default), it also creates and exports a run-scoped UART
+bridge; set `BIND_UART=0` to skip it. Upload clears ILA state before returning.
+Remote hooks source `REMOTE_ENV`, which defaults to
+`source ~/.bash_profile &&` and can be overridden by the caller.
+Internally, `ila_host_env.sh` generates the ILA/DDR hooks and `bind_uart.sh`
+generates the optional UART settings.
+
+`$FPGA_RUNTIME` does not control the Linux PCIe endpoint on `$FPGA_HOST`.
+Around every runtime download, the caller runs `pcie_remove` on `$FPGA_HOST`,
+runs `write_bitstream` on `$FPGA_RUNTIME`, and then runs `pcie_rescan` on
+`$FPGA_HOST`. The rescan waits for
 `xdma-chr`, prints the endpoint and device nodes, and verifies access; an
 installed XDMA udev rule avoids a separate `sudo chmod`.
 
@@ -264,26 +276,27 @@ upload_uhd -depth 1000000 -position 0 -clock clk5_p -out uvhs_ila
 
 The FPGA host clears `HOST_IO_ILA_TRIGGER`, invokes `FPGA_ILA_ARM_CMD`, and then
 releases the CPU. It raises that signal at Good Trap or DiffTest failure, then
-invokes `FPGA_ILA_UPLOAD_CMD` during normal host cleanup. Generate both hooks
-with `ila_host_env` so capture starts before CPU release and upload is followed
-by trigger/capture cleanup:
+invokes `FPGA_ILA_UPLOAD_CMD` during normal host cleanup. Generate the host
+environment immediately before `fpga-host` so capture starts before CPU release
+and upload is followed by trigger/capture cleanup:
 
 ```sh
-eval "$(make -s ila_host_env FPGA_BACKEND=uvhs \
-  CPU=<design> SUFFIX=<tag> UVHS_RUNTIME=$UVHS_RUNTIME)"
+eval "$(make -s host_env FPGA_BACKEND=uvhs \
+  CPU=<design> SUFFIX=<tag> FPGA_RUNTIME=<user@fpga-runtime> \
+  WORKLOAD=/path/to/workload.txt)"
+trap 'eval "${FPGA_HOST_CLEANUP_CMD:-:}"' EXIT
 
 /path/to/fpga-host <host arguments>
 ```
 
 The arm command must use the same runtime work directory as
-`uvhs_write_bitstream`. If `$UVHS_HOST` and `$UVHS_RUNTIME` name the same
+`uvhs_write_bitstream`. If `$FPGA_HOST` and `$FPGA_RUNTIME` name the same
 machine, omit the generated SSH wrapper. The trigger signal must be listed in
 the compile-time `trigger_net` group; adding it to RTL with `mark_debug` alone
 is not sufficient.
 
-The generated upload hook clears the trigger after a normal host-triggered
-capture. Clear it explicitly after an interrupted or independently armed
-capture with:
+The generated upload hook clears the trigger after every attempted upload.
+Clear it explicitly after an interrupted or independently armed capture with:
 
 ```sh
 make uvhs_ila_clear CPU=<design> SUFFIX=<tag>
@@ -314,8 +327,7 @@ The upload window is controlled when starting the capture:
 
 ```sh
 make uvhs_ila_arm CPU=<design> SUFFIX=<tag> TRIGGER=/path/to/trigger.ini \
-  UVHS_ILA_POSITION=0 \
-  UVHS_ILA_GATED_CLOCK=<capture-clock-0>,<capture-clock-1>
+  UVHS_ILA_POSITION=0
 make uvhs_ila_upload CPU=<design> SUFFIX=<tag> UVHS_ILA_DEPTH=1000000
 ```
 
@@ -333,12 +345,13 @@ UHD bandwidth, using 512 bits per capture station and clock cycle. The original
 sign-off frequency is restored after upload, after an arm failure, or by
 `uvhs_ila_clear`.
 
-If the compile-time sampling path is gated, pass the exact clock name shown by
-`query -capture` through `UVHS_ILA_GATED_CLOCK`. Use a comma-separated list
-when stations use multiple post-partition clock replicas. The runtime registers
-each clock at the automatically selected capture frequency before installing
-the trigger. This makes the KMH capture stations advance on actual
-`inter_soc_clk` edges, so clock-gated intervals do not consume station samples.
+`UVHS_ILA_GATED_CLOCK` defaults to `fpga_top_debug.core_def.inter_soc_clk` for
+all CPU profiles. Override it with the exact comma-separated names shown by
+`query -capture` when stations use additional post-partition clock replicas.
+The runtime registers each clock at the automatically selected capture
+frequency before installing the trigger. This makes the KMH capture stations
+advance on actual `inter_soc_clk` edges, so clock-gated intervals do not consume
+station samples.
 The vendor documents gated-clock capture as approximate when the clock stops or
 changes frequency; the trigger must also eventually receive a gated-clock edge.
 Use the free-running parent clock for trigger-only profiles that must remain

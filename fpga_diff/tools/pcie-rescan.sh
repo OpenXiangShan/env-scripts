@@ -17,15 +17,19 @@ REQUIRED_NODES=(
 printf '1\n' | sudo -n tee /sys/bus/pci/rescan >/dev/null
 
 BDF=
+CONFIG_DWORD=
 for ((elapsed = 0; elapsed < XDMA_RESCAN_TIMEOUT; elapsed++)); do
   BDF=$(lspci -D -d "$XDMA_PCI_ID" | awk 'NR == 1 {print $1}')
   if [[ -n $BDF && -e /sys/bus/pci/devices/$BDF/driver ]]; then
     DRIVER=$(basename "$(readlink /sys/bus/pci/devices/$BDF/driver)")
+    CONFIG_DWORD=$(od -An -tx4 -N4 "/sys/bus/pci/devices/$BDF/config" \
+      2>/dev/null | tr -d '[:space:]')
     nodes_ready=1
     for node in "${REQUIRED_NODES[@]}"; do
       [[ -c $node ]] || nodes_ready=0
     done
-    if [[ $DRIVER == xdma-chr && $nodes_ready == 1 ]]; then
+    if [[ $DRIVER == xdma-chr && $nodes_ready == 1 && \
+          -n $CONFIG_DWORD && $CONFIG_DWORD != ffffffff ]]; then
       break
     fi
   fi
@@ -42,6 +46,7 @@ fi
 
 echo "XDMA PCI device:"
 lspci -Dnnk -s "$BDF"
+echo "XDMA PCI config dword 0: $CONFIG_DWORD"
 echo "XDMA device nodes:"
 ls -l /dev/xdma0_*
 

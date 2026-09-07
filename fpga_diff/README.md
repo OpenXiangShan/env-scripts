@@ -18,7 +18,22 @@ Core RTL to FPGA Steps
   chmod u+x tools/pcie-remove.sh
   chmod u+x tools/pcie-rescan.sh
 
-6. make write_bitstream
+6. Program the FPGA. The Vivado backend removes and rescans its local XDMA
+endpoint around programming:
+
+```shell
+make write_bitstream FPGA_BACKEND=<vivado-or-uvhs> \
+  FPGA_BIT_HOME=/path/to/vivado-bitstream
+```
+
+For a split-host backend, env-scripts also exposes local `pcie_remove` and
+`pcie_rescan` targets. The caller runs them on the XDMA host before and after
+`write_bitstream` on the runtime host. Rescan rejects an all-`ff` PCI
+configuration read even if stale device nodes still exist.
+
+`PRJ_NAME` is derived from `FPGA_BACKEND`, `CPU`, and `SUFFIX`. A staged UVHS
+runtime artifact must be copied to the printed relative destination under this
+checkout so the derived project directory contains `hw.dat`.
 
 7. write DDR and run with diff/no-diff
 ```shell
@@ -30,47 +45,33 @@ make write_ddr FPGA_BACKEND=vivado
 make reset_cpu
 
 case 2: With fpga-host (no-diff mode)
-FPGA_DDR_LOAD_CMD="bash -lc ' \
-  source ~/.bash_profile && \
-  make -C /path/to/fpga_diff write_ddr FPGA_BACKEND=vivado \
-    FPGA_BIT_HOME=... \
-    WORKLOAD=<workload>.txt \
-'" \
 ./fpga-host --no-diff
 
 case 3: With fpga-host (diff mode)
-FPGA_DDR_LOAD_CMD="bash -lc ' \
-  source ~/.bash_profile && \
-  make -C /path/to/fpga_diff write_ddr FPGA_BACKEND=vivado \
-    FPGA_BIT_HOME=... \
-    WORKLOAD=<workload>.txt \
-'" \
 ./fpga-host --diff <nemu> -i <workload>.bin
 ```
 
-Remote UART for fpga-host
-=========================
+fpga-host environment
+=====================
 
-When `fpga-host` runs on a machine other than the FPGA USB-UART host, bridge
-the remote UART to a local pseudo-terminal. `$UVHS_RUNTIME` owns UVHS and the
-physical UART while `$UVHS_HOST` owns XDMA and runs `fpga-host`. Install socat
-on both hosts, then start the bridge from `$UVHS_HOST`:
+Run `host_env` on the XDMA host immediately before `fpga-host`:
 
-    make bind_uart REMOTE=<user@fpga-runtime>
+    eval "$(make -s host_env FPGA_BACKEND=uvhs CPU=<design> \
+      FPGA_RUNTIME=<user@fpga-runtime> WORKLOAD=/path/to/workload.txt)"
+    trap 'eval "${FPGA_HOST_CLEANUP_CMD:-:}"' EXIT
+    /path/to/fpga-host ...
 
-The target bridges remote /dev/ttyUSB0 at 115200 baud to
-/tmp/fpga-remote-uart locally, exports FPGA_UART_PORT, and starts an
-interactive shell. Run fpga-host in that shell; leaving it stops the bridge.
-Replace the REMOTE placeholder with an SSH target resolvable from $UVHS_HOST;
-it may be a configured alias or a user@hostname destination.
-Override REMOTE_UART_PORT, REMOTE_UART_BAUD, or FPGA_UART_PORT when needed.
-For a scripted invocation, obtain the same environment assignment with:
+- Exports ILA arm/upload hooks; upload always follows with `ila_clear`.
+- Exports a DDR fallback hook when `WORKLOAD` is set; H2C-enabled hosts ignore it.
+- By default, bridges runtime `/dev/ttyUSB0` to a host PTY and exports
+  `FPGA_UART_PORT`; set `BIND_UART=0` to skip it.
+- Exports `FPGA_HOST_CLEANUP_CMD` for the caller to release the UART bridge.
 
-    eval "$(make -s uart_env)"
+`FPGA_RUNTIME` may be an SSH alias or `user@hostname` resolvable from the FPGA
+host. UART binding requires `socat` on both machines.
 
-The bridge is bidirectional, so interactive UART input is also forwarded. It
-deliberately uses a /tmp pseudo-terminal rather than overwriting local
-/dev/ttyUSB0.
+`runtime_stop` releases the UVHS runtime session and is a no-op for Vivado, so
+callers can invoke the backend-neutral target after `fpga-host` exits.
 
 UVHS Flow
 =========
