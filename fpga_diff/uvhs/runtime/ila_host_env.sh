@@ -35,7 +35,7 @@ make_command() {
   done
 
   if [[ -n $runtime_host ]]; then
-    printf 'ssh %q %q' "$runtime_host" "$remote_env $command"
+    printf 'env LC_ALL=C ssh %q %q' "$runtime_host" "$remote_env $command"
   else
     printf '%s' "$command"
   fi

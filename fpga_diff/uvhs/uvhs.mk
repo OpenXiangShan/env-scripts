@@ -34,7 +34,9 @@ UVHS_ILA_TIMEOUT ?= 60
 UVHS_ILA_DEPTH ?= 1000000
 UVHS_ILA_POSITION ?= 0
 UVHS_ILA_CLOCK ?= clk5_p
-UVHS_ILA_GATED_CLOCK ?= fpga_top_debug.core_def.inter_soc_clk
+# 0804 hw.dat exposes the replicated CPU gated clocks below; override this for
+# a different runtime database.
+UVHS_ILA_GATED_CLOCK ?= b0/f0/part_0/UV_REPLICATED_CLOCKCONE/SOC_CLK_CTRL_UVin_bufgce_1/O,b0/f2/part_2/core_def/SOC_CLK_CTRL_UVin_bufgce_1/O
 UVHS_ILA_TRIGGER ?= $(UVHS_RUNTIME_DIR)/trigger.ini
 # uv_shell writes UHD output below its project-local runtime work directory.
 UVHS_ILA_OUTPUT_DIR := $(UVHS_RUNTIME_WORK_DIR)/UHD/uvhs_ila

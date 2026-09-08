@@ -134,7 +134,8 @@ runtime session with `uvhs_write_bitstream` so it reloads and downloads
 
 `host_env` exports ILA arm/upload and DDR fallback settings for `fpga-host`.
 With `BIND_UART=1` (the default), it also creates and exports a run-scoped UART
-bridge; set `BIND_UART=0` to skip it. Upload clears ILA state before returning.
+bridge and rejects an already occupied physical UART; set `BIND_UART=0` to skip
+it. Upload clears ILA state before returning.
 Remote hooks source `REMOTE_ENV`, which defaults to
 `source ~/.bash_profile &&` and can be overridden by the caller.
 Internally, `ila_host_env.sh` generates the ILA/DDR hooks and `bind_uart.sh`
@@ -284,7 +285,7 @@ and upload is followed by trigger/capture cleanup:
 eval "$(make -s host_env FPGA_BACKEND=uvhs \
   CPU=<design> SUFFIX=<tag> FPGA_RUNTIME=<user@fpga-runtime> \
   WORKLOAD=/path/to/workload.txt)"
-trap 'eval "${FPGA_HOST_CLEANUP_CMD:-:}"' EXIT
+trap "${FPGA_HOST_CLEANUP_CMD:-:}" 0
 
 /path/to/fpga-host <host arguments>
 ```
@@ -345,9 +346,9 @@ UHD bandwidth, using 512 bits per capture station and clock cycle. The original
 sign-off frequency is restored after upload, after an arm failure, or by
 `uvhs_ila_clear`.
 
-`UVHS_ILA_GATED_CLOCK` defaults to `fpga_top_debug.core_def.inter_soc_clk` for
-all CPU profiles. Override it with the exact comma-separated names shown by
-`query -capture` when stations use additional post-partition clock replicas.
+`UVHS_ILA_GATED_CLOCK` defaults to the two replicated gated-clock paths in the
+0804 runtime database. Override it with the exact comma-separated names shown
+by `query -capture` for another bitstream or runtime database.
 The runtime registers each clock at the automatically selected capture
 frequency before installing the trigger. This makes the KMH capture stations
 advance on actual `inter_soc_clk` edges, so clock-gated intervals do not consume

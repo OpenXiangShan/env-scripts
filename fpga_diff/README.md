@@ -58,17 +58,18 @@ Run `host_env` on the XDMA host immediately before `fpga-host`:
 
     eval "$(make -s host_env FPGA_BACKEND=uvhs CPU=<design> \
       FPGA_RUNTIME=<user@fpga-runtime> WORKLOAD=/path/to/workload.txt)"
-    trap 'eval "${FPGA_HOST_CLEANUP_CMD:-:}"' EXIT
+    trap "${FPGA_HOST_CLEANUP_CMD:-:}" 0
     /path/to/fpga-host ...
 
 - Exports ILA arm/upload hooks; upload always follows with `ila_clear`.
 - Exports a DDR fallback hook when `WORKLOAD` is set; H2C-enabled hosts ignore it.
 - By default, bridges runtime `/dev/ttyUSB0` to a host PTY and exports
-  `FPGA_UART_PORT`; set `BIND_UART=0` to skip it.
+  `FPGA_UART_PORT`; it fails if another process is already reading the physical
+  UART. Set `BIND_UART=0` to skip it.
 - Exports `FPGA_HOST_CLEANUP_CMD` for the caller to release the UART bridge.
 
 `FPGA_RUNTIME` may be an SSH alias or `user@hostname` resolvable from the FPGA
-host. UART binding requires `socat` on both machines.
+host. UART binding requires `socat` on both machines and `fuser` on the runtime.
 
 `runtime_stop` releases the UVHS runtime session and is a no-op for Vivado, so
 callers can invoke the backend-neutral target after `fpga-host` exits.

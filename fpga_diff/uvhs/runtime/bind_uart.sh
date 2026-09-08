@@ -17,8 +17,15 @@ command -v socat >/dev/null || {
 
 host_uart="/tmp/fpga-remote-uart-${UID}-$$"
 uart_log="${host_uart}.log"
+remote_uart_check="$remote_env command -v fuser >/dev/null || {"
+remote_uart_check+=" echo 'ERROR: fuser is required on the FPGA runtime' >&2; exit 127; };"
+remote_uart_check+=" if fuser /dev/ttyUSB0 >/dev/null 2>&1; then"
+remote_uart_check+=" echo 'ERROR: /dev/ttyUSB0 already has a reader' >&2;"
+remote_uart_check+=" fuser -v /dev/ttyUSB0 >&2; exit 1; fi"
+env LC_ALL=C ssh -T "$runtime_host" "$remote_uart_check"
+
 remote_uart_command="$remote_env exec socat - /dev/ttyUSB0,rawer,b115200"
-printf -v ssh_command 'ssh -T %q %q' "$runtime_host" "$remote_uart_command"
+printf -v ssh_command 'env LC_ALL=C ssh -T %q %q' "$runtime_host" "$remote_uart_command"
 
 socat -d -d "pty,link=$host_uart,rawer,echo=0,waitslave" \
   "EXEC:$ssh_command,nofork" </dev/null >"$uart_log" 2>&1 &
@@ -33,7 +40,8 @@ trap cleanup_bridge EXIT
 for _ in {1..50}; do
   [[ -L $host_uart ]] && break
   kill -0 "$bridge_pid" 2>/dev/null || {
-    echo "ERROR: failed to start UART bridge; see $uart_log" >&2
+    cat "$uart_log" >&2
+    echo "ERROR: failed to start UART bridge" >&2
     exit 1
   }
   sleep 0.1
