@@ -7,12 +7,13 @@ import json
 from pathlib import Path
 import re
 import statistics
-from typing import Deque
+from typing import Deque, Literal
 
 DEFAULT_LOG_ROOT = Path("/nfs/home/ci-runner/perf-report")
 DEFAULT_PROFILE_PATH = (
     Path(__file__).resolve().parent / "spec06_gcc15_rv64gcb_base_260604.json"
 )
+SortMode = Literal["json", "avgtime", "maxtime"]
 
 NEW_SUCCESS_RE = re.compile(
     r"\[(?P<progress>[^\]]+)\]\s+(?P<checkpoint>\S+)\s+succeeded\s+on\s+\S+\s+in\s+"
@@ -132,14 +133,83 @@ def get_profile_runtimes(profile: dict) -> dict[str, list[float]]:
 
         benchmark_runtimes = []
         for runtime in points.values():
-            if isinstance(runtime, bool):
-                continue
-            try:
-                benchmark_runtimes.append(float(runtime))
-            except (TypeError, ValueError):
-                continue
+            value = parse_runtime(runtime)
+            if value is not None:
+                benchmark_runtimes.append(value)
         runtimes[str(benchmark)] = benchmark_runtimes
     return runtimes
+
+
+def parse_runtime(runtime: object) -> float | None:
+    """Convert a profile value to a runtime, ignoring non-numeric values."""
+    if isinstance(runtime, bool):
+        return None
+    try:
+        return float(runtime)
+    except (TypeError, ValueError):
+        return None
+
+
+def _measured_runtimes(values: list[float]) -> list[float]:
+    return [runtime for runtime in values if runtime > 0]
+
+
+def get_profile_slices(profile: dict) -> list[tuple[str, str, float]]:
+    """Return numeric ``(benchmark, slice, runtime)`` entries in JSON order."""
+    slices: list[tuple[str, str, float]] = []
+    for benchmark, points in profile.items():
+        if not isinstance(points, dict):
+            continue
+        for point, runtime in points.items():
+            value = parse_runtime(runtime)
+            if value is not None:
+                slices.append((str(benchmark), str(point), value))
+    return slices
+
+
+def _ordered_benchmarks(
+    benchmark_runtimes: dict[str, list[float]], sort: SortMode | None
+) -> list[str]:
+    """Order benchmark rows while keeping ties stable and deterministic."""
+    benchmarks = list(benchmark_runtimes)
+    if sort == "json":
+        return benchmarks
+    if sort == "avgtime":
+        return sorted(
+            benchmarks,
+            key=lambda benchmark: _sort_time(
+                benchmark_runtimes[benchmark], "avgtime"
+            ),
+            reverse=True,
+        )
+    if sort == "maxtime":
+        return sorted(
+            benchmarks,
+            key=lambda benchmark: _sort_time(
+                benchmark_runtimes[benchmark], "maxtime"
+            ),
+            reverse=True,
+        )
+    # Keep the historical --show ordering when no sort was requested.
+    return sorted(benchmarks)
+
+
+def _sort_time(values: list[float], sort: SortMode) -> float:
+    measured = _measured_runtimes(values)
+    if not measured:
+        return float("-inf")
+    if sort == "avgtime":
+        return statistics.mean(measured)
+    return max(measured)
+
+
+def _ordered_slices(
+    slices: list[tuple[str, str, float]], sort: SortMode | None
+) -> list[tuple[str, str, float]]:
+    """Order detail rows, preserving JSON order unless a time sort is requested."""
+    if sort in {"avgtime", "maxtime"}:
+        return sorted(slices, key=lambda item: item[2], reverse=True)
+    return slices
 
 
 def runtime_distribution(runtimes: list[float]) -> list[tuple[str, int]]:
@@ -184,7 +254,12 @@ def format_seconds(value: float) -> str:
     return f"{value:.6g}"
 
 
-def show_profile(profile_path: Path) -> None:
+def show_profile(
+    profile_path: Path,
+    detail: bool = False,
+    sort: SortMode | None = None,
+) -> None:
+    """Print profile totals and either benchmark or per-slice statistics."""
     profile = load_profile(profile_path)
     benchmark_runtimes = get_profile_runtimes(profile)
     runtimes = [runtime for values in benchmark_runtimes.values() for runtime in values]
@@ -212,14 +287,24 @@ def show_profile(profile_path: Path) -> None:
         percentage = count / total * 100 if total else 0
         print(f"  {bucket:>18}: {count:4d} ({percentage:5.1f}%)")
 
+    if detail:
+        print("\nSlice statistics (seconds):")
+        print(f"  {'Slice':<40} {'Runtime':>12}")
+        for benchmark, point, runtime in _ordered_slices(
+            get_profile_slices(profile), sort
+        ):
+            slice_name = f"{benchmark}_{point}"
+            print(f"  {slice_name:<40} {format_seconds(runtime):>12}")
+        return
+
     print("\nBenchmark statistics (seconds):")
     print(
         f"  {'Benchmark':<30} {'Points':>6} {'Measured':>9} "
         f"{'Average':>12} {'Minimum':>12} {'Maximum':>12}"
     )
-    for benchmark in sorted(benchmark_runtimes):
+    for benchmark in _ordered_benchmarks(benchmark_runtimes, sort):
         values = benchmark_runtimes[benchmark]
-        measured_values = [runtime for runtime in values if runtime > 0]
+        measured_values = _measured_runtimes(values)
         if measured_values:
             average = format_seconds(statistics.mean(measured_values))
             minimum = format_seconds(min(measured_values))
@@ -245,6 +330,19 @@ def main():
         "--show",
         action="store_true",
         help="Show profile runtime statistics",
+    )
+    parser.add_argument(
+        "--detail",
+        action="store_true",
+        help="Show runtime statistics for each slice (use with --show)",
+    )
+    parser.add_argument(
+        "--sort",
+        choices=("json", "avgtime", "maxtime"),
+        help=(
+            "Sort statistics rows: json keeps profile order, avgtime sorts by "
+            "average runtime, maxtime sorts by maximum runtime"
+        ),
     )
     parser.add_argument(
         "--log-root",
@@ -287,7 +385,7 @@ def main():
             )
 
     if args.show:
-        show_profile(args.profile)
+        show_profile(args.profile, detail=args.detail, sort=args.sort)
 
 
 if __name__ == "__main__":
