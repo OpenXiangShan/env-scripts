@@ -34,14 +34,7 @@ UVHS_ILA_TIMEOUT ?= 60
 UVHS_ILA_DEPTH ?= 1000000
 UVHS_ILA_POSITION ?= 0
 UVHS_ILA_CLOCK ?= clk5_p
-UVHS_ILA_GATED_CLOCK ?=
-# Settings used to construct fpga-host hooks.
-UVHS_RUNTIME ?=
-# This must name the fpga_diff checkout visible on UVHS_RUNTIME; it cannot be
-# inferred when the runtime host has multiple checkouts.
-UVHS_ILA_DIR ?= $(UVHS_ROOT_DIR)
-UVHS_ILA_ENV ?= source ~/.bashrc &&
-UVHS_ILA_TRIGGER ?= $(UVHS_ILA_DIR)/uvhs/runtime/trigger.ini
+UVHS_ILA_TRIGGER ?= $(UVHS_RUNTIME_DIR)/trigger.ini
 # uv_shell writes UHD output below its project-local runtime work directory.
 UVHS_ILA_OUTPUT_DIR := $(UVHS_RUNTIME_WORK_DIR)/UHD/uvhs_ila
 UVHS_ILA_USDB := $(UVHS_ILA_OUTPUT_DIR)/UvData.usdb
@@ -69,7 +62,7 @@ UVHS_FLOW_ENV = \
 	uvhs_halt_soc uvhs_reset_cpu uvhs_write_ddr uvhs_write_flash \
 	uvhs_ila_arm uvhs_ila_upload uvhs_vcd uvhs_ila_clear \
 	uvhs_runtime_status uvhs_runtime_stop uvhs_bitstream \
-	uvhs_stage_bitstream uvhs_ila_host_env
+	uvhs_stage_bitstream uvhs_host_env
 
 # Validate host tools and external inputs before starting a multi-hour build.
 uvhs_preflight: check_project_name
@@ -191,13 +184,25 @@ uvhs_write_flash:
 	$(call uvhs_runtime_command,write_flash "$(abspath $(WORKLOAD))" 0x0 0x8000)
 
 uvhs_stage_bitstream:
-	@echo "UVHS implementation database: $(UVHS_RUNTIME_DB)"
+	@test -n "$(FPGA_BIT_ARTIFACT_DIR)" && test "$(FPGA_BIT_ARTIFACT_DIR)" != "/" || { \
+		echo "ERROR: please set a safe FPGA_BIT_ARTIFACT_DIR=..." >&2; exit 2; \
+	}
+	@test -d "$(UVHS_RUNTIME_DB)"
+	@mkdir -p "$(FPGA_BIT_ARTIFACT_DIR)/runtime"
+	@test ! -e "$(FPGA_BIT_ARTIFACT_DIR)/runtime/$(PRJ_NAME)" || { \
+		echo "ERROR: runtime artifact already exists; clean the bit archive first" >&2; exit 2; \
+	}
+	@mkdir -p "$(FPGA_BIT_ARTIFACT_DIR)/runtime/$(PRJ_NAME)"
+	@cp -a --reflink=auto "$(UVHS_RUNTIME_DB)" \
+		"$(FPGA_BIT_ARTIFACT_DIR)/runtime/$(PRJ_NAME)/"
+	@echo "FPGA_RUNTIME_ARTIFACT=$(FPGA_BIT_ARTIFACT_DIR)/runtime/$(PRJ_NAME)"
+	@echo "FPGA_RUNTIME_DEST=env-scripts/fpga_diff/$(PRJ_NAME)"
 
 uvhs_ila_arm:
 	test -f "$(UVHS_ILA_TRIGGER)"
 	$(call uvhs_runtime_command,ila_arm \
 		"$(abspath $(UVHS_ILA_TRIGGER))" "$(UVHS_ILA_POSITION)" \
-		"$(UVHS_ILA_CLOCK)" "$(UVHS_ILA_GATED_CLOCK)")
+		"$(UVHS_ILA_CLOCK)")
 
 uvhs_ila_upload:
 	$(call uvhs_runtime_command,ila_upload uvhs_ila \
@@ -207,14 +212,21 @@ uvhs_ila_upload:
 	$(MAKE) uvhs_vcd
 	@echo "UVHS_ILA_USDB=$(UVHS_ILA_USDB)"
 
-# Print sourceable host/runtime lifecycle commands. They use the public backend
-# targets so callers do not depend on UVHS implementation names.
-uvhs_ila_host_env:
-	@bash "$(UVHS_RUNTIME_DIR)/ila_host_env.sh" \
-		"$(UVHS_RUNTIME)" "$(UVHS_ILA_DIR)" \
-		"$(UVHS_ILA_ENV)" "$(CPU)" "$(SUFFIX)" "$(PRJ_NAME)" \
-		"$(UVHS_ILA_TRIGGER)" "$(UVHS_ILA_POSITION)" "$(UVHS_ILA_CLOCK)" \
-		"$(UVHS_ILA_GATED_CLOCK)" "$(UVHS_ILA_TIMEOUT)" "$(UVHS_ILA_DEPTH)"
+# Print sourceable ILA/DDR hooks, then optionally establish the UART bridge.
+uvhs_host_env:
+	@FPGA_RUNTIME="$(FPGA_RUNTIME)" \
+		REMOTE_ENV="$(REMOTE_ENV)" CPU="$(CPU)" SUFFIX="$(SUFFIX)" \
+		WORKLOAD="$(WORKLOAD)" \
+		UVHS_ILA_TRIGGER="$(UVHS_ILA_TRIGGER)" \
+		UVHS_ILA_POSITION="$(UVHS_ILA_POSITION)" \
+		UVHS_ILA_CLOCK="$(UVHS_ILA_CLOCK)" \
+		UVHS_ILA_TIMEOUT="$(UVHS_ILA_TIMEOUT)" \
+		UVHS_ILA_DEPTH="$(UVHS_ILA_DEPTH)" \
+		bash "$(UVHS_RUNTIME_DIR)/ila_host_env.sh"
+	@if [ "$(BIND_UART)" = 1 ]; then \
+		FPGA_RUNTIME="$(FPGA_RUNTIME)" REMOTE_ENV="$(REMOTE_ENV)" \
+			bash "$(UVHS_RUNTIME_DIR)/bind_uart.sh"; \
+	fi
 
 uvhs_vcd:
 	test -x "$$UV_ROOT/uvd/uvs/bin/usdb2vcd"
