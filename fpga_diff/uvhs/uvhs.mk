@@ -34,9 +34,6 @@ UVHS_ILA_TIMEOUT ?= 60
 UVHS_ILA_DEPTH ?= 1000000
 UVHS_ILA_POSITION ?= 0
 UVHS_ILA_CLOCK ?= clk5_p
-# 0804 hw.dat exposes the replicated CPU gated clocks below; override this for
-# a different runtime database.
-UVHS_ILA_GATED_CLOCK ?= b0/f0/part_0/UV_REPLICATED_CLOCKCONE/SOC_CLK_CTRL_UVin_bufgce_1/O,b0/f2/part_2/core_def/SOC_CLK_CTRL_UVin_bufgce_1/O
 UVHS_ILA_TRIGGER ?= $(UVHS_RUNTIME_DIR)/trigger.ini
 # uv_shell writes UHD output below its project-local runtime work directory.
 UVHS_ILA_OUTPUT_DIR := $(UVHS_RUNTIME_WORK_DIR)/UHD/uvhs_ila
@@ -205,7 +202,7 @@ uvhs_ila_arm:
 	test -f "$(UVHS_ILA_TRIGGER)"
 	$(call uvhs_runtime_command,ila_arm \
 		"$(abspath $(UVHS_ILA_TRIGGER))" "$(UVHS_ILA_POSITION)" \
-		"$(UVHS_ILA_CLOCK)" "$(UVHS_ILA_GATED_CLOCK)")
+		"$(UVHS_ILA_CLOCK)")
 
 uvhs_ila_upload:
 	$(call uvhs_runtime_command,ila_upload uvhs_ila \
@@ -223,7 +220,6 @@ uvhs_host_env:
 		UVHS_ILA_TRIGGER="$(UVHS_ILA_TRIGGER)" \
 		UVHS_ILA_POSITION="$(UVHS_ILA_POSITION)" \
 		UVHS_ILA_CLOCK="$(UVHS_ILA_CLOCK)" \
-		UVHS_ILA_GATED_CLOCK="$(UVHS_ILA_GATED_CLOCK)" \
 		UVHS_ILA_TIMEOUT="$(UVHS_ILA_TIMEOUT)" \
 		UVHS_ILA_DEPTH="$(UVHS_ILA_DEPTH)" \
 		bash "$(UVHS_RUNTIME_DIR)/ila_host_env.sh"

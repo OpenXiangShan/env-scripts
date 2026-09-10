@@ -11,7 +11,6 @@ workload=${WORKLOAD-}
 trigger=${UVHS_ILA_TRIGGER-}
 position=${UVHS_ILA_POSITION-}
 clock=${UVHS_ILA_CLOCK-}
-gated_clock=${UVHS_ILA_GATED_CLOCK-}
 timeout=${UVHS_ILA_TIMEOUT-}
 depth=${UVHS_ILA_DEPTH-}
 
@@ -44,8 +43,7 @@ make_command() {
 arm_command=$(make_command ila_arm \
   "CPU=$cpu" "SUFFIX=$suffix" \
   "UVHS_ILA_TRIGGER=$trigger" \
-  "UVHS_ILA_POSITION=$position" "UVHS_ILA_CLOCK=$clock" \
-  "UVHS_ILA_GATED_CLOCK=$gated_clock")
+  "UVHS_ILA_POSITION=$position" "UVHS_ILA_CLOCK=$clock")
 upload_command=$(make_command ila_upload \
   "CPU=$cpu" "SUFFIX=$suffix" \
   "UVHS_ILA_TIMEOUT=$timeout" \

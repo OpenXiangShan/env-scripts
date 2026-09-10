@@ -266,7 +266,8 @@ trigger -ini_check /path/to/trigger.ini
 query -capture
 config -clock -name clk5_p -frequency <bandwidth-limited-frequency>
 config -clock -commit
-trigger -set -gatedclk fpga_top_debug.core_def.inter_soc_clk \
+# ila_arm obtains enabled non-global capture clocks from query -capture.
+trigger -set -gatedclk <clock-from-query-capture> \
   -frequency <bandwidth-limited-frequency> -polarity H
 trigger -set -condition /path/to/trigger.ini -position 0
 capture -enable
@@ -346,13 +347,14 @@ UHD bandwidth, using 512 bits per capture station and clock cycle. The original
 sign-off frequency is restored after upload, after an arm failure, or by
 `uvhs_ila_clear`.
 
-`UVHS_ILA_GATED_CLOCK` defaults to the two replicated gated-clock paths in the
-0804 runtime database. Override it with the exact comma-separated names shown
-by `query -capture` for another bitstream or runtime database.
-The runtime registers each clock at the automatically selected capture
-frequency before installing the trigger. This makes the KMH capture stations
-advance on actual `inter_soc_clk` edges, so clock-gated intervals do not consume
-station samples.
+Before installing the trigger, `ila_arm` queries the enabled UHD capture
+stations. It also queries the global clock names and registers every capture
+station clock that is not a global clock as a gated clock. This removes
+runtime-database-specific clock paths from the Makefile and adapts to replicated
+or otherwise renamed gated clocks in a new bitstream. The runtime registers
+each discovered clock at the automatically selected capture frequency. This
+makes the KMH capture stations advance on actual gated-clock edges, so
+clock-gated intervals do not consume station samples.
 The vendor documents gated-clock capture as approximate when the clock stops or
 changes frequency; the trigger must also eventually receive a gated-clock edge.
 Use the free-running parent clock for trigger-only profiles that must remain
