@@ -12,10 +12,18 @@ NO_DIFF ?= 0
 XDMA_LINK_WIDTH ?= X4
 VIVADO_JOBS ?=
 export XDMA_LINK_WIDTH VIVADO_JOBS NO_DIFF
+DIFFTEST_HOSTIF ?= XDMA
+ifeq ($(filter XDMA GBUS,$(DIFFTEST_HOSTIF)),)
+$(error DIFFTEST_HOSTIF must be XDMA or GBUS, got $(DIFFTEST_HOSTIF))
+endif
+export DIFFTEST_HOSTIF
 REMOTE ?=
 REMOTE_UART_PORT ?= /dev/ttyUSB0
 REMOTE_UART_BAUD ?= 115200
 FPGA_UART_PORT ?= /tmp/fpga-remote-uart
+FPGA_RUNTIME ?=
+REMOTE_ENV ?= source ~/.bash_profile &&
+BIND_UART ?= 1
 # Supported CPU parameters:
 #   kmh
 #   nutshell
@@ -31,7 +39,7 @@ PRJ_NAME ?= fpga_$(FPGA_BACKEND)_$(CPU)$(if $(strip $(SUFFIX)),-$(strip $(SUFFIX
 export PRJ_NAME
 FPGA_DISPATCH_TARGETS := project bitstream stage_bitstream write_bitstream halt_soc \
 	write_ddr write_flash reset_cpu runtime_status runtime_stop \
-	ila_arm ila_upload ila_clear ila_host_env
+	ila_arm ila_upload ila_clear ila_host_env host_env
 
 .PHONY: $(FPGA_DISPATCH_TARGETS) check_project_name bind_uart uart_env
 

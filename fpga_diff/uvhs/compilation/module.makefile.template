@@ -1,0 +1,38 @@
+WORKER?=UNKNOWN
+MOD_NAME?=$(notdir $(CURDIR))
+LOG_DIR=../../../Log/${MOD_NAME}
+LOG_FILE=${LOG_DIR}/${MOD_NAME}_uvsyn.log
+EDIF_DUMPED_FLAG=.EDIF_DUMPED
+SYN_PASS_FLAG=.SYNTH_PASS
+# UVHS launches many module workers concurrently and can occasionally fail to
+# start a mod_syn job while the shared VFS database is being read.  Retry the
+# same immutable VFS slice a few times before reporting a real module failure.
+MAX_RETRIES=3
+VFS_DISK_FILE?=
+VFS_HEAD?=
+VFS_TAIL?=
+
+all:
+	@sys_err_times=0; \\
+	until bash -c '\
+		set -e ;\
+		echo "This module is synthesized by worker ${WORKER}" ;\
+		mkdir -p ${EDIF_DIR} ${LOG_DIR} ;\
+		if [ -f ${LOG_FILE} ]; then \
+			mv -v ${LOG_FILE} ${LOG_FILE}_$$(stat -c %y ${LOG_FILE} | cut -d"." -f1 | tr " :" "_") ;\
+		fi ;\
+		rm -rfv ${SYN_PASS_FLAG} ${EDIF_DUMPED_FLAG} uvsyn.dat ;\
+		retry_cnt=0 ;\
+		while [ $${retry_cnt} -lt ${MAX_RETRIES} ]; do\
+			let retry_cnt+=1 ;\
+			UVSHL_ABNORMAL_EXIT="false" ;\
+			UVHS_RUNTIME_LIB_DIR="$${UVHS_RUNTIME_LIB_DIR:-}" UVSHELL_EXEC_NAME="$${UVSHELL_EXEC_NAME:-}" bash @UVHS_UV_SHELL@ -type mod_syn -batch -evaluate "set vfs_disk_file \\\"$${VFS_DISK_FILE}\\\";set vfs_head \\\"$${VFS_HEAD}\\\";set vfs_tail \\\"$${VFS_TAIL}\\\"" -script uvsyn_synth.tcl >> ${LOG_FILE} 2>&1 || UVSHL_ABNORMAL_EXIT="true" ;\
+			if [ "$${UVSHL_ABNORMAL_EXIT}" == "false" ] && [ -f ${EDIF_DUMPED_FLAG} ]; then \
+				mv ${EDIF_DUMPED_FLAG} ${SYN_PASS_FLAG} ;\
+				break;\
+			fi ;\
+		done ;\
+	'; do \\
+		if [ $${sys_err_times} -lt 1000 ]; then exit 1 ; fi ;\
+		let sys_err_times+=1 ; sleep 1; \
+	done

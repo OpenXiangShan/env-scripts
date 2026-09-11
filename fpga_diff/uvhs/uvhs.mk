@@ -4,8 +4,37 @@ UVHS_RUNTIME_DIR := $(UVHS_ROOT_DIR)/uvhs/runtime
 
 UVHS_TEMPLATE_DIR ?=
 UVHS_UVW_AXI4_TO_DDR4_SRC ?=
-# KMH is the XiangShan target; keep the larger CPU profile enabled by default.
-UVHS_PROBE_TCL ?= $(if $(filter kmh xiangshan,$(CPU)),$(UVHS_COMPILATION_DIR)/probe_kmh.tcl,$(UVHS_COMPILATION_DIR)/probe_ila.tcl)
+DIFFTEST_HOSTIF ?= XDMA
+UVHS_GBUS_C2H_DMA ?= 0
+ifneq ($(filter 0 1,$(UVHS_GBUS_C2H_DMA)),$(UVHS_GBUS_C2H_DMA))
+$(error UVHS_GBUS_C2H_DMA must be 0 or 1)
+endif
+ifeq ($(UVHS_GBUS_C2H_DMA),1)
+ifneq ($(DIFFTEST_HOSTIF),GBUS)
+$(error UVHS_GBUS_C2H_DMA=1 requires DIFFTEST_HOSTIF=GBUS)
+endif
+endif
+ifeq ($(filter XDMA GBUS,$(DIFFTEST_HOSTIF)),)
+$(error DIFFTEST_HOSTIF must be XDMA or GBUS, got $(DIFFTEST_HOSTIF))
+endif
+# GBus lives on F2 while the user DDR controller lives on F0 in the current
+# UVHS topology.  Packetize the merged AXI traffic before partitioning so the
+# inter-FPGA link carries compact request/response flits instead of the full
+# AXI channel bundle.  Keep the legacy XDMA topology unchanged by default.
+UVHS_FUNCTIONAL_DDR_REMOTE_LINK ?= $(if $(filter GBUS,$(DIFFTEST_HOSTIF)),1,0)
+ifeq ($(filter 0 1,$(UVHS_FUNCTIONAL_DDR_REMOTE_LINK)),)
+$(error UVHS_FUNCTIONAL_DDR_REMOTE_LINK must be 0 or 1, got $(UVHS_FUNCTIONAL_DDR_REMOTE_LINK))
+endif
+ifneq ($(filter 1,$(UVHS_FUNCTIONAL_DDR_REMOTE_LINK)),)
+ifneq ($(DIFFTEST_HOSTIF),GBUS)
+$(error UVHS_FUNCTIONAL_DDR_REMOTE_LINK=1 requires DIFFTEST_HOSTIF=GBUS)
+endif
+endif
+# The detailed KMH profile is tied to a particular generated XiangShan
+# hierarchy.  GBus bring-up only requires the stable host trigger, so avoid
+# making ordinary GBus builds fail when internal CPU signal names change.
+# XDMA keeps its historical default; either flow may still opt in explicitly.
+UVHS_PROBE_TCL ?= $(if $(and $(filter kmh xiangshan,$(CPU)),$(filter XDMA,$(DIFFTEST_HOSTIF))),$(UVHS_COMPILATION_DIR)/probe_kmh.tcl,$(UVHS_COMPILATION_DIR)/probe_ila.tcl)
 UVHS_PROBE_PATH := $(if $(strip $(UVHS_PROBE_TCL)),$(abspath $(UVHS_PROBE_TCL)),)
 UVHS_DDR_AXI_WIDTH := $(if $(filter nutshell,$(CPU)),64,256)
 UVHS_WORK_DIR := $(ENV_SCRIPTS_HOME)/$(PRJ_NAME)
@@ -33,7 +62,7 @@ UVHS_TMCLK_CPU_RATIO ?= 50
 UVHS_ILA_TIMEOUT ?= 60
 UVHS_ILA_DEPTH ?= 1000000
 UVHS_ILA_POSITION ?= 0
-UVHS_ILA_CLOCK ?= clk5_p
+UVHS_ILA_CLOCK ?= clk6_p
 UVHS_ILA_GATED_CLOCK ?=
 # Settings used to construct fpga-host hooks.
 UVHS_RUNTIME ?=
@@ -58,6 +87,9 @@ UVHS_TOOL_ENV = \
 UVHS_FLOW_ENV = \
 	$(UVHS_TOOL_ENV) \
 	UVHS_FLOW=1 \
+	DIFFTEST_HOSTIF="$(DIFFTEST_HOSTIF)" \
+	UVHS_FUNCTIONAL_DDR_REMOTE_LINK="$(UVHS_FUNCTIONAL_DDR_REMOTE_LINK)" \
+	UVHS_GBUS_C2H_DMA="$(UVHS_GBUS_C2H_DMA)" \
 	UVHS_PROBE_TCL="$(UVHS_PROBE_PATH)" \
 	XDMA_LINK_WIDTH="$(XDMA_LINK_WIDTH)" \
 	UVHS_KEEP_FPGAS="$(UVHS_KEEP_FPGAS)" \
@@ -69,7 +101,7 @@ UVHS_FLOW_ENV = \
 	uvhs_halt_soc uvhs_reset_cpu uvhs_write_ddr uvhs_write_flash \
 	uvhs_ila_arm uvhs_ila_upload uvhs_vcd uvhs_ila_clear \
 	uvhs_runtime_status uvhs_runtime_stop uvhs_bitstream \
-	uvhs_stage_bitstream uvhs_ila_host_env
+	uvhs_stage_bitstream uvhs_ila_host_env uvhs_host_env
 
 # Validate host tools and external inputs before starting a multi-hour build.
 uvhs_preflight: check_project_name
@@ -122,6 +154,9 @@ uvhs_prepare: uvhs_preflight
 		"$(UVHS_UVW_AXI4_TO_DDR4_SRC)" "$(UVHS_DDR_AXI_WIDTH)"
 
 uvhs_project: uvhs_prepare
+	DIFFTEST_HOSTIF="$(DIFFTEST_HOSTIF)" \
+	UVHS_FUNCTIONAL_DDR_REMOTE_LINK="$(UVHS_FUNCTIONAL_DDR_REMOTE_LINK)" \
+	UVHS_GBUS_C2H_DMA="$(UVHS_GBUS_C2H_DMA)" \
 	bash "$(UVHS_ROOT_DIR)/tools/update_core_flist.sh" uvhs \
 		"$(CORE_DIR)" "$(UVHS_WORK_DIR)" "$(CPU)" "$(UVHS_FILELIST)" \
 		-- $(RTL_INCLUDE)
