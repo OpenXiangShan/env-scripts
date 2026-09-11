@@ -67,7 +67,17 @@ proc uvhs::start_frontend_shell_compat {} {
         error "UVHS shell compatibility helper not found: $helper"
     }
     set module_makefile [file join [pwd] hw.dat Synthesis Uvsyn Script module.makefile]
-    exec bash $helper wait-module $module_makefile &
+    # Do not let asynchronous compatibility helpers inherit the frontend
+    # command's stdout pipe.  If they do, the caller's `tee` remains open
+    # after uv_shell exits and `make uvhs_frontend` waits forever even though
+    # UVHS_FRONTEND_SUCCESS was already emitted.
+    set module_log [file join [pwd] uvhs_module_shell_compat.log]
+    exec bash $helper wait-module $module_makefile > $module_log < /dev/null 2>@1 &
+    # Vivado IP jobs are generated after elaboration in a separate tree and
+    # are launched by make under /bin/sh. Patch those makefiles as soon as
+    # they appear as well.
+    set vivado_log [file join [pwd] uvhs_vivado_shell_compat.log]
+    exec bash $helper wait-vivado [file join [pwd] hw.dat Synthesis Vivado Rundir] > $vivado_log < /dev/null 2>@1 &
     puts "INFO: started UVHS frontend shell compatibility helper"
 }
 
@@ -76,6 +86,12 @@ set_option syn.computeFeCheckSum true
 
 set_parallel_option -max_threads 4 -max_processes 16 -label frontend
 set_parallel_option -max_threads 16 -label runtime
+# UVHS launches Vivado module workers through /bin/sh.  The generated worker
+# makefiles use bash-only redirection (>&); point the worker shell at bash so
+# vendor IP synthesis jobs produce their DCP/liberty outputs.
+set ::env(SHELL) /bin/bash
+set ::env(MAKE) /usr/bin/make
+set ::env(BASH_ENV) ""
 
 set_option global.log.label MEMORY
 set_option syn.checkMultiDriver false
@@ -112,14 +128,26 @@ foreach reset_port {rstn_sw6 rstn_sw5 rstn_sw4} {
 uvhs::import_blackbox blk_mem_gen_0 ./rtl/soc/blk_mem_gen_0.dcp
 uvhs::import_blackbox AXI_bridge ./rtl/soc/AXI_bridge.dcp
 uvhs::import_blackbox data_bridge ./rtl/soc/data_bridge.dcp
-uvhs::import_blackbox xdma_ep ./rtl/device/pcie/xdma_ep.dcp
+# GENERALBD must be registered as a UVHS general-bus endpoint.  Use the
+# vendor's set_blackbox -generalbd form (set_ip is rejected as an unsupported
+# user blackbox by 2506p4), while retaining the clock-enable metadata.
+uvhs::import_blackbox generalBD ./rtl/soc/generalBD.dcp \
+    -clock_enable_pairs {i_clk i_clk_en 1} -generalbd
+if {[string toupper [uvhs::env_or_default DIFFTEST_HOSTIF XDMA]] eq "XDMA"} {
+    uvhs::import_blackbox xdma_ep ./rtl/device/pcie/xdma_ep.dcp
+} else {
+    puts "INFO: skip xdma_ep blackbox import for DiffTest host interface [uvhs::env_or_default DIFFTEST_HOSTIF XDMA]"
+}
 uvhs::import_blackbox uvw_general_bus \
     ./rtl/soc/uvw_general_bus/uvw_general_bus.dcp \
     -clock_enable_pairs {dut_axi_aclk dut_axi_aclk_en 1}
-uvhs::import_ip uvw_axi4_to_ddr4 ./rtl/soc/uvw_axi4_to_ddr4.dcp \
-    ./rtl/soc/uvw_axi4_to_ddr4_Stub.v \
+uvhs::import_blackbox uvw_axi4_to_ddr4 ./rtl/soc/uvw_axi4_to_ddr4.dcp \
     -clock_enable_pairs {ddr4ip_dut_axi_aclk ddr4ip_dut_axi_aclk_en 1} \
     -script_file {prePlace ./script/uvw_axi4_to_ddr4_pblock.tcl}
+# set_blackbox registers the protected checkpoint but does not add the Verilog
+# declaration to the elaboration source set.  Read the matching stub explicitly
+# so the RTL instance resolves without using the unsupported set_ip command.
+read_verilog ./rtl/soc/uvw_axi4_to_ddr4_Stub.v
 
 set filelist ./rtl/filelist.f
 if {![file exists $filelist]} {

@@ -16,6 +16,9 @@ proc fpga_diff_top_port {name} {
 create_clock -name TMCLK -period 1000 [get_ports [fpga_diff_top_port clk8_p]]
 create_clock -name ddr_ref_clk -period 12.5 [get_ports [fpga_diff_top_port clk7_p]]
 create_clock -name CPU_CLK_IN -period 40 [get_ports [fpga_diff_top_port clk5_p]]
+# clk6_p is the always-running UVHS host clock (UART shares this source).
+# Keep the established UART_CLK_IN name for compatibility; GBus uses this
+# explicit clock object and never relies on infer_clock for its host path.
 create_clock -name UART_CLK_IN -period 20 [get_ports [fpga_diff_top_port clk6_p]]
 create_clock -name jtag_vclk -period 83.333 [get_ports [fpga_diff_top_port JTAG_TCK]]
 create_clock -name pcie_ep_refclk -period 10 [get_ports [fpga_diff_top_port pcie_ep_gt_ref_clk_p]]
