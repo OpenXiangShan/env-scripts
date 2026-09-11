@@ -4,6 +4,52 @@ This directory contains the UVHS build and runtime flow for FPGA-Diff. UVHS
 commands use the `uvhs_*` prefix and do not replace the existing Vivado, PCIe,
 or JTAG commands.
 
+## GBus SRAM C2H
+
+`DIFFTEST_HOSTIF=GBUS` retains the shared `Difftest2AXIs` sender and buffers
+DiffTest output only in on-chip SRAM. Workload H2C uses GBus DMA writes to DDR;
+`UVHS_FUNCTIONAL_DDR_REMOTE_LINK=1` retains the CPU/workload DDR connection.
+The obsolete C2H DDR-ring writer and DDR trace sink are not included.
+
+`UVHS_GBUS_C2H_DMA=0` (default) selects GBS1, a register-drained SRAM window.
+`UVHS_GBUS_C2H_DMA=1` selects GBD1: a 64 KiB FIFO feeds an immutable 1 KiB bank,
+read through a local AXI3 aperture at `0x10000000`. The read router precedes the
+DDR adapter; workload writes retain their original route. Backpressure reaches
+the sender and CPU while the host transport clock continues to run.
+
+GeneralBD local offsets are below; the host adds its config base (`0x1000`).
+
+| Local offset | GBD1 register |
+| --- | --- |
+| `0x1200` | present[31], frame error[30], protocol error[29], staged words[16:8], filling[7], FIFO data[6], frozen[5], AXI active[4] |
+| `0x1204` | control: FILL=1, ACK=2, clear protocol error=4 |
+| `0x1208` | ID `0x47424431` (GBS1 reports `0x47425331`) |
+| `0x120c` | publication sequence |
+| `0x1210`, `0x1214` | DMA base and capacity (1024 bytes) |
+| `0x1218`, `0x121c`, `0x1220` | last AR address, attributes, accepted AR count |
+| `0x2000..0x23fc` | SRAM debug data window |
+
+GBD1 accepts aligned FIXED/INCR reads with ARSIZE 0..5 and ARLEN 0..15.
+Requests beyond the published bytes return SLVERR. AXI RLAST terminates a burst;
+AXIS TLAST separately validates each 768-byte DiffTest range. The host validates
+and captures the bank before ACK, preserving residual bytes across windows.
+GBS1 control bit 1 discards queued data; it is not the GBD1 ACK operation.
+The matching fpga-host implementation is in OpenXiangShan/difftest#954.
+
+Local validation (no board):
+
+```sh
+python3 tests/run_uvhs_generalbd_decode.py --functional-only
+python3 tests/run_uvhs_generalbd_decode.py --dma
+bash tests/run_uvhs_gbus_c2h_dma_verilator.sh
+bash tests/run_uvhs_gbus_axi_read_router_verilator.sh
+python3 tools/gbus_supervisor_tests.py
+```
+
+The legacy functional test skips its documented reserved-address hole check:
+GBS1 currently also acknowledges local `0x2400..0x2ffc` with zero data.
+Simulation success does not establish hardware GOOD TRAP or final timing closure.
+
 ## RTL Input
 
 Generate an FPGA release before entering `env-scripts`. `CORE_DIR` is the
@@ -20,6 +66,13 @@ conversion. The UVHS flow only consumes that result.
 `.list` files. Relative entries are resolved from the file list that contains
 them. `uvhs_project` combines those inputs with the release RTL and FPGA-Diff
 wrappers in `<work>/rtl/filelist.f`, which the UVHS frontend reads directly.
+
+## GBus host paths
+
+The GBus C2H path uses the on-chip SRAM register window identified as GBS1.
+The optional GBD1 path provides the DMA endpoint and router checks used by the
+GBus host flow. GBus H2C writes to DDR remain enabled for workload and CPU
+functionality; no DDR C2H ring fallback is part of this flow.
 
 ## Build
 
@@ -86,7 +139,8 @@ per-bit TDM skew on the time value. The remaining logic is partitioned
 automatically. XiangShan uses these path constraints together with high
 partition effort and the `uv_placer_balance_slrs` PnR strategy.
 
-UVHS drives the AXI UART16550 from `clk6_p` at a fixed 50 MHz. The CPU/SoC
+UVHS drives the AXI UART16550 and the GBus/DiffTest host interface from
+`clk6_p` at a fixed 50 MHz. The CPU/SoC
 `clk5_p` frequency comes from the system sign-off result committed in the
 selected runtime database, so each partition and PnR result runs at its own
 reported frequency. The fixed UART clock matches the 50 MHz clock declared by
@@ -167,17 +221,19 @@ from the server's global Tcl scope.
 ## UVHS ILA Waveform Capture
 
 The probe scripts describe compile-time instrumentation, not a runtime dump.
-For XiangShan/KMH builds, the frontend sources `compilation/probe_kmh.tcl` by
-default. CPU and L2 signals are sampled on
+For XiangShan/KMH XDMA builds, the frontend sources
+`compilation/probe_kmh.tcl` by default. It is the larger profile derived from
+the 2026-08-04 and 2026-08-07 debug builds. CPU and L2 signals are sampled on
 `core_def.inter_soc_clk`, the gated clock connected to `SimTop.clock`. DDR and
-host-trigger signals remain on their free-running `core_def.sys_clk_i` domain,
-so the host trigger remains observable after the CPU clock stops. Its generated
+host-trigger signals remain on their free-running host-clock domain, so the host
+trigger remains observable after the CPU clock stops. Its generated
 hierarchy must be checked before it is reused with a different XiangShan RTL
 revision. The braces preserve hierarchy indexes such as `[0]`.
-Other CPU builds continue to use the minimal `compilation/probe_ila.tcl`
-profile by default.
+GBus builds and other CPU builds use the minimal
+`compilation/probe_ila.tcl` profile by default. This keeps the stable host
+trigger without coupling a build to revision-specific CPU internals.
 Set `UVHS_PROBE_TCL` to select a profile or an external file; an override must
-retain the XDMA host trigger if host-controlled capture is required. Set it to
+retain the host trigger if host-controlled capture is required. Set it to
 an empty value for a build with no UHD instrumentation. The scripts call
 `probe_net` for sampled signals and `trigger_net` for signals that may
 participate in a trigger condition.

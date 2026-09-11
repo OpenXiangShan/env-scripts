@@ -613,7 +613,17 @@ proc uvhs_initialize_runtime {} {
         set db_path [file normalize [file join [pwd] .. hw.dat]]
     }
     puts "INFO: loading runtime database $db_path"
-    load_db -db $db_path
+    # A multi-FPGA runtime DB may contain a timing-failed auxiliary partition
+    # while the selected board partition has a usable bitstream.  Keep the
+    # normal sign-off gate by default; allow an explicit, logged override for
+    # board bring-up only.  This does not alter any timing report or bitstream.
+    if {[info exists ::env(UVHS_IGNORE_TIMING_SIGNOFF_ERROR)] &&
+        [string is true -strict $::env(UVHS_IGNORE_TIMING_SIGNOFF_ERROR)]} {
+        puts "WARN: loading runtime DB with -ignore_timing_signoff_error (explicit bring-up override)"
+        load_db -db $db_path -ignore_timing_signoff_error
+    } else {
+        load_db -db $db_path
+    }
 
     config -connector
     query -connector -type fmc

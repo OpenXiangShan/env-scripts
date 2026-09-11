@@ -23,6 +23,40 @@ if {[llength $fpga_diff_refclk_ports]} {
     puts "INFO: kept XDMA GT refclk pads unbuffered: $fpga_diff_refclk_ports"
 }
 
+# In GBUS mode the XDMA endpoint is replaced by a quiescent adapter, but the
+# shared top-level still exposes the PCIe differential outputs so the same
+# wrapper can be used for XDMA builds.  UVHS still carries the assigned F2
+# package pins into the partition; because no GT output primitive drives them
+# in GBUS mode Vivado otherwise leaves their I/O standard at DEFAULT and the
+# per-FPGA NSTD-1/UCIO-1 DRC rejects the bitstream.  Keep the physical pins
+# explicitly differential even though the adapter drives them low.
+set fpga_diff_hostif XDMA
+if {[info exists ::env(DIFFTEST_HOSTIF)] && $::env(DIFFTEST_HOSTIF) ne ""} {
+    set fpga_diff_hostif $::env(DIFFTEST_HOSTIF)
+}
+if {[string toupper $fpga_diff_hostif] eq "GBUS"} {
+    set fpga_diff_gbus_pcie_tx_ports {}
+    foreach pattern {pci_ep_txp_* pci_ep_txn_*} {
+        foreach port [get_ports -quiet $pattern] {
+            lappend fpga_diff_gbus_pcie_tx_ports $port
+        }
+    }
+    if {[llength $fpga_diff_gbus_pcie_tx_ports]} {
+        # The quiescent GBUS adapter exposes each TX lane as an independent
+        # single-ended OBUF (the shared wrapper keeps the XDMA differential
+        # port names for compatibility).  LVDS is therefore illegal for these
+        # ports and triggers IOSTDTYPE-1; use the board's 1.8-V single-ended
+        # standard while retaining the connector locations from assign_pin.
+        set_property IOSTANDARD LVCMOS18 $fpga_diff_gbus_pcie_tx_ports
+        puts "INFO: GBUS PCIe placeholder outputs use LVCMOS18 I/O standard: $fpga_diff_gbus_pcie_tx_ports"
+    }
+    # Physical connector assignment remains owned by assign_pin.tcl.  Do not
+    # apply PACKAGE_PIN/LOC here: the connector indices resolve to GT sites,
+    # while GBUS placeholders are ordinary fabric OBUF ports and Vivado rejects
+    # a GTYE4_CHANNEL LOC on that shape.
+    puts "INFO: GBUS PCIe placeholder locations left to UVHS connector assignment"
+}
+
 proc fpga_diff_mark_async_regs {label patterns} {
     set cells {}
     foreach pattern $patterns {
@@ -107,7 +141,7 @@ foreach {fpga_diff_clock fpga_diff_master fpga_diff_gate} {
 }
 
 set fpga_diff_async_groups [list]
-foreach fpga_diff_clock {TMCLK ddr_ref_clk CPU_CLK_IN jtag_vclk pcie_ep_refclk} {
+foreach fpga_diff_clock {TMCLK ddr_ref_clk CPU_CLK_IN UART_CLK_IN jtag_vclk pcie_ep_refclk} {
     lappend fpga_diff_async_groups -group \
         [get_clocks -include_generated_clocks $fpga_diff_clock]
 }
@@ -124,7 +158,7 @@ set fpga_diff_ddr_reset_regs [get_cells -hier -quiet -filter {
 if {[llength $fpga_diff_ddr_reset_regs]} {
     set fpga_diff_tdm_tx_sync_candidates [get_pins -hier -quiet -filter {
         REF_PIN_NAME == D &&
-        NAME =~ */uvtdm_tx_ctrl_inst/sync_flop_0_reg*/D
+        NAME =~ */uvtdm_parity_g/sync_flop_0_reg*/D
     }]
     set fpga_diff_tdm_tx_sync_d_pins {}
     if {[llength $fpga_diff_tdm_tx_sync_candidates]} {
@@ -147,4 +181,25 @@ if {[llength $fpga_diff_ddr_reset_regs]} {
     }
 } else {
     puts "INFO: no DDR reset-to-TDM CDC sources on this FPGA"
+}
+
+# UVHS places the DDR MIG reset status into a TDM transmit synchronizer when
+# the DDR and TDM banks are split across FPGAs.  This is an IP-owned reset CDC
+# (the destination is the UVHS-provided synchronizer, not DUT logic); the
+# UVHS DDR timing XDC classifies it as asynchronous.  Apply the same narrow
+# exception after Vivado has linked the partition so timing signoff does not
+# treat the unrelated MMCM and GT TX clocks as a synchronous data path.
+set fpga_diff_ddr_tdm_reset_src [get_pins -hierarchical -quiet -filter {
+    NAME =~ */core_def/U_UVHS_UVW_AXI4_TO_DDR4/*/proc_sys_reset_0/U0/ACTIVE_LOW_PR_OUT_DFF*/C
+}]
+set fpga_diff_ddr_tdm_reset_dst [get_pins -hierarchical -quiet -filter {
+    REF_PIN_NAME == D && NAME =~ */uvtdm_parity_g/sync_flop_0_reg*/D
+}]
+if {[llength $fpga_diff_ddr_tdm_reset_src] &&
+    [llength $fpga_diff_ddr_tdm_reset_dst]} {
+    set_false_path -from $fpga_diff_ddr_tdm_reset_src \
+        -to $fpga_diff_ddr_tdm_reset_dst
+    puts "INFO: constrained UVHS DDR-reset to TDM synchronizer CDC: sources=[llength $fpga_diff_ddr_tdm_reset_src] destinations=[llength $fpga_diff_ddr_tdm_reset_dst]"
+} else {
+    puts "INFO: no linked UVHS DDR-reset to TDM synchronizer CDC endpoints"
 }
