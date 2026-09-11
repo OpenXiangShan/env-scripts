@@ -6,7 +6,11 @@ set uvhs_base_assemble ./script/1B_4F_HGC_assemble.tcl
 set uvhs_target_fpga b0.f2
 set uvhs_known_fpgas {b0.f0 b0.f1 b0.f2 b0.f3}
 set uvhs_keep_fpgas {}
-foreach uvhs_fpga [split [uvhs::env_or_default UVHS_KEEP_FPGAS $uvhs_target_fpga]] {
+# fpga_diff spans F0 (UVHS DDR) and F2 (CPU/host path). Keep both assembly
+# containers by default; UVHS_KEEP_FPGAS can still override this for a
+# single-FPGA experiment.
+set uvhs_keep_default "$uvhs_target_fpga b0.f0"
+foreach uvhs_fpga [split [uvhs::env_or_default UVHS_KEEP_FPGAS $uvhs_keep_default]] {
     set uvhs_fpga [string tolower [string trim $uvhs_fpga]]
     if {$uvhs_fpga ne "" && [lsearch -exact $uvhs_keep_fpgas $uvhs_fpga] < 0} {
         lappend uvhs_keep_fpgas $uvhs_fpga

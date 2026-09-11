@@ -10,6 +10,23 @@ find_library() {
 
 mkdir -p "$UVHS_RUNTIME_LIB_DIR"
 
+ensure_link() {
+  local source=$1 destination=$2
+  if [[ -e $destination ]]; then
+    [[ -r $destination ]] || {
+      echo "ERROR: unreadable runtime link: $destination" >&2
+      return 1
+    }
+    [[ "$(readlink -f "$destination")" == "$(readlink -f "$source")" ]] || {
+      echo "ERROR: runtime link points to the wrong library: $destination" >&2
+      return 1
+    }
+    return 0
+  fi
+  ln -s "$source" "$destination" 2>/dev/null || [[ -e $destination ]]
+  [[ -r $destination ]] && [[ "$(readlink -f "$destination")" == "$(readlink -f "$source")" ]]
+}
+
 ffi=$(find_library libffi.so.6)
 if [[ -z $ffi ]]; then
   ffi=$(find_library libffi.so.8)
@@ -18,7 +35,7 @@ fi
   echo "ERROR: libffi.so.6 or libffi.so.8 is required by uv_shell_exec" >&2
   exit 1
 }
-ln -sfn "$ffi" "$UVHS_RUNTIME_LIB_DIR/libffi.so.6"
+ensure_link "$ffi" "$UVHS_RUNTIME_LIB_DIR/libffi.so.6"
 
 if ldd "$UV_ROOT/bin/uv_shell_exec" 2>/dev/null | grep -q 'libpcre[.]so[.]1 => not found'; then
   pcre=
@@ -37,7 +54,7 @@ if ldd "$UV_ROOT/bin/uv_shell_exec" 2>/dev/null | grep -q 'libpcre[.]so[.]1 => n
     exit 1
   }
   if [[ $pcre != "$UVHS_RUNTIME_LIB_DIR/libpcre.so.1" ]]; then
-    ln -sfn "$pcre" "$UVHS_RUNTIME_LIB_DIR/libpcre.so.1"
+    ensure_link "$pcre" "$UVHS_RUNTIME_LIB_DIR/libpcre.so.1"
   fi
 fi
 

@@ -20,6 +20,12 @@ fpga/.Xil
 test*
 !dingtalk_robot/tests/
 !dingtalk_robot/tests/*.py
+# Verilator testbenches for the fpga_diff RTL are checked in; their build
+# outputs are not.
+!fpga_diff/tests/
+!fpga_diff/tests/*.sv
+!fpga_diff/tests/*.sh
+fpga_diff/tests/obj_*/
 json/
 
 # python third-party libraries are stored temporarily
