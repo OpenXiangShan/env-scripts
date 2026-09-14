@@ -113,6 +113,25 @@ foreach fpga_diff_clock {TMCLK ddr_ref_clk CPU_CLK_IN jtag_vclk pcie_ep_refclk} 
 }
 set_clock_groups -asynchronous {*}$fpga_diff_async_groups
 
+# The XDMA IP creates a 1 MHz pre-PERST clock on this BUFG_GT. It is an
+# independent primary clock imported with the XDMA DCP, so it is not included
+# in the generated clocks rooted at the board PCIe reference clock above.
+set fpga_diff_xdma_intclk_pins [get_pins -hierarchical -quiet -filter {
+    NAME =~ */core_def/xdma_ep_i/xdma_0/inst/pcie4c_ip_i/inst/*/phy_clk_i/bufg_gt_intclk/O
+}]
+set fpga_diff_xdma_intclks [get_clocks -quiet -of_objects \
+    $fpga_diff_xdma_intclk_pins]
+set fpga_diff_pcie_refclks [get_clocks -quiet pcie_ep_refclk]
+if {[llength $fpga_diff_xdma_intclks] && [llength $fpga_diff_pcie_refclks]} {
+    set_clock_groups -asynchronous \
+        -group $fpga_diff_xdma_intclks -group $fpga_diff_pcie_refclks
+    puts "INFO: constrained XDMA pre-PERST clock-to-PCIe refclk CDC: \
+        sources=[llength $fpga_diff_xdma_intclks] \
+        destinations=[llength $fpga_diff_pcie_refclks]"
+} else {
+    puts "INFO: no XDMA pre-PERST clock-to-PCIe refclk CDC on this FPGA"
+}
+
 # The DDR reset controller is clocked by the MIG MMCM. When partitioning puts
 # its peripheral_aresetn consumer on another FPGA, UVHS inserts a TDM input
 # synchronizer clocked by the GT TX clock. The MIG clock is not a DUT clock, so
