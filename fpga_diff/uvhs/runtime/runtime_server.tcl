@@ -272,6 +272,77 @@ proc uvhs_query_default_clock_frequency {clock} {
     return [lindex $frequencies 0]
 }
 
+proc uvhs_query_clock_names {} {
+    set names {}
+    foreach line [split [query -clock -tclobj] "\n"] {
+        set fields [regexp -all -inline {\S+} $line]
+        if {[llength $fields] >= 6 &&
+            [string is double -strict [lindex $fields 3]]} {
+            lappend names [lindex $fields 4]
+        }
+    }
+    return [lsort -unique $names]
+}
+
+proc uvhs_query_capture_rows {} {
+    set rows {}
+    set row ""
+    foreach line [split [query -capture -tclobj] "\n"] {
+        set trimmed [string trim $line]
+        if {[regexp -nocase {^B[0-9]+(?:\.[Ff][0-9]+|[[:space:]]+F[0-9]+)[[:space:]]+} $trimmed]} {
+            if {$row ne ""} {
+                lappend rows $row
+            }
+            set row $trimmed
+        } elseif {$row ne "" && $trimmed ne ""} {
+            # UVHS wraps long clock paths at the terminal width. The wrapped
+            # fragment is part of the same field and must be joined verbatim.
+            append row $trimmed
+        }
+    }
+    if {$row ne ""} {
+        lappend rows $row
+    }
+    return $rows
+}
+
+proc uvhs_query_gated_clocks {} {
+    set global_clocks [uvhs_query_clock_names]
+    set gated_clocks {}
+    foreach row [uvhs_query_capture_rows] {
+        set fields [regexp -all -inline {\S+} $row]
+        if {[llength $fields] < 6} {
+            continue
+        }
+
+        set port_index 2
+        set enable_index 3
+        set enabled_values {yes true 1 enable enabled}
+        if {[regexp -nocase {^(B[0-9]+)\.(F[0-9]+)$} \
+                [lindex $fields 0] -> board fpga_id]} {
+            # Current UVHS objects print B0.F2 in the first two columns.
+        } elseif {[regexp -nocase {^B[0-9]+$} [lindex $fields 0]] &&
+                  [regexp -nocase {^F[0-9]+$} [lindex $fields 1]]} {
+            # Older UVHS Tcl objects print B0 and F2 separately.
+            set enabled_values {no false 0}
+        } else {
+            continue
+        }
+
+        if {![string is integer -strict [lindex $fields $port_index]] ||
+            [string tolower [lindex $fields $enable_index]] ni $enabled_values ||
+            ![string is integer -strict [lindex $fields end]]} {
+            continue
+        }
+        set clock [join [lrange $fields 5 end-1] ""]
+        if {$clock eq "" || [lsearch -exact $global_clocks $clock] >= 0} {
+            continue
+        }
+        lappend gated_clocks $clock
+    }
+    return [lsort -unique $gated_clocks]
+}
+
 proc uvhs_configure_tmclk_from_cpu {{cpu_frequency ""}} {
     # Keep the CPU-to-TMCLK relationship stable across sign-off frequencies.
     # The environment variable remains available for controlled experiments,
@@ -302,8 +373,8 @@ proc uvhs_configure_tmclk_from_cpu {{cpu_frequency ""}} {
 
 proc uvhs_capture_station_counts {} {
     set counts {}
-    foreach line [split [query -capture -tclobj] "\n"] {
-        set fields [regexp -all -inline {\S+} $line]
+    foreach row [uvhs_query_capture_rows] {
+        set fields [regexp -all -inline {\S+} $row]
         if {[llength $fields] < 5} {
             continue
         }
@@ -394,9 +465,7 @@ proc uvhs_prepare_ila_clock {clock} {
     return $applied_frequency
 }
 
-proc uvhs_ila_arm {
-    trigger_file position clock gated_clocks
-} {
+proc uvhs_ila_arm {trigger_file position clock} {
     if {![file isfile $trigger_file]} {
         error "trigger condition file not found: $trigger_file"
     }
@@ -414,11 +483,9 @@ proc uvhs_ila_arm {
     trigger -ini_check $trigger_file
     set status [catch {
         set capture_frequency [uvhs_prepare_ila_clock $clock]
-        foreach gated_clock [split $gated_clocks ","] {
-            set gated_clock [string trim $gated_clock]
-            if {$gated_clock eq ""} {
-                continue
-            }
+        set gated_clocks [uvhs_query_gated_clocks]
+        puts "INFO: gated capture clocks from query -capture: $gated_clocks"
+        foreach gated_clock $gated_clocks {
             trigger -set -gatedclk $gated_clock \
                 -frequency $capture_frequency -polarity H
         }
@@ -524,7 +591,7 @@ proc uvhs_execute_command {args} {
             uvhs_release_cpu_after_memory
         }
         ila_arm {
-            if {[llength $args] != 5} { error "ila_arm expects 4 arguments" }
+            if {[llength $args] != 4} { error "ila_arm expects 3 arguments" }
             uvhs_ila_arm {*}[lrange $args 1 4]
         }
         ila_upload {
