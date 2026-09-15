@@ -73,11 +73,6 @@ proc uvhs::start_frontend_shell_compat {} {
     # UVHS_FRONTEND_SUCCESS was already emitted.
     set module_log [file join [pwd] uvhs_module_shell_compat.log]
     exec bash $helper wait-module $module_makefile > $module_log < /dev/null 2>@1 &
-    # Vivado IP jobs are generated after elaboration in a separate tree and
-    # are launched by make under /bin/sh. Patch those makefiles as soon as
-    # they appear as well.
-    set vivado_log [file join [pwd] uvhs_vivado_shell_compat.log]
-    exec bash $helper wait-vivado [file join [pwd] hw.dat Synthesis Vivado Rundir] > $vivado_log < /dev/null 2>@1 &
     puts "INFO: started UVHS frontend shell compatibility helper"
 }
 
@@ -128,14 +123,14 @@ foreach reset_port {rstn_sw6 rstn_sw5 rstn_sw4} {
 uvhs::import_blackbox blk_mem_gen_0 ./rtl/soc/blk_mem_gen_0.dcp
 uvhs::import_blackbox AXI_bridge ./rtl/soc/AXI_bridge.dcp
 uvhs::import_blackbox data_bridge ./rtl/soc/data_bridge.dcp
-# GENERALBD must be registered as a UVHS general-bus endpoint.  Use the
-# vendor's set_blackbox -generalbd form (set_ip is rejected as an unsupported
-# user blackbox by 2506p4), while retaining the clock-enable metadata.
-uvhs::import_blackbox generalBD ./rtl/soc/generalBD.dcp \
-    -clock_enable_pairs {i_clk i_clk_en 1} -generalbd
 if {[string toupper [uvhs::env_or_default DIFFTEST_HOSTIF XDMA]] eq "XDMA"} {
     uvhs::import_blackbox xdma_ep ./rtl/device/pcie/xdma_ep.dcp
 } else {
+    # GeneralBD must be registered as a UVHS general-bus endpoint. Use the
+    # vendor's set_blackbox -generalbd form while retaining clock-enable
+    # metadata.
+    uvhs::import_blackbox generalBD ./rtl/soc/generalBD.dcp \
+        -clock_enable_pairs {i_clk i_clk_en 1} -generalbd
     puts "INFO: skip xdma_ep blackbox import for DiffTest host interface [uvhs::env_or_default DIFFTEST_HOSTIF XDMA]"
 }
 uvhs::import_blackbox uvw_general_bus \

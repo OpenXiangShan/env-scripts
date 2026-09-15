@@ -97,9 +97,6 @@ if {$uvhs_hostif eq "XDMA"} {
         core_def/U_GBUS_CPU_DDR_CDC \
         core_def/U_GBUS_DDR_ARBITER \
         core_def/U_GBUS_C2H_FIFO}
-    if {[uvhs::env_or_default UVHS_GBUS_C2H_DMA 0] eq "1"} {
-        lappend uvhs_gbus_host_path_names core_def/U_GBUS_C2H_READ_ROUTER
-    }
     set uvhs_host_path_names \
         [concat $uvhs_host_path_names $uvhs_gbus_host_path_names]
     if {$uvhs_functional_ddr_remote_link eq "1"} {

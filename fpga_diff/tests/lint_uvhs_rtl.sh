@@ -21,14 +21,8 @@ set -euo pipefail
 
 root="$(cd "$(dirname "$0")/.." && pwd)"
 rtl="$root/src/rtl/common"
-if [[ -n ${UVHS_RELEASE_GENERATED_SRC:-} ]]; then
-  incdir=$UVHS_RELEASE_GENERATED_SRC
-else
-  # Fall back to any checked-out generated-src that supplies DifftestMacros.svh.
-  incdir=$(ls -d /nfs/home/fengkehan/project/minjie-playground/XiangShan-uvhs-trace-build/build/generated-src \
-    /nfs/home/fengkehan/project/minjie-playground/difftest/build/generated-src 2>/dev/null | head -1 || true)
-fi
-[[ -n $incdir ]] || { echo "ERROR: no generated-src with DifftestMacros.svh found; set UVHS_RELEASE_GENERATED_SRC" >&2; exit 2; }
+[[ -n ${UVHS_RELEASE_GENERATED_SRC:-} ]] || { echo "ERROR: set UVHS_RELEASE_GENERATED_SRC" >&2; exit 2; }
+incdir=$UVHS_RELEASE_GENERATED_SRC
 
 run_lint() {
   local hostif=$1
@@ -51,7 +45,6 @@ run_lint() {
 # Sibling modules are named explicitly so their port lists are checked.
 siblings=(
   "$rtl/uvhs_axi_3master_arbiter.sv"
-  "$rtl/uvhs_axi_2master_arbiter.sv"
   "$rtl/uvhs_axi3_to_axi4_adapter.sv"
   "$rtl/uvhs_axi_async_bridge.sv"
   "$rtl/uvhs_axi64_to_axi256.sv"

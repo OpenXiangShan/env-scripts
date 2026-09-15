@@ -50,30 +50,6 @@ module DifftestClockGate (
 endmodule
 `endif
 
-// UVHS GBus configuration endpoint.  The protected GENERALBD IP is supplied
-// by the UVHS platform at implementation time; this declaration lets the
-// frontend elaborate the shared SoC wrapper without pulling in a Vivado-only
-// generated source.  Its UV_HW_IP metadata is consumed when the design is
-// lowered into the UVHS system bus.
-(* uvw_generalBD = 1 *)
-(* UV_HW_IP="type:<GENERALBD>,toSysbus:<uvw_generalBD>,targetPlatform:<U2>" *)
-(* black_box, syn_black_box *)
-module generalBD (
-  input i_clk,
-  input i_rstn,
-  input i_clk_en,
-  output o_wr_en,
-  output [15:0] o_wr_addr,
-  output [31:0] o_wdata,
-  output o_rd_en,
-  output [15:0] o_rd_addr,
-  input [31:0] i_rdata,
-  input i_rdata_vld,
-  input [255:0] gbd_sysbus_i,
-  output [255:0] gbd_sysbus_o
-);
-endmodule
-
 (* black_box, syn_black_box *)
 module vio_0 (
   clk, probe_out0, probe_out1, probe_out2

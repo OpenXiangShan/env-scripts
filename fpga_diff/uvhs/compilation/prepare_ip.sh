@@ -29,28 +29,6 @@ generalbus_stub_is_256() {
     grep -Eq 'input[[:space:]]+\[255:0\][[:space:]]*dut_axi_rdata' "$1"
 }
 
-generalbd_source_default() {
-  # Keep the checked-in pair as the default.  The GeneralBD and generalBus
-  # checkpoints are a matched UVHS ABI; selecting a different vendor example
-  # can leave [GENERAL_BUS] empty in binding.log even though both blackboxes
-  # elaborate successfully.  Regeneration remains available explicitly via
-  # UVHS_GBUS_REGENERATE=1.
-  local candidate
-  for candidate in \
-    "$script_dir/../../third_party/gbus_ip/generalBD/generalBD.dcp" \
-    "${UVHS_GBUS_IP_ROOT:-$script_dir/../../third_party/gbus_ip}/generalBD/generalBD.dcp" \
-    "$UV_ROOT/doc/UVHS/example/gbus_demo/generalBD_gbus/generalBD.dcp" \
-    "$UV_ROOT/doc/UVHS/example/gbd_demo/src/ip/generalBD/generalBD.dcp" \
-    "$UV_ROOT/doc/UVHS-2/example/gbus_demo/src/ip/generalBD/generalBD.dcp"; do
-    if [[ -s $candidate ]]; then
-      printf '%s\n' "$candidate"
-      return 0
-    fi
-  done
-  find "$UV_ROOT/doc/UVHS" -path '*/gBD_force_monitor/gbd_ip/generalBD.dcp' \
-    -type f -size +0c -print -quit
-}
-
 # Export the Vivado IP owned by this repository.
 vivado=$UV_XILINX_VIVADO/bin/vivado
 vivado_args=(
@@ -63,59 +41,27 @@ export VIVADO_HOME=$UV_XILINX_VIVADO XILINX_VIVADO=$UV_XILINX_VIVADO
 "$vivado" -mode batch -source "$script_dir/export_vivado_ip.tcl" \
   -tclargs "${vivado_args[@]}"
 
-# Generate the vendor generalBus from a private copy. Its original generator
-# removes the Vivado project before an asynchronous DCP copy has completed.
-gbus_source=$UV_ROOT/platform/U2.2/Prototype/ips/uvw_gbus.3.1
-gbus_gen=$work_dir/ip-gen/generalbus
-gbus_release=$gbus_gen/uvw_general_bus
-gbus_asset_root=${UVHS_GBUS_IP_ROOT:-$(cd "$script_dir/../../third_party/gbus_ip" 2>/dev/null && pwd || true)}
-require_file "$gbus_source/gen_generalbus_ip.py"
-require_file "$gbus_source/uvw_axi3_generalbus.json"
-gbus_bundled_dcp=${UVHS_GBUS_DCP:-$gbus_asset_root/uvw_general_bus/uvw_general_bus.dcp}
-gbus_bundled_stub=${UVHS_GBUS_STUB:-$gbus_asset_root/uvw_general_bus/uvw_general_bus_Stub.v}
-if [[ ${UVHS_GBUS_REGENERATE:-0} != 1 && -s $gbus_bundled_dcp && -s $gbus_bundled_stub ]]; then
-  rm -rf "$work_dir/rtl/soc/uvw_general_bus"
-  mkdir -p "$work_dir/rtl/soc" "$work_dir/rtl/stubs"
-  mkdir -p "$work_dir/rtl/soc/uvw_general_bus"
-  cp -a "$gbus_asset_root/uvw_general_bus"/. "$work_dir/rtl/soc/uvw_general_bus/"
-  cp -f "$gbus_bundled_stub" "$work_dir/rtl/stubs/uvw_general_bus.v"
-  generalbus_stub_is_256 "$work_dir/rtl/stubs/uvw_general_bus.v"
-  echo "INFO: using checked-in UVHS generalBus DCP $gbus_bundled_dcp"
-else
-  if [[ $force == 1 || ! -s $gbus_release/uvw_general_bus.dcp ||
-        ! -s $gbus_release/uvw_general_bus_Stub.v ]] ||
-      ! generalbus_stub_is_256 "$gbus_release/uvw_general_bus_Stub.v"; then
-  rm -rf "$gbus_gen"
-  mkdir -p "$gbus_gen"
-  cp -a "$gbus_source" "$gbus_gen/ip-src"
-  generator=$gbus_gen/ip-src/gen_generalbus_ip.py
-  sed -i '/os[.]popen.*f_dcp_in.*f_dcp_out/c\    shutil.copy2(f_dcp_in, f_dcp_out)' \
-    "$generator"
-  sed -i 's|#!/bin/tcsh|#!/usr/bin/env bash|' "$generator"
-  grep -Fq 'shutil.copy2(f_dcp_in, f_dcp_out)' "$generator"
-  grep -Fq '#!/usr/bin/env bash' "$generator"
-  json=$gbus_gen/uvw_axi3_generalbus.json
-  cp -f "$gbus_source/uvw_axi3_generalbus.json" "$json"
-  sed -i -E \
-    "s|(\"IP_LOCATION\"[[:space:]]*:[[:space:]]*)\"[^\"]*\"|\1\"$gbus_gen/ip-src\"|; \
-     s|(\"DATA_WIDTH\"[[:space:]]*:[[:space:]]*)\"[^\"]*\"|\1\"256\"|" "$json"
-    (cd "$gbus_gen" && PATH="$UV_XILINX_VIVADO/bin:$PATH" \
-      python3 "$generator" -j "$json")
-  fi
-  require_file "$gbus_release/uvw_general_bus.dcp"
-  require_file "$gbus_release/uvw_general_bus_Stub.v"
-  generalbus_stub_is_256 "$gbus_release/uvw_general_bus_Stub.v"
-  rm -rf "$work_dir/rtl/soc/uvw_general_bus"
-  mkdir -p "$work_dir/rtl/soc" "$work_dir/rtl/stubs"
-  cp -a "$gbus_release" "$work_dir/rtl/soc/uvw_general_bus"
-  cp -f "$gbus_release/uvw_general_bus_Stub.v" "$work_dir/rtl/stubs/uvw_general_bus.v"
-  echo "INFO: prepared regenerated 256-bit UVHS generalBus DCP"
-fi
+# GeneralBus is protected UVHS IP. Keep the approved release assets with the
+# UVHS flow while allowing a site to select another matching release pair.
+gbus_asset_root=$script_dir/../ip/gbus
+gbus_dcp=${UVHS_GBUS_DCP:-$gbus_asset_root/uvw_general_bus/uvw_general_bus.dcp}
+gbus_stub=${UVHS_GBUS_STUB:-$gbus_asset_root/uvw_general_bus/uvw_general_bus_Stub.v}
+require_file "$gbus_dcp"
+require_file "$gbus_stub"
+generalbus_stub_is_256 "$gbus_stub" || {
+  echo "ERROR: UVHS GeneralBus stub is not 256-bit: $gbus_stub" >&2
+  exit 1
+}
+echo "INFO: using UVHS GeneralBus DCP $gbus_dcp"
+rm -rf "$work_dir/rtl/soc/uvw_general_bus"
+mkdir -p "$work_dir/rtl/soc/uvw_general_bus" "$work_dir/rtl/stubs"
+cp -f "$gbus_dcp" "$work_dir/rtl/soc/uvw_general_bus/uvw_general_bus.dcp"
+cp -f "$gbus_stub" "$work_dir/rtl/soc/uvw_general_bus/uvw_general_bus_Stub.v"
+cp -f "$gbus_stub" "$work_dir/rtl/stubs/uvw_general_bus.v"
 
-# GENERALBD is a protected UVHS endpoint referenced by core_def_xdma in GBus
-# mode.  Keep its platform DCP alongside the other imported IPs so frontend
-# elaboration can resolve the metadata-bearing blackbox.
-generalbd_dcp=${UVHS_GENERALBD_DCP:-$(generalbd_source_default)}
+# GeneralBD is the protected endpoint paired with GeneralBus. A site may select
+# another matching release pair explicitly.
+generalbd_dcp=${UVHS_GENERALBD_DCP:-$gbus_asset_root/generalBD/generalBD.dcp}
 [[ -n "$generalbd_dcp" && -s "$generalbd_dcp" ]] || {
   echo "ERROR: UVHS GENERALBD DCP not found; set UVHS_GENERALBD_DCP" >&2
   exit 1
