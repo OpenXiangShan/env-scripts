@@ -6,6 +6,6 @@ rm -rf "$obj_dir"
 verilator --binary --timing -Wall -Wno-fatal \
   --top-module uvhs_axi_remote_link_tb \
   --Mdir "$obj_dir" \
-  "$root/src/rtl/common/cpu_trace/uvhs_axi_remote_link.sv" \
+  "$root/src/rtl/common/uvhs_axi_remote_link.sv" \
   "$root/tests/uvhs_axi_remote_link_tb.sv"
 "$obj_dir/Vuvhs_axi_remote_link_tb"

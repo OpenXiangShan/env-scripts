@@ -11,39 +11,28 @@ DiffTest output only in on-chip SRAM. Workload H2C uses GBus DMA writes to DDR;
 `UVHS_FUNCTIONAL_DDR_REMOTE_LINK=1` retains the CPU/workload DDR connection.
 The obsolete C2H DDR-ring writer and DDR trace sink are not included.
 
-`UVHS_GBUS_C2H_DMA=0` (default) selects GBS1, a register-drained SRAM window.
-`UVHS_GBUS_C2H_DMA=1` selects GBD1: a 64 KiB FIFO feeds an immutable 1 KiB bank,
-read through a local AXI3 aperture at `0x10000000`. The read router precedes the
-DDR adapter; workload writes retain their original route. Backpressure reaches
-the sender and CPU while the host transport clock continues to run.
+GBS1 is a register-drained SRAM window. Backpressure reaches the DiffTest
+sender and pauses the CPU while the host transport clock continues to run.
+The matching fpga-host implementation is in OpenXiangShan/difftest#954.
 
 GeneralBD local offsets are below; the host adds its config base (`0x1000`).
 
-| Local offset | GBD1 register |
+| Local offset | GBS1 register |
 | --- | --- |
-| `0x1200` | present[31], frame error[30], protocol error[29], staged words[16:8], filling[7], FIFO data[6], frozen[5], AXI active[4] |
-| `0x1204` | control: FILL=1, ACK=2, clear protocol error=4 |
-| `0x1208` | ID `0x47424431` (GBS1 reports `0x47425331`) |
-| `0x120c` | publication sequence |
-| `0x1210`, `0x1214` | DMA base and capacity (1024 bytes) |
-| `0x1218`, `0x121c`, `0x1220` | last AR address, attributes, accepted AR count |
-| `0x2000..0x23fc` | SRAM debug data window |
+| `0x1200` | present[31], frame error[30], draining[29], staged words[16:8], filling[7], FIFO data[6] |
+| `0x1204` | control: FILL=1, DRAIN=2 |
+| `0x1208` | ID `0x47425331` |
+| `0x2000..0x23fc` | SRAM data window |
 
-GBD1 accepts aligned FIXED/INCR reads with ARSIZE 0..5 and ARLEN 0..15.
-Requests beyond the published bytes return SLVERR. AXI RLAST terminates a burst;
-AXIS TLAST separately validates each 768-byte DiffTest range. The host validates
-and captures the bank before ACK, preserving residual bytes across windows.
-GBS1 control bit 1 discards queued data; it is not the GBD1 ACK operation.
-The matching fpga-host implementation is in OpenXiangShan/difftest#954.
+AXIS TLAST validates each 768-byte DiffTest range. The host dispatches complete
+96-byte records and preserves any partial record across SRAM windows.
 
 Local validation (no board):
 
 ```sh
 python3 tests/run_uvhs_generalbd_decode.py --functional-only
-python3 tests/run_uvhs_generalbd_decode.py --dma
-bash tests/run_uvhs_gbus_c2h_dma_verilator.sh
-bash tests/run_uvhs_gbus_axi_read_router_verilator.sh
-python3 tools/gbus_supervisor_tests.py
+bash tests/run_uvhs_gbus_c2h_fifo_verilator.sh
+bash tests/run_uvhs_axi_remote_link_verilator.sh
 ```
 
 The legacy functional test skips its documented reserved-address hole check:
@@ -70,9 +59,8 @@ wrappers in `<work>/rtl/filelist.f`, which the UVHS frontend reads directly.
 ## GBus host paths
 
 The GBus C2H path uses the on-chip SRAM register window identified as GBS1.
-The optional GBD1 path provides the DMA endpoint and router checks used by the
-GBus host flow. GBus H2C writes to DDR remain enabled for workload and CPU
-functionality; no DDR C2H ring fallback is part of this flow.
+GBus H2C writes to DDR remain enabled for workload and CPU functionality; no
+DDR C2H ring is part of the UVHS RTL flow.
 
 ## Build
 
@@ -88,7 +76,8 @@ the runtime database.
 `uvhs_project` performs these steps:
 
 1. Copies the vendor board template into an isolated work directory.
-2. Prepares repository-owned Vivado IP and the 64-bit generalBus DCP.
+2. Prepares repository-owned Vivado IP and the protected 256-bit GeneralBus
+   and GeneralBD release assets from `uvhs/ip/gbus`.
 3. Imports the selected DDR DCP and validates its AXI width.
 4. Builds the complete RTL file list and checks the expected top module.
 
@@ -105,12 +94,11 @@ helper scripts, board-template files, and the external DDR directory. This
 keeps a missing input from being discovered after a multi-hour run has started.
 
 IP preparation intentionally retains two files. `prepare_ip.sh` is the outer
-orchestrator for three different sources: repository Vivado IP, the vendor
-Python generalBus generator, and an external DDR checkpoint. The child
+orchestrator for repository Vivado IP, the protected GBus assets under
+`uvhs/ip/gbus`, and an external DDR checkpoint. The child
 `export_vivado_ip.tcl` must run inside Vivado because it uses project, IP, BD,
-and checkpoint commands. Merging them would require Vivado to launch a nested
-Vivado process or embedding a generated Tcl file in shell, neither of which
-simplifies the execution model.
+and checkpoint commands. The four `UVHS_GBUS_*` and `UVHS_GENERALBD_*`
+variables may select another matching protected-IP release pair.
 
 `uvhs_backend` follows the vendor implementation sequence: clock inference and
 transformation, remap, partition, localization, system routing, FPGA PnR,
@@ -140,15 +128,12 @@ automatically. XiangShan uses these path constraints together with high
 partition effort and the `uv_placer_balance_slrs` PnR strategy.
 
 UVHS drives the AXI UART16550 and the GBus/DiffTest host interface from
-`clk6_p` at a fixed 50 MHz. The CPU/SoC
-`clk5_p` frequency comes from the system sign-off result committed in the
-selected runtime database, so each partition and PnR result runs at its own
-reported frequency. The fixed UART clock matches the 50 MHz clock declared by
-the XiangShan FPGA device tree and keeps UART baud timing independent of CPU
-clock gating.
+`clk6_p`, while the CPU/SoC uses `clk5_p`. At runtime, both clocks are restored
+to the sign-off frequencies stored in the selected runtime database, so each
+partition and PnR result runs at its reported frequency. Keeping UART and GBus
+on the free-running transport clock makes them independent of CPU clock gating.
 
-At runtime, `clk5_p` is restored to the sign-off frequency stored in the
-selected runtime database. `clk8_p` is then derived at a fixed 50:1 CPU-to-TMCLK
+`clk8_p` is then derived at a fixed 50:1 CPU-to-TMCLK
 ratio, so a 14 MHz CPU clock uses approximately 280 kHz TMCLK. The optional
 `UVHS_TMCLK_CPU_RATIO` environment variable is retained only for controlled
 clock-sweep experiments. Update the Linux device-tree `timebase-frequency` to

@@ -74,9 +74,6 @@ generate_uvhs_filelist() {
   shift 4
 
   local hostif=${DIFFTEST_HOSTIF:-XDMA}
-  local c2h_dma=${UVHS_GBUS_C2H_DMA:-0}
-  [[ $c2h_dma == 0 || $c2h_dma == 1 ]] || rtl_flist_fail "UVHS_GBUS_C2H_DMA must be 0 or 1"
-  [[ $c2h_dma == 0 || $hostif == GBUS ]] || rtl_flist_fail "UVHS_GBUS_C2H_DMA=1 requires GBUS"
   local functional_ddr_remote_link=${UVHS_FUNCTIONAL_DDR_REMOTE_LINK:-0}
   [[ $hostif == XDMA || $hostif == GBUS ]] ||
     rtl_flist_fail "DIFFTEST_HOSTIF must be XDMA or GBUS: $hostif"
@@ -113,9 +110,6 @@ generate_uvhs_filelist() {
     fi
     if [[ $hostif == GBUS ]]; then
       printf '+define+CONFIG_DIFFTEST_HOSTIF_GBUS\n'
-      if [[ $c2h_dma == 1 ]]; then
-        printf '+define+UVHS_GBUS_C2H_DMA\n'
-      fi
       if [[ $functional_ddr_remote_link == 1 ]]; then
         printf '+define+UVHS_FUNCTIONAL_DDR_REMOTE_LINK\n'
       fi

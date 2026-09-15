@@ -2,8 +2,8 @@ Core RTL to FPGA Steps
 ======================
 
 For UVHS GBus builds, see [the SRAM C2H interface and build flow](uvhs/README.md).
-`DIFFTEST_HOSTIF=GBUS` keeps DiffTest output in SRAM; `UVHS_GBUS_C2H_DMA=1`
-selects local AXI3 DMA readout. Workload H2C still writes DDR through GBus DMA.
+`DIFFTEST_HOSTIF=GBUS` keeps DiffTest output in the GBS1 on-chip SRAM window.
+Workload H2C writes DDR through GBus DMA.
 
 1. modify Makefile, assign CORE_DIR
 

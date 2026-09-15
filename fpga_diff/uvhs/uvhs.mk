@@ -4,16 +4,12 @@ UVHS_RUNTIME_DIR := $(UVHS_ROOT_DIR)/uvhs/runtime
 
 UVHS_TEMPLATE_DIR ?=
 UVHS_UVW_AXI4_TO_DDR4_SRC ?=
+UVHS_GBUS_IP_DIR := $(UVHS_ROOT_DIR)/uvhs/ip/gbus
+UVHS_GBUS_DCP ?= $(UVHS_GBUS_IP_DIR)/uvw_general_bus/uvw_general_bus.dcp
+UVHS_GBUS_STUB ?= $(UVHS_GBUS_IP_DIR)/uvw_general_bus/uvw_general_bus_Stub.v
+UVHS_GENERALBD_DCP ?= $(UVHS_GBUS_IP_DIR)/generalBD/generalBD.dcp
+UVHS_GENERALBD_STUB ?= $(UVHS_GBUS_IP_DIR)/generalBD/generalBD_Stub.v
 DIFFTEST_HOSTIF ?= XDMA
-UVHS_GBUS_C2H_DMA ?= 0
-ifneq ($(filter 0 1,$(UVHS_GBUS_C2H_DMA)),$(UVHS_GBUS_C2H_DMA))
-$(error UVHS_GBUS_C2H_DMA must be 0 or 1)
-endif
-ifeq ($(UVHS_GBUS_C2H_DMA),1)
-ifneq ($(DIFFTEST_HOSTIF),GBUS)
-$(error UVHS_GBUS_C2H_DMA=1 requires DIFFTEST_HOSTIF=GBUS)
-endif
-endif
 ifeq ($(filter XDMA GBUS,$(DIFFTEST_HOSTIF)),)
 $(error DIFFTEST_HOSTIF must be XDMA or GBUS, got $(DIFFTEST_HOSTIF))
 endif
@@ -75,6 +71,10 @@ UVHS_TOOL_ENV = \
 	UVHS_RUNTIME_LIB_DIR="$(UVHS_RUNTIME_LIB_DIR)" \
 	UVHS_COMPAT_BIN="$(UVHS_COMPAT_BIN)" \
 	UVHS_TMCLK_CPU_RATIO="$(UVHS_TMCLK_CPU_RATIO)" \
+	UVHS_GBUS_DCP="$(UVHS_GBUS_DCP)" \
+	UVHS_GBUS_STUB="$(UVHS_GBUS_STUB)" \
+	UVHS_GENERALBD_DCP="$(UVHS_GENERALBD_DCP)" \
+	UVHS_GENERALBD_STUB="$(UVHS_GENERALBD_STUB)" \
 	UVSHELL_EXEC_NAME="$(UVHS_RUNTIME_DIR)/uv_shell_exec_compat.sh"
 
 UVHS_FLOW_ENV = \
@@ -82,7 +82,6 @@ UVHS_FLOW_ENV = \
 	UVHS_FLOW=1 \
 	DIFFTEST_HOSTIF="$(DIFFTEST_HOSTIF)" \
 	UVHS_FUNCTIONAL_DDR_REMOTE_LINK="$(UVHS_FUNCTIONAL_DDR_REMOTE_LINK)" \
-	UVHS_GBUS_C2H_DMA="$(UVHS_GBUS_C2H_DMA)" \
 	UVHS_PROBE_TCL="$(UVHS_PROBE_PATH)" \
 	XDMA_LINK_WIDTH="$(XDMA_LINK_WIDTH)" \
 	UVHS_KEEP_FPGAS="$(UVHS_KEEP_FPGAS)" \
@@ -115,12 +114,17 @@ uvhs_preflight: check_project_name
 			"$(UVHS_ROOT_DIR)/tools/update_core_flist.sh"; do \
 			[[ -x "$$executable" ]] || { echo "ERROR: executable not found: $$executable" >&2; exit 1; }; \
 		done; \
-		for file in \
-			"$(UVHS_COMPILATION_DIR)/vivado_pre_opt.tcl" \
-			"$(UVHS_COMPILATION_DIR)/partition.tcl" \
-			"$(UVHS_TEMPLATE_DIR)/Makefile" \
-			"$(UVHS_TEMPLATE_DIR)/script/1B_4F_HGC_assemble.tcl"; do \
-			[[ -f "$$file" ]] || { echo "ERROR: file not found: $$file" >&2; exit 1; }; \
+			for file in \
+				"$(UVHS_COMPILATION_DIR)/vivado_pre_opt.tcl" \
+				"$(UVHS_COMPILATION_DIR)/partition.tcl" \
+				"$(UVHS_GBUS_DCP)" \
+				"$(UVHS_GBUS_STUB)" \
+				"$(UVHS_GENERALBD_DCP)" \
+				"$(UVHS_GENERALBD_STUB)" \
+				"$(UVHS_TEMPLATE_DIR)/Makefile" \
+				"$(UVHS_TEMPLATE_DIR)/script/1B_4F_HGC_assemble.tcl"; do \
+				[[ -f "$$file" ]] || { echo "ERROR: file not found: $$file" >&2; exit 1; }; \
+
 		done; \
 		for directory in "$(CORE_DIR)" "$(UVHS_TEMPLATE_DIR)/script" "$(UVHS_UVW_AXI4_TO_DDR4_SRC)"; do \
 			[[ -d "$$directory" ]] || { echo "ERROR: directory not found: $$directory" >&2; exit 1; }; \
@@ -149,7 +153,6 @@ uvhs_prepare: uvhs_preflight
 uvhs_project: uvhs_prepare
 	DIFFTEST_HOSTIF="$(DIFFTEST_HOSTIF)" \
 	UVHS_FUNCTIONAL_DDR_REMOTE_LINK="$(UVHS_FUNCTIONAL_DDR_REMOTE_LINK)" \
-	UVHS_GBUS_C2H_DMA="$(UVHS_GBUS_C2H_DMA)" \
 	bash "$(UVHS_ROOT_DIR)/tools/update_core_flist.sh" uvhs \
 		"$(CORE_DIR)" "$(UVHS_WORK_DIR)" "$(CPU)" "$(UVHS_FILELIST)" \
 		-- $(RTL_INCLUDE)

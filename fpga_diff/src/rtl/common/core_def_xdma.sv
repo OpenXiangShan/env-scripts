@@ -1642,9 +1642,13 @@ wire [0:0]    br2cfg_wvalid;
     .pcie_ep_perstn(pcie_ep_perstn)
   );
 
-  // Difftest2AXIs supplies the same packet stream in XDMA and GBus modes.
-  // GBus buffers it in SRAM for register or local AXI DMA reads; producer
-  // backpressure must propagate through the shared sender to the CPU gate.
+  // The shared DiffTest sender (`Difftest2AXIs` inside the generated SimTop --
+  // the very module the XDMA build streams straight into the XDMA IP) is the
+  // C2H producer in both hostif modes.  Only the interface layer below it
+  // differs.  The XDMA build has no DDR staging and neither does this one: the
+  // same 256-bit stream is buffered in on-chip SRAM and exposed as a GBus
+  // register window, so the DDR ring, its AXI master, the three-master arbiter
+  // port and the inter-FPGA link hop all leave the C2H path.
   assign difftest_to_host_axis_tready_io = gbus_c2h_sready;
   assign gbus_shell_sready = 1'b0;
 
@@ -1665,78 +1669,20 @@ wire [0:0]    br2cfg_wvalid;
   assign gbus_cfg_local_wr_addr = gbus_cfg_wr_addr - 16'h1000;
   assign gbus_cfg_local_rd_addr = gbus_cfg_rd_addr - 16'h1000;
 
-`ifdef UVHS_GBUS_C2H_DMA
-  wire gbus_c2h_cfg_wr_en =
-      gbus_cfg_wr_en && (gbus_cfg_local_wr_addr == 16'h1204);
-  wire gbus_c2h_cfg_rd_en =
-      gbus_cfg_rd_en &&
-      (((gbus_cfg_local_rd_addr >= 16'h1200) && (gbus_cfg_local_rd_addr <= 16'h1220)) ||
-       ((gbus_cfg_local_rd_addr >= 16'h2000) && (gbus_cfg_local_rd_addr <= 16'h23fc)));
-`else
   wire gbus_c2h_cfg_wr_en =
       gbus_cfg_wr_en && (gbus_cfg_local_wr_addr >= 16'h1200) && (gbus_cfg_local_wr_addr <= 16'h1208);
   wire gbus_c2h_cfg_rd_en =
       gbus_cfg_rd_en &&
       (((gbus_cfg_local_rd_addr >= 16'h1200) && (gbus_cfg_local_rd_addr <= 16'h1208)) ||
        ((gbus_cfg_local_rd_addr >= 16'h2000) && (gbus_cfg_local_rd_addr <= 16'h2ffc)));
-`endif
   wire gbus_axil_cfg_wr_en = gbus_cfg_wr_en && (gbus_cfg_local_wr_addr <= 16'h0030);
   wire gbus_axil_cfg_rd_en = gbus_cfg_rd_en && (gbus_cfg_local_rd_addr <= 16'h0030);
 
   // The sender is the same Difftest2AXIs instance the XDMA build feeds to PCIe;
   // only this interface layer differs, so nothing is staged in DDR.
-`ifdef UVHS_GBUS_C2H_DMA
-  wire [7:0] gbus_local_arid, gbus_local_rid;
-  wire [31:0] gbus_local_araddr;
-  wire [3:0] gbus_local_arlen;
-  wire [2:0] gbus_local_arsize;
-  wire [1:0] gbus_local_arburst, gbus_local_rresp;
-  wire gbus_local_arvalid, gbus_local_arready;
-  wire [255:0] gbus_local_rdata;
-  wire gbus_local_rlast, gbus_local_rvalid, gbus_local_rready;
-  wire [7:0] gbus_routed_arid, gbus_routed_rid;
-  wire [31:0] gbus_routed_araddr;
-  wire [3:0] gbus_routed_arlen, gbus_routed_arcache, gbus_routed_arqos;
-  wire [2:0] gbus_routed_arsize, gbus_routed_arprot;
-  wire [1:0] gbus_routed_arburst, gbus_routed_arlock, gbus_routed_rresp;
-  wire gbus_routed_arvalid, gbus_routed_arready;
-  wire [255:0] gbus_routed_rdata;
-  wire gbus_routed_rlast, gbus_routed_rvalid, gbus_routed_rready;
-
-  uvhs_gbus_axi_read_router U_GBUS_C2H_READ_ROUTER (
-    .clk(gbus_host_clk), .rstn(rstn_sw4),
-    .s_arid(gbus_axi_arid), .s_araddr(gbus_axi_araddr), .s_arlen(gbus_axi_arlen),
-    .s_arsize(gbus_axi_arsize), .s_arburst(gbus_axi_arburst), .s_arlock(gbus_axi_arlock),
-    .s_arcache(gbus_axi_arcache), .s_arprot(gbus_axi_arprot), .s_arqos(gbus_axi_arqos),
-    .s_arvalid(gbus_axi_arvalid), .s_arready(gbus_axi_arready),
-    .s_rid(gbus_axi_rid), .s_rdata(gbus_axi_rdata), .s_rresp(gbus_axi_rresp),
-    .s_rlast(gbus_axi_rlast), .s_rvalid(gbus_axi_rvalid), .s_rready(gbus_axi_rready),
-    .d_arid(gbus_routed_arid), .d_araddr(gbus_routed_araddr), .d_arlen(gbus_routed_arlen),
-    .d_arsize(gbus_routed_arsize), .d_arburst(gbus_routed_arburst), .d_arlock(gbus_routed_arlock),
-    .d_arcache(gbus_routed_arcache), .d_arprot(gbus_routed_arprot), .d_arqos(gbus_routed_arqos),
-    .d_arvalid(gbus_routed_arvalid), .d_arready(gbus_routed_arready),
-    .d_rid(gbus_routed_rid), .d_rdata(gbus_routed_rdata), .d_rresp(gbus_routed_rresp),
-    .d_rlast(gbus_routed_rlast), .d_rvalid(gbus_routed_rvalid), .d_rready(gbus_routed_rready),
-    .c_arid(gbus_local_arid), .c_araddr(gbus_local_araddr), .c_arlen(gbus_local_arlen),
-    .c_arsize(gbus_local_arsize), .c_arburst(gbus_local_arburst),
-    .c_arvalid(gbus_local_arvalid), .c_arready(gbus_local_arready),
-    .c_rid(gbus_local_rid), .c_rdata(gbus_local_rdata), .c_rresp(gbus_local_rresp),
-    .c_rlast(gbus_local_rlast), .c_rvalid(gbus_local_rvalid), .c_rready(gbus_local_rready)
-  );
-
-  uvhs_gbus_c2h_dma #(
-      .AXIS_DATA_WIDTH(`CONFIG_DIFFTEST_HOST_AXIS_WIDTH)
-  ) U_GBUS_C2H_FIFO (
-    .s_arid(gbus_local_arid), .s_araddr(gbus_local_araddr), .s_arlen(gbus_local_arlen),
-    .s_arsize(gbus_local_arsize), .s_arburst(gbus_local_arburst),
-    .s_arvalid(gbus_local_arvalid), .s_arready(gbus_local_arready),
-    .s_rid(gbus_local_rid), .s_rdata(gbus_local_rdata), .s_rresp(gbus_local_rresp),
-    .s_rlast(gbus_local_rlast), .s_rvalid(gbus_local_rvalid), .s_rready(gbus_local_rready),
-`else
   uvhs_gbus_c2h_fifo #(
       .AXIS_DATA_WIDTH(`CONFIG_DIFFTEST_HOST_AXIS_WIDTH)
   ) U_GBUS_C2H_FIFO (
-`endif
     .clk(gbus_host_clk), .rstn(rstn_sw4),
     .stream_rstn(difftest_c2h_rstn),
     .s_tdata(difftest_to_host_axis_tdata), .s_tkeep(difftest_to_host_axis_tkeep),
@@ -1809,16 +1755,7 @@ wire [0:0]    br2cfg_wvalid;
     .clk(uvhs_ddr_transport_clk), .rstn(rstn_sw4),
     .s_awid(gbus_axi_awid), .s_awaddr({2'b0,gbus_axi_awaddr}), .s_awlen(gbus_axi_awlen), .s_awsize(gbus_axi_awsize), .s_awburst(gbus_axi_awburst), .s_awlock(gbus_axi_awlock), .s_awcache(gbus_axi_awcache), .s_awprot(gbus_axi_awprot), .s_awqos(gbus_axi_awqos), .s_awvalid(gbus_axi_awvalid), .s_awready(gbus_axi_awready),
     .s_wid(gbus_axi_wid), .s_wdata(gbus_axi_wdata), .s_wstrb(gbus_axi_wstrb), .s_wlast(gbus_axi_wlast), .s_wvalid(gbus_axi_wvalid), .s_wready(gbus_axi_wready), .s_bid(gbus_axi_bid), .s_bresp(gbus_axi_bresp), .s_bvalid(gbus_axi_bvalid), .s_bready(gbus_axi_bready),
-`ifdef UVHS_GBUS_C2H_DMA
-    .s_arid(gbus_routed_arid), .s_araddr({2'b0,gbus_routed_araddr}), .s_arlen(gbus_routed_arlen),
-    .s_arsize(gbus_routed_arsize), .s_arburst(gbus_routed_arburst), .s_arlock(gbus_routed_arlock),
-    .s_arcache(gbus_routed_arcache), .s_arprot(gbus_routed_arprot), .s_arqos(gbus_routed_arqos),
-    .s_arvalid(gbus_routed_arvalid), .s_arready(gbus_routed_arready),
-    .s_rid(gbus_routed_rid), .s_rdata(gbus_routed_rdata), .s_rresp(gbus_routed_rresp),
-    .s_rlast(gbus_routed_rlast), .s_rvalid(gbus_routed_rvalid), .s_rready(gbus_routed_rready),
-`else
     .s_arid(gbus_axi_arid), .s_araddr({2'b0,gbus_axi_araddr}), .s_arlen(gbus_axi_arlen), .s_arsize(gbus_axi_arsize), .s_arburst(gbus_axi_arburst), .s_arlock(gbus_axi_arlock), .s_arcache(gbus_axi_arcache), .s_arprot(gbus_axi_arprot), .s_arqos(gbus_axi_arqos), .s_arvalid(gbus_axi_arvalid), .s_arready(gbus_axi_arready), .s_rid(gbus_axi_rid), .s_rdata(gbus_axi_rdata), .s_rresp(gbus_axi_rresp), .s_rlast(gbus_axi_rlast), .s_rvalid(gbus_axi_rvalid), .s_rready(gbus_axi_rready),
-`endif
     .m_awid(gbus_ddr_awid), .m_awaddr(gbus_ddr_awaddr), .m_awlen(gbus_ddr_awlen), .m_awsize(gbus_ddr_awsize), .m_awburst(gbus_ddr_awburst), .m_awlock(gbus_ddr_awlock), .m_awcache(gbus_ddr_awcache), .m_awprot(gbus_ddr_awprot), .m_awqos(gbus_ddr_awqos), .m_awregion(gbus_ddr_awregion), .m_awvalid(gbus_ddr_awvalid), .m_awready(gbus_ddr_awready), .m_wdata(gbus_ddr_wdata), .m_wstrb(gbus_ddr_wstrb), .m_wlast(gbus_ddr_wlast), .m_wvalid(gbus_ddr_wvalid), .m_wready(gbus_ddr_wready), .m_bid(gbus_ddr_bid), .m_bresp(gbus_ddr_bresp), .m_bvalid(gbus_ddr_bvalid), .m_bready(gbus_ddr_bready), .m_arid(gbus_ddr_arid), .m_araddr(gbus_ddr_araddr), .m_arlen(gbus_ddr_arlen), .m_arsize(gbus_ddr_arsize), .m_arburst(gbus_ddr_arburst), .m_arlock(gbus_ddr_arlock), .m_arcache(gbus_ddr_arcache), .m_arprot(gbus_ddr_arprot), .m_arqos(gbus_ddr_arqos), .m_arregion(gbus_ddr_arregion), .m_arvalid(gbus_ddr_arvalid), .m_arready(gbus_ddr_arready), .m_rid(gbus_ddr_rid), .m_rdata(gbus_ddr_rdata), .m_rresp(gbus_ddr_rresp), .m_rlast(gbus_ddr_rlast), .m_rvalid(gbus_ddr_rvalid), .m_rready(gbus_ddr_rready)
   );
 
@@ -2426,9 +2363,11 @@ uvhs_axi_async_bridge #(.ADDR_WIDTH(34), .ID_WIDTH(14), .DATA_WIDTH(256)) U_GBUS
   .m_arid(cpu_ddr_arid), .m_araddr(cpu_ddr_araddr), .m_arlen(cpu_ddr_arlen), .m_arsize(cpu_ddr_arsize), .m_arburst(cpu_ddr_arburst), .m_arlock(cpu_ddr_arlock), .m_arcache(cpu_ddr_arcache), .m_arprot(cpu_ddr_arprot), .m_arqos(cpu_ddr_arqos), .m_arregion(cpu_ddr_arregion), .m_arvalid(cpu_ddr_arvalid), .m_arready(cpu_ddr_arready), .m_rid(cpu_ddr_rid), .m_rdata(cpu_ddr_rdata), .m_rresp(cpu_ddr_rresp), .m_rlast(cpu_ddr_rlast), .m_rvalid(cpu_ddr_rvalid), .m_rready(cpu_ddr_rready)
 );
 
-// CPU (s0) and GBus (s1) are independent AXI4 masters sharing the UVHS DDR
-// AXI port. The unused third input is tied off while workload and CPU DDR
-// writes continue through the burst-atomic arbiter.
+// CPU (s0) and GBus (s1) are independent AXI4 masters.  The UVHS DDR IP has
+// one AXI port, therefore all channels must pass through this burst-atomic
+// arbiter; direct multi-driver wiring is intentionally avoided.  s2 carried the
+// former C2H DDR ring writer; the C2H path now stages packets in an on-chip
+// SRAM FIFO that the host drains through GENERALBD, so s2 is tied off.
 uvhs_axi_3master_arbiter #(.ADDR_WIDTH(34), .ID_WIDTH(14), .DATA_WIDTH(256)) U_GBUS_DDR_ARBITER (
   .clk(uvhs_ddr_transport_clk), .rstn(rstn_sw4),
   .s0_awid(cpu_ddr_awid), .s0_awaddr(cpu_ddr_awaddr), .s0_awlen(cpu_ddr_awlen), .s0_awsize(cpu_ddr_awsize), .s0_awburst(cpu_ddr_awburst), .s0_awlock(cpu_ddr_awlock), .s0_awcache(cpu_ddr_awcache), .s0_awprot(cpu_ddr_awprot), .s0_awqos(cpu_ddr_awqos), .s0_awregion(cpu_ddr_awregion), .s0_awvalid(cpu_ddr_awvalid), .s0_awready(cpu_ddr_awready), .s0_wdata(cpu_ddr_wdata), .s0_wstrb(cpu_ddr_wstrb), .s0_wlast(cpu_ddr_wlast), .s0_wvalid(cpu_ddr_wvalid), .s0_wready(cpu_ddr_wready), .s0_bid(cpu_ddr_bid), .s0_bresp(cpu_ddr_bresp), .s0_bvalid(cpu_ddr_bvalid), .s0_bready(cpu_ddr_bready), .s0_arid(cpu_ddr_arid), .s0_araddr(cpu_ddr_araddr), .s0_arlen(cpu_ddr_arlen), .s0_arsize(cpu_ddr_arsize), .s0_arburst(cpu_ddr_arburst), .s0_arlock(cpu_ddr_arlock), .s0_arcache(cpu_ddr_arcache), .s0_arprot(cpu_ddr_arprot), .s0_arqos(cpu_ddr_arqos), .s0_arregion(cpu_ddr_arregion), .s0_arvalid(cpu_ddr_arvalid), .s0_arready(cpu_ddr_arready), .s0_rid(cpu_ddr_rid), .s0_rdata(cpu_ddr_rdata), .s0_rresp(cpu_ddr_rresp), .s0_rlast(cpu_ddr_rlast), .s0_rvalid(cpu_ddr_rvalid), .s0_rready(cpu_ddr_rready),
@@ -2922,6 +2861,10 @@ assign hpm_dig_result = 0;
 
 AXI_bridge CFG_AXI_bridge_i
        (.SYS_INTER_CLK          (inter_soc_clk),
+`ifdef UVHS
+        .UART_ACLK              (uart_sclk),
+        .UART_ARESETN           (uart_sclk_sync_rstn),
+`endif
         .SYS_INTER_ARESETN      (inter_soc_sync_rstn),
         .ACLK                   (sys_clk_i),
         .ARESETN                (axi_bclk_sync_rstn),

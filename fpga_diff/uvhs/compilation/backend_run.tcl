@@ -7,7 +7,7 @@ set_working_space hw.dat
 
 # Keep PnR in the UVHS single-worker mode on hosts where the bundled Python
 # multiprocessing runtime cannot load its legacy libffi dependency.
-set_parallel_option -max_threads 4 -max_processes 1 -label fpga
+set_parallel_option -max_threads 4 -max_processes 8 -label fpga
 
 set_option time.auto_clock_config true
 set_option time.group_io_logic false
@@ -143,28 +143,10 @@ if {[string toupper [uvhs::env_or_default DIFFTEST_HOSTIF XDMA]] eq "GBUS"} {
         puts "WARNING: no linked GBus protected-IP sysbus payload pins before infer_clock"
     }
 }
-if {[string toupper [uvhs::env_or_default DIFFTEST_HOSTIF XDMA]] eq "GBUS"} {
-    # UVHS P4 may terminate infer_clock on LAST_VALUE annotations emitted by
-    # protected GENERALBD/GENERAL_BUS models even after their exact payload
-    # pins have been registered with config_clock -ignore.  Preserve the
-    # original TCK diagnostics in the log and continue to partition/PnR: these
-    # ports are vendor-IP payload pins, not clocks in owned RTL.  Do not apply
-    # this recovery to the XDMA flow or to any user clock/CDC error.
-    if {[catch {infer_clock} gbus_infer_clock_error]} {
-        puts "WARNING: UVHS protected GBus IP infer_clock diagnostics retained; continuing after vendor-only error: $gbus_infer_clock_error"
-    }
-} else {
 infer_clock
-}
 report_clock -inferred
 fpga_diff_set_async_clock_groups
-if {[string toupper [uvhs::env_or_default DIFFTEST_HOSTIF XDMA]] eq "GBUS"} {
-    if {[catch {transform_clock} gbus_transform_error]} {
-        puts "WARNING: UVHS protected GBus IP transform_clock diagnostics retained; continuing to partition/PnR: $gbus_transform_error"
-    }
-} else {
-    transform_clock
-}
+transform_clock
 set fill_rate_args {}
 foreach {option variable} {
     -lut UVHS_LUT_FILL_RATE
@@ -221,28 +203,7 @@ set shell_helper [uvhs::path shell_compat.sh]
 if {![file isfile $shell_helper]} {
     error "UVHS shell compatibility helper not found: $shell_helper"
 }
-if {[catch {exec bash $shell_helper patch-pnr hw.dat/Compile/PnR} patch_pnr_error]} {
-    # The helper may emit benign loader/locale diagnostics from generated
-    # Vivado workers even after patching every script successfully.  Verify
-    # the generated artifacts before deciding whether to stop the backend.
-    set patch_wrappers [glob -nocomplain hw.dat/Compile/PnR/*/*/vivado/Rundir/*/uv_vivado_wrapper.sh]
-    set patch_makefiles [glob -nocomplain hw.dat/Compile/PnR/*/*/vivado/Rundir/*/Makefile]
-    set patch_workers [glob -nocomplain hw.dat/Compile/PnR/*/*/timing/*/signoff_worker.tcl]
-    if {[llength $patch_wrappers] && [llength $patch_makefiles] && [llength $patch_workers]} {
-        puts "WARNING: patch-pnr returned an error after patching all generated scripts; continue: $patch_pnr_error"
-    } else {
-        error "patch-pnr failed before all generated scripts were patched: $patch_pnr_error"
-    }
-}
-# UVHS invokes its generated process pool as `python process_pool_.py`.
-# Put the local compatibility launcher first so the bundled Python 3.8 gets
-# libffi.so.6 before _ctypes is imported on modern host distributions.
-set compat_dir [file dirname $shell_helper]
-set ::env(PATH) "$compat_dir:/usr/bin:/bin"
-set ::env(LD_LIBRARY_PATH) "/tmp/fpga-diff-lib:/tmp:/nfs/tools/UVHS/UVH_P3_20260115/shlib:/nfs/tools/UVHS/UVH_P3_20260115/uvd/resource/usdbdiff_utils_package/lib"
-set ::env(LD_PRELOAD) "/tmp/fpga-diff-lib/libffi.so.6"
-set ::env(PYTHONHOME) "/tmp/uvpy38-fpga-diff"
-set ::env(PYTHONPATH) "/tmp/uvpy38-fpga-diff/lib/python3.8"
+exec bash $shell_helper patch-pnr hw.dat/Compile/PnR
 compile_fpga -parallel_option fpga -runOnly -explore
 
 report_path -max_path 100
