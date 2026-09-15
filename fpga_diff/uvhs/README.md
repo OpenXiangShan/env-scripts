@@ -27,18 +27,6 @@ GeneralBD local offsets are below; the host adds its config base (`0x1000`).
 AXIS TLAST validates each 768-byte DiffTest range. The host dispatches complete
 96-byte records and preserves any partial record across SRAM windows.
 
-Local validation (no board):
-
-```sh
-python3 tests/run_uvhs_generalbd_decode.py --functional-only
-bash tests/run_uvhs_gbus_c2h_fifo_verilator.sh
-bash tests/run_uvhs_axi_remote_link_verilator.sh
-```
-
-The legacy functional test skips its documented reserved-address hole check:
-GBS1 currently also acknowledges local `0x2400..0x2ffc` with zero data.
-Simulation success does not establish hardware GOOD TRAP or final timing closure.
-
 ## RTL Input
 
 Generate an FPGA release before entering `env-scripts`. `CORE_DIR` is the
