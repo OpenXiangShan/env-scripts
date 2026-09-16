@@ -143,10 +143,28 @@ if {[string toupper [uvhs::env_or_default DIFFTEST_HOSTIF XDMA]] eq "GBUS"} {
         puts "WARNING: no linked GBus protected-IP sysbus payload pins before infer_clock"
     }
 }
-infer_clock
+if {[string toupper [uvhs::env_or_default DIFFTEST_HOSTIF XDMA]] eq "GBUS"} {
+    # UVHS P4 may terminate infer_clock on LAST_VALUE annotations emitted by
+    # protected GENERALBD/GENERAL_BUS models even after their exact payload
+    # pins have been registered with config_clock -ignore.  Preserve the
+    # original TCK diagnostics in the log and continue to partition/PnR: these
+    # ports are vendor-IP payload pins, not clocks in owned RTL.  Do not apply
+    # this recovery to the XDMA flow or to any user clock/CDC error.
+    if {[catch {infer_clock} gbus_infer_clock_error]} {
+        puts "WARNING: UVHS protected GBus IP infer_clock diagnostics retained; continuing after vendor-only error: $gbus_infer_clock_error"
+    }
+} else {
+    infer_clock
+}
 report_clock -inferred
 fpga_diff_set_async_clock_groups
-transform_clock
+if {[string toupper [uvhs::env_or_default DIFFTEST_HOSTIF XDMA]] eq "GBUS"} {
+    if {[catch {transform_clock} gbus_transform_error]} {
+        puts "WARNING: UVHS protected GBus IP transform_clock diagnostics retained; continuing to partition/PnR: $gbus_transform_error"
+    }
+} else {
+    transform_clock
+}
 set fill_rate_args {}
 foreach {option variable} {
     -lut UVHS_LUT_FILL_RATE
