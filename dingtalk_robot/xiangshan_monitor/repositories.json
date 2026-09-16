@@ -1,0 +1,51 @@
+{
+  "organization": "OpenXiangShan",
+  "repositories": [
+    "XiangShan",
+    "NEMU",
+    "difftest",
+    "GEM5",
+    "xs-env",
+    "workload-builder",
+    "XSAI",
+    "XSCache",
+    "XiangShan-Dashboard",
+    "minjie-playground",
+    "ZhuJiang",
+    "CUTE",
+    "YunSuan",
+    "CoupledL2",
+    "gsim",
+    "XSAICache",
+    "Utility"
+  ],
+  "clone_dir": "dingtalk_robot/xiangshan_monitor/repos",
+  "timezone": "Asia/Shanghai",
+  "workday_calendar": "dingtalk_robot/xiangshan_monitor/workdays.json",
+  "delivery_history": "dingtalk_robot/xiangshan_monitor/delivery_history.json",
+  "scheduled_delivery": {
+    "analysis_start_time": "17:49",
+    "debug_time": "17:55",
+    "release_time": "18:00"
+  },
+  "analysis_window": "24h",
+  "highlight_count": null,
+  "max_commits": 0,
+  "git_timeout_seconds": 900,
+  "output": "dingtalk_robot/xiangshan_monitor/reports/{date}-{window}.json",
+  "message_output": "dingtalk_robot/xiangshan_monitor/reports/{date}-{window}.md",
+  "dingtalk_use_proxy": false,
+  "overflow_strategy": "map_reduce",
+  "prompt_file": "dingtalk_robot/xiangshan_monitor/prompt.txt",
+  "ai": {
+    "wire_api": "responses",
+    "model": "gpt-5.6-sol",
+    "context_window_tokens": 1050000,
+    "max_api_calls": 32,
+    "timeout_seconds": 300,
+    "max_output_tokens": 1800,
+    "reasoning_effort": "xhigh",
+    "use_proxy": true,
+    "store": false
+  }
+}

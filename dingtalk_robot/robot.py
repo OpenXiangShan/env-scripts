@@ -36,6 +36,7 @@ def send_message(
     secret: str,
     payload: Dict[str, Any],
     timeout: float = 15,
+    use_proxy: bool = True,
 ) -> Dict[str, Any]:
     """Send a raw DingTalk robot payload and validate the API response."""
     request = urllib.request.Request(
@@ -45,7 +46,12 @@ def send_message(
         method="POST",
     )
     try:
-        with urllib.request.urlopen(request, timeout=timeout) as response:
+        if use_proxy:
+            response_context = urllib.request.urlopen(request, timeout=timeout)
+        else:
+            opener = urllib.request.build_opener(urllib.request.ProxyHandler({}))
+            response_context = opener.open(request, timeout=timeout)
+        with response_context as response:
             result = json.loads(response.read().decode("utf-8"))
     except urllib.error.HTTPError as exc:
         detail = exc.read().decode("utf-8", errors="replace")
@@ -67,13 +73,18 @@ def send_message(
 
 
 def send_text(
-    webhook: str, secret: str, content: str, timeout: float = 15
+    webhook: str,
+    secret: str,
+    content: str,
+    timeout: float = 15,
+    use_proxy: bool = True,
 ) -> Dict[str, Any]:
     return send_message(
         webhook,
         secret,
         {"msgtype": "text", "text": {"content": content}},
         timeout,
+        use_proxy,
     )
 
 
@@ -83,10 +94,12 @@ def send_markdown(
     title: str,
     content: str,
     timeout: float = 15,
+    use_proxy: bool = True,
 ) -> Dict[str, Any]:
     return send_message(
         webhook,
         secret,
         {"msgtype": "markdown", "markdown": {"title": title, "text": content}},
         timeout,
+        use_proxy,
     )

@@ -3,6 +3,20 @@
     "webhook": "https://oapi.dingtalk.com/robot/send?access_token=YOUR_ACCESS_TOKEN",
     "secret": "SEC_YOUR_SIGNING_SECRET"
   },
+  "xiangshan_monitor": {
+    "api_url": "http://LOCAL-AI-HOST:PORT",
+    "api_key": "LOCAL_AI_API_KEY",
+    "dingtalk": {
+      "debug": {
+        "webhook": "https://oapi.dingtalk.com/robot/send?access_token=DEBUG_ACCESS_TOKEN",
+        "secret": "SEC_DEBUG_SIGNING_SECRET"
+      },
+      "release": {
+        "webhook": "https://oapi.dingtalk.com/robot/send?access_token=RELEASE_ACCESS_TOKEN",
+        "secret": "SEC_RELEASE_SIGNING_SECRET"
+      }
+    }
+  },
   "github": {
     "organization": "OpenXiangShan",
     "token": "",

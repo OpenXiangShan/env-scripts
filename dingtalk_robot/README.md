@@ -113,3 +113,89 @@ Run tests with:
 ```bash
 python3 -m unittest discover -s dingtalk_robot/tests -v
 ```
+
+## OpenXiangShan daily praise monitor
+
+`xiangshan_monitor/xiangshan_monitor.py` is a three-stage daily job for the OpenXiangShan
+organization. `pull` clones or fast-forward-updates the repositories listed in
+`dingtalk_robot/xiangshan_monitor/repositories.json` and records commits from a
+rolling window (`24h` by default, or `7d`), including the complete patch for
+every commit. `talk` reads the checked-in `prompt.txt` and uses the explicitly
+configured local API in `config.json` to select standout contributors and write
+a casual DingTalk-ready Chinese message from the patch material. The prompt
+file keeps the final, map, and reduce instructions in separate `[final]`, `[map]`,
+and `[reduce]` sections. `highlight_count` controls how many contributors are
+selected; when it is `null`, the monitor chooses 1 for a window up to 24h, adds
+one for each additional full day, and caps at 3. If the AI API returns an
+error or unusable response, the monitor writes and sends its fixed fallback
+message instead. `push` sends that message as plain text with the normal signed
+DingTalk helper; it never calls an AI API. Monitor credentials are layered as
+`xiangshan_monitor.dingtalk.release` (the current release robot) and
+`xiangshan_monitor.dingtalk.debug` (the legacy MemBlock-compatible robot).
+`debug` is the default; select the release layer with `--dingtalk-layer release`.
+
+The repository data file includes XiangShan, NEMU, difftest, GEM5, xs-env,
+workload-builder, XSAI, XSCache, XiangShan-Dashboard, minjie-playground, ZhuJiang,
+CUTE, YunSuan, CoupledL2, gsim, XSAICache, and Utility. Edit that file to add or
+remove repositories or change the default `analysis_window` to `7d`.
+`max_commits: 0` means every commit in the window is included. The local API
+key and both layered DingTalk credentials belong in the ignored
+`config.json`; all are required and there is no `.codex` or public OpenAI
+fallback. `ai.use_proxy` makes the configured AI endpoint reuse the explicit
+`github.proxy` value from that same local config; set it to `false` for a
+directly reachable private endpoint.
+
+Run the complete job once, which is suitable for cron or a systemd timer:
+
+```bash
+python3 dingtalk_robot/xiangshan_monitor/xiangshan_monitor.py
+```
+
+The installed workday delivery mode resumes from the analysis cutoff of the
+last successful release, stored in the ignored local
+`xiangshan_monitor/delivery_history.json`. A failed day therefore remains in
+the next successful report instead of creating a gap. It reuses the same
+generated message for both robots: debug at 17:55 and release at 18:00.
+It reads `xiangshan_monitor/workdays.json` before doing any repository or AI
+work, so normal weekends and official holidays are skipped while official
+makeup workdays are included. It accepts scheduled starts only from 17:49 up
+to 17:55, so starting the delivery entry point at another time makes no Git,
+GitHub, AI, or DingTalk request. If any repository pull or Stars lookup fails,
+AI is not called, release is skipped, and only debug receives an error. A
+successful release advances the local cutoff and saves all repositories'
+current Stars as the next growth baseline. Calendar years that are not present
+in the JSON fail closed without sending.
+
+```bash
+python3 dingtalk_robot/xiangshan_monitor/xiangshan_monitor.py --workday-delivery
+```
+
+Run the same collection and AI pipeline immediately but send only to debug,
+without advancing the successful-release cutoff or Stars baseline:
+
+```bash
+python3 dingtalk_robot/xiangshan_monitor/xiangshan_monitor.py --debug-now
+```
+
+Run individual stages or test delivery with the monitor's DingTalk robot:
+
+```bash
+python3 dingtalk_robot/xiangshan_monitor/xiangshan_monitor.py --stage pull --window 7d
+python3 dingtalk_robot/xiangshan_monitor/xiangshan_monitor.py --stage talk --report dingtalk_robot/xiangshan_monitor/reports/2026-09-11-7d.json
+python3 dingtalk_robot/xiangshan_monitor/xiangshan_monitor.py --stage push \
+  --message dingtalk_robot/xiangshan_monitor/reports/2026-09-11-7d.md \
+  --dingtalk-section xiangshan_monitor \
+  --dingtalk-layer release
+```
+
+Use `--dry-run` to suppress DingTalk delivery (including while testing the
+`debug` layer). With `--workday-delivery`, a dry run is a pure schedule/window
+check: it skips Git, GitHub, AI, DingTalk, and waiting. The older single-layer loop remains available through
+`--daemon`; the registered systemd timer is easier to monitor. The first
+successful run establishes the Stars baseline; later successful runs report
+the current total, net change, and per-repository changes. If the
+complete diff for a long window does not fit one context, the default
+`overflow_strategy: map_reduce` splits at commit boundaries, asks the local API
+for compact fact summaries, and makes one final synthesis call. The checked-in
+`ai.max_api_calls` cap prevents unbounded requests; a single oversized commit is
+split by text without dropping its patch content.

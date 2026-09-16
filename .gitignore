@@ -11,6 +11,7 @@ __pycache__
 .vscode
 
 *.txt
+!dingtalk_robot/xiangshan_monitor/prompt.txt
 *.log
 *.csv
 *.jou
@@ -33,3 +34,9 @@ dingtalk_robot/config.json
 dingtalk_robot/token
 dingtalk_robot/oss_stats/reports/*.json
 dingtalk_robot/oss_stats/reports/*.xlsx
+
+# OpenXiangShan daily monitor clones and generated reports
+dingtalk_robot/xiangshan_monitor/repos/
+dingtalk_robot/xiangshan_monitor/reports/*.json
+dingtalk_robot/xiangshan_monitor/reports/*.md
+dingtalk_robot/xiangshan_monitor/delivery_history.json
