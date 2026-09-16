@@ -141,7 +141,11 @@ foreach {fpga_diff_clock fpga_diff_master fpga_diff_gate} {
 }
 
 set fpga_diff_async_groups [list]
-foreach fpga_diff_clock {TMCLK ddr_ref_clk CPU_CLK_IN UART_CLK_IN jtag_vclk pcie_ep_refclk} {
+set fpga_diff_async_clock_names {TMCLK ddr_ref_clk CPU_CLK_IN jtag_vclk pcie_ep_refclk}
+if {[string toupper $fpga_diff_hostif] eq "GBUS"} {
+    lappend fpga_diff_async_clock_names UART_CLK_IN
+}
+foreach fpga_diff_clock $fpga_diff_async_clock_names {
     lappend fpga_diff_async_groups -group \
         [get_clocks -include_generated_clocks $fpga_diff_clock]
 }
@@ -177,7 +181,8 @@ set fpga_diff_ddr_reset_regs [get_cells -hier -quiet -filter {
 if {[llength $fpga_diff_ddr_reset_regs]} {
     set fpga_diff_tdm_tx_sync_candidates [get_pins -hier -quiet -filter {
         REF_PIN_NAME == D &&
-        NAME =~ */uvtdm_parity_g/sync_flop_0_reg*/D
+        (NAME =~ */uvtdm_tx_ctrl_inst/sync_flop_0_reg*/D ||
+         NAME =~ */uvtdm_parity_g/sync_flop_0_reg*/D)
     }]
     set fpga_diff_tdm_tx_sync_d_pins {}
     if {[llength $fpga_diff_tdm_tx_sync_candidates]} {
@@ -208,17 +213,19 @@ if {[llength $fpga_diff_ddr_reset_regs]} {
 # UVHS DDR timing XDC classifies it as asynchronous.  Apply the same narrow
 # exception after Vivado has linked the partition so timing signoff does not
 # treat the unrelated MMCM and GT TX clocks as a synchronous data path.
-set fpga_diff_ddr_tdm_reset_src [get_pins -hierarchical -quiet -filter {
-    NAME =~ */core_def/U_UVHS_UVW_AXI4_TO_DDR4/*/proc_sys_reset_0/U0/ACTIVE_LOW_PR_OUT_DFF*/C
-}]
-set fpga_diff_ddr_tdm_reset_dst [get_pins -hierarchical -quiet -filter {
-    REF_PIN_NAME == D && NAME =~ */uvtdm_parity_g/sync_flop_0_reg*/D
-}]
-if {[llength $fpga_diff_ddr_tdm_reset_src] &&
-    [llength $fpga_diff_ddr_tdm_reset_dst]} {
-    set_false_path -from $fpga_diff_ddr_tdm_reset_src \
-        -to $fpga_diff_ddr_tdm_reset_dst
-    puts "INFO: constrained UVHS DDR-reset to TDM synchronizer CDC: sources=[llength $fpga_diff_ddr_tdm_reset_src] destinations=[llength $fpga_diff_ddr_tdm_reset_dst]"
-} else {
-    puts "INFO: no linked UVHS DDR-reset to TDM synchronizer CDC endpoints"
+if {[string toupper $fpga_diff_hostif] eq "GBUS"} {
+    set fpga_diff_ddr_tdm_reset_src [get_pins -hierarchical -quiet -filter {
+        NAME =~ */core_def/U_UVHS_UVW_AXI4_TO_DDR4/*/proc_sys_reset_0/U0/ACTIVE_LOW_PR_OUT_DFF*/C
+    }]
+    set fpga_diff_ddr_tdm_reset_dst [get_pins -hierarchical -quiet -filter {
+        REF_PIN_NAME == D && NAME =~ */uvtdm_parity_g/sync_flop_0_reg*/D
+    }]
+    if {[llength $fpga_diff_ddr_tdm_reset_src] &&
+        [llength $fpga_diff_ddr_tdm_reset_dst]} {
+        set_false_path -from $fpga_diff_ddr_tdm_reset_src \
+            -to $fpga_diff_ddr_tdm_reset_dst
+        puts "INFO: constrained UVHS DDR-reset to TDM synchronizer CDC: sources=[llength $fpga_diff_ddr_tdm_reset_src] destinations=[llength $fpga_diff_ddr_tdm_reset_dst]"
+    } else {
+        puts "INFO: no linked UVHS DDR-reset to TDM synchronizer CDC endpoints"
+    }
 }

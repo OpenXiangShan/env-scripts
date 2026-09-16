@@ -67,12 +67,14 @@ proc uvhs::start_frontend_shell_compat {} {
         error "UVHS shell compatibility helper not found: $helper"
     }
     set module_makefile [file join [pwd] hw.dat Synthesis Uvsyn Script module.makefile]
-    # Do not let asynchronous compatibility helpers inherit the frontend
-    # command's stdout pipe.  If they do, the caller's `tee` remains open
-    # after uv_shell exits and `make uvhs_frontend` waits forever even though
-    # UVHS_FRONTEND_SUCCESS was already emitted.
-    set module_log [file join [pwd] uvhs_module_shell_compat.log]
-    exec bash $helper wait-module $module_makefile > $module_log < /dev/null 2>@1 &
+    if {[string toupper [uvhs::env_or_default DIFFTEST_HOSTIF XDMA]] eq "GBUS"} {
+        # Do not let the GBus compatibility helper keep the frontend output pipe
+        # open after uv_shell exits.
+        set module_log [file join [pwd] uvhs_module_shell_compat.log]
+        exec bash $helper wait-module $module_makefile > $module_log < /dev/null 2>@1 &
+    } else {
+        exec bash $helper wait-module $module_makefile &
+    }
     puts "INFO: started UVHS frontend shell compatibility helper"
 }
 
@@ -81,12 +83,12 @@ set_option syn.computeFeCheckSum true
 
 set_parallel_option -max_threads 4 -max_processes 16 -label frontend
 set_parallel_option -max_threads 16 -label runtime
-# UVHS launches Vivado module workers through /bin/sh.  The generated worker
-# makefiles use bash-only redirection (>&); point the worker shell at bash so
-# vendor IP synthesis jobs produce their DCP/liberty outputs.
-set ::env(SHELL) /bin/bash
-set ::env(MAKE) /usr/bin/make
-set ::env(BASH_ENV) ""
+if {[string toupper [uvhs::env_or_default DIFFTEST_HOSTIF XDMA]] eq "GBUS"} {
+    # The GBus protected-IP worker makefiles use bash-only redirection.
+    set ::env(SHELL) /bin/bash
+    set ::env(MAKE) /usr/bin/make
+    set ::env(BASH_ENV) ""
+}
 
 set_option global.log.label MEMORY
 set_option syn.checkMultiDriver false
@@ -136,13 +138,18 @@ if {[string toupper [uvhs::env_or_default DIFFTEST_HOSTIF XDMA]] eq "XDMA"} {
 uvhs::import_blackbox uvw_general_bus \
     ./rtl/soc/uvw_general_bus/uvw_general_bus.dcp \
     -clock_enable_pairs {dut_axi_aclk dut_axi_aclk_en 1}
-uvhs::import_blackbox uvw_axi4_to_ddr4 ./rtl/soc/uvw_axi4_to_ddr4.dcp \
-    -clock_enable_pairs {ddr4ip_dut_axi_aclk ddr4ip_dut_axi_aclk_en 1} \
-    -script_file {prePlace ./script/uvw_axi4_to_ddr4_pblock.tcl}
-# set_blackbox registers the protected checkpoint but does not add the Verilog
-# declaration to the elaboration source set.  Read the matching stub explicitly
-# so the RTL instance resolves without using the unsupported set_ip command.
-read_verilog ./rtl/soc/uvw_axi4_to_ddr4_Stub.v
+if {[string toupper [uvhs::env_or_default DIFFTEST_HOSTIF XDMA]] eq "GBUS"} {
+    uvhs::import_blackbox uvw_axi4_to_ddr4 ./rtl/soc/uvw_axi4_to_ddr4.dcp \
+        -clock_enable_pairs {ddr4ip_dut_axi_aclk ddr4ip_dut_axi_aclk_en 1} \
+        -script_file {prePlace ./script/uvw_axi4_to_ddr4_pblock.tcl}
+    # set_blackbox does not add the Verilog declaration to the source set.
+    read_verilog ./rtl/soc/uvw_axi4_to_ddr4_Stub.v
+} else {
+    uvhs::import_ip uvw_axi4_to_ddr4 ./rtl/soc/uvw_axi4_to_ddr4.dcp \
+        ./rtl/soc/uvw_axi4_to_ddr4_Stub.v \
+        -clock_enable_pairs {ddr4ip_dut_axi_aclk ddr4ip_dut_axi_aclk_en 1} \
+        -script_file {prePlace ./script/uvw_axi4_to_ddr4_pblock.tcl}
+}
 
 set filelist ./rtl/filelist.f
 if {![file exists $filelist]} {

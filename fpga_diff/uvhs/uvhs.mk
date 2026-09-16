@@ -70,8 +70,10 @@ UVHS_TOOL_ENV = \
 	MAKEFLAGS="$${MAKEFLAGS:+$$MAKEFLAGS }SHELL=/bin/bash" \
 	UVHS_RUNTIME_LIB_DIR="$(UVHS_RUNTIME_LIB_DIR)" \
 	UVHS_COMPAT_BIN="$(UVHS_COMPAT_BIN)" \
-	UVHS_TMCLK_CPU_RATIO="$(UVHS_TMCLK_CPU_RATIO)" \
-	UVHS_GBUS_DCP="$(UVHS_GBUS_DCP)" \
+		UVHS_TMCLK_CPU_RATIO="$(UVHS_TMCLK_CPU_RATIO)" \
+		DIFFTEST_HOSTIF="$(DIFFTEST_HOSTIF)" \
+		UVHS_GBUS_DCP="$(UVHS_GBUS_DCP)" \
+
 	UVHS_GBUS_STUB="$(UVHS_GBUS_STUB)" \
 	UVHS_GENERALBD_DCP="$(UVHS_GENERALBD_DCP)" \
 	UVHS_GENERALBD_STUB="$(UVHS_GENERALBD_STUB)" \
@@ -114,18 +116,20 @@ uvhs_preflight: check_project_name
 			"$(UVHS_ROOT_DIR)/tools/update_core_flist.sh"; do \
 			[[ -x "$$executable" ]] || { echo "ERROR: executable not found: $$executable" >&2; exit 1; }; \
 		done; \
-			for file in \
-				"$(UVHS_COMPILATION_DIR)/vivado_pre_opt.tcl" \
-				"$(UVHS_COMPILATION_DIR)/partition.tcl" \
-				"$(UVHS_GBUS_DCP)" \
-				"$(UVHS_GBUS_STUB)" \
-				"$(UVHS_GENERALBD_DCP)" \
-				"$(UVHS_GENERALBD_STUB)" \
-				"$(UVHS_TEMPLATE_DIR)/Makefile" \
-				"$(UVHS_TEMPLATE_DIR)/script/1B_4F_HGC_assemble.tcl"; do \
-				[[ -f "$$file" ]] || { echo "ERROR: file not found: $$file" >&2; exit 1; }; \
-
+		for file in \
+			"$(UVHS_COMPILATION_DIR)/vivado_pre_opt.tcl" \
+			"$(UVHS_COMPILATION_DIR)/partition.tcl" \
+			"$(UVHS_TEMPLATE_DIR)/Makefile" \
+			"$(UVHS_TEMPLATE_DIR)/script/1B_4F_HGC_assemble.tcl"; do \
+			[[ -f "$$file" ]] || { echo "ERROR: file not found: $$file" >&2; exit 1; }; \
 		done; \
+		if [[ "$(DIFFTEST_HOSTIF)" == GBUS ]]; then \
+			for file in \
+				"$(UVHS_GBUS_DCP)" "$(UVHS_GBUS_STUB)" \
+				"$(UVHS_GENERALBD_DCP)" "$(UVHS_GENERALBD_STUB)"; do \
+				[[ -s "$$file" ]] || { echo "ERROR: file missing or empty: $$file" >&2; exit 1; }; \
+			done; \
+		fi; \
 		for directory in "$(CORE_DIR)" "$(UVHS_TEMPLATE_DIR)/script" "$(UVHS_UVW_AXI4_TO_DDR4_SRC)"; do \
 			[[ -d "$$directory" ]] || { echo "ERROR: directory not found: $$directory" >&2; exit 1; }; \
 		done; \

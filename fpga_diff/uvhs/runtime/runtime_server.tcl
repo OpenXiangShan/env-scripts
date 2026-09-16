@@ -693,9 +693,13 @@ proc uvhs_initialize_runtime {} {
     } else {
         config -clock -default
     }
-    # Restore the transport and CPU clocks committed by timing sign-off.
-    set signoff_transport_frequency [uvhs_query_default_clock_frequency clk6_p]
-    config -clock -name clk6_p -frequency $signoff_transport_frequency
+    if {[info exists ::env(DIFFTEST_HOSTIF)] &&
+            [string toupper $::env(DIFFTEST_HOSTIF)] eq "GBUS"} {
+        set transport_frequency [uvhs_query_default_clock_frequency clk6_p]
+    } else {
+        set transport_frequency 50000000
+    }
+    config -clock -name clk6_p -frequency $transport_frequency
     set signoff_cpu_frequency [uvhs_query_default_clock_frequency clk5_p]
     config -clock -name clk5_p -frequency $signoff_cpu_frequency
     uvhs_configure_tmclk_from_cpu $signoff_cpu_frequency
