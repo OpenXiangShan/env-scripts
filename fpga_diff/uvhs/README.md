@@ -13,7 +13,7 @@ The obsolete C2H DDR-ring writer and DDR trace sink are not included.
 
 GBS1 is a register-drained SRAM window. Backpressure reaches the DiffTest
 sender and pauses the CPU while the host transport clock continues to run.
-The matching fpga-host implementation is in OpenXiangShan/difftest#954.
+The matching fpga-host selects the same GBS1 register-window protocol.
 
 GeneralBD local offsets are below; the host adds its config base (`0x1000`).
 
@@ -208,8 +208,8 @@ from the server's global Tcl scope.
 
 The probe scripts describe compile-time instrumentation, not a runtime dump.
 For XiangShan/KMH XDMA builds, the frontend sources
-`compilation/probe_kmh.tcl` by default. It is the larger profile derived from
-the 2026-08-04 and 2026-08-07 debug builds. CPU and L2 signals are sampled on
+`compilation/probe_kmh.tcl` by default. This larger profile samples CPU and L2
+signals on
 `core_def.inter_soc_clk`, the gated clock connected to `SimTop.clock`. DDR and
 host-trigger signals remain on their free-running host-clock domain, so the host
 trigger remains observable after the CPU clock stops. Its generated

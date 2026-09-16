@@ -19,13 +19,14 @@ proc assign_pin_env_or_default {name fallback} {
     return $fallback
 }
 
-set top [assign_pin_env_or_default UVHS_ASSIGN_PIN_TOP none]
+set fpga_diff_hostif [string toupper [assign_pin_env_or_default DIFFTEST_HOSTIF XDMA]]
+set default_top [expr {$fpga_diff_hostif eq "GBUS" ? "none" : "fpga_top_debug"}]
+set top [assign_pin_env_or_default UVHS_ASSIGN_PIN_TOP $default_top]
 set xdma_link_width [string toupper [string trim [assign_pin_env_or_default XDMA_LINK_WIDTH X4]]]
 if {$xdma_link_width ni {X4 X8}} {
     error "XDMA_LINK_WIDTH must be one of X4/X8, got '$xdma_link_width'"
 }
 set xdma_lane_count [expr {$xdma_link_width eq "X8" ? 8 : 4}]
-set fpga_diff_hostif [string toupper [assign_pin_env_or_default DIFFTEST_HOSTIF XDMA]]
 
 set apc16_indices {
     101 102 104 105 114 115 117 57
@@ -43,8 +44,7 @@ proc apc16_pin {port slot} {
 # Low-speed debug/control pins on the unused F2 APC16 connector.
 # rstn_sw* are exported as UVHS global resets and must not also be assign_pin'd.
 if {$fpga_diff_hostif eq "GBUS"} {
-    # Exact assignment from the successful 2026-08-26 mini XiangShan GBus
-    # frontend. Do not assign ports absent from that mini top.
+    # The GBus release exposes only this reduced set of low-speed ports.
     foreach {port slot} {
         led0 3 led2 4 led3 5
         uart0_sout 6 uart0_sin 7 uart1_sout 8 uart2_sout 10
@@ -84,7 +84,7 @@ assign_pin -port [pin_name $top pcie_ep_lnk_up] -connector b0.F2_APC16 -index 58
 # XDMA endpoint signals. X4 uses the HGC7 lane group from the Hejian official
 # XDMA EP example; bind HGC6 only when X8 is explicitly selected.
 if {$fpga_diff_hostif eq "GBUS"} {
-    puts "INFO: assign quiescent GBus PCIe TX ports to known-good APC16 pins"
+    puts "INFO: assign quiescent GBus PCIe TX ports to APC16 pins"
     foreach {port index} {
         {pci_ep_txp[0]} 101 {pci_ep_txn[0]} 102
         {pci_ep_txp[1]} 104 {pci_ep_txn[1]} 85

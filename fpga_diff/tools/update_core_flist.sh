@@ -101,12 +101,15 @@ generate_uvhs_filelist() {
     # same synthesis/configuration defines used by the established UVHS flow;
     # without UVHS the shared top incorrectly selects Vivado-only primitives.
     # XiangShan UVHS builds require the platform adaptation and external DDR
-    # contract used by the known-good fpgamini GBus release.  Without these
-    # defines the shared core falls back to the reduced Vivado-only path.
+    # contract. Without these defines the shared core falls back to the reduced
+    # Vivado-only path.
     if [[ $cpu == kmh ]]; then
-      printf '+define+UVHS_SOC_ADAPT\n+define+UVHS_NO_XILINX_CLK_PRIMS\n'
+      printf '+define+UVHS_NO_XILINX_CLK_PRIMS\n'
       printf '+define+UVHS_EXTERNAL_UVW_AXI4_TO_DDR4\n+define+UVHS_UVW_AXI4_TO_DDR4\n'
       printf '+define+UVHS_CPU_DEBUG_CLK\n+define+CONFIG_USE_XSCORE_AXI\n'
+      if [[ $hostif == GBUS ]]; then
+        printf '+define+UVHS_SOC_ADAPT\n'
+      fi
     fi
     if [[ $hostif == GBUS ]]; then
       printf '+define+CONFIG_DIFFTEST_HOSTIF_GBUS\n'

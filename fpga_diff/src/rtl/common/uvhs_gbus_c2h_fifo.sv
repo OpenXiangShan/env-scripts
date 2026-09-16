@@ -148,7 +148,7 @@ module uvhs_gbus_c2h_fifo #(
   // Drain mode only discards what is already buffered; the instant the FIFO is
   // empty the drain ends so the host is not left polling a permanently busy FSM.
   wire drain_beat = filling && drain_mode && fifo_tvalid;
-  wire drain_done = filling && drain_mode && !fifo_tvalid;
+  wire drain_done = filling && drain_mode && !fifo_has_data;
 
   // A beat is popped exactly once, on the cycle it is latched into the holding
   // register.  The FIFO's output stage is already registered, so latching
@@ -165,7 +165,7 @@ module uvhs_gbus_c2h_fifo #(
   // A fill ends when the staging window is full, or when the FIFO has run dry.
   // The host observes the end through status[7] going low and reads
   // status[16:8] to learn how many words landed.
-  wire stream_dry = filling && !drain_mode && !hold_valid && !fifo_tvalid;
+  wire stream_dry = filling && !drain_mode && !hold_valid && !fifo_has_data;
 
   integer k;
   // The staging FSM and the frame counter follow the stream reset, not just the
@@ -229,12 +229,13 @@ module uvhs_gbus_c2h_fifo #(
   end
 
   // --------------------------------------------------------- register reads
+  wire [8:0] staged_words_status = 9'(staged_words);
   wire [31:0] status_word = {
       1'b1,                        // [31]   window present
       frame_error,                 // [30]   sticky framing error
       drain_mode,                  // [29]   drain in progress
       12'b0,                       // [28:17]
-      staged_words,                // [16:8] valid staging words
+      staged_words_status,         // [16:8] valid staging words
       filling,                     // [7]    staging fill in progress
       has_data,                    // [6]    payload still buffered
       6'b0                         // [5:0]
@@ -253,7 +254,7 @@ module uvhs_gbus_c2h_fifo #(
       else
         case (cfg_rd_addr)
           REG_STATUS: cfg_rdata <= status_word;
-          REG_CTRL: cfg_rdata <= {23'b0, staged_words};
+          REG_CTRL: cfg_rdata <= {23'b0, staged_words_status};
           REG_ID: cfg_rdata <= ID_MAGIC;
           default: cfg_rdata <= 32'b0;
         endcase

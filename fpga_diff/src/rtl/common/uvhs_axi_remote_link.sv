@@ -374,21 +374,23 @@ module uvhs_axi_remote_sink #(
     wire [PACKET_WIDTH-1:0] req_packet;
     wire req_packet_valid;
     wire [1:0] req_type = req_packet[1:0];
-    wire [AW_PAYLOAD_WIDTH-1:0] req_aw_payload =
+    // AW and AR packets intentionally share the same address/control layout;
+    // req_type selects which AXI channel consumes this payload.
+    wire [AW_PAYLOAD_WIDTH-1:0] req_addr_payload =
         req_packet[2 +: AW_PAYLOAD_WIDTH];
     wire [W_PAYLOAD_WIDTH-1:0] req_w_payload =
         req_packet[2 +: W_PAYLOAD_WIDTH];
 
-    assign m_axi_awid = req_aw_payload[0 +: ID_WIDTH];
-    assign m_axi_awaddr = req_aw_payload[ID_WIDTH +: ADDR_WIDTH];
-    assign m_axi_awlen = req_aw_payload[ID_WIDTH+ADDR_WIDTH +: 8];
-    assign m_axi_awsize = req_aw_payload[ID_WIDTH+ADDR_WIDTH+8 +: 3];
-    assign m_axi_awburst = req_aw_payload[ID_WIDTH+ADDR_WIDTH+11 +: 2];
-    assign m_axi_awlock = req_aw_payload[ID_WIDTH+ADDR_WIDTH+13];
-    assign m_axi_awcache = req_aw_payload[ID_WIDTH+ADDR_WIDTH+14 +: 4];
-    assign m_axi_awprot = req_aw_payload[ID_WIDTH+ADDR_WIDTH+18 +: 3];
-    assign m_axi_awqos = req_aw_payload[ID_WIDTH+ADDR_WIDTH+21 +: 4];
-    assign m_axi_awregion = req_aw_payload[ID_WIDTH+ADDR_WIDTH+25 +: 4];
+    assign m_axi_awid = req_addr_payload[0 +: ID_WIDTH];
+    assign m_axi_awaddr = req_addr_payload[ID_WIDTH +: ADDR_WIDTH];
+    assign m_axi_awlen = req_addr_payload[ID_WIDTH+ADDR_WIDTH +: 8];
+    assign m_axi_awsize = req_addr_payload[ID_WIDTH+ADDR_WIDTH+8 +: 3];
+    assign m_axi_awburst = req_addr_payload[ID_WIDTH+ADDR_WIDTH+11 +: 2];
+    assign m_axi_awlock = req_addr_payload[ID_WIDTH+ADDR_WIDTH+13];
+    assign m_axi_awcache = req_addr_payload[ID_WIDTH+ADDR_WIDTH+14 +: 4];
+    assign m_axi_awprot = req_addr_payload[ID_WIDTH+ADDR_WIDTH+18 +: 3];
+    assign m_axi_awqos = req_addr_payload[ID_WIDTH+ADDR_WIDTH+21 +: 4];
+    assign m_axi_awregion = req_addr_payload[ID_WIDTH+ADDR_WIDTH+25 +: 4];
     assign m_axi_awvalid = req_packet_valid && req_type == TYPE_AW;
     assign m_axi_wdata = req_w_payload[0 +: DATA_WIDTH];
     assign m_axi_wstrb = req_w_payload[DATA_WIDTH +: DATA_WIDTH/8];
