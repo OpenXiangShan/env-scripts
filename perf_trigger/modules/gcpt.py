@@ -36,7 +36,7 @@ class GCPT:
 
     @property
     def benchmark_group(self) -> str:
-        return self.__benchmark.split("_")[0] # gcc_s02 -> gcc
+        return self.__benchmark.split("_")[0]  # gcc_s02 -> gcc
 
     @property
     def checkpoint(self) -> str:
@@ -56,7 +56,12 @@ class GCPT:
 
     @property
     def bin_path(self) -> Path:
-        return self.__gcpt_path / self.__benchmark / self.__checkpoint
+        return (
+            self.__gcpt_path
+            / self.__benchmark
+            / self.__checkpoint
+            / f"_{self.__checkpoint}_{self.__weight}_memory_.zstd"
+        )
 
     @property
     def result_path(self) -> Path:
@@ -108,7 +113,9 @@ class GCPT:
     def clear_state(self) -> None:
         self.__state = GCPT.State.NONE
 
-    def get_perf(self, counters: set[str] | None = None, full_name: bool = False) -> dict[str, int]:
+    def get_perf(
+        self, counters: set[str] | None = None, full_name: bool = False
+    ) -> dict[str, int]:
         if self.refresh_state() != GCPT.State.FINISHED:
             return {}
 

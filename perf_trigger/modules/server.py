@@ -348,29 +348,6 @@ class Server:
         gcpt.result_path.mkdir(parents=True, exist_ok=True)
 
         # find binary
-        p = self.run(
-            [
-                "ls",
-                shlex.quote(str(gcpt.bin_path)),
-            ]
-        )
-        if p.returncode != 0 or p.stdout is None:
-            self.tracker.error("Failed to find gcpt binary: %s", gcpt.bin_path)
-            return
-
-        gcpt_file = [f.strip() for f in p.stdout.read().decode().split()]
-        gcpt_file = [
-            f
-            for f in gcpt_file
-            if f.endswith(".gz") or f.endswith(".zstd") or f.endswith(".bin")
-        ]
-        if len(gcpt_file) == 0:
-            self.tracker.error("Failed to find gcpt binary: %s", gcpt.bin_path)
-            return
-        if len(gcpt_file) > 1:
-            self.tracker.warning("Multiple gcpt binaries found, using the first one.")
-        gcpt_file = gcpt_file[0]
-
         with (
             gcpt.stdout_path.open("w", encoding="utf-8") as fout,
             gcpt.stderr_path.open("w", encoding="utf-8") as ferr,
@@ -394,7 +371,7 @@ class Server:
                     "-I",
                     str(emu_config.max_instr) if not emu_config.dry_run else "2000",
                     "-i",
-                    shlex.quote(str(gcpt.bin_path / gcpt_file)),
+                    shlex.quote(str(gcpt.bin_path)),
                     "-s",
                     str(random.randint(0, 9999)),
                 ]
