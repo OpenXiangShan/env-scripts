@@ -5,15 +5,9 @@ artifacts required by the UVHS GBus flow. The DCPs are opaque vendor IP and are
 not modified. The generated synthesis stubs retain the vendor interfaces while
 omitting build-host metadata.
 
-`uvhs/compilation/prepare_ip.sh` uses these files by default. A site may select
-a different matching release pair with:
-
-- `UVHS_GBUS_DCP` and `UVHS_GBUS_STUB`
-- `UVHS_GENERALBD_DCP` and `UVHS_GENERALBD_STUB`
-
-The selected GeneralBus stub must expose 256-bit AXI read and write data ports.
-The applicable IP license and redistribution terms are those of the UVHS vendor
-release.
+`uvhs/compilation/prepare_ip.sh` copies these fixed release assets into the
+UVHS work directory. The applicable IP license and redistribution terms are
+those of the UVHS vendor release.
 
 | File | SHA-256 |
 | --- | --- |

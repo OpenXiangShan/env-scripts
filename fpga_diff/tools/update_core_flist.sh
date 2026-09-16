@@ -74,14 +74,8 @@ generate_uvhs_filelist() {
   shift 4
 
   local hostif=${DIFFTEST_HOSTIF:-XDMA}
-  local functional_ddr_remote_link=${UVHS_FUNCTIONAL_DDR_REMOTE_LINK:-0}
   [[ $hostif == XDMA || $hostif == GBUS ]] ||
     rtl_flist_fail "DIFFTEST_HOSTIF must be XDMA or GBUS: $hostif"
-  [[ $functional_ddr_remote_link == 0 || $functional_ddr_remote_link == 1 ]] ||
-    rtl_flist_fail "UVHS_FUNCTIONAL_DDR_REMOTE_LINK must be 0 or 1: $functional_ddr_remote_link"
-  if [[ $functional_ddr_remote_link == 1 && $hostif != GBUS ]]; then
-    rtl_flist_fail "UVHS_FUNCTIONAL_DDR_REMOTE_LINK=1 requires DIFFTEST_HOSTIF=GBUS"
-  fi
 
   core_dir=$(realpath -e -- "$core_dir")
   work_dir=$(realpath -e -- "$work_dir")
@@ -97,25 +91,8 @@ generate_uvhs_filelist() {
 
   {
     printf '+define+SYNTHESIS\n+define+XIANGSHAN_FPGA\n+define+UVHS\n'
-    # UVHS supplies the board clocking, DDR, and platform wrappers.  Keep the
-    # same synthesis/configuration defines used by the established UVHS flow;
-    # without UVHS the shared top incorrectly selects Vivado-only primitives.
-    # XiangShan UVHS builds require the platform adaptation and external DDR
-    # contract. Without these defines the shared core falls back to the reduced
-    # Vivado-only path.
-    if [[ $cpu == kmh ]]; then
-      printf '+define+UVHS_NO_XILINX_CLK_PRIMS\n'
-      printf '+define+UVHS_EXTERNAL_UVW_AXI4_TO_DDR4\n+define+UVHS_UVW_AXI4_TO_DDR4\n'
-      printf '+define+UVHS_CPU_DEBUG_CLK\n+define+CONFIG_USE_XSCORE_AXI\n'
-      if [[ $hostif == GBUS ]]; then
-        printf '+define+UVHS_SOC_ADAPT\n'
-      fi
-    fi
     if [[ $hostif == GBUS ]]; then
       printf '+define+CONFIG_DIFFTEST_HOSTIF_GBUS\n'
-      if [[ $functional_ddr_remote_link == 1 ]]; then
-        printf '+define+UVHS_FUNCTIONAL_DDR_REMOTE_LINK\n'
-      fi
     fi
     printf '+define+DDR4_16G_X8\n+define+DQ64\n+define+DDR4_2400\n'
     printf '+define+DQ=64\n+define+MICRON_DDR\n+define+DDR4_16Gbx8\n'
@@ -123,9 +100,14 @@ generate_uvhs_filelist() {
     if [[ $cpu == nutshell ]]; then
       printf '+define+CPU_NUTSHELL\n'
     fi
-    if [[ $cpu == kmh ]] &&
-      grep -Eq '^[[:space:]]*(input|output)[[:space:]].*dma_awready' "$core_rtl_dir/SimTop.sv"; then
-      printf '+define+CONFIG_SIMTOP_HAS_DMA\n'
+    if [[ $cpu == kmh ]]; then
+      if grep -Eq '^[[:space:]]*(input|output)[[:space:]].*dma_awready' \
+        "$core_rtl_dir/SimTop.sv"; then
+        printf '+define+CONFIG_SIMTOP_HAS_DMA\n'
+      elif [[ $hostif == GBUS ]]; then
+        rtl_flist_fail \
+          "GBus H2C requires the generated KMH SimTop dma_* AXI interface"
+      fi
     fi
 
     printf '+incdir+%s\n' "$core_dir" "$core_rtl_dir"
@@ -161,11 +143,7 @@ generate_uvhs_filelist() {
     kmh|nutshell) required_modules=(SimTop) ;;
     nanhu) required_modules=(XlnFpgaTop) ;;
   esac
-  # XiangShan's top is supplied by the generated release RTL and does not
-  # require an additional wrapper module check here.  Keep the loop safe for
-  # CPUs without an explicit required-module list under `set -u`.
-  if ((${#required_modules[@]})); then
-    for module_name in "${required_modules[@]}"; do
+  for module_name in "${required_modules[@]}"; do
     found=0
     while IFS= read -r source_file; do
       [[ $source_file != +* && -f $source_file ]] || continue
@@ -176,8 +154,7 @@ generate_uvhs_filelist() {
     done < "$output"
     [[ $found == 1 ]] || rtl_flist_fail "required module not found: $module_name"
     echo "INFO: found required module: $module_name"
-    done
-  fi
+  done
   echo "INFO: generated UVHS file list $output"
 }
 

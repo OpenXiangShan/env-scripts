@@ -8,7 +8,7 @@ set uvhs_known_fpgas {b0.f0 b0.f1 b0.f2 b0.f3}
 set uvhs_keep_fpgas {}
 set uvhs_keep_default $uvhs_target_fpga
 if {[string toupper [uvhs::env_or_default DIFFTEST_HOSTIF XDMA]] eq "GBUS"} {
-    # GBus uses the CPU/host partition on F2 and the DDR partition on F0.
+    # Keep F0 for the CPU memory hierarchy and F2 for the CPU/host partition.
     set uvhs_keep_default "$uvhs_target_fpga b0.f0"
 }
 foreach uvhs_fpga [split [uvhs::env_or_default UVHS_KEEP_FPGAS $uvhs_keep_default]] {

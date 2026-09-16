@@ -274,9 +274,7 @@ proc create_and_launch_bd_ip_runs {bd jobs} {
 }
 
 proc export_xci_ip {name script out_file jobs force} {
-    if {[llength [get_ips -quiet $name]] == 0} {
-        source_ip_tcl $script
-    }
+    source_ip_tcl $script
 
     set ip [get_ips -quiet $name]
     if {[llength $ip] == 0} {
@@ -338,13 +336,17 @@ proc export_bd_ip {name script out_file jobs force} {
 set exports [list \
     [list xci blk_mem_gen_0 [file join $tcl_dir blk_mem_gen_0.tcl] [file join $out_dir rtl soc blk_mem_gen_0.dcp]] \
     [list bd  AXI_bridge    [file join $tcl_dir AXI_bridge.tcl]    [file join $out_dir rtl soc AXI_bridge.dcp]] \
-    [list bd  data_bridge   [file join $tcl_dir data_bridge.tcl]   [file join $out_dir rtl soc data_bridge.dcp]] \
 ]
 if {$hostif eq "XDMA"} {
+    lappend exports [list bd data_bridge [file join $tcl_dir data_bridge.tcl] \
+        [file join $out_dir rtl soc data_bridge.dcp]]
     lappend exports [list bd xdma_ep [file join $tcl_dir xdma_ep.tcl] \
         [file join $out_dir rtl device pcie xdma_ep.dcp]]
 } else {
-    puts "INFO: skip xdma_ep export for DiffTest host interface $hostif"
+    lappend exports [list xci uvhs_gbus_axi_dwidth \
+        [file join $tcl_dir uvhs_gbus_axi_dwidth.tcl] \
+        [file join $out_dir rtl soc uvhs_gbus_axi_dwidth.dcp]]
+    puts "INFO: skip data_bridge and xdma_ep export for DiffTest host interface $hostif"
 }
 
 set failed_exports [list]

@@ -4,27 +4,9 @@ UVHS_RUNTIME_DIR := $(UVHS_ROOT_DIR)/uvhs/runtime
 
 UVHS_TEMPLATE_DIR ?=
 UVHS_UVW_AXI4_TO_DDR4_SRC ?=
-UVHS_GBUS_IP_DIR := $(UVHS_ROOT_DIR)/uvhs/ip/gbus
-UVHS_GBUS_DCP ?= $(UVHS_GBUS_IP_DIR)/uvw_general_bus/uvw_general_bus.dcp
-UVHS_GBUS_STUB ?= $(UVHS_GBUS_IP_DIR)/uvw_general_bus/uvw_general_bus_Stub.v
-UVHS_GENERALBD_DCP ?= $(UVHS_GBUS_IP_DIR)/generalBD/generalBD.dcp
-UVHS_GENERALBD_STUB ?= $(UVHS_GBUS_IP_DIR)/generalBD/generalBD_Stub.v
 DIFFTEST_HOSTIF ?= XDMA
 ifeq ($(filter XDMA GBUS,$(DIFFTEST_HOSTIF)),)
 $(error DIFFTEST_HOSTIF must be XDMA or GBUS, got $(DIFFTEST_HOSTIF))
-endif
-# GBus lives on F2 while the user DDR controller lives on F0 in the current
-# UVHS topology.  Packetize the merged AXI traffic before partitioning so the
-# inter-FPGA link carries compact request/response flits instead of the full
-# AXI channel bundle.  Keep the legacy XDMA topology unchanged by default.
-UVHS_FUNCTIONAL_DDR_REMOTE_LINK ?= $(if $(filter GBUS,$(DIFFTEST_HOSTIF)),1,0)
-ifeq ($(filter 0 1,$(UVHS_FUNCTIONAL_DDR_REMOTE_LINK)),)
-$(error UVHS_FUNCTIONAL_DDR_REMOTE_LINK must be 0 or 1, got $(UVHS_FUNCTIONAL_DDR_REMOTE_LINK))
-endif
-ifneq ($(filter 1,$(UVHS_FUNCTIONAL_DDR_REMOTE_LINK)),)
-ifneq ($(DIFFTEST_HOSTIF),GBUS)
-$(error UVHS_FUNCTIONAL_DDR_REMOTE_LINK=1 requires DIFFTEST_HOSTIF=GBUS)
-endif
 endif
 # The detailed KMH profile is tied to a particular generated XiangShan
 # hierarchy.  GBus bring-up only requires the stable host trigger, so avoid
@@ -70,20 +52,14 @@ UVHS_TOOL_ENV = \
 	MAKEFLAGS="$${MAKEFLAGS:+$$MAKEFLAGS }SHELL=/bin/bash" \
 	UVHS_RUNTIME_LIB_DIR="$(UVHS_RUNTIME_LIB_DIR)" \
 	UVHS_COMPAT_BIN="$(UVHS_COMPAT_BIN)" \
-		UVHS_TMCLK_CPU_RATIO="$(UVHS_TMCLK_CPU_RATIO)" \
-		DIFFTEST_HOSTIF="$(DIFFTEST_HOSTIF)" \
-		UVHS_GBUS_DCP="$(UVHS_GBUS_DCP)" \
-
-	UVHS_GBUS_STUB="$(UVHS_GBUS_STUB)" \
-	UVHS_GENERALBD_DCP="$(UVHS_GENERALBD_DCP)" \
-	UVHS_GENERALBD_STUB="$(UVHS_GENERALBD_STUB)" \
+	UVHS_TMCLK_CPU_RATIO="$(UVHS_TMCLK_CPU_RATIO)" \
+	DIFFTEST_HOSTIF="$(DIFFTEST_HOSTIF)" \
 	UVSHELL_EXEC_NAME="$(UVHS_RUNTIME_DIR)/uv_shell_exec_compat.sh"
 
 UVHS_FLOW_ENV = \
 	$(UVHS_TOOL_ENV) \
 	UVHS_FLOW=1 \
 	DIFFTEST_HOSTIF="$(DIFFTEST_HOSTIF)" \
-	UVHS_FUNCTIONAL_DDR_REMOTE_LINK="$(UVHS_FUNCTIONAL_DDR_REMOTE_LINK)" \
 	UVHS_PROBE_TCL="$(UVHS_PROBE_PATH)" \
 	XDMA_LINK_WIDTH="$(XDMA_LINK_WIDTH)" \
 	UVHS_KEEP_FPGAS="$(UVHS_KEEP_FPGAS)" \
@@ -123,13 +99,6 @@ uvhs_preflight: check_project_name
 			"$(UVHS_TEMPLATE_DIR)/script/1B_4F_HGC_assemble.tcl"; do \
 			[[ -f "$$file" ]] || { echo "ERROR: file not found: $$file" >&2; exit 1; }; \
 		done; \
-		if [[ "$(DIFFTEST_HOSTIF)" == GBUS ]]; then \
-			for file in \
-				"$(UVHS_GBUS_DCP)" "$(UVHS_GBUS_STUB)" \
-				"$(UVHS_GENERALBD_DCP)" "$(UVHS_GENERALBD_STUB)"; do \
-				[[ -s "$$file" ]] || { echo "ERROR: file missing or empty: $$file" >&2; exit 1; }; \
-			done; \
-		fi; \
 		for directory in "$(CORE_DIR)" "$(UVHS_TEMPLATE_DIR)/script" "$(UVHS_UVW_AXI4_TO_DDR4_SRC)"; do \
 			[[ -d "$$directory" ]] || { echo "ERROR: directory not found: $$directory" >&2; exit 1; }; \
 		done; \
@@ -156,7 +125,6 @@ uvhs_prepare: uvhs_preflight
 
 uvhs_project: uvhs_prepare
 	DIFFTEST_HOSTIF="$(DIFFTEST_HOSTIF)" \
-	UVHS_FUNCTIONAL_DDR_REMOTE_LINK="$(UVHS_FUNCTIONAL_DDR_REMOTE_LINK)" \
 	bash "$(UVHS_ROOT_DIR)/tools/update_core_flist.sh" uvhs \
 		"$(CORE_DIR)" "$(UVHS_WORK_DIR)" "$(CPU)" "$(UVHS_FILELIST)" \
 		-- $(RTL_INCLUDE)

@@ -70,14 +70,6 @@ set uvhs_config_path_names {
     core_def/U_SYS_CFG
     core_def/u_rom
 }
-set uvhs_functional_ddr_remote_link \
-    [uvhs::env_or_default UVHS_FUNCTIONAL_DDR_REMOTE_LINK 0]
-if {$uvhs_functional_ddr_remote_link ni {0 1}} {
-    error "UVHS_FUNCTIONAL_DDR_REMOTE_LINK must be 0 or 1"
-}
-if {$uvhs_functional_ddr_remote_link eq "1" && $uvhs_hostif ne "GBUS"} {
-    error "UVHS_FUNCTIONAL_DDR_REMOTE_LINK=1 requires DIFFTEST_HOSTIF=GBUS"
-}
 set uvhs_host_path_names {
     core_def/U_CPU_TOP/u_XSTop/soc/core_with_l2
     core_def/U_CPU_TOP/u_XSTop/endpoint
@@ -89,28 +81,23 @@ set uvhs_host_path_names {
 if {$uvhs_hostif eq "XDMA"} {
     lappend uvhs_host_path_names core_def/xdma_ep_i
 } elseif {$uvhs_hostif eq "GBUS"} {
-    # Keep the GBus endpoint, all transport-clock AXI stages, and the C2H SRAM
-    # staging interface together on F2.  Only the compact sink is placed with
-    # the physical DDR controller on F0 below.
+    # Keep the protected GBus endpoints, H2C clock crossing, and C2H SRAM
+    # staging interface together with the CPU host path on F2.
     set uvhs_gbus_host_path_names {\
         core_def/U_GBUS_CONFIG_BRIDGE \
         core_def/U_GBUS_GENERALBD \
         core_def/U_GBUS_GENERAL_BUS \
-        core_def/U_GBUS_CPU_DDR_CDC \
-        core_def/U_GBUS_DDR_ARBITER \
+        core_def/U_GBUS_H2C_CDC \
         core_def/U_GBUS_C2H_FIFO}
     set uvhs_host_path_names \
         [concat $uvhs_host_path_names $uvhs_gbus_host_path_names]
-    if {$uvhs_functional_ddr_remote_link eq "1"} {
-        lappend uvhs_host_path_names \
-            core_def/u_uvhs_gbus_func_ddr_remote_source
-        set uvhs_remote_sink_cells \
-            [get_cells -quiet {core_def/u_uvhs_gbus_func_ddr_remote_sink}]
-        if {[llength $uvhs_remote_sink_cells] != 1} {
-            error [format "expected one functional DDR remote sink, got %d: %s" \
-                [llength $uvhs_remote_sink_cells] $uvhs_remote_sink_cells]
-        }
-        set uvhs_f0_cells [concat $uvhs_f0_cells $uvhs_remote_sink_cells]
+    set uvhs_gbus_dwidth_cells \
+        [get_cells -quiet {core_def/U_GBUS_H2C_DWIDTH}]
+    if {[llength $uvhs_gbus_dwidth_cells] > 1} {
+        error "expected at most one GBus H2C width converter"
+    }
+    if {[llength $uvhs_gbus_dwidth_cells] == 1} {
+        lappend uvhs_host_path_names core_def/U_GBUS_H2C_DWIDTH
     }
 } else {
     error "unsupported DIFFTEST_HOSTIF: $uvhs_hostif"
@@ -229,16 +216,6 @@ if {[llength $uvhs_xiangshan_cell] == 1} {
             error "missing required GBus F2 cells: $uvhs_missing_gbus_host_cells"
         }
     }
-    if {$uvhs_functional_ddr_remote_link eq "1"} {
-        set uvhs_remote_source_cells [get_cells -quiet \
-            {core_def/u_uvhs_gbus_func_ddr_remote_source}]
-        if {[llength $uvhs_remote_source_cells] != 1 ||
-                [lsearch -exact $uvhs_host_path_cells \
-                    [lindex $uvhs_remote_source_cells 0]] < 0} {
-            error "functional DDR remote source is not constrained to b0.f2"
-        }
-        puts "INFO: constrain compact DDR remote source to b0.f2 and sink to b0.f0"
-    }
     set uvhs_host_path_cells [concat $uvhs_host_path_cells \
         $uvhs_nocmisc_f2_cells]
     set uvhs_f0_cells [concat $uvhs_f0_cells $uvhs_memory_path_cells \
@@ -309,8 +286,7 @@ unset -nocomplain uvhs_ddr_cell uvhs_ddr_connector \
     uvhs_host_path_names uvhs_host_path_cells \
     uvhs_gbus_host_path_names uvhs_gbus_host_path_name \
     uvhs_gbus_host_path_cell uvhs_missing_gbus_host_cells \
-    uvhs_hostif uvhs_functional_ddr_remote_link \
-    uvhs_remote_source_cells uvhs_remote_sink_cells \
+    uvhs_gbus_dwidth_cells uvhs_hostif \
     uvhs_nocmisc_path uvhs_nocmisc_prefix uvhs_nocmisc_f0_anchors \
     uvhs_nocmisc_f2_children uvhs_nocmisc_direct_cells \
     uvhs_nocmisc_direct_names uvhs_nocmisc_f0_cells uvhs_nocmisc_f0_names \
