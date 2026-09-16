@@ -7,9 +7,13 @@ or JTAG commands.
 ## GBus SRAM C2H
 
 `DIFFTEST_HOSTIF=GBUS` retains the shared `Difftest2AXIs` sender and buffers
-DiffTest output only in on-chip SRAM. Workload H2C uses GBus DMA writes to DDR;
-`UVHS_FUNCTIONAL_DDR_REMOTE_LINK=1` retains the CPU/workload DDR connection.
-The obsolete C2H DDR-ring writer and DDR trace sink are not included.
+DiffTest output only in on-chip SRAM. Workload H2C converts the GeneralBus AXI3
+master to AXI4, crosses into the CPU clock domain, and occupies the CPU
+subsystem's existing `dma_core_*` inbound interface. KMH retains the 256-bit
+interface; NutShell uses the generated AXI data-width converter before its
+64-bit frontend, so no GeneralBus data lanes are discarded. The CPU memory
+hierarchy and physical DDR path remain unchanged. The obsolete C2H DDR-ring
+writer and DDR trace sink are not included.
 
 GBS1 is a register-drained SRAM window. Backpressure reaches the DiffTest
 sender and pauses the CPU while the host transport clock continues to run.
@@ -47,8 +51,9 @@ wrappers in `<work>/rtl/filelist.f`, which the UVHS frontend reads directly.
 ## GBus host paths
 
 The GBus C2H path uses the on-chip SRAM register window identified as GBS1.
-GBus H2C writes to DDR remain enabled for workload and CPU functionality; no
-DDR C2H ring is part of the UVHS RTL flow.
+GBus H2C occupies the existing `dma_core_*` inbound AXI interface during the
+workload load phase; no DDR C2H ring or GBus-specific physical-DDR path is part
+of the UVHS RTL flow.
 
 ## Build
 
@@ -64,8 +69,9 @@ the runtime database.
 `uvhs_project` performs these steps:
 
 1. Copies the vendor board template into an isolated work directory.
-2. Prepares repository-owned Vivado IP and the protected 256-bit GeneralBus
-   and GeneralBD release assets from `uvhs/ip/gbus`.
+2. Prepares repository-owned Vivado IP, including the NutShell 256-to-64 AXI
+   converter, and the protected GeneralBus and GeneralBD release assets from
+   `uvhs/ip/gbus`.
 3. Imports the selected DDR DCP and validates its AXI width.
 4. Builds the complete RTL file list and checks the expected top module.
 
@@ -85,8 +91,7 @@ IP preparation intentionally retains two files. `prepare_ip.sh` is the outer
 orchestrator for repository Vivado IP, the protected GBus assets under
 `uvhs/ip/gbus`, and an external DDR checkpoint. The child
 `export_vivado_ip.tcl` must run inside Vivado because it uses project, IP, BD,
-and checkpoint commands. The four `UVHS_GBUS_*` and `UVHS_GENERALBD_*`
-variables may select another matching protected-IP release pair.
+and checkpoint commands.
 
 `uvhs_backend` follows the vendor implementation sequence: clock inference and
 transformation, remap, partition, localization, system routing, FPGA PnR,
@@ -423,7 +428,7 @@ before the UVHS timing worker reads it.
 | `uvhs.mk` | Build and runtime target wiring. |
 | `../tools/update_core_flist.sh` | Shared Vivado/UVHS RTL file-list entry point. |
 | `../tools/rtl_filelist_lib.sh` | Nested file-list parsing and path resolution. |
-| `../src/tcl/common/{blk_mem_gen_0,AXI_bridge,data_bridge,xdma_ep}.tcl` | Shared Vivado IP/BD generators used by UVHS IP export and Vivado project creation. |
+| `../src/tcl/common/{blk_mem_gen_0,AXI_bridge,data_bridge,xdma_ep,uvhs_gbus_axi_dwidth}.tcl` | Shared Vivado IP/BD generators used by UVHS IP export and Vivado project creation. GBus exports the 256-to-64 converter and skips `data_bridge`/`xdma_ep`; XDMA does the reverse. |
 | `compilation/flow_common.tcl` | Shared UVHS path, environment, and source helpers. |
 | `compilation/frontend_run.tcl` | RTL/IP import, elaboration, and uvsyn frontend. |
 | `compilation/backend_run.tcl` | Fill-rate setup, partition, routing, PnR, and database commit. |

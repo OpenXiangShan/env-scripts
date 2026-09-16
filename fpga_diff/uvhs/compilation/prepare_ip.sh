@@ -24,21 +24,19 @@ require_file() {
   }
 }
 
-generalbus_stub_is_256() {
-  grep -Eq 'output[[:space:]]+\[255:0\][[:space:]]*dut_axi_wdata' "$1" &&
-    grep -Eq 'input[[:space:]]+\[255:0\][[:space:]]*dut_axi_rdata' "$1"
+require_stub_port() {
+  local stub=$1
+  local pattern=$2
+  local description=$3
+  grep -Eq "$pattern" "$stub" || {
+    echo "ERROR: generated IP stub has the wrong $description: $stub" >&2
+    exit 1
+  }
 }
 
 generalbus_stub_is_64() {
   grep -Eq 'output[[:space:]]+\[63:0\][[:space:]]*dut_axi_wdata' "$1" &&
     grep -Eq 'input[[:space:]]+\[63:0\][[:space:]]*dut_axi_rdata' "$1"
-}
-
-generalbd_stub_is_256() {
-  grep -Eq 'module[[:space:]]+generalBD' "$1" &&
-    grep -Eq 'output[[:space:]]+\[255:0\][[:space:]]*gbd_sysbus_o' "$1" &&
-    grep -Eq 'input[[:space:]]+\[255:0\][[:space:]]*gbd_sysbus_i' "$1" &&
-    grep -Fq 'UV_HW_IP' "$1"
 }
 
 # Export the Vivado IP owned by this repository.
@@ -55,54 +53,40 @@ export VIVADO_HOME=$UV_XILINX_VIVADO XILINX_VIVADO=$UV_XILINX_VIVADO
 
 hostif=${DIFFTEST_HOSTIF:-XDMA}
 if [[ $hostif == GBUS ]]; then
-  # GeneralBus is protected UVHS IP. Keep the approved release assets with the
-  # UVHS flow while allowing a site to select another matching release pair.
+  dwidth_stub=$work_dir/rtl/stubs/uvhs_gbus_axi_dwidth.v
+  require_file "$work_dir/rtl/soc/uvhs_gbus_axi_dwidth.dcp"
+  require_file "$dwidth_stub"
+  require_stub_port "$dwidth_stub" \
+    'input[[:space:]]+\[255:0\][[:space:]]*s_axi_wdata' \
+    'slave data width; expected 256 bits'
+  require_stub_port "$dwidth_stub" \
+    'output[[:space:]]+\[63:0\][[:space:]]*m_axi_wdata' \
+    'master data width; expected 64 bits'
+  require_stub_port "$dwidth_stub" \
+    'input[[:space:]]+\[35:0\][[:space:]]*s_axi_awaddr' \
+    'address width; expected 36 bits'
+  require_stub_port "$dwidth_stub" \
+    'input[[:space:]]+\[13:0\][[:space:]]*s_axi_awid' \
+    'slave ID width; expected 14 bits'
+  echo "INFO: verified GBus AXI data width converter: 256-bit to 64-bit"
+
   gbus_asset_root=$script_dir/../ip/gbus
-  gbus_dcp=${UVHS_GBUS_DCP:-$gbus_asset_root/uvw_general_bus/uvw_general_bus.dcp}
-  gbus_stub=${UVHS_GBUS_STUB:-$gbus_asset_root/uvw_general_bus/uvw_general_bus_Stub.v}
-  require_file "$gbus_dcp"
-  require_file "$gbus_stub"
-  generalbus_stub_is_256 "$gbus_stub" || {
-    echo "ERROR: UVHS GeneralBus stub is not 256-bit: $gbus_stub" >&2
-    exit 1
-  }
-  echo "INFO: using UVHS GeneralBus DCP $gbus_dcp"
+  gbus_release=$gbus_asset_root/uvw_general_bus
+  generalbd_release=$gbus_asset_root/generalBD
+
   rm -rf "$work_dir/rtl/soc/uvw_general_bus"
   mkdir -p "$work_dir/rtl/soc/uvw_general_bus" "$work_dir/rtl/stubs"
-  cp -f "$gbus_dcp" "$work_dir/rtl/soc/uvw_general_bus/uvw_general_bus.dcp"
-  cp -f "$gbus_stub" "$work_dir/rtl/soc/uvw_general_bus/uvw_general_bus_Stub.v"
-  cp -f "$gbus_stub" "$work_dir/rtl/stubs/uvw_general_bus.v"
-
-  # GeneralBD is the protected endpoint paired with GeneralBus. A site may select
-  # another matching release pair explicitly.
-  generalbd_dcp=${UVHS_GENERALBD_DCP:-$gbus_asset_root/generalBD/generalBD.dcp}
-  [[ -n "$generalbd_dcp" && -s "$generalbd_dcp" ]] || {
-    echo "ERROR: UVHS GENERALBD DCP not found; set UVHS_GENERALBD_DCP" >&2
-    exit 1
-  }
-  cp -f "$generalbd_dcp" "$work_dir/rtl/soc/generalBD.dcp"
-  echo "INFO: prepared UVHS generalBD DCP from $generalbd_dcp"
-
-  # The GENERALBD metadata stub is part of the protected-IP contract, not an
-  # optional Vivado stub.  UVHS uses its UV_HW_IP to pair GENERALBD with the
-  # GENERALBUS system-bus endpoint; without it the generated static elaboration
-  # leaves gbd_sysbus_i/o unconnected even when the DCP was imported with
-  # -generalbd.
-  generalbd_stub=${UVHS_GENERALBD_STUB:-${generalbd_dcp%.dcp}_Stub.v}
-  if [[ ! -s "$generalbd_stub" ]]; then
-    generalbd_stub=$(dirname "$generalbd_dcp")/generalBD_Stub.v
-  fi
-  [[ -s "$generalbd_stub" ]] || {
-    echo "ERROR: UVHS GENERALBD metadata stub not found next to $generalbd_dcp; set UVHS_GENERALBD_STUB" >&2
-    exit 1
-  }
-  generalbd_stub_is_256 "$generalbd_stub" || {
-    echo "ERROR: UVHS GENERALBD stub lacks the 256-bit metadata contract: $generalbd_stub" >&2
-    exit 1
-  }
-  cp -f "$generalbd_stub" "$work_dir/rtl/stubs/generalBD.v"
-  echo "INFO: prepared UVHS generalBD metadata stub from $generalbd_stub"
-
+  cp -f "$gbus_release/uvw_general_bus.dcp" \
+    "$work_dir/rtl/soc/uvw_general_bus/uvw_general_bus.dcp"
+  cp -f "$gbus_release/uvw_general_bus_Stub.v" \
+    "$work_dir/rtl/soc/uvw_general_bus/uvw_general_bus_Stub.v"
+  cp -f "$gbus_release/uvw_general_bus_Stub.v" \
+    "$work_dir/rtl/stubs/uvw_general_bus.v"
+  cp -f "$generalbd_release/generalBD.dcp" \
+    "$work_dir/rtl/soc/generalBD.dcp"
+  cp -f "$generalbd_release/generalBD_Stub.v" \
+    "$work_dir/rtl/stubs/generalBD.v"
+  echo "INFO: prepared repository UVHS GBus IP"
 else
   # Generate the vendor generalBus from a private copy. Its original generator
   # removes the Vivado project before an asynchronous DCP copy has completed.

@@ -317,10 +317,4 @@ output [31:0] S01_AXI_rdata;
 output S01_AXI_bvalid, S01_AXI_rlast, S01_AXI_rvalid;
 endmodule
 
-`ifndef UVHS_EXTERNAL_UVW_AXI4_TO_DDR4
-(* black_box, syn_black_box *)
-module uvw_axi4_to_ddr4;
-endmodule
-`endif
-
 `endif

@@ -1,7 +1,7 @@
 `timescale 1ns/1ps
 
-// Width/protocol shim for the U2.2 uvw_general_bus AXI3 user port and the
-// existing UVHS DDR AXI4 blackbox.  The general-bus IP emits at most 16-beat
+// Protocol shim for the U2.2 uvw_general_bus AXI3 user port and the existing
+// CPU-subsystem DMA AXI4 interface. The general-bus IP emits at most 16-beat
 // AXI3 bursts; AXI4 accepts the same burst semantics with widened metadata.
 module uvhs_axi3_to_axi4_adapter #(
     parameter integer ADDR_WIDTH = 34,

@@ -124,8 +124,8 @@ foreach reset_port {rstn_sw6 rstn_sw5 rstn_sw4} {
 
 uvhs::import_blackbox blk_mem_gen_0 ./rtl/soc/blk_mem_gen_0.dcp
 uvhs::import_blackbox AXI_bridge ./rtl/soc/AXI_bridge.dcp
-uvhs::import_blackbox data_bridge ./rtl/soc/data_bridge.dcp
 if {[string toupper [uvhs::env_or_default DIFFTEST_HOSTIF XDMA]] eq "XDMA"} {
+    uvhs::import_blackbox data_bridge ./rtl/soc/data_bridge.dcp
     uvhs::import_blackbox xdma_ep ./rtl/device/pcie/xdma_ep.dcp
 } else {
     # GeneralBD must be registered as a UVHS general-bus endpoint. Use the
@@ -133,23 +133,17 @@ if {[string toupper [uvhs::env_or_default DIFFTEST_HOSTIF XDMA]] eq "XDMA"} {
     # metadata.
     uvhs::import_blackbox generalBD ./rtl/soc/generalBD.dcp \
         -clock_enable_pairs {i_clk i_clk_en 1} -generalbd
-    puts "INFO: skip xdma_ep blackbox import for DiffTest host interface [uvhs::env_or_default DIFFTEST_HOSTIF XDMA]"
+    uvhs::import_blackbox uvhs_gbus_axi_dwidth \
+        ./rtl/soc/uvhs_gbus_axi_dwidth.dcp
+    puts "INFO: skip data_bridge and xdma_ep blackbox import for DiffTest host interface [uvhs::env_or_default DIFFTEST_HOSTIF XDMA]"
 }
 uvhs::import_blackbox uvw_general_bus \
     ./rtl/soc/uvw_general_bus/uvw_general_bus.dcp \
     -clock_enable_pairs {dut_axi_aclk dut_axi_aclk_en 1}
-if {[string toupper [uvhs::env_or_default DIFFTEST_HOSTIF XDMA]] eq "GBUS"} {
-    uvhs::import_blackbox uvw_axi4_to_ddr4 ./rtl/soc/uvw_axi4_to_ddr4.dcp \
-        -clock_enable_pairs {ddr4ip_dut_axi_aclk ddr4ip_dut_axi_aclk_en 1} \
-        -script_file {prePlace ./script/uvw_axi4_to_ddr4_pblock.tcl}
-    # set_blackbox does not add the Verilog declaration to the source set.
-    read_verilog ./rtl/soc/uvw_axi4_to_ddr4_Stub.v
-} else {
-    uvhs::import_ip uvw_axi4_to_ddr4 ./rtl/soc/uvw_axi4_to_ddr4.dcp \
-        ./rtl/soc/uvw_axi4_to_ddr4_Stub.v \
-        -clock_enable_pairs {ddr4ip_dut_axi_aclk ddr4ip_dut_axi_aclk_en 1} \
-        -script_file {prePlace ./script/uvw_axi4_to_ddr4_pblock.tcl}
-}
+uvhs::import_ip uvw_axi4_to_ddr4 ./rtl/soc/uvw_axi4_to_ddr4.dcp \
+    ./rtl/soc/uvw_axi4_to_ddr4_Stub.v \
+    -clock_enable_pairs {ddr4ip_dut_axi_aclk ddr4ip_dut_axi_aclk_en 1} \
+    -script_file {prePlace ./script/uvw_axi4_to_ddr4_pblock.tcl}
 
 set filelist ./rtl/filelist.f
 if {![file exists $filelist]} {
