@@ -429,7 +429,8 @@ before the UVHS timing worker reads it.
 | `../tools/update_core_flist.sh` | Shared Vivado/UVHS RTL file-list entry point, including `uvhs/common`. |
 | `common/` | Owned GBus/UVHS RTL wrappers, CDC, and blackbox stubs. |
 | `../tools/rtl_filelist_lib.sh` | Nested file-list parsing and path resolution. |
-| `../src/tcl/common/{blk_mem_gen_0,AXI_bridge,data_bridge,xdma_ep,uvhs_gbus_axi_dwidth}.tcl` | Shared Vivado IP/BD generators used by UVHS IP export and Vivado project creation. GBus exports the 256-to-64 converter and skips `data_bridge`/`xdma_ep`; XDMA does the reverse. |
+| `../src/tcl/common/{blk_mem_gen_0,AXI_bridge,data_bridge,xdma_ep}.tcl` | Shared Vivado IP/BD generators used by UVHS IP export and Vivado project creation. XDMA exports `data_bridge`/`xdma_ep`; GBus skips them. |
+| `tcl/uvhs_gbus_axi_dwidth.tcl` | GBus-only 256-to-64 AXI converter generator. |
 | `compilation/flow_common.tcl` | Shared UVHS path, environment, and source helpers. |
 | `compilation/frontend_run.tcl` | RTL/IP import, elaboration, and uvsyn frontend. |
 | `compilation/backend_run.tcl` | Fill-rate setup, partition, routing, PnR, and database commit. |

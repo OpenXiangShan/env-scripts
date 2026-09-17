@@ -42,6 +42,7 @@ if {$core_dir ne ""} {
     set core_dir [file normalize $core_dir]
 }
 set tcl_dir [file join $origin_dir src tcl common]
+set uvhs_tcl_dir [file join $origin_dir uvhs tcl]
 set export_project_dir [file join $out_dir vivado_ip_export]
 set export_project [file join $export_project_dir vivado_ip_export.xpr]
 
@@ -344,7 +345,7 @@ if {$hostif eq "XDMA"} {
         [file join $out_dir rtl device pcie xdma_ep.dcp]]
 } else {
     lappend exports [list xci uvhs_gbus_axi_dwidth \
-        [file join $tcl_dir uvhs_gbus_axi_dwidth.tcl] \
+        [file join $uvhs_tcl_dir uvhs_gbus_axi_dwidth.tcl] \
         [file join $out_dir rtl soc uvhs_gbus_axi_dwidth.dcp]]
     puts "INFO: skip data_bridge and xdma_ep export for DiffTest host interface $hostif"
 }
