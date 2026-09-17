@@ -1002,7 +1002,6 @@ wire [1 : 0]                rom_axi_rresp    ;
 (*mark_debug = "true"*) wire                        rom_axi_rvalid   ;
 (*mark_debug = "true"*) wire                        rom_axi_rlast    ;
 (*mark_debug = "true"*) wire                        rom_axi_rready   ;
-`ifndef CONFIG_DIFFTEST_HOSTIF_GBUS
 `ifdef UVHS
 wire [7:0]  uvhs_flash_axi_awid;
 wire [31:0] uvhs_flash_axi_awaddr;
@@ -1088,7 +1087,6 @@ uvw_general_bus U_UVHS_FLASH_GBUS (
     .sysbus_ghbd_o     (),
     .sysbus_ghbd_i     ()
 );
-`endif
 `endif
 `endif
 
