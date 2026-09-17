@@ -693,13 +693,9 @@ proc uvhs_initialize_runtime {} {
     } else {
         config -clock -default
     }
-    if {[info exists ::env(DIFFTEST_HOSTIF)] &&
-            [string toupper $::env(DIFFTEST_HOSTIF)] eq "GBUS"} {
-        set transport_frequency [uvhs_query_default_clock_frequency clk6_p]
-    } else {
-        set transport_frequency 50000000
-    }
-    config -clock -name clk6_p -frequency $transport_frequency
+    # Keep clk5_p at the system sign-off frequency committed in this runtime DB.
+    # It varies with the partition and PnR result, so it must not be hard-coded.
+    config -clock -name clk6_p -frequency 50000000
     set signoff_cpu_frequency [uvhs_query_default_clock_frequency clk5_p]
     config -clock -name clk5_p -frequency $signoff_cpu_frequency
     uvhs_configure_tmclk_from_cpu $signoff_cpu_frequency

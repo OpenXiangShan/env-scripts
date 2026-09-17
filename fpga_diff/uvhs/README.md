@@ -70,8 +70,8 @@ the runtime database.
 
 1. Copies the vendor board template into an isolated work directory.
 2. Prepares repository-owned Vivado IP, including the NutShell 256-to-64 AXI
-   converter, and the protected GeneralBus and GeneralBD release assets from
-   `uvhs/ip/gbus`.
+   converter, and generates the protected GeneralBus and GeneralBD checkpoints
+   from the local UVHS installation.
 3. Imports the selected DDR DCP and validates its AXI width.
 4. Builds the complete RTL file list and checks the expected top module.
 
@@ -88,10 +88,10 @@ helper scripts, board-template files, and the external DDR directory. This
 keeps a missing input from being discovered after a multi-hour run has started.
 
 IP preparation intentionally retains two files. `prepare_ip.sh` is the outer
-orchestrator for repository Vivado IP, the protected GBus assets under
-`uvhs/ip/gbus`, and an external DDR checkpoint. The child
+orchestrator for repository Vivado IP, generated GeneralBus/GeneralBD
+checkpoints, and an external DDR checkpoint. The child
 `export_vivado_ip.tcl` must run inside Vivado because it uses project, IP, BD,
-and checkpoint commands.
+and checkpoint commands. Owned GBus RTL lives in `uvhs/common`.
 
 `uvhs_backend` follows the vendor implementation sequence: clock inference and
 transformation, remap, partition, localization, system routing, FPGA PnR,
@@ -426,7 +426,8 @@ before the UVHS timing worker reads it.
 | File | Role |
 | --- | --- |
 | `uvhs.mk` | Build and runtime target wiring. |
-| `../tools/update_core_flist.sh` | Shared Vivado/UVHS RTL file-list entry point. |
+| `../tools/update_core_flist.sh` | Shared Vivado/UVHS RTL file-list entry point, including `uvhs/common`. |
+| `common/` | Owned GBus/UVHS RTL wrappers, CDC, and blackbox stubs. |
 | `../tools/rtl_filelist_lib.sh` | Nested file-list parsing and path resolution. |
 | `../src/tcl/common/{blk_mem_gen_0,AXI_bridge,data_bridge,xdma_ep,uvhs_gbus_axi_dwidth}.tcl` | Shared Vivado IP/BD generators used by UVHS IP export and Vivado project creation. GBus exports the 256-to-64 converter and skips `data_bridge`/`xdma_ep`; XDMA does the reverse. |
 | `compilation/flow_common.tcl` | Shared UVHS path, environment, and source helpers. |
@@ -437,7 +438,8 @@ before the UVHS timing worker reads it.
 | `compilation/assign_pin.tcl` | Physical UART daughter-card, clock, PCIe, JTAG, SD, and control pins. |
 | `compilation/timing.tcl` | External clock and asynchronous-group constraints. |
 | `compilation/vivado_pre_opt.tcl` | XDMA refclock and CDC constraints. |
-| `compilation/prepare_ip.sh` | Coordinates Vivado, generalBus, and external DDR IP preparation. |
+| `compilation/prepare_ip.sh` | Coordinates Vivado IP export, GeneralBus/GeneralBD generation, and external DDR import. |
+| `ip/gbus/README.md` | Documents the vendor sources used to generate GBus checkpoints. |
 | `compilation/export_vivado_ip.tcl` | Runs repository-owned XCI/BD exports inside Vivado. |
 | `compilation/probe_ila.tcl` | Minimal host-trigger UHD probe profile. |
 | `compilation/probe_kmh.tcl` | KMH debug UHD probe profile. |
