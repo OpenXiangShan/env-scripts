@@ -53,7 +53,9 @@ wrappers in `<work>/rtl/filelist.f`, which the UVHS frontend reads directly.
 The GBus C2H path uses the on-chip SRAM register window identified as GBS1.
 GBus H2C occupies the existing `dma_core_*` inbound AXI interface during the
 workload load phase; no DDR C2H ring or GBus-specific physical-DDR path is part
-of the UVHS RTL flow.
+of the UVHS RTL flow. Host DMA offsets stay relative to the GeneralBus start
+address (`GBUS_DDR_BASE=0`). The wrapper maps that offset onto CPU DRAM at
+`0x80000000` before `dma_core_*`.
 
 ## Build
 
