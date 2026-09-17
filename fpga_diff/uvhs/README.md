@@ -55,7 +55,9 @@ GBus H2C occupies the existing `dma_core_*` inbound AXI interface during the
 workload load phase; no DDR C2H ring or GBus-specific physical-DDR path is part
 of the UVHS RTL flow. Host DMA offsets stay relative to the GeneralBus start
 address (`GBUS_DDR_BASE=0`). The wrapper maps that offset onto CPU DRAM at
-`0x80000000` before `dma_core_*`.
+`0x80000000` before `dma_core_*`. During that load, `HOST_IO_RESET` still
+halts the cores, but the SoC fabric and inbound DMA slave stay out of reset
+so the AXI writes can complete.
 
 ## Build
 
