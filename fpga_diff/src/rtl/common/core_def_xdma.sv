@@ -2312,7 +2312,15 @@ SimTop_wrapper U_CPU_TOP(
     .difftest_cfg_axilite_rready     (difftest_cfg_axilite_rready),
 `endif
     .inter_soc_clk                  (inter_soc_clk),
+`ifdef CONFIG_DIFFTEST_HOSTIF_GBUS
+    // GBus H2C occupies dma_core_* inside XSTop.  cpu_rstn_io follows
+    // HOST_IO_RESET, which is asserted for the whole workload load.  Keep
+    // the SoC fabric and inbound DMA slave out of that reset so offset 0
+    // can complete on CPU DRAM; cores still stay halted via hostCtrl.reset.
+    .sys_rstn_i                     (cpu_rstn     ),
+`else
     .sys_rstn_i                     (cpu_rstn_io  ),
+`endif
     .tmclk                          (inter_rtc_clk),
 
     .global_reset                   (cpu_rstn                  ),
