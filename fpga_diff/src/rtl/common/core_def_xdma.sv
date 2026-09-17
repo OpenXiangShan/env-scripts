@@ -362,6 +362,7 @@ wire                                           data_cpu_bridge_s2m_rlast      ;
 wire                                           data_cpu_bridge_s2m_rvalid     ;
 wire            [3:0]                          data_cpu_bridge_m2s_awqos      ;
 wire            [3:0]                          data_cpu_bridge_m2s_arqos      ;
+
 wire                                           dft_glb_gt_se                  ;
 wire                                           dft_dp_rst_disable             ;
 wire                                           dft_dp_ram_hold                ;
@@ -1002,6 +1003,7 @@ wire [1 : 0]                rom_axi_rresp    ;
 (*mark_debug = "true"*) wire                        rom_axi_rvalid   ;
 (*mark_debug = "true"*) wire                        rom_axi_rlast    ;
 (*mark_debug = "true"*) wire                        rom_axi_rready   ;
+
 `ifdef UVHS
 wire [7:0]  uvhs_flash_axi_awid;
 wire [31:0] uvhs_flash_axi_awaddr;
