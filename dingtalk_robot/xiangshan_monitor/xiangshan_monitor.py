@@ -12,6 +12,7 @@ commit chunks are summarized first, then one final call writes the message.
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
 import math
 import re
@@ -57,6 +58,8 @@ DEFAULT_MAX_API_CALLS = 1
 DEFAULT_REASONING_EFFORT = "xhigh"
 DEFAULT_DINGTALK_LAYER = "debug"
 DEFAULT_HIGHLIGHT_COUNT = 1
+RANDOM_GIFT_DENOMINATOR = 7
+RANDOM_GIFT_LABEL = "随机礼包"
 DEFAULT_ANALYSIS_START_TIME = "17:49"
 DEFAULT_DEBUG_SEND_TIME = "17:55"
 DEFAULT_RELEASE_SEND_TIME = "18:00"
@@ -415,6 +418,54 @@ def resolve_highlight_count(data: Mapping[str, Any], report: Mapping[str, Any], 
     return value
 
 
+def random_gift_slots(report: Mapping[str, Any], highlight_count: int) -> List[int]:
+    """Return the stable winning highlight slots for this report.
+
+    The draw is deliberately local and deterministic: the report date, every
+    repository's captured HEAD, and the slot number form the seed.  A slot
+    wins when its SHA-256 digest is divisible by seven, so no AI output (or
+    fragile name parsing) is involved. Every report must contain a captured
+    repository HEAD; incomplete snapshots are rejected.
+    """
+    if isinstance(highlight_count, bool) or not isinstance(highlight_count, int) or highlight_count <= 0:
+        raise ValueError("highlight_count must be a positive integer")
+    report_date = str(report.get("date", "")).strip()
+    try:
+        date.fromisoformat(report_date)
+    except ValueError as exc:
+        raise XiangShanMonitorError(f"Invalid report date for random gift: {report_date!r}") from exc
+
+    repositories = report.get("repositories")
+    if not isinstance(repositories, list) or not repositories:
+        raise XiangShanMonitorError("Random gift requires repository head hashes")
+    heads: List[Tuple[str, str]] = []
+    for repository in repositories:
+        if not isinstance(repository, Mapping):
+            raise XiangShanMonitorError("Random gift found an invalid repository entry")
+        name = str(repository.get("name", "")).strip()
+        head_sha = str(repository.get("head_sha") or "").strip().lower()
+        if not name or not re.fullmatch(r"[0-9a-f]{40}|[0-9a-f]{64}", head_sha):
+            raise XiangShanMonitorError(f"Random gift requires a head hash for {name or 'unknown'}")
+        heads.append((name, head_sha))
+
+    snapshot = "\n".join(f"{name}:{head_sha}" for name, head_sha in sorted(heads))
+    winners: List[int] = []
+    for slot in range(1, highlight_count + 1):
+        seed = f"xiangshan-random-gift-v1\n{report_date}\n{snapshot}\nslot:{slot}"
+        digest_value = int.from_bytes(hashlib.sha256(seed.encode("utf-8")).digest(), "big")
+        if digest_value % RANDOM_GIFT_DENOMINATOR == 0:
+            winners.append(slot)
+    return winners
+
+
+def append_random_gift_result(message: str, winning_slots: Sequence[int]) -> str:
+    """Add winning slot numbers after the AI-written message."""
+    if not winning_slots:
+        return message
+    slots = "、".join(f"第{slot}位" for slot in winning_slots)
+    return f"{message.rstrip()}\n\n{RANDOM_GIFT_LABEL}中奖序号：{slots}"
+
+
 def _relative_path(path: Path, root: Path) -> str:
     try:
         return str(path.resolve().relative_to(root.resolve()))
@@ -444,10 +495,11 @@ def pull_data(repository_data: Optional[Mapping[str, Any]] = None, window_spec: 
         raise ConfigError("repositories.json.git_timeout_seconds must be positive")
     repositories: List[Dict[str, Any]] = []
     for spec in repository_specs(data):
-        item: Dict[str, Any] = {"name": spec.name, "remote": spec.remote or f"https://github.com/{organization}/{spec.name}.git", "path": _relative_path(clone_root / spec.name, root), "status": "error", "branch": spec.branch, "commits": []}
+        item: Dict[str, Any] = {"name": spec.name, "remote": spec.remote or f"https://github.com/{organization}/{spec.name}.git", "path": _relative_path(clone_root / spec.name, root), "status": "error", "branch": spec.branch, "head_sha": None, "commits": []}
         try:
             path, branch = clone_or_pull(spec, organization, clone_root, git_runner, float(timeout))
             item["path"], item["branch"] = _relative_path(path, root), branch
+            item["head_sha"] = git_runner(["rev-parse", branch], cwd=path).strip()
             item["commits"] = collect_repository_commits(path, branch, window, organization, spec.name, max_commits, git_runner)
             item["status"] = "updated"
         except (OSError, XiangShanMonitorError, ValueError) as exc:
@@ -758,13 +810,17 @@ def talk(report: Mapping[str, Any], config: Mapping[str, Any], repository_data: 
     data = repository_data or load_repository_data()
     api = local_api_settings(config, data)
     selected_highlights = resolve_highlight_count(data, report, highlight_count)
+    winning_slots = random_gift_slots(report, selected_highlights)
     source = f"消息时间范围参考：{_report_period_hint(report)}。\n本次重点表扬人数：{selected_highlights} 人。\n\n{render_pull_summary(report)}"
     if opener is None:
         # DeepSeek is reachable directly; never inherit http(s)_proxy from the environment.
         opener = urllib.request.build_opener(urllib.request.ProxyHandler({}))
     direct_prompt = _prompt_text(data, root_dir, source).replace("{highlight_count}", str(selected_highlights))
     if estimate_tokens(direct_prompt) + api["max_output_tokens"] <= api["context_window_tokens"]:
-        return _call_local_api(direct_prompt, api, opener)
+        return append_random_gift_result(
+            _call_local_api(direct_prompt, api, opener),
+            winning_slots,
+        )
     strategy = str(data.get("overflow_strategy", "map_reduce")).lower()
     if strategy != "map_reduce":
         raise XiangShanMonitorError(
@@ -802,7 +858,10 @@ def talk(report: Mapping[str, Any], config: Mapping[str, Any], repository_data: 
                 raise XiangShanMonitorError(
                     f"完整报告需要至少 {calls_used + 1} 次 API，超过 max_api_calls={api['max_api_calls']}；请缩短窗口或提高上限"
                 )
-            return _call_local_api(final_prompt, api, opener)
+            return append_random_gift_result(
+                _call_local_api(final_prompt, api, opener),
+                winning_slots,
+            )
         if len(summaries) == 1:
             raise XiangShanMonitorError("摘要仍超过 context 上限，请提高 context_window_tokens")
         if calls_used + 1 >= int(api["max_api_calls"]):
