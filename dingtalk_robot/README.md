@@ -141,9 +141,8 @@ remove repositories or change the default `analysis_window` to `7d`.
 `max_commits: 0` means every commit in the window is included. The local API
 key and both layered DingTalk credentials belong in the ignored
 `config.json`; all are required and there is no `.codex` or public OpenAI
-fallback. `ai.use_proxy` makes the configured AI endpoint reuse the explicit
-`github.proxy` value from that same local config; set it to `false` for a
-directly reachable private endpoint.
+fallback. The DeepSeek chat-completions endpoint is always reached directly
+and never reuses `github.proxy` or process proxy environment variables.
 
 Run the complete job once, which is suitable for cron or a systemd timer:
 

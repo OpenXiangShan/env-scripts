@@ -38,14 +38,13 @@
   "overflow_strategy": "map_reduce",
   "prompt_file": "dingtalk_robot/xiangshan_monitor/prompt.txt",
   "ai": {
-    "wire_api": "responses",
-    "model": "gpt-5.6-sol",
-    "context_window_tokens": 1050000,
+    "wire_api": "chat_completions",
+    "model": "deepseek-flash",
+    "context_window_tokens": 1000000,
     "max_api_calls": 32,
     "timeout_seconds": 300,
     "max_output_tokens": 1800,
     "reasoning_effort": "xhigh",
-    "use_proxy": true,
     "store": false
   }
 }

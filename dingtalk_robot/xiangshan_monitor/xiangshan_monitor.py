@@ -54,6 +54,7 @@ DEFAULT_API_TIMEOUT = 90.0
 DEFAULT_CONTEXT_WINDOW_TOKENS = 120000
 DEFAULT_MAX_OUTPUT_TOKENS = 1800
 DEFAULT_MAX_API_CALLS = 1
+DEFAULT_REASONING_EFFORT = "xhigh"
 DEFAULT_DINGTALK_LAYER = "debug"
 DEFAULT_HIGHLIGHT_COUNT = 1
 DEFAULT_ANALYSIS_START_TIME = "17:49"
@@ -542,9 +543,8 @@ def local_api_settings(config: Mapping[str, Any], data: Mapping[str, Any]) -> Di
     map_output = ai.get("map_max_output_tokens", min(max_output, 800))
     timeout = ai.get("timeout_seconds", DEFAULT_API_TIMEOUT)
     max_api_calls = ai.get("max_api_calls", DEFAULT_MAX_API_CALLS)
-    reasoning_effort = ai.get("reasoning_effort")
+    reasoning_effort = ai.get("reasoning_effort", DEFAULT_REASONING_EFFORT)
     store = ai.get("store", False)
-    use_proxy = ai.get("use_proxy", False)
     http_headers = ai.get("http_headers", {})
     if any(isinstance(value, bool) or not isinstance(value, int) or value <= 0 for value in (context_tokens, max_output, map_output, max_api_calls)):
         raise ConfigError("repositories.json.ai token/call limits must be positive integers")
@@ -554,17 +554,6 @@ def local_api_settings(config: Mapping[str, Any], data: Mapping[str, Any]) -> Di
         raise ConfigError("repositories.json.ai.reasoning_effort must be a non-empty string when set")
     if not isinstance(store, bool):
         raise ConfigError("repositories.json.ai.store must be boolean")
-    if not isinstance(use_proxy, bool):
-        raise ConfigError("repositories.json.ai.use_proxy must be boolean")
-    proxy = ""
-    if use_proxy:
-        github = config.get("github")
-        if not isinstance(github, Mapping):
-            raise ConfigError("Missing configuration object: github (needed for ai.use_proxy)")
-        raw_proxy = github.get("proxy")
-        if not isinstance(raw_proxy, str) or not raw_proxy.strip():
-            raise ConfigError("Missing configuration value: github.proxy (needed for ai.use_proxy)")
-        proxy = raw_proxy.strip()
     if not isinstance(http_headers, dict) or any(
         not isinstance(key, str) or not key.strip() or not isinstance(value, str)
         for key, value in http_headers.items()
@@ -578,7 +567,7 @@ def local_api_settings(config: Mapping[str, Any], data: Mapping[str, Any]) -> Di
         endpoint = base if base.endswith("/chat/completions") else f"{base}/chat/completions"
     else:
         raise ConfigError("repositories.json.ai.wire_api must be responses or chat_completions")
-    return {"api_key": api_key, "endpoint": endpoint, "model": model.strip(), "wire_api": wire, "context_window_tokens": context_tokens, "max_output_tokens": max_output, "map_max_output_tokens": map_output, "timeout": float(timeout), "max_api_calls": max_api_calls, "reasoning_effort": reasoning_effort.strip() if reasoning_effort else None, "store": store, "proxy": proxy, "http_headers": {key.strip(): value for key, value in http_headers.items()}}
+    return {"api_key": api_key, "endpoint": endpoint, "model": model.strip(), "wire_api": wire, "context_window_tokens": context_tokens, "max_output_tokens": max_output, "map_max_output_tokens": map_output, "timeout": float(timeout), "max_api_calls": max_api_calls, "reasoning_effort": reasoning_effort.strip() if reasoning_effort else None, "store": store, "proxy": "", "http_headers": {key.strip(): value for key, value in http_headers.items()}}
 
 
 def _prompt_path(data: Mapping[str, Any], root_dir: Union[Path, str]) -> Path:
@@ -650,7 +639,15 @@ def _call_local_api(prompt: str, api: Mapping[str, Any], opener: Any, max_output
     if estimate_tokens(prompt) + output_tokens > int(api["context_window_tokens"]):
         raise XiangShanMonitorError("单次 API 请求仍超过 context 上限，请缩短分析窗口或提高 context_window_tokens")
     if api["wire_api"] in {"chat", "chat_completions", "chat-completions"}:
-        payload = {"model": api["model"], "messages": [{"role": "user", "content": prompt}], "max_tokens": output_tokens}
+        payload = {
+            "model": api["model"],
+            "messages": [{"role": "user", "content": prompt}],
+            # DeepSeek thinking tokens also count against max_tokens. Leave
+            # headroom so the final answer is not truncated after xhigh thinking.
+            "max_tokens": max(output_tokens, 8192),
+            "thinking": {"type": "enabled"},
+            "reasoning_effort": api.get("reasoning_effort") or DEFAULT_REASONING_EFFORT,
+        }
     else:
         payload = {
             "model": api["model"],
@@ -763,9 +760,8 @@ def talk(report: Mapping[str, Any], config: Mapping[str, Any], repository_data: 
     selected_highlights = resolve_highlight_count(data, report, highlight_count)
     source = f"消息时间范围参考：{_report_period_hint(report)}。\n本次重点表扬人数：{selected_highlights} 人。\n\n{render_pull_summary(report)}"
     if opener is None:
-        proxy = str(api.get("proxy", ""))
-        proxies = {"http": proxy, "https": proxy} if proxy else {}
-        opener = urllib.request.build_opener(urllib.request.ProxyHandler(proxies))
+        # DeepSeek is reachable directly; never inherit http(s)_proxy from the environment.
+        opener = urllib.request.build_opener(urllib.request.ProxyHandler({}))
     direct_prompt = _prompt_text(data, root_dir, source).replace("{highlight_count}", str(selected_highlights))
     if estimate_tokens(direct_prompt) + api["max_output_tokens"] <= api["context_window_tokens"]:
         return _call_local_api(direct_prompt, api, opener)
