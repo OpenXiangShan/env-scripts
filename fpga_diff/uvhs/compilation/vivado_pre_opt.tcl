@@ -199,19 +199,40 @@ if {[llength $fpga_diff_ddr_reset_regs] && [llength $fpga_diff_tdm_tx_sync_d_pin
     puts "INFO: no DDR reset-to-TDM CDC sources on this FPGA"
 }
 
-# UVHS timing signoff reports this same crossing from the launching flop clock
-# pin to the TDM D pin (mmcm_clkout0 -> gtye4_ch_txoutclk). Cover that
-# startpoint explicitly after the netlist is linked.
-if {[string toupper $fpga_diff_hostif] eq "GBUS"} {
-    set fpga_diff_ddr_tdm_reset_src [get_pins -hierarchical -quiet -filter {
-        NAME =~ */core_def/U_UVHS_UVW_AXI4_TO_DDR4/*/proc_sys_reset_0/U0/ACTIVE_LOW_PR_OUT_DFF*/C
-    }]
-    if {[llength $fpga_diff_ddr_tdm_reset_src] &&
-        [llength $fpga_diff_tdm_tx_sync_d_pins]} {
-        set_false_path -from $fpga_diff_ddr_tdm_reset_src \
-            -to $fpga_diff_tdm_tx_sync_d_pins
-        puts "INFO: constrained UVHS DDR-reset to TDM synchronizer CDC: sources=[llength $fpga_diff_ddr_tdm_reset_src] destinations=[llength $fpga_diff_tdm_tx_sync_d_pins]"
-    } else {
-        puts "INFO: no linked UVHS DDR-reset to TDM synchronizer CDC endpoints"
-    }
+# UVHS TSO reports this crossing as an unconstrained non-DUT clock pair
+# (mmcm_clkout0 -> gtye4_ch_txoutclk) with EXCEPTION empty. Pin-level
+# false_path is not enough: the checker looks at the clock pair. Cut the
+# clocks themselves after the netlist is linked. This is independent of
+# DiffTest hostif; GBus only made the path visible on this partition.
+set fpga_diff_ddr_reset_clk_pins [get_pins -hierarchical -quiet -filter {
+    NAME =~ */core_def/U_UVHS_UVW_AXI4_TO_DDR4/*/proc_sys_reset_0/U0/ACTIVE_LOW_PR_OUT_DFF*/C
+}]
+set fpga_diff_tdm_tx_sync_clk_pins [get_pins -hier -quiet -filter {
+    REF_PIN_NAME == C &&
+    (NAME =~ */uvtdm_tx_ctrl_inst/sync_flop_0_reg*/C ||
+     NAME =~ */uvtdm_parity_g/sync_flop_0_reg*/C)
+}]
+if {[llength $fpga_diff_ddr_reset_clk_pins] &&
+    [llength $fpga_diff_tdm_tx_sync_d_pins]} {
+    set_false_path -from $fpga_diff_ddr_reset_clk_pins \
+        -to $fpga_diff_tdm_tx_sync_d_pins
+    puts "INFO: constrained UVHS DDR-reset clock pin to TDM synchronizer CDC: \
+        sources=[llength $fpga_diff_ddr_reset_clk_pins] \
+        destinations=[llength $fpga_diff_tdm_tx_sync_d_pins]"
+}
+set fpga_diff_ddr_reset_clocks [get_clocks -quiet -of_objects \
+    $fpga_diff_ddr_reset_clk_pins]
+set fpga_diff_tdm_tx_clocks [get_clocks -quiet -of_objects \
+    $fpga_diff_tdm_tx_sync_clk_pins]
+if {[llength $fpga_diff_ddr_reset_clocks] && [llength $fpga_diff_tdm_tx_clocks]} {
+    set_false_path -from $fpga_diff_ddr_reset_clocks \
+        -to $fpga_diff_tdm_tx_clocks
+    set_clock_groups -asynchronous \
+        -group $fpga_diff_ddr_reset_clocks \
+        -group $fpga_diff_tdm_tx_clocks
+    puts "INFO: constrained DDR MIG clock to TDM TX clock CDC: \
+        sources=$fpga_diff_ddr_reset_clocks \
+        destinations=$fpga_diff_tdm_tx_clocks"
+} else {
+    puts "INFO: no DDR MIG clock to TDM TX clock CDC on this FPGA"
 }
