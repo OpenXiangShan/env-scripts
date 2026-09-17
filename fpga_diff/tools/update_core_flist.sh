@@ -115,10 +115,16 @@ generate_uvhs_filelist() {
       printf '+incdir+%s\n' "$core_generated_dir"
     fi
     printf '+incdir+%s/src/rtl/common\n' "$fpga_diff_dir"
+    printf '+incdir+%s/uvhs/common\n' "$fpga_diff_dir"
 
     find "$fpga_diff_dir/src/rtl/common" -type f \
       \( -name '*.v' -o -name '*.sv' -o -name '*.vh' -o -name '*.svh' \) \
       ! -name 'u0_xdma.v' -print | LC_ALL=C sort
+    if [[ -d $fpga_diff_dir/uvhs/common ]]; then
+      find "$fpga_diff_dir/uvhs/common" -type f \
+        \( -name '*.v' -o -name '*.sv' -o -name '*.vh' -o -name '*.svh' \) \
+        -print | LC_ALL=C sort
+    fi
     if [[ -d $work_dir/rtl/stubs ]]; then
       find "$work_dir/rtl/stubs" -type f -name '*.v' -print | LC_ALL=C sort
     fi
