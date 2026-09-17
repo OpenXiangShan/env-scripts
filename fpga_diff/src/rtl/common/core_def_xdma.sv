@@ -1743,11 +1743,15 @@ wire [0:0]    br2cfg_wvalid;
     .sysbus_ghbd_i (gbus_sysbus_to_generalbus)
   );
 
+  // GBus DMA offsets are relative to the GeneralBus start address.  The
+  // inbound dma_core_* slave uses the CPU physical map, where DRAM starts at
+  // 0x80000000.  Keep the host at offset 0 and add that base here so the
+  // common CPU-to-DDR subtract still maps guest RAM onto physical DDR 0.
   uvhs_axi3_to_axi4_adapter #(
       .ADDR_WIDTH(36), .ID_WIDTH(14), .AXI3_ID_WIDTH(8), .DATA_WIDTH(256)
   ) U_GBUS_AXI_ADAPTER (
     .clk(gbus_host_clk), .rstn(rstn_sw4),
-    .s_awid(gbus_axi_awid), .s_awaddr({4'b0, gbus_axi_awaddr}),
+    .s_awid(gbus_axi_awid), .s_awaddr({4'b0, gbus_axi_awaddr} + 36'h8000_0000),
     .s_awlen(gbus_axi_awlen), .s_awsize(gbus_axi_awsize),
     .s_awburst(gbus_axi_awburst), .s_awlock(gbus_axi_awlock),
     .s_awcache(gbus_axi_awcache), .s_awprot(gbus_axi_awprot),
@@ -1758,7 +1762,7 @@ wire [0:0]    br2cfg_wvalid;
     .s_wready(gbus_axi_wready), .s_bid(gbus_axi_bid),
     .s_bresp(gbus_axi_bresp), .s_bvalid(gbus_axi_bvalid),
     .s_bready(gbus_axi_bready), .s_arid(gbus_axi_arid),
-    .s_araddr({4'b0, gbus_axi_araddr}), .s_arlen(gbus_axi_arlen),
+    .s_araddr({4'b0, gbus_axi_araddr} + 36'h8000_0000), .s_arlen(gbus_axi_arlen),
     .s_arsize(gbus_axi_arsize), .s_arburst(gbus_axi_arburst),
     .s_arlock(gbus_axi_arlock), .s_arcache(gbus_axi_arcache),
     .s_arprot(gbus_axi_arprot), .s_arqos(gbus_axi_arqos),
