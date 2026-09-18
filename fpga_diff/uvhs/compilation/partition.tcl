@@ -81,13 +81,15 @@ set uvhs_host_path_names {
 if {$uvhs_hostif eq "XDMA"} {
     lappend uvhs_host_path_names core_def/xdma_ep_i
 } elseif {$uvhs_hostif eq "GBUS"} {
-    # Keep the protected GBus endpoints, H2C clock crossing, and C2H SRAM
-    # staging interface together with the CPU host path on F2.
+    # Keep the protected GBus endpoints, AXI-stream H2C converter, and C2H SRAM
+    # staging interface together with the CPU host path on F2.  GBus occupies
+    # DifftestMemCtrl's existing stream engine, so the converter stays on F2
+    # with memCtrl; do not require the deleted U_GBUS_H2C_CDC bridge.
     set uvhs_gbus_host_path_names {\
         core_def/U_GBUS_CONFIG_BRIDGE \
         core_def/U_GBUS_GENERALBD \
         core_def/U_GBUS_GENERAL_BUS \
-        core_def/U_GBUS_H2C_CDC \
+        core_def/U_GBUS_H2C_AXIS \
         core_def/U_GBUS_C2H_FIFO}
     set uvhs_host_path_names \
         [concat $uvhs_host_path_names $uvhs_gbus_host_path_names]
