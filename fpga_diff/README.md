@@ -1,6 +1,10 @@
 Core RTL to FPGA Steps
 ======================
 
+For UVHS GBus builds, see [the SRAM C2H interface and build flow](uvhs/README.md).
+`DIFFTEST_HOSTIF=GBUS` keeps DiffTest output in the GBS1 on-chip SRAM window.
+Workload H2C enters through the existing CPU-subsystem DMA AXI interface.
+
 1. modify Makefile, assign CORE_DIR
 
 2. make vivado CPU=XXX

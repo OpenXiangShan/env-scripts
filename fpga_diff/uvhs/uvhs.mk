@@ -4,8 +4,15 @@ UVHS_RUNTIME_DIR := $(UVHS_ROOT_DIR)/uvhs/runtime
 
 UVHS_TEMPLATE_DIR ?=
 UVHS_UVW_AXI4_TO_DDR4_SRC ?=
-# KMH is the XiangShan target; keep the larger CPU profile enabled by default.
-UVHS_PROBE_TCL ?= $(if $(filter kmh xiangshan,$(CPU)),$(UVHS_COMPILATION_DIR)/probe_kmh.tcl,$(UVHS_COMPILATION_DIR)/probe_ila.tcl)
+DIFFTEST_HOSTIF ?= XDMA
+ifeq ($(filter XDMA GBUS,$(DIFFTEST_HOSTIF)),)
+$(error DIFFTEST_HOSTIF must be XDMA or GBUS, got $(DIFFTEST_HOSTIF))
+endif
+# The detailed KMH profile is tied to a particular generated XiangShan
+# hierarchy.  GBus bring-up only requires the stable host trigger, so avoid
+# making ordinary GBus builds fail when internal CPU signal names change.
+# XDMA keeps its historical default; either flow may still opt in explicitly.
+UVHS_PROBE_TCL ?= $(if $(and $(filter kmh xiangshan,$(CPU)),$(filter XDMA,$(DIFFTEST_HOSTIF))),$(UVHS_COMPILATION_DIR)/probe_kmh.tcl,$(UVHS_COMPILATION_DIR)/probe_ila.tcl)
 UVHS_PROBE_PATH := $(if $(strip $(UVHS_PROBE_TCL)),$(abspath $(UVHS_PROBE_TCL)),)
 UVHS_DDR_AXI_WIDTH := $(if $(filter nutshell,$(CPU)),64,256)
 UVHS_WORK_DIR := $(ENV_SCRIPTS_HOME)/$(PRJ_NAME)
@@ -46,11 +53,13 @@ UVHS_TOOL_ENV = \
 	UVHS_RUNTIME_LIB_DIR="$(UVHS_RUNTIME_LIB_DIR)" \
 	UVHS_COMPAT_BIN="$(UVHS_COMPAT_BIN)" \
 	UVHS_TMCLK_CPU_RATIO="$(UVHS_TMCLK_CPU_RATIO)" \
+	DIFFTEST_HOSTIF="$(DIFFTEST_HOSTIF)" \
 	UVSHELL_EXEC_NAME="$(UVHS_RUNTIME_DIR)/uv_shell_exec_compat.sh"
 
 UVHS_FLOW_ENV = \
 	$(UVHS_TOOL_ENV) \
 	UVHS_FLOW=1 \
+	DIFFTEST_HOSTIF="$(DIFFTEST_HOSTIF)" \
 	UVHS_PROBE_TCL="$(UVHS_PROBE_PATH)" \
 	XDMA_LINK_WIDTH="$(XDMA_LINK_WIDTH)" \
 	UVHS_KEEP_FPGAS="$(UVHS_KEEP_FPGAS)" \
@@ -115,6 +124,7 @@ uvhs_prepare: uvhs_preflight
 		"$(UVHS_UVW_AXI4_TO_DDR4_SRC)" "$(UVHS_DDR_AXI_WIDTH)"
 
 uvhs_project: uvhs_prepare
+	DIFFTEST_HOSTIF="$(DIFFTEST_HOSTIF)" \
 	bash "$(UVHS_ROOT_DIR)/tools/update_core_flist.sh" uvhs \
 		"$(CORE_DIR)" "$(UVHS_WORK_DIR)" "$(CPU)" "$(UVHS_FILELIST)" \
 		-- $(RTL_INCLUDE)

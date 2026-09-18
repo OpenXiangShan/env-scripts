@@ -4,6 +4,33 @@ This directory contains the UVHS build and runtime flow for FPGA-Diff. UVHS
 commands use the `uvhs_*` prefix and do not replace the existing Vivado, PCIe,
 or JTAG commands.
 
+## GBus SRAM C2H
+
+`DIFFTEST_HOSTIF=GBUS` retains the shared `Difftest2AXIs` sender and buffers
+DiffTest output only in on-chip SRAM. Workload H2C converts the GeneralBus AXI3
+master to AXI4, crosses into the CPU clock domain, and occupies the CPU
+subsystem's existing `dma_core_*` inbound interface. KMH retains the 256-bit
+interface; NutShell uses the generated AXI data-width converter before its
+64-bit frontend, so no GeneralBus data lanes are discarded. The CPU memory
+hierarchy and physical DDR path remain unchanged. The obsolete C2H DDR-ring
+writer and DDR trace sink are not included.
+
+GBS1 is a register-drained SRAM window. Backpressure reaches the DiffTest
+sender and pauses the CPU while the host transport clock continues to run.
+The matching fpga-host selects the same GBS1 register-window protocol.
+
+GeneralBD local offsets are below; the host adds its config base (`0x1000`).
+
+| Local offset | GBS1 register |
+| --- | --- |
+| `0x1200` | present[31], frame error[30], draining[29], staged words[16:8], filling[7], FIFO data[6] |
+| `0x1204` | control: FILL=1, DRAIN=2 |
+| `0x1208` | ID `0x47425331` |
+| `0x2000..0x23fc` | SRAM data window |
+
+AXIS TLAST validates each 768-byte DiffTest range. The host dispatches complete
+96-byte records and preserves any partial record across SRAM windows.
+
 ## RTL Input
 
 Generate an FPGA release before entering `env-scripts`. `CORE_DIR` is the
@@ -21,6 +48,17 @@ conversion. The UVHS flow only consumes that result.
 them. `uvhs_project` combines those inputs with the release RTL and FPGA-Diff
 wrappers in `<work>/rtl/filelist.f`, which the UVHS frontend reads directly.
 
+## GBus host paths
+
+The GBus C2H path uses the on-chip SRAM register window identified as GBS1.
+GBus H2C occupies the existing `dma_core_*` inbound AXI interface during the
+workload load phase; no DDR C2H ring or GBus-specific physical-DDR path is part
+of the UVHS RTL flow. Host DMA offsets stay relative to the GeneralBus start
+address (`GBUS_DDR_BASE=0`). The wrapper maps that offset onto CPU DRAM at
+`0x80000000` before `dma_core_*`. During that load, `HOST_IO_RESET` still
+halts the cores, but the SoC fabric and inbound DMA slave stay out of reset
+so the AXI writes can complete.
+
 ## Build
 
 ```sh
@@ -35,7 +73,9 @@ the runtime database.
 `uvhs_project` performs these steps:
 
 1. Copies the vendor board template into an isolated work directory.
-2. Prepares repository-owned Vivado IP and the 64-bit generalBus DCP.
+2. Prepares repository-owned Vivado IP, including the NutShell 256-to-64 AXI
+   converter, and generates the protected GeneralBus and GeneralBD checkpoints
+   from the local UVHS installation.
 3. Imports the selected DDR DCP and validates its AXI width.
 4. Builds the complete RTL file list and checks the expected top module.
 
@@ -52,12 +92,10 @@ helper scripts, board-template files, and the external DDR directory. This
 keeps a missing input from being discovered after a multi-hour run has started.
 
 IP preparation intentionally retains two files. `prepare_ip.sh` is the outer
-orchestrator for three different sources: repository Vivado IP, the vendor
-Python generalBus generator, and an external DDR checkpoint. The child
+orchestrator for repository Vivado IP, generated GeneralBus/GeneralBD
+checkpoints, and an external DDR checkpoint. The child
 `export_vivado_ip.tcl` must run inside Vivado because it uses project, IP, BD,
-and checkpoint commands. Merging them would require Vivado to launch a nested
-Vivado process or embedding a generated Tcl file in shell, neither of which
-simplifies the execution model.
+and checkpoint commands. Owned GBus RTL lives in `uvhs/common`.
 
 `uvhs_backend` follows the vendor implementation sequence: clock inference and
 transformation, remap, partition, localization, system routing, FPGA PnR,
@@ -86,15 +124,13 @@ per-bit TDM skew on the time value. The remaining logic is partitioned
 automatically. XiangShan uses these path constraints together with high
 partition effort and the `uv_placer_balance_slrs` PnR strategy.
 
-UVHS drives the AXI UART16550 from `clk6_p` at a fixed 50 MHz. The CPU/SoC
-`clk5_p` frequency comes from the system sign-off result committed in the
-selected runtime database, so each partition and PnR result runs at its own
-reported frequency. The fixed UART clock matches the 50 MHz clock declared by
-the XiangShan FPGA device tree and keeps UART baud timing independent of CPU
-clock gating.
+UVHS drives the AXI UART16550 and the GBus/DiffTest host interface from
+`clk6_p`, while the CPU/SoC uses `clk5_p`. At runtime, both clocks are restored
+to the sign-off frequencies stored in the selected runtime database, so each
+partition and PnR result runs at its reported frequency. Keeping UART and GBus
+on the free-running transport clock makes them independent of CPU clock gating.
 
-At runtime, `clk5_p` is restored to the sign-off frequency stored in the
-selected runtime database. `clk8_p` is then derived at a fixed 50:1 CPU-to-TMCLK
+`clk8_p` is then derived at a fixed 50:1 CPU-to-TMCLK
 ratio, so a 14 MHz CPU clock uses approximately 280 kHz TMCLK. The optional
 `UVHS_TMCLK_CPU_RATIO` environment variable is retained only for controlled
 clock-sweep experiments. Update the Linux device-tree `timebase-frequency` to
@@ -180,17 +216,19 @@ from the server's global Tcl scope.
 ## UVHS ILA Waveform Capture
 
 The probe scripts describe compile-time instrumentation, not a runtime dump.
-For XiangShan/KMH builds, the frontend sources `compilation/probe_kmh.tcl` by
-default. CPU and L2 signals are sampled on
+For XiangShan/KMH XDMA builds, the frontend sources
+`compilation/probe_kmh.tcl` by default. This larger profile samples CPU and L2
+signals on
 `core_def.inter_soc_clk`, the gated clock connected to `SimTop.clock`. DDR and
-host-trigger signals remain on their free-running `core_def.sys_clk_i` domain,
-so the host trigger remains observable after the CPU clock stops. Its generated
+host-trigger signals remain on their free-running host-clock domain, so the host
+trigger remains observable after the CPU clock stops. Its generated
 hierarchy must be checked before it is reused with a different XiangShan RTL
 revision. The braces preserve hierarchy indexes such as `[0]`.
-Other CPU builds continue to use the minimal `compilation/probe_ila.tcl`
-profile by default.
+GBus builds and other CPU builds use the minimal
+`compilation/probe_ila.tcl` profile by default. This keeps the stable host
+trigger without coupling a build to revision-specific CPU internals.
 Set `UVHS_PROBE_TCL` to select a profile or an external file; an override must
-retain the XDMA host trigger if host-controlled capture is required. Set it to
+retain the host trigger if host-controlled capture is required. Set it to
 an empty value for a build with no UHD instrumentation. The scripts call
 `probe_net` for sampled signals and `trigger_net` for signals that may
 participate in a trigger condition.
@@ -392,9 +430,11 @@ before the UVHS timing worker reads it.
 | File | Role |
 | --- | --- |
 | `uvhs.mk` | Build and runtime target wiring. |
-| `../tools/update_core_flist.sh` | Shared Vivado/UVHS RTL file-list entry point. |
+| `../tools/update_core_flist.sh` | Shared Vivado/UVHS RTL file-list entry point, including `uvhs/common`. |
+| `common/` | Owned GBus/UVHS RTL wrappers, CDC, and blackbox stubs. |
 | `../tools/rtl_filelist_lib.sh` | Nested file-list parsing and path resolution. |
-| `../src/tcl/common/{blk_mem_gen_0,AXI_bridge,data_bridge,xdma_ep}.tcl` | Shared Vivado IP/BD generators used by UVHS IP export and Vivado project creation. |
+| `../src/tcl/common/{blk_mem_gen_0,AXI_bridge,data_bridge,xdma_ep}.tcl` | Shared Vivado IP/BD generators used by UVHS IP export and Vivado project creation. XDMA exports `data_bridge`/`xdma_ep`; GBus skips them. |
+| `tcl/uvhs_gbus_axi_dwidth.tcl` | GBus-only 256-to-64 AXI converter generator. |
 | `compilation/flow_common.tcl` | Shared UVHS path, environment, and source helpers. |
 | `compilation/frontend_run.tcl` | RTL/IP import, elaboration, and uvsyn frontend. |
 | `compilation/backend_run.tcl` | Fill-rate setup, partition, routing, PnR, and database commit. |
@@ -403,7 +443,8 @@ before the UVHS timing worker reads it.
 | `compilation/assign_pin.tcl` | Physical UART daughter-card, clock, PCIe, JTAG, SD, and control pins. |
 | `compilation/timing.tcl` | External clock and asynchronous-group constraints. |
 | `compilation/vivado_pre_opt.tcl` | XDMA refclock and CDC constraints. |
-| `compilation/prepare_ip.sh` | Coordinates Vivado, generalBus, and external DDR IP preparation. |
+| `compilation/prepare_ip.sh` | Coordinates Vivado IP export, GeneralBus/GeneralBD generation, and external DDR import. |
+| `ip/gbus/README.md` | Documents the vendor sources used to generate GBus checkpoints. |
 | `compilation/export_vivado_ip.tcl` | Runs repository-owned XCI/BD exports inside Vivado. |
 | `compilation/probe_ila.tcl` | Minimal host-trigger UHD probe profile. |
 | `compilation/probe_kmh.tcl` | KMH debug UHD probe profile. |

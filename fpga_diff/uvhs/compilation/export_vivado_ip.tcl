@@ -7,11 +7,12 @@ set out_dir "./uvhs_ip"
 set force 0
 set jobs 8
 set core_dir ""
+set hostif "XDMA"
 
 proc print_help {} {
     puts "Usage:"
     puts "  vivado -mode batch -source uvhs/compilation/export_vivado_ip.tcl -tclargs \\"
-    puts "    --origin_dir <fpga_diff> --out_dir <uvhs_work_dir> \[--core_dir <dir>\] \[--force\] \[--jobs N\]"
+    puts "    --origin_dir <fpga_diff> --out_dir <uvhs_work_dir> \[--core_dir <dir>\] \[--hostif XDMA|GBUS\] \[--force\] \[--jobs N\]"
     exit 0
 }
 
@@ -21,6 +22,7 @@ for {set i 0} {$i < $::argc} {incr i} {
         "--origin_dir"     { incr i; set origin_dir [lindex $::argv $i] }
         "--out_dir"        { incr i; set out_dir [lindex $::argv $i] }
         "--core_dir"       { incr i; set core_dir [lindex $::argv $i] }
+        "--hostif"         { incr i; set hostif [string toupper [lindex $::argv $i]] }
         "--force"          { set force 1 }
         "--jobs"           { incr i; set jobs [lindex $::argv $i] }
         "--help"           { print_help }
@@ -30,6 +32,9 @@ for {set i 0} {$i < $::argc} {incr i} {
         }
     }
 }
+if {$hostif ni {XDMA GBUS}} {
+    error "unsupported DiffTest host interface: $hostif"
+}
 
 set origin_dir [file normalize $origin_dir]
 set out_dir [file normalize $out_dir]
@@ -37,6 +42,7 @@ if {$core_dir ne ""} {
     set core_dir [file normalize $core_dir]
 }
 set tcl_dir [file join $origin_dir src tcl common]
+set uvhs_tcl_dir [file join $origin_dir uvhs tcl]
 set export_project_dir [file join $out_dir vivado_ip_export]
 set export_project [file join $export_project_dir vivado_ip_export.xpr]
 
@@ -156,11 +162,25 @@ proc copy_generated_stub {kind name} {
     if {$kind eq "xci"} {
         set candidates [concat \
             [glob -nocomplain [file join $export_project_dir *.srcs sources_1 ip $name ${name}_stub.v]] \
-            [glob -nocomplain [file join $export_project_dir *.gen sources_1 ip $name ${name}_stub.v]]]
+            [glob -nocomplain [file join $export_project_dir *.gen sources_1 ip $name ${name}_stub.v]] \
+            [glob -nocomplain [file join $export_project_dir *.gen sources_1 ip $name ${name}_bmstub.v]] \
+            [glob -nocomplain [file join $export_project_dir *.gen sources_1 ip $name synth ${name}_stub.v]] \
+            [glob -nocomplain [file join $export_project_dir *.gen sources_1 ip $name synth ${name}_bmstub.v]]]
     } else {
         set candidates [glob -nocomplain [file join $export_project_dir *.gen sources_1 bd $name ${name}_bmstub.v]]
     }
-    if {[llength $candidates] != 1} {
+    # Vivado 2024.2 can emit both *_stub.v and *_bmstub.v.  The regular
+    # synthesis stub is preferred; *_bmstub.v is only a fallback for older
+    # releases.  Do not treat the two valid outputs as an ambiguity.
+    if {$kind eq "xci"} {
+        set preferred [glob -nocomplain \
+            [file join $export_project_dir *.gen sources_1 ip $name ${name}_stub.v] \
+            [file join $export_project_dir *.srcs sources_1 ip $name ${name}_stub.v]]
+        if {[llength $preferred] > 0} {
+            set candidates $preferred
+        }
+    }
+    if {[llength $candidates] == 0} {
         error "cannot find generated $kind stub for $name"
     }
 
@@ -255,9 +275,7 @@ proc create_and_launch_bd_ip_runs {bd jobs} {
 }
 
 proc export_xci_ip {name script out_file jobs force} {
-    if {[llength [get_ips -quiet $name]] == 0} {
-        source_ip_tcl $script
-    }
+    source_ip_tcl $script
 
     set ip [get_ips -quiet $name]
     if {[llength $ip] == 0} {
@@ -272,6 +290,10 @@ proc export_xci_ip {name script out_file jobs force} {
         }
     }
     generate_target all $ip
+    # Vivado 2024.2 may leave the generated stub under the IP's synth tree;
+    # copy_generated_stub accepts that location, but stale failed runs can
+    # otherwise make the expected stub appear missing.
+    update_compile_order -fileset sources_1
     catch {create_ip_run $ip}
     run_and_copy_dcp ${name}_synth_1 $out_file $jobs $force
     copy_generated_stub xci $name
@@ -315,9 +337,18 @@ proc export_bd_ip {name script out_file jobs force} {
 set exports [list \
     [list xci blk_mem_gen_0 [file join $tcl_dir blk_mem_gen_0.tcl] [file join $out_dir rtl soc blk_mem_gen_0.dcp]] \
     [list bd  AXI_bridge    [file join $tcl_dir AXI_bridge.tcl]    [file join $out_dir rtl soc AXI_bridge.dcp]] \
-    [list bd  data_bridge   [file join $tcl_dir data_bridge.tcl]   [file join $out_dir rtl soc data_bridge.dcp]] \
-    [list bd  xdma_ep       [file join $tcl_dir xdma_ep.tcl]       [file join $out_dir rtl device pcie xdma_ep.dcp]] \
 ]
+if {$hostif eq "XDMA"} {
+    lappend exports [list bd data_bridge [file join $tcl_dir data_bridge.tcl] \
+        [file join $out_dir rtl soc data_bridge.dcp]]
+    lappend exports [list bd xdma_ep [file join $tcl_dir xdma_ep.tcl] \
+        [file join $out_dir rtl device pcie xdma_ep.dcp]]
+} else {
+    lappend exports [list xci uvhs_gbus_axi_dwidth \
+        [file join $uvhs_tcl_dir uvhs_gbus_axi_dwidth.tcl] \
+        [file join $out_dir rtl soc uvhs_gbus_axi_dwidth.dcp]]
+    puts "INFO: skip data_bridge and xdma_ep export for DiffTest host interface $hostif"
+}
 
 set failed_exports [list]
 foreach item $exports {

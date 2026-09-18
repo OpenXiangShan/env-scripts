@@ -73,6 +73,10 @@ generate_uvhs_filelist() {
   local -a required_modules=()
   shift 4
 
+  local hostif=${DIFFTEST_HOSTIF:-XDMA}
+  [[ $hostif == XDMA || $hostif == GBUS ]] ||
+    rtl_flist_fail "DIFFTEST_HOSTIF must be XDMA or GBUS: $hostif"
+
   core_dir=$(realpath -e -- "$core_dir")
   work_dir=$(realpath -e -- "$work_dir")
   core_rtl_dir=$core_dir/rtl
@@ -87,15 +91,23 @@ generate_uvhs_filelist() {
 
   {
     printf '+define+SYNTHESIS\n+define+XIANGSHAN_FPGA\n+define+UVHS\n'
+    if [[ $hostif == GBUS ]]; then
+      printf '+define+CONFIG_DIFFTEST_HOSTIF_GBUS\n'
+    fi
     printf '+define+DDR4_16G_X8\n+define+DQ64\n+define+DDR4_2400\n'
     printf '+define+DQ=64\n+define+MICRON_DDR\n+define+DDR4_16Gbx8\n'
     printf '+define+DDR4\n+define+SRAM_SYN\n+define+DATA_VERSION=0\n'
     if [[ $cpu == nutshell ]]; then
       printf '+define+CPU_NUTSHELL\n'
     fi
-    if [[ $cpu == kmh ]] &&
-      grep -Eq '^[[:space:]]*(input|output)[[:space:]].*dma_awready' "$core_rtl_dir/SimTop.sv"; then
-      printf '+define+CONFIG_SIMTOP_HAS_DMA\n'
+    if [[ $cpu == kmh ]]; then
+      if grep -Eq '^[[:space:]]*(input|output)[[:space:]].*dma_awready' \
+        "$core_rtl_dir/SimTop.sv"; then
+        printf '+define+CONFIG_SIMTOP_HAS_DMA\n'
+      elif [[ $hostif == GBUS ]]; then
+        rtl_flist_fail \
+          "GBus H2C requires the generated KMH SimTop dma_* AXI interface"
+      fi
     fi
 
     printf '+incdir+%s\n' "$core_dir" "$core_rtl_dir"
@@ -103,10 +115,16 @@ generate_uvhs_filelist() {
       printf '+incdir+%s\n' "$core_generated_dir"
     fi
     printf '+incdir+%s/src/rtl/common\n' "$fpga_diff_dir"
+    printf '+incdir+%s/uvhs/common\n' "$fpga_diff_dir"
 
     find "$fpga_diff_dir/src/rtl/common" -type f \
       \( -name '*.v' -o -name '*.sv' -o -name '*.vh' -o -name '*.svh' \) \
       ! -name 'u0_xdma.v' -print | LC_ALL=C sort
+    if [[ -d $fpga_diff_dir/uvhs/common ]]; then
+      find "$fpga_diff_dir/uvhs/common" -type f \
+        \( -name '*.v' -o -name '*.sv' -o -name '*.vh' -o -name '*.svh' \) \
+        -print | LC_ALL=C sort
+    fi
     if [[ -d $work_dir/rtl/stubs ]]; then
       find "$work_dir/rtl/stubs" -type f -name '*.v' -print | LC_ALL=C sort
     fi
