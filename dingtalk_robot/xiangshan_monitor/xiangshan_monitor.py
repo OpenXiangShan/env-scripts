@@ -58,7 +58,7 @@ DEFAULT_MAX_API_CALLS = 1
 DEFAULT_REASONING_EFFORT = "xhigh"
 DEFAULT_DINGTALK_LAYER = "debug"
 DEFAULT_HIGHLIGHT_COUNT = 1
-RANDOM_GIFT_DENOMINATOR = 7
+RANDOM_GIFT_DENOMINATOR = 5
 RANDOM_GIFT_LABEL = "随机礼包"
 DEFAULT_ANALYSIS_START_TIME = "17:49"
 DEFAULT_DEBUG_SEND_TIME = "17:55"
@@ -222,14 +222,25 @@ def _run_git(args: Sequence[str], cwd: Optional[Path] = None, timeout: float = D
     return result.stdout
 
 
-def _branch_name(path: Path, configured: Optional[str], git_runner: Callable[..., str]) -> str:
-    if configured:
-        return configured
-    current = git_runner(["branch", "--show-current"], cwd=path).strip()
-    if current:
-        return current
+def _origin_default_branch(path: Path, git_runner: Callable[..., str]) -> str:
+    """Return origin's current default branch, ignoring any local branch state."""
     remote_head = git_runner(["symbolic-ref", "--short", "refs/remotes/origin/HEAD"], cwd=path).strip()
-    return remote_head[7:] if remote_head.startswith("origin/") else (remote_head or "HEAD")
+    prefix = "origin/"
+    branch = remote_head[len(prefix):] if remote_head.startswith(prefix) else remote_head
+    if branch and branch != "HEAD":
+        return branch
+    raise XiangShanMonitorError(f"Cannot determine origin default branch in {path}")
+
+
+def _checkout_origin_default(path: Path, git_runner: Callable[..., str], timeout: float) -> str:
+    """Point HEAD at origin's latest default commit. Never merge or pull locally."""
+    try:
+        git_runner(["remote", "set-head", "origin", "--auto"], cwd=path, timeout=timeout)
+    except XiangShanMonitorError:
+        pass
+    branch = _origin_default_branch(path, git_runner)
+    git_runner(["checkout", "--force", "--detach", f"origin/{branch}"], cwd=path, timeout=timeout)
+    return branch
 
 
 def clone_or_pull(spec: RepositorySpec, organization: str, clone_root: Path, git_runner: Callable[..., str] = _run_git, timeout: float = DEFAULT_GIT_TIMEOUT) -> Tuple[Path, str]:
@@ -238,21 +249,11 @@ def clone_or_pull(spec: RepositorySpec, organization: str, clone_root: Path, git
     remote = spec.remote or f"https://github.com/{organization}/{spec.name}.git"
     if (target / ".git").is_dir():
         git_runner(["fetch", "--prune", "origin"], cwd=target, timeout=timeout)
-        branch = _branch_name(target, spec.branch, git_runner)
-        if branch != "HEAD":
-            current = git_runner(["branch", "--show-current"], cwd=target).strip()
-            if current != branch:
-                git_runner(["checkout", branch], cwd=target, timeout=timeout)
-            git_runner(["pull", "--ff-only", "origin", branch], cwd=target, timeout=timeout)
-        return target, branch
+        return target, _checkout_origin_default(target, git_runner, timeout)
     if target.exists() and any(target.iterdir()):
         raise XiangShanMonitorError(f"Clone destination is not an empty Git repository: {target}")
-    args: List[str] = ["clone"]
-    if spec.branch:
-        args.extend(["--branch", spec.branch])
-    args.extend([remote, str(target)])
-    git_runner(args, timeout=timeout)
-    return target, _branch_name(target, spec.branch, git_runner)
+    git_runner(["clone", remote, str(target)], timeout=timeout)
+    return target, _checkout_origin_default(target, git_runner, timeout)
 
 
 def _parse_numstat(lines: Iterable[str]) -> Tuple[List[str], int, int]:
@@ -423,7 +424,7 @@ def random_gift_slots(report: Mapping[str, Any], highlight_count: int) -> List[i
 
     The draw is deliberately local and deterministic: the report date, every
     repository's captured HEAD, and the slot number form the seed.  A slot
-    wins when its SHA-256 digest is divisible by seven, so no AI output (or
+    wins when its SHA-256 digest is divisible by five (1/5 odds), so no AI output (or
     fragile name parsing) is involved. Every report must contain a captured
     repository HEAD; incomplete snapshots are rejected.
     """
@@ -499,8 +500,8 @@ def pull_data(repository_data: Optional[Mapping[str, Any]] = None, window_spec: 
         try:
             path, branch = clone_or_pull(spec, organization, clone_root, git_runner, float(timeout))
             item["path"], item["branch"] = _relative_path(path, root), branch
-            item["head_sha"] = git_runner(["rev-parse", branch], cwd=path).strip()
-            item["commits"] = collect_repository_commits(path, branch, window, organization, spec.name, max_commits, git_runner)
+            item["head_sha"] = git_runner(["rev-parse", "HEAD"], cwd=path).strip()
+            item["commits"] = collect_repository_commits(path, "HEAD", window, organization, spec.name, max_commits, git_runner)
             item["status"] = "updated"
         except (OSError, XiangShanMonitorError, ValueError) as exc:
             item["error"] = str(exc)

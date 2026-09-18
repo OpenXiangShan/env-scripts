@@ -117,7 +117,8 @@ python3 -m unittest discover -s dingtalk_robot/tests -v
 ## OpenXiangShan daily praise monitor
 
 `xiangshan_monitor/xiangshan_monitor.py` is a three-stage daily job for the OpenXiangShan
-organization. `pull` clones or fast-forward-updates the repositories listed in
+organization. `pull` clones or force-checkouts the remote default branch of the
+repositories listed in
 `dingtalk_robot/xiangshan_monitor/repositories.json` and records commits from a
 rolling window (`24h` by default, or `7d`), including the complete patch for
 every commit. `talk` reads the checked-in `prompt.txt` and uses the explicitly
@@ -126,7 +127,9 @@ a casual DingTalk-ready Chinese message from the patch material. The prompt
 file keeps the final, map, and reduce instructions in separate `[final]`, `[map]`,
 and `[reduce]` sections. `highlight_count` controls how many contributors are
 selected; when it is `null`, the monitor chooses 1 for a window up to 24h, adds
-one for each additional full day, and caps at 3. If the AI API returns an
+one for each additional full day, and caps at 3. After the message is written,
+each highlight independently wins a random gift with probability 1/5, using the
+report date and captured repository HEADs as the seed. If the AI API returns an
 error or unusable response, the monitor writes and sends its fixed fallback
 message instead. `push` sends that message as plain text with the normal signed
 DingTalk helper; it never calls an AI API. Monitor credentials are layered as
