@@ -1453,7 +1453,9 @@ wire [0:0]    br2cfg_wvalid;
   assign xdma_s00_axis_tkeep = difftest_to_host_axis_tkeep;
   assign xdma_s00_axis_tlast = difftest_to_host_axis_tlast;
   assign xdma_s00_axis_tvalid = difftest_to_host_axis_tvalid_io;
+`ifndef CONFIG_DIFFTEST_HOSTIF_GBUS
   assign xdma_m00_axis_tready = difftest_from_host_axis_tready;
+`endif
   // Keep the XDMA user side in the clock domain exported by the XDMA DCP and
   // do not let SoC reset
   // hold the endpoint user logic while the host probes BARs.
@@ -1526,26 +1528,6 @@ wire [0:0]    br2cfg_wvalid;
   wire [1:0] gbus_h2c_bresp, gbus_h2c_rresp;
   wire gbus_h2c_bvalid, gbus_h2c_bready, gbus_h2c_arvalid, gbus_h2c_arready;
   wire gbus_h2c_rlast, gbus_h2c_rvalid, gbus_h2c_rready;
-
-  wire [13:0] gbus_dma_awid, gbus_dma_arid;
-  wire [35:0] gbus_dma_awaddr, gbus_dma_araddr;
-  wire [7:0] gbus_dma_awlen, gbus_dma_arlen;
-  wire [2:0] gbus_dma_awsize, gbus_dma_arsize;
-  wire [1:0] gbus_dma_awburst, gbus_dma_arburst;
-  wire gbus_dma_awlock, gbus_dma_arlock;
-  wire [3:0] gbus_dma_awcache, gbus_dma_arcache;
-  wire [3:0] gbus_dma_awqos, gbus_dma_arqos;
-  wire [3:0] gbus_dma_awregion, gbus_dma_arregion;
-  wire [2:0] gbus_dma_awprot, gbus_dma_arprot;
-  wire gbus_dma_awvalid, gbus_dma_awready;
-  wire [255:0] gbus_dma_wdata, gbus_dma_rdata;
-  wire [31:0] gbus_dma_wstrb;
-  wire gbus_dma_wlast, gbus_dma_wvalid, gbus_dma_wready;
-  wire [13:0] gbus_dma_bid, gbus_dma_rid;
-  wire [1:0] gbus_dma_bresp, gbus_dma_rresp;
-  wire gbus_dma_bvalid, gbus_dma_bready;
-  wire gbus_dma_arvalid, gbus_dma_arready;
-  wire gbus_dma_rlast, gbus_dma_rvalid, gbus_dma_rready;
   wire gbus_shell_sready;
   wire gbus_c2h_sready;
   // The GENERALBD and GENERALBUS protected IPs share a 256-bit system-bus
@@ -1576,11 +1558,21 @@ wire [0:0]    br2cfg_wvalid;
     .S00_AXIS_0_tready    (difftest_to_host_axis_tready_io),
 `endif
     .S00_AXIS_0_tvalid    (xdma_s00_axis_tvalid),
+`ifdef CONFIG_DIFFTEST_HOSTIF_GBUS
+    // GBus occupies the existing DifftestMemCtrl AXI-stream H2C engine.
+    // Leave the compatibility shell's unused M00 stream disconnected.
+    .M00_AXIS_0_tdata     (),
+    .M00_AXIS_0_tkeep     (),
+    .M00_AXIS_0_tlast     (),
+    .M00_AXIS_0_tready    (1'b0),
+    .M00_AXIS_0_tvalid    (),
+`else
     .M00_AXIS_0_tdata     (difftest_from_host_axis_tdata),
     .M00_AXIS_0_tkeep     (difftest_from_host_axis_tkeep),
     .M00_AXIS_0_tlast     (difftest_from_host_axis_tlast),
     .M00_AXIS_0_tready    (xdma_m00_axis_tready),
     .M00_AXIS_0_tvalid    (difftest_from_host_axis_tvalid),
+`endif
 
 `ifdef CONFIG_DIFFTEST_HOSTIF_GBUS
     // The compatibility shell is not the GBus register master.  Leave its
@@ -1743,15 +1735,16 @@ wire [0:0]    br2cfg_wvalid;
     .sysbus_ghbd_i (gbus_sysbus_to_generalbus)
   );
 
-  // GBus DMA offsets are relative to the GeneralBus start address.  The
-  // inbound dma_core_* slave uses the CPU physical map, where DRAM starts at
-  // 0x80000000.  Keep the host at offset 0 and add that base here so the
-  // common CPU-to-DDR subtract still maps guest RAM onto physical DDR 0.
+  // GBus occupies the existing DifftestMemCtrl AXI-stream H2C engine, not
+  // dma_core_*.  Host DMA writes stay at GeneralBus offset 0; H2CAXIs2Mem
+  // ignores AXI addresses and writes physical DRAM from 0x80000000 using
+  // HOST_IO_H2C_SIZE_MB.  Keep dma_core idle so GBus and XDMA remain
+  // compile-time exclusive owners of their respective inbound masters.
   uvhs_axi3_to_axi4_adapter #(
       .ADDR_WIDTH(36), .ID_WIDTH(14), .AXI3_ID_WIDTH(8), .DATA_WIDTH(256)
   ) U_GBUS_AXI_ADAPTER (
     .clk(gbus_host_clk), .rstn(rstn_sw4),
-    .s_awid(gbus_axi_awid), .s_awaddr({4'b0, gbus_axi_awaddr} + 36'h8000_0000),
+    .s_awid(gbus_axi_awid), .s_awaddr({4'b0, gbus_axi_awaddr}),
     .s_awlen(gbus_axi_awlen), .s_awsize(gbus_axi_awsize),
     .s_awburst(gbus_axi_awburst), .s_awlock(gbus_axi_awlock),
     .s_awcache(gbus_axi_awcache), .s_awprot(gbus_axi_awprot),
@@ -1762,7 +1755,7 @@ wire [0:0]    br2cfg_wvalid;
     .s_wready(gbus_axi_wready), .s_bid(gbus_axi_bid),
     .s_bresp(gbus_axi_bresp), .s_bvalid(gbus_axi_bvalid),
     .s_bready(gbus_axi_bready), .s_arid(gbus_axi_arid),
-    .s_araddr({4'b0, gbus_axi_araddr} + 36'h8000_0000), .s_arlen(gbus_axi_arlen),
+    .s_araddr({4'b0, gbus_axi_araddr}), .s_arlen(gbus_axi_arlen),
     .s_arsize(gbus_axi_arsize), .s_arburst(gbus_axi_arburst),
     .s_arlock(gbus_axi_arlock), .s_arcache(gbus_axi_arcache),
     .s_arprot(gbus_axi_arprot), .s_arqos(gbus_axi_arqos),
@@ -1792,10 +1785,10 @@ wire [0:0]    br2cfg_wvalid;
     .m_rready(gbus_h2c_rready)
   );
 
-  uvhs_axi_async_bridge #(
+  uvhs_gbus_axi_to_axis #(
       .ADDR_WIDTH(36), .ID_WIDTH(14), .DATA_WIDTH(256)
-  ) U_GBUS_H2C_CDC (
-    .s_clk(gbus_host_clk), .s_rstn(rstn_sw4),
+  ) U_GBUS_H2C_AXIS (
+    .clk(gbus_host_clk), .rstn(rstn_sw4),
     .s_awid(gbus_h2c_awid), .s_awaddr(gbus_h2c_awaddr),
     .s_awlen(gbus_h2c_awlen), .s_awsize(gbus_h2c_awsize),
     .s_awburst(gbus_h2c_awburst), .s_awlock(gbus_h2c_awlock),
@@ -1816,132 +1809,39 @@ wire [0:0]    br2cfg_wvalid;
     .s_rdata(gbus_h2c_rdata), .s_rresp(gbus_h2c_rresp),
     .s_rlast(gbus_h2c_rlast), .s_rvalid(gbus_h2c_rvalid),
     .s_rready(gbus_h2c_rready),
-    .m_clk(inter_soc_clk), .m_rstn(inter_soc_sync_rstn),
-    .m_awid(gbus_dma_awid), .m_awaddr(gbus_dma_awaddr),
-    .m_awlen(gbus_dma_awlen), .m_awsize(gbus_dma_awsize),
-    .m_awburst(gbus_dma_awburst), .m_awlock(gbus_dma_awlock),
-    .m_awcache(gbus_dma_awcache), .m_awprot(gbus_dma_awprot),
-    .m_awqos(gbus_dma_awqos), .m_awregion(gbus_dma_awregion),
-    .m_awvalid(gbus_dma_awvalid), .m_awready(gbus_dma_awready),
-    .m_wdata(gbus_dma_wdata), .m_wstrb(gbus_dma_wstrb),
-    .m_wlast(gbus_dma_wlast), .m_wvalid(gbus_dma_wvalid),
-    .m_wready(gbus_dma_wready), .m_bid(gbus_dma_bid),
-    .m_bresp(gbus_dma_bresp), .m_bvalid(gbus_dma_bvalid),
-    .m_bready(gbus_dma_bready), .m_arid(gbus_dma_arid),
-    .m_araddr(gbus_dma_araddr), .m_arlen(gbus_dma_arlen),
-    .m_arsize(gbus_dma_arsize), .m_arburst(gbus_dma_arburst),
-    .m_arlock(gbus_dma_arlock), .m_arcache(gbus_dma_arcache),
-    .m_arprot(gbus_dma_arprot), .m_arqos(gbus_dma_arqos),
-    .m_arregion(gbus_dma_arregion), .m_arvalid(gbus_dma_arvalid),
-    .m_arready(gbus_dma_arready), .m_rid(gbus_dma_rid),
-    .m_rdata(gbus_dma_rdata), .m_rresp(gbus_dma_rresp),
-    .m_rlast(gbus_dma_rlast), .m_rvalid(gbus_dma_rvalid),
-    .m_rready(gbus_dma_rready)
+    .m_tvalid(difftest_from_host_axis_tvalid),
+    .m_tdata(difftest_from_host_axis_tdata),
+    .m_tkeep(difftest_from_host_axis_tkeep),
+    .m_tlast(difftest_from_host_axis_tlast),
+    .m_tready(difftest_from_host_axis_tready)
   );
 
-`ifdef CPU_NUTSHELL
-  // NutShell's inbound frontend is 64 bits wide even though the common wrapper
-  // exposes the 256-bit dma_core_* contract. Use the vendor AXI converter so
-  // wide and narrow GeneralBus bursts retain their AXI lane and response rules.
-  uvhs_gbus_axi_dwidth U_GBUS_H2C_DWIDTH (
-    .s_axi_aclk(inter_soc_clk), .s_axi_aresetn(inter_soc_sync_rstn),
-    .s_axi_awid(gbus_dma_awid), .s_axi_awaddr(gbus_dma_awaddr),
-    .s_axi_awlen(gbus_dma_awlen), .s_axi_awsize(gbus_dma_awsize),
-    .s_axi_awburst(gbus_dma_awburst), .s_axi_awlock(gbus_dma_awlock),
-    .s_axi_awcache(gbus_dma_awcache), .s_axi_awprot(gbus_dma_awprot),
-    .s_axi_awregion(gbus_dma_awregion), .s_axi_awqos(gbus_dma_awqos),
-    .s_axi_awvalid(gbus_dma_awvalid), .s_axi_awready(gbus_dma_awready),
-    .s_axi_wdata(gbus_dma_wdata), .s_axi_wstrb(gbus_dma_wstrb),
-    .s_axi_wlast(gbus_dma_wlast), .s_axi_wvalid(gbus_dma_wvalid),
-    .s_axi_wready(gbus_dma_wready), .s_axi_bid(gbus_dma_bid),
-    .s_axi_bresp(gbus_dma_bresp), .s_axi_bvalid(gbus_dma_bvalid),
-    .s_axi_bready(gbus_dma_bready), .s_axi_arid(gbus_dma_arid),
-    .s_axi_araddr(gbus_dma_araddr), .s_axi_arlen(gbus_dma_arlen),
-    .s_axi_arsize(gbus_dma_arsize), .s_axi_arburst(gbus_dma_arburst),
-    .s_axi_arlock(gbus_dma_arlock), .s_axi_arcache(gbus_dma_arcache),
-    .s_axi_arprot(gbus_dma_arprot), .s_axi_arregion(gbus_dma_arregion),
-    .s_axi_arqos(gbus_dma_arqos), .s_axi_arvalid(gbus_dma_arvalid),
-    .s_axi_arready(gbus_dma_arready), .s_axi_rid(gbus_dma_rid),
-    .s_axi_rdata(gbus_dma_rdata), .s_axi_rresp(gbus_dma_rresp),
-    .s_axi_rlast(gbus_dma_rlast), .s_axi_rvalid(gbus_dma_rvalid),
-    .s_axi_rready(gbus_dma_rready),
-    .m_axi_awaddr(data_cpu_bridge_m2s_awaddr),
-    .m_axi_awlen(data_cpu_bridge_m2s_awlen),
-    .m_axi_awsize(data_cpu_bridge_m2s_awsize),
-    .m_axi_awburst(data_cpu_bridge_m2s_awburst),
-    .m_axi_awlock(data_cpu_bridge_m2s_awlock),
-    .m_axi_awcache(data_cpu_bridge_m2s_awcache),
-    .m_axi_awprot(data_cpu_bridge_m2s_awprot), .m_axi_awregion(),
-    .m_axi_awqos(data_cpu_bridge_m2s_awqos),
-    .m_axi_awvalid(data_cpu_bridge_m2s_awvalid),
-    .m_axi_awready(data_cpu_bridge_s2m_awready),
-    .m_axi_wdata(data_cpu_bridge_m2s_wdata[63:0]),
-    .m_axi_wstrb(data_cpu_bridge_m2s_wstrb[7:0]),
-    .m_axi_wlast(data_cpu_bridge_m2s_wlast),
-    .m_axi_wvalid(data_cpu_bridge_m2s_wvalid),
-    .m_axi_wready(data_cpu_bridge_s2m_wready),
-    .m_axi_bresp(data_cpu_bridge_s2m_bresp),
-    .m_axi_bvalid(data_cpu_bridge_s2m_bvalid),
-    .m_axi_bready(data_cpu_bridge_m2s_bready),
-    .m_axi_araddr(data_cpu_bridge_m2s_araddr),
-    .m_axi_arlen(data_cpu_bridge_m2s_arlen),
-    .m_axi_arsize(data_cpu_bridge_m2s_arsize),
-    .m_axi_arburst(data_cpu_bridge_m2s_arburst),
-    .m_axi_arlock(data_cpu_bridge_m2s_arlock),
-    .m_axi_arcache(data_cpu_bridge_m2s_arcache),
-    .m_axi_arprot(data_cpu_bridge_m2s_arprot), .m_axi_arregion(),
-    .m_axi_arqos(data_cpu_bridge_m2s_arqos),
-    .m_axi_arvalid(data_cpu_bridge_m2s_arvalid),
-    .m_axi_arready(data_cpu_bridge_s2m_arready),
-    .m_axi_rdata(data_cpu_bridge_s2m_rdata[63:0]),
-    .m_axi_rresp(data_cpu_bridge_s2m_rresp),
-    .m_axi_rlast(data_cpu_bridge_s2m_rlast),
-    .m_axi_rvalid(data_cpu_bridge_s2m_rvalid),
-    .m_axi_rready(data_cpu_bridge_m2s_rready)
-  );
   assign data_cpu_bridge_m2s_awid = 14'b0;
+  assign data_cpu_bridge_m2s_awaddr = 36'b0;
+  assign data_cpu_bridge_m2s_awlen = 8'b0;
+  assign data_cpu_bridge_m2s_awsize = 3'b0;
+  assign data_cpu_bridge_m2s_awburst = 2'b0;
+  assign data_cpu_bridge_m2s_awlock = 1'b0;
+  assign data_cpu_bridge_m2s_awcache = 4'b0;
+  assign data_cpu_bridge_m2s_awprot = 3'b0;
+  assign data_cpu_bridge_m2s_awqos = 4'b0;
+  assign data_cpu_bridge_m2s_awvalid = 1'b0;
+  assign data_cpu_bridge_m2s_wdata = 256'b0;
+  assign data_cpu_bridge_m2s_wstrb = 32'b0;
+  assign data_cpu_bridge_m2s_wlast = 1'b0;
+  assign data_cpu_bridge_m2s_wvalid = 1'b0;
+  assign data_cpu_bridge_m2s_bready = 1'b0;
   assign data_cpu_bridge_m2s_arid = 14'b0;
-  assign data_cpu_bridge_m2s_wdata[255:64] = 192'b0;
-  assign data_cpu_bridge_m2s_wstrb[31:8] = 24'b0;
-`else
-  assign data_cpu_bridge_m2s_awid = gbus_dma_awid;
-  assign data_cpu_bridge_m2s_awaddr = gbus_dma_awaddr;
-  assign data_cpu_bridge_m2s_awlen = gbus_dma_awlen;
-  assign data_cpu_bridge_m2s_awsize = gbus_dma_awsize;
-  assign data_cpu_bridge_m2s_awburst = gbus_dma_awburst;
-  assign data_cpu_bridge_m2s_awlock = gbus_dma_awlock;
-  assign data_cpu_bridge_m2s_awcache = gbus_dma_awcache;
-  assign data_cpu_bridge_m2s_awprot = gbus_dma_awprot;
-  assign data_cpu_bridge_m2s_awqos = gbus_dma_awqos;
-  assign data_cpu_bridge_m2s_awvalid = gbus_dma_awvalid;
-  assign gbus_dma_awready = data_cpu_bridge_s2m_awready;
-  assign data_cpu_bridge_m2s_wdata = gbus_dma_wdata;
-  assign data_cpu_bridge_m2s_wstrb = gbus_dma_wstrb;
-  assign data_cpu_bridge_m2s_wlast = gbus_dma_wlast;
-  assign data_cpu_bridge_m2s_wvalid = gbus_dma_wvalid;
-  assign gbus_dma_wready = data_cpu_bridge_s2m_wready;
-  assign gbus_dma_bid = data_cpu_bridge_s2m_bid;
-  assign gbus_dma_bresp = data_cpu_bridge_s2m_bresp;
-  assign gbus_dma_bvalid = data_cpu_bridge_s2m_bvalid;
-  assign data_cpu_bridge_m2s_bready = gbus_dma_bready;
-  assign data_cpu_bridge_m2s_arid = gbus_dma_arid;
-  assign data_cpu_bridge_m2s_araddr = gbus_dma_araddr;
-  assign data_cpu_bridge_m2s_arlen = gbus_dma_arlen;
-  assign data_cpu_bridge_m2s_arsize = gbus_dma_arsize;
-  assign data_cpu_bridge_m2s_arburst = gbus_dma_arburst;
-  assign data_cpu_bridge_m2s_arlock = gbus_dma_arlock;
-  assign data_cpu_bridge_m2s_arcache = gbus_dma_arcache;
-  assign data_cpu_bridge_m2s_arprot = gbus_dma_arprot;
-  assign data_cpu_bridge_m2s_arqos = gbus_dma_arqos;
-  assign data_cpu_bridge_m2s_arvalid = gbus_dma_arvalid;
-  assign gbus_dma_arready = data_cpu_bridge_s2m_arready;
-  assign gbus_dma_rid = data_cpu_bridge_s2m_rid;
-  assign gbus_dma_rdata = data_cpu_bridge_s2m_rdata;
-  assign gbus_dma_rresp = data_cpu_bridge_s2m_rresp;
-  assign gbus_dma_rlast = data_cpu_bridge_s2m_rlast;
-  assign gbus_dma_rvalid = data_cpu_bridge_s2m_rvalid;
-  assign data_cpu_bridge_m2s_rready = gbus_dma_rready;
-`endif
+  assign data_cpu_bridge_m2s_araddr = 36'b0;
+  assign data_cpu_bridge_m2s_arlen = 8'b0;
+  assign data_cpu_bridge_m2s_arsize = 3'b0;
+  assign data_cpu_bridge_m2s_arburst = 2'b0;
+  assign data_cpu_bridge_m2s_arlock = 1'b0;
+  assign data_cpu_bridge_m2s_arcache = 4'b0;
+  assign data_cpu_bridge_m2s_arprot = 3'b0;
+  assign data_cpu_bridge_m2s_arqos = 4'b0;
+  assign data_cpu_bridge_m2s_arvalid = 1'b0;
+  assign data_cpu_bridge_m2s_rready = 1'b0;
 
 `endif
 
@@ -2312,15 +2212,7 @@ SimTop_wrapper U_CPU_TOP(
     .difftest_cfg_axilite_rready     (difftest_cfg_axilite_rready),
 `endif
     .inter_soc_clk                  (inter_soc_clk),
-`ifdef CONFIG_DIFFTEST_HOSTIF_GBUS
-    // GBus H2C occupies dma_core_* inside XSTop.  cpu_rstn_io follows
-    // HOST_IO_RESET, which is asserted for the whole workload load.  Keep
-    // the SoC fabric and inbound DMA slave out of that reset so offset 0
-    // can complete on CPU DRAM; cores still stay halted via hostCtrl.reset.
-    .sys_rstn_i                     (cpu_rstn     ),
-`else
     .sys_rstn_i                     (cpu_rstn_io  ),
-`endif
     .tmclk                          (inter_rtc_clk),
 
     .global_reset                   (cpu_rstn                  ),
