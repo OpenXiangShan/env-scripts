@@ -15,6 +15,35 @@
         "webhook": "https://oapi.dingtalk.com/robot/send?access_token=RELEASE_ACCESS_TOKEN",
         "secret": "SEC_RELEASE_SIGNING_SECRET"
       }
+    },
+    "gifts": {
+      "win_denominator": 5,
+      "tracking_start": "2026-09-20",
+      "special_gifts": [
+        {
+          "id": "mid_autumn",
+          "name": "中秋礼物",
+          "enabled": true,
+          "start": "2026-09-20",
+          "end": "2026-09-24",
+          "per_day": 1
+        }
+      ],
+      "highlight_pity": {
+        "enabled": true,
+        "threshold": 3
+      },
+      "commit_pity": {
+        "enabled": true,
+        "threshold": 50
+      },
+      "weekly_pity": {
+        "enabled": true,
+        "window_days": 7
+      },
+      "random_gift": {
+        "name": "一盒随机口味哈根达斯（或一罐无糖可乐）"
+      }
     }
   },
   "github": {

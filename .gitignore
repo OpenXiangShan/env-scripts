@@ -40,3 +40,4 @@ dingtalk_robot/xiangshan_monitor/repos/
 dingtalk_robot/xiangshan_monitor/reports/*.json
 dingtalk_robot/xiangshan_monitor/reports/*.md
 dingtalk_robot/xiangshan_monitor/delivery_history.json
+dingtalk_robot/xiangshan_monitor/gift_history.json

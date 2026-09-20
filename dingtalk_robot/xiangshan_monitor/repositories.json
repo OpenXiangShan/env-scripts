@@ -23,9 +23,10 @@
   "timezone": "Asia/Shanghai",
   "workday_calendar": "dingtalk_robot/xiangshan_monitor/workdays.json",
   "delivery_history": "dingtalk_robot/xiangshan_monitor/delivery_history.json",
+  "gift_history": "dingtalk_robot/xiangshan_monitor/gift_history.json",
   "scheduled_delivery": {
-    "analysis_start_time": "17:49",
-    "debug_time": "17:55",
+    "analysis_start_time": "17:39",
+    "debug_time": "17:45",
     "release_time": "18:00"
   },
   "analysis_window": "24h",
