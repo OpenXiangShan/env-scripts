@@ -50,7 +50,7 @@ class GCPT:
     def __str__(self) -> str:
         if self.__name_override is not None:
             return self.__name_override
-        return "_".join([self.__benchmark, self.__checkpoint, str(self.__weight)])
+        return "_".join([self.__benchmark, self.__checkpoint, f"{self.__weight:.6f}"])
 
     @property
     def benchmark(self) -> str:
@@ -84,7 +84,7 @@ class GCPT:
             self.__gcpt_path
             / self.__benchmark
             / self.__checkpoint
-            / f"_{self.__checkpoint}_{self.__weight}_memory_.zstd"
+            / f"_{self.__checkpoint}_{self.__weight:.6f}_memory_.zstd"
         )
 
     @property
