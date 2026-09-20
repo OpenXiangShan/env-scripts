@@ -127,11 +127,21 @@ a casual DingTalk-ready Chinese message from the patch material. The prompt
 file keeps the final, map, and reduce instructions in separate `[final]`, `[map]`,
 and `[reduce]` sections. `highlight_count` controls how many contributors are
 selected; when it is `null`, the monitor chooses 1 for a window up to 24h, adds
-one for each additional full day, and caps at 3. After the message is written,
-each highlight independently wins a random gift with probability 1/5, using the
-report date and captured repository HEADs as the seed. If the AI API returns an
-error or unusable response, the monitor writes and sends its fixed fallback
-message instead. `push` sends that message as plain text with the normal signed
+one for each additional full day, and caps at 3. The final praise reply must
+include a machine-readable highlight block so the lottery can record people,
+not just slot numbers. Each highlight independently wins a random gift when a local hash is divisible
+by `xiangshan_monitor.gifts.win_denominator` in `config.json` (default 5, so
+1/5 odds), using the report date and captured repository HEADs as the seed.
+Pity rules are also read from that `gifts` object. `special_gifts` lists dated
+named gifts and how many copies to award each day in those windows;
+`highlight_pity.threshold` consecutive highlights without a win guarantee a
+gift; `commit_pity.threshold` commits without a win also guarantee a gift; and
+if a rolling `weekly_pity.window_days` window has no successful draw at all,
+that day forces one. Award history is stored in the
+ignored local `xiangshan_monitor/gift_history.json`. Remaining gift counts live in `delivery_history.json` under `gift_inventory` as `remaining` only, and only decrease after a successful release. During a special-gift window the daily copies come from that gift's remaining count, not the random pool; ordinary days draw from `random.remaining`. A second `[award]` prompt asks the model to write the
+public winner announcement from that already-decided result. If the AI API
+returns an error or unusable response, the monitor writes and sends its fixed
+fallback message instead. `push` sends that message as plain text with the normal signed
 DingTalk helper; it never calls an AI API. Monitor credentials are layered as
 `xiangshan_monitor.dingtalk.release` (the current release robot) and
 `xiangshan_monitor.dingtalk.debug` (the legacy MemBlock-compatible robot).
@@ -157,11 +167,11 @@ The installed workday delivery mode resumes from the analysis cutoff of the
 last successful release, stored in the ignored local
 `xiangshan_monitor/delivery_history.json`. A failed day therefore remains in
 the next successful report instead of creating a gap. It reuses the same
-generated message for both robots: debug at 17:55 and release at 18:00.
+generated message for both robots: debug at 17:45 and release at 18:00.
 It reads `xiangshan_monitor/workdays.json` before doing any repository or AI
 work, so normal weekends and official holidays are skipped while official
-makeup workdays are included. It accepts scheduled starts only from 17:49 up
-to 17:55, so starting the delivery entry point at another time makes no Git,
+makeup workdays are included. It accepts scheduled starts only from 17:39 up
+to 17:45, so starting the delivery entry point at another time makes no Git,
 GitHub, AI, or DingTalk request. If any repository pull or Stars lookup fails,
 AI is not called, release is skipped, and only debug receives an error. A
 successful release advances the local cutoff and saves all repositories'

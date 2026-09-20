@@ -46,6 +46,7 @@ DEFAULT_REPOSITORY_DATA = DEFAULT_MONITOR_DIR / "repositories.json"
 DEFAULT_PROMPT_PATH = DEFAULT_MONITOR_DIR / "prompt.txt"
 DEFAULT_WORKDAY_CALENDAR = DEFAULT_MONITOR_DIR / "workdays.json"
 DEFAULT_DELIVERY_HISTORY = DEFAULT_MONITOR_DIR / "delivery_history.json"
+DEFAULT_GIFT_HISTORY = DEFAULT_MONITOR_DIR / "gift_history.json"
 DEFAULT_ANALYSIS_WINDOW = "24h"
 DEFAULT_CLONE_DIR = "dingtalk_robot/xiangshan_monitor/repos"
 DEFAULT_REPORT_PATH = "dingtalk_robot/xiangshan_monitor/reports/{date}-{window}.json"
@@ -59,15 +60,47 @@ DEFAULT_REASONING_EFFORT = "xhigh"
 DEFAULT_DINGTALK_LAYER = "debug"
 DEFAULT_HIGHLIGHT_COUNT = 1
 RANDOM_GIFT_DENOMINATOR = 5
-RANDOM_GIFT_LABEL = "随机礼包"
-DEFAULT_ANALYSIS_START_TIME = "17:49"
-DEFAULT_DEBUG_SEND_TIME = "17:55"
+RANDOM_GIFT_LABEL = "一盒随机口味哈根达斯（或一罐无糖可乐）"
+GIFT_TRACKING_START = date(2026, 9, 20)
+MID_AUTUMN_GIFT_START = date(2026, 9, 20)
+MID_AUTUMN_GIFT_END = date(2026, 9, 24)
+HIGHLIGHT_PITY_THRESHOLD = 3
+COMMIT_PITY_THRESHOLD = 50
+WEEKLY_PITY_WINDOW_DAYS = 7
+GIFT_KIND_RANDOM = "random"
+GIFT_KIND_MID_AUTUMN = "mid_autumn"
+GIFT_KIND_HIGHLIGHT_PITY = "highlight_pity"
+GIFT_KIND_COMMIT_PITY = "commit_pity"
+GIFT_KIND_WEEKLY_PITY = "weekly_pity"
+GIFT_PITY_KINDS = frozenset({GIFT_KIND_MID_AUTUMN, GIFT_KIND_HIGHLIGHT_PITY, GIFT_KIND_COMMIT_PITY, GIFT_KIND_WEEKLY_PITY})
+GIFT_KIND_LABELS = {
+    GIFT_KIND_RANDOM: RANDOM_GIFT_LABEL,
+    GIFT_KIND_MID_AUTUMN: "中秋礼物",
+    GIFT_KIND_HIGHLIGHT_PITY: "保底礼包",
+    GIFT_KIND_COMMIT_PITY: "保底礼包",
+    GIFT_KIND_WEEKLY_PITY: "保底礼包",
+}
+GIFT_REASON_TEXT = {
+    GIFT_KIND_RANDOM: "随机抽中",
+    GIFT_KIND_MID_AUTUMN: "中秋活动，今日保底一份",
+    GIFT_KIND_HIGHLIGHT_PITY: "连续3次表扬未中奖保底",
+    GIFT_KIND_COMMIT_PITY: "连续50个commit未中奖保底",
+    GIFT_KIND_WEEKLY_PITY: "过去一周无人中奖，今日保底一份",
+}
+DEFAULT_ANALYSIS_START_TIME = "17:39"
+DEFAULT_DEBUG_SEND_TIME = "17:45"
 DEFAULT_RELEASE_SEND_TIME = "18:00"
 API_FAILURE_MESSAGE = "呜呜呜，API访问不通，我今天不知道该说什么了"
 _DINGTALK_LAYERS = frozenset({"debug", "release"})
 _REPOSITORY_NAME = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]*$")
 _PR_MERGE_SUBJECT = re.compile(r"\bmerge\s+pull\s+request\s+#(\d+)", re.IGNORECASE)
 _PR_SQUASH_SUBJECT = re.compile(r"\(#(\d+)\)")
+_HIGHLIGHT_BLOCK = re.compile(
+    r"<<<xiangshan-highlights>>>\s*(.*?)\s*<<<xiangshan-highlights-end>>>",
+    re.DOTALL | re.IGNORECASE,
+)
+_HIGHLIGHT_LINE = re.compile(r"^\s*(\d+)\.\s*(.+?)\s*$")
+_NAME_EMAIL = re.compile(r"^(?P<name>.+?)\s*<\s*(?P<email>[^>]+)\s*>$")
 
 
 class XiangShanMonitorError(RuntimeError):
@@ -419,23 +452,262 @@ def resolve_highlight_count(data: Mapping[str, Any], report: Mapping[str, Any], 
     return value
 
 
-def random_gift_slots(report: Mapping[str, Any], highlight_count: int) -> List[int]:
-    """Return the stable winning highlight slots for this report.
+def default_gift_settings() -> Dict[str, Any]:
+    return {
+        "win_denominator": RANDOM_GIFT_DENOMINATOR,
+        "tracking_start": GIFT_TRACKING_START,
+        "special_gifts": [
+            {
+                "id": "mid_autumn",
+                "name": "中秋礼物",
+                "enabled": True,
+                "windows": [(MID_AUTUMN_GIFT_START, MID_AUTUMN_GIFT_END)],
+                "per_day": 1,
+            }
+        ],
+        "random_gift": {"name": RANDOM_GIFT_LABEL},
+        "highlight_pity": {"enabled": True, "threshold": HIGHLIGHT_PITY_THRESHOLD},
+        "commit_pity": {"enabled": True, "threshold": COMMIT_PITY_THRESHOLD},
+        "weekly_pity": {"enabled": True, "window_days": WEEKLY_PITY_WINDOW_DAYS},
+    }
 
-    The draw is deliberately local and deterministic: the report date, every
-    repository's captured HEAD, and the slot number form the seed.  A slot
-    wins when its SHA-256 digest is divisible by five (1/5 odds), so no AI output (or
-    fragile name parsing) is involved. Every report must contain a captured
-    repository HEAD; incomplete snapshots are rejected.
-    """
-    if isinstance(highlight_count, bool) or not isinstance(highlight_count, int) or highlight_count <= 0:
-        raise ValueError("highlight_count must be a positive integer")
-    report_date = str(report.get("date", "")).strip()
+
+def _parse_config_date(value: Any, field: str) -> date:
+    if isinstance(value, date) and not isinstance(value, datetime):
+        return value
     try:
-        date.fromisoformat(report_date)
-    except ValueError as exc:
-        raise XiangShanMonitorError(f"Invalid report date for random gift: {report_date!r}") from exc
+        return date.fromisoformat(str(value).strip())
+    except (TypeError, ValueError) as exc:
+        raise ConfigError(f"{field} must be an ISO date") from exc
 
+
+def _parse_positive_int(value: Any, field: str) -> int:
+    if isinstance(value, bool) or not isinstance(value, int) or value <= 0:
+        raise ConfigError(f"{field} must be a positive integer")
+    return value
+
+
+def _parse_bool(value: Any, field: str) -> bool:
+    if not isinstance(value, bool):
+        raise ConfigError(f"{field} must be a boolean")
+    return value
+
+
+def _parse_special_windows(item: Mapping[str, Any], prefix: str) -> List[Tuple[date, date]]:
+    windows: List[Tuple[date, date]] = []
+    raw_windows = item.get("windows")
+    if raw_windows is not None:
+        if not isinstance(raw_windows, list) or not raw_windows:
+            raise ConfigError(f"{prefix}.windows must be a non-empty list")
+        for index, window in enumerate(raw_windows):
+            window_prefix = f"{prefix}.windows[{index}]"
+            if not isinstance(window, Mapping):
+                raise ConfigError(f"{window_prefix} must be an object")
+            start = _parse_config_date(window.get("start"), f"{window_prefix}.start")
+            end = _parse_config_date(window.get("end"), f"{window_prefix}.end")
+            if start > end:
+                raise ConfigError(f"{window_prefix}.start must be on or before end")
+            windows.append((start, end))
+        return windows
+    start = _parse_config_date(item.get("start"), f"{prefix}.start")
+    end = _parse_config_date(item.get("end"), f"{prefix}.end")
+    if start > end:
+        raise ConfigError(f"{prefix}.start must be on or before end")
+    return [(start, end)]
+
+
+def _parse_special_gifts(raw: Any) -> List[Dict[str, Any]]:
+    if not isinstance(raw, list):
+        raise ConfigError("xiangshan_monitor.gifts.special_gifts must be a list")
+    gifts: List[Dict[str, Any]] = []
+    seen = set()
+    for index, item in enumerate(raw):
+        prefix = f"xiangshan_monitor.gifts.special_gifts[{index}]"
+        if not isinstance(item, Mapping):
+            raise ConfigError(f"{prefix} must be an object")
+        ident = str(item.get("id") or "").strip()
+        if not ident or not re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9_-]*", ident):
+            raise ConfigError(f"{prefix}.id must be a slug such as mid_autumn")
+        if ident in seen:
+            raise ConfigError(f"{prefix}.id is duplicated: {ident}")
+        seen.add(ident)
+        name = str(item.get("name") or "").strip()
+        if not name:
+            raise ConfigError(f"{prefix}.name is required")
+        enabled = True if "enabled" not in item else _parse_bool(item.get("enabled"), f"{prefix}.enabled")
+        per_day = 1 if "per_day" not in item else _parse_positive_int(item.get("per_day"), f"{prefix}.per_day")
+        gifts.append({
+            "id": ident,
+            "name": name,
+            "enabled": enabled,
+            "windows": _parse_special_windows(item, prefix),
+            "per_day": per_day,
+        })
+    return gifts
+
+
+def _special_gift_active(gift: Mapping[str, Any], report_day: date) -> bool:
+    if not gift.get("enabled"):
+        return False
+    windows = gift.get("windows") or []
+    return any(start <= report_day <= end for start, end in windows)
+
+
+def _merge_gift_rule(raw: Any, dest: Dict[str, Any], prefix: str, *, date_keys: Sequence[str] = (), int_keys: Sequence[str] = ()) -> None:
+    if raw is None:
+        return
+    if not isinstance(raw, Mapping):
+        raise ConfigError(f"{prefix} must be an object")
+    if "enabled" in raw:
+        dest["enabled"] = _parse_bool(raw.get("enabled"), f"{prefix}.enabled")
+    for key in date_keys:
+        if key in raw:
+            dest[key] = _parse_config_date(raw.get(key), f"{prefix}.{key}")
+    for key in int_keys:
+        if key in raw:
+            dest[key] = _parse_positive_int(raw.get(key), f"{prefix}.{key}")
+
+
+def gift_settings(config: Optional[Mapping[str, Any]] = None) -> Dict[str, Any]:
+    """Load lottery odds and pity rules from config.json, with code defaults."""
+    settings = default_gift_settings()
+    if not isinstance(config, Mapping):
+        return settings
+    section = config.get("xiangshan_monitor")
+    if not isinstance(section, Mapping) or "gifts" not in section:
+        return settings
+    raw = section.get("gifts")
+    if not isinstance(raw, Mapping):
+        raise ConfigError("xiangshan_monitor.gifts must be an object")
+    if "win_denominator" in raw:
+        settings["win_denominator"] = _parse_positive_int(raw.get("win_denominator"), "xiangshan_monitor.gifts.win_denominator")
+    if "tracking_start" in raw:
+        settings["tracking_start"] = _parse_config_date(raw.get("tracking_start"), "xiangshan_monitor.gifts.tracking_start")
+    if "special_gifts" in raw:
+        settings["special_gifts"] = _parse_special_gifts(raw.get("special_gifts"))
+    random_gift = raw.get("random_gift")
+    if random_gift is not None:
+        if not isinstance(random_gift, Mapping):
+            raise ConfigError("xiangshan_monitor.gifts.random_gift must be an object")
+        name = str(random_gift.get("name") or "").strip()
+        if not name:
+            raise ConfigError("xiangshan_monitor.gifts.random_gift.name is required")
+        settings["random_gift"] = {"name": name}
+    _merge_gift_rule(raw.get("highlight_pity"), settings["highlight_pity"], "xiangshan_monitor.gifts.highlight_pity", int_keys=("threshold",))
+    _merge_gift_rule(raw.get("commit_pity"), settings["commit_pity"], "xiangshan_monitor.gifts.commit_pity", int_keys=("threshold",))
+    _merge_gift_rule(raw.get("weekly_pity"), settings["weekly_pity"], "xiangshan_monitor.gifts.weekly_pity", int_keys=("window_days",))
+    return settings
+
+
+def _gift_reason_text(settings: Mapping[str, Any]) -> Dict[str, str]:
+    highlight_n = int(settings["highlight_pity"]["threshold"])
+    commit_n = int(settings["commit_pity"]["threshold"])
+    weekly_n = int(settings["weekly_pity"]["window_days"])
+    reasons = {
+        GIFT_KIND_RANDOM: GIFT_REASON_TEXT[GIFT_KIND_RANDOM],
+        GIFT_KIND_HIGHLIGHT_PITY: f"连续{highlight_n}次表扬未中奖保底",
+        GIFT_KIND_COMMIT_PITY: f"连续{commit_n}个commit未中奖保底",
+        GIFT_KIND_WEEKLY_PITY: f"过去{weekly_n}天无人中奖，今日保底一份",
+    }
+    for gift in settings.get("special_gifts") or []:
+        reasons[str(gift["id"])] = f"{gift['name']}，今日保底{gift['per_day']}份"
+    return reasons
+
+
+def _gift_labels(settings: Mapping[str, Any]) -> Dict[str, str]:
+    labels = dict(GIFT_KIND_LABELS)
+    random_name = str((settings.get("random_gift") or {}).get("name") or RANDOM_GIFT_LABEL)
+    labels[GIFT_KIND_RANDOM] = random_name
+    labels[GIFT_KIND_HIGHLIGHT_PITY] = random_name
+    labels[GIFT_KIND_COMMIT_PITY] = random_name
+    labels[GIFT_KIND_WEEKLY_PITY] = random_name
+    for gift in settings.get("special_gifts") or []:
+        labels[str(gift["id"])] = str(gift["name"])
+    return labels
+
+
+def _award_inventory_key(award: Mapping[str, Any]) -> str:
+    special_id = str(award.get("special_id") or "").strip()
+    if special_id:
+        return special_id
+    kind = str(award.get("kind") or "")
+    if kind in {GIFT_KIND_RANDOM, GIFT_KIND_HIGHLIGHT_PITY, GIFT_KIND_COMMIT_PITY, GIFT_KIND_WEEKLY_PITY}:
+        return GIFT_KIND_RANDOM
+    return kind or GIFT_KIND_RANDOM
+
+
+def resolve_gift_inventory(settings: Mapping[str, Any], delivery_history: Optional[Mapping[str, Any]] = None) -> Dict[str, Optional[int]]:
+    stored = delivery_history.get("gift_inventory") if isinstance(delivery_history, Mapping) else None
+    if not isinstance(stored, Mapping):
+        stored = {}
+    keys = {GIFT_KIND_RANDOM, *[str(gift["id"]) for gift in settings.get("special_gifts") or []]}
+    keys.update(str(key) for key in stored)
+    remaining: Dict[str, Optional[int]] = {}
+    for key in keys:
+        item = stored.get(key)
+        if isinstance(item, Mapping) and item.get("remaining") is not None:
+            try:
+                remaining[key] = max(0, int(item["remaining"]))
+                continue
+            except (TypeError, ValueError):
+                pass
+        remaining[key] = None
+    return remaining
+
+
+def serialize_gift_inventory(
+    remaining: Mapping[str, Optional[int]],
+    settings: Mapping[str, Any],
+    previous: Optional[Mapping[str, Any]] = None,
+) -> Dict[str, Any]:
+    labels = _gift_labels(settings)
+    out: Dict[str, Any] = {}
+    keys: List[str] = []
+    if isinstance(previous, Mapping):
+        keys.extend(str(key) for key in previous)
+    for key in remaining:
+        key_name = str(key)
+        if key_name not in keys:
+            keys.append(key_name)
+    for key in keys:
+        value = remaining.get(key)
+        if value is None:
+            continue
+        label = labels.get(key)
+        if not label and isinstance(previous, Mapping) and isinstance(previous.get(key), Mapping):
+            label = previous[key].get("label")
+        out[key] = {
+            "label": str(label or key),
+            "remaining": max(0, int(value)),
+        }
+    return out
+
+
+def ensure_gift_inventory(history: Dict[str, Any], settings: Mapping[str, Any]) -> None:
+    previous = history.get("gift_inventory") if isinstance(history.get("gift_inventory"), Mapping) else {}
+    remaining = resolve_gift_inventory(settings, history)
+    history["gift_inventory"] = serialize_gift_inventory(remaining, settings, previous)
+
+
+def _take_stock(stock: Dict[str, Optional[int]], key: str) -> bool:
+    if key not in stock or stock[key] is None:
+        return True
+    if int(stock[key]) <= 0:
+        return False
+    stock[key] = int(stock[key]) - 1
+    return True
+
+
+def _report_date(report: Mapping[str, Any]) -> date:
+
+    raw = str(report.get("date", "")).strip()
+    try:
+        return date.fromisoformat(raw)
+    except ValueError as exc:
+        raise XiangShanMonitorError(f"Invalid report date for random gift: {raw!r}") from exc
+
+
+def _repository_head_snapshot(report: Mapping[str, Any]) -> str:
     repositories = report.get("repositories")
     if not isinstance(repositories, list) or not repositories:
         raise XiangShanMonitorError("Random gift requires repository head hashes")
@@ -448,13 +720,27 @@ def random_gift_slots(report: Mapping[str, Any], highlight_count: int) -> List[i
         if not name or not re.fullmatch(r"[0-9a-f]{40}|[0-9a-f]{64}", head_sha):
             raise XiangShanMonitorError(f"Random gift requires a head hash for {name or 'unknown'}")
         heads.append((name, head_sha))
+    return "\n".join(f"{name}:{head_sha}" for name, head_sha in sorted(heads))
 
-    snapshot = "\n".join(f"{name}:{head_sha}" for name, head_sha in sorted(heads))
+
+def random_gift_slots(report: Mapping[str, Any], highlight_count: int, settings: Optional[Mapping[str, Any]] = None) -> List[int]:
+    """Return the stable winning highlight slots for this report.
+
+    The draw is deliberately local and deterministic: the report date, every
+    repository's captured HEAD, and the slot number form the seed.  A slot
+    wins when its SHA-256 digest is divisible by the configured denominator.
+    """
+    if isinstance(highlight_count, bool) or not isinstance(highlight_count, int) or highlight_count <= 0:
+        raise ValueError("highlight_count must be a positive integer")
+    gifts = settings or default_gift_settings()
+    denominator = int(gifts["win_denominator"])
+    report_date = _report_date(report).isoformat()
+    snapshot = _repository_head_snapshot(report)
     winners: List[int] = []
     for slot in range(1, highlight_count + 1):
         seed = f"xiangshan-random-gift-v1\n{report_date}\n{snapshot}\nslot:{slot}"
         digest_value = int.from_bytes(hashlib.sha256(seed.encode("utf-8")).digest(), "big")
-        if digest_value % RANDOM_GIFT_DENOMINATOR == 0:
+        if digest_value % denominator == 0:
             winners.append(slot)
     return winners
 
@@ -465,6 +751,610 @@ def append_random_gift_result(message: str, winning_slots: Sequence[int]) -> str
         return message
     slots = "、".join(f"第{slot}位" for slot in winning_slots)
     return f"{message.rstrip()}\n\n{RANDOM_GIFT_LABEL}中奖序号：{slots}"
+
+
+def _stable_index(report: Mapping[str, Any], salt: str, count: int) -> int:
+    if count <= 0:
+        raise ValueError("stable pick requires a positive candidate count")
+    seed = f"xiangshan-gift-pity-v1\n{_report_date(report).isoformat()}\n{_repository_head_snapshot(report)}\n{salt}"
+    value = int.from_bytes(hashlib.sha256(seed.encode("utf-8")).digest(), "big")
+    return value % count
+
+
+def _is_bot_author(author: str, email: str) -> bool:
+    return "[bot]" in author.lower() or "[bot]" in email.lower()
+
+
+def _norm_name(name: str) -> str:
+    return re.sub(r"\s+", " ", name).strip().lower()
+
+
+def _author_identity(author: Any, email: Any) -> Optional[Dict[str, str]]:
+    name = str(author or "").strip()
+    mail = str(email or "").strip()
+    if _is_bot_author(name, mail) or not (name or mail):
+        return None
+    key = f"email:{mail.lower()}" if mail else f"name:{_norm_name(name)}"
+    return {"key": key, "name": name or mail, "email": mail}
+
+
+def iter_report_commits(report: Mapping[str, Any]) -> Iterable[Tuple[str, Mapping[str, Any]]]:
+    repositories = report.get("repositories")
+    if not isinstance(repositories, list):
+        return
+    for repository in repositories:
+        if not isinstance(repository, Mapping):
+            continue
+        name = str(repository.get("name", "unknown"))
+        commits = repository.get("commits")
+        if not isinstance(commits, list):
+            continue
+        for commit in commits:
+            if isinstance(commit, Mapping):
+                yield name, commit
+
+
+def report_author_roster(report: Mapping[str, Any]) -> List[Dict[str, Any]]:
+    people: Dict[str, Dict[str, Any]] = {}
+    order: List[str] = []
+    for _repo, commit in iter_report_commits(report):
+        identity = _author_identity(commit.get("author"), commit.get("email"))
+        if identity is None:
+            continue
+        item = people.get(identity["key"])
+        if item is None:
+            item = {**identity, "commits": 0}
+            people[identity["key"]] = item
+            order.append(identity["key"])
+        item["commits"] += 1
+    return [people[key] for key in order]
+
+
+def format_author_roster(roster: Sequence[Mapping[str, Any]]) -> str:
+    if not roster:
+        return "本次可点名的提交者：无。"
+    lines = ["本次可点名的提交者（结构化名单必须从下列原样复制“姓名 <email>”，邮箱不可改）："]
+    for item in roster:
+        email = str(item.get("email") or "").strip()
+        name = str(item.get("name") or "").strip()
+        lines.append(f"- {name} <{email}>" if email else f"- {name}")
+    return "\n".join(lines)
+
+
+def _split_highlight_block(text: str) -> Tuple[str, Optional[str]]:
+    match = _HIGHLIGHT_BLOCK.search(text)
+    if not match:
+        return text.strip(), None
+    praise = f"{text[:match.start()]}{text[match.end():]}".strip()
+    return praise, match.group(1)
+
+
+def _resolve_highlight_payload(
+    payload: str,
+    by_email: Mapping[str, Mapping[str, Any]],
+    by_name: Mapping[str, Sequence[Mapping[str, Any]]],
+) -> Optional[Dict[str, Any]]:
+    mail_match = _NAME_EMAIL.match(payload.strip())
+    if mail_match:
+        email = mail_match.group("email").strip().lower()
+        person = by_email.get(email)
+        if person is None:
+            return None
+        resolved = dict(person)
+        name = mail_match.group("name").strip()
+        if name:
+            resolved["name"] = name
+        return resolved
+    matches = list(by_name.get(_norm_name(payload), []))
+    if len(matches) == 1:
+        return dict(matches[0])
+    return None
+
+
+def _parse_highlight_block(block: str, roster: Sequence[Mapping[str, Any]]) -> List[Dict[str, Any]]:
+    by_email = {str(item.get("email", "")).strip().lower(): dict(item) for item in roster if str(item.get("email") or "").strip()}
+    by_name: Dict[str, List[Dict[str, Any]]] = {}
+    for item in roster:
+        by_name.setdefault(_norm_name(str(item.get("name", ""))), []).append(dict(item))
+    parsed: List[Tuple[int, Dict[str, Any]]] = []
+    seen = set()
+    for raw_line in block.splitlines():
+        line_match = _HIGHLIGHT_LINE.match(raw_line)
+        if not line_match:
+            continue
+        payload = line_match.group(2).strip()
+        identity = _resolve_highlight_payload(payload, by_email, by_name)
+        if identity is None or identity["key"] in seen:
+            continue
+        seen.add(identity["key"])
+        parsed.append((int(line_match.group(1)), identity))
+    parsed.sort(key=lambda item: item[0])
+    return [item for _slot, item in parsed]
+
+
+def _mentioned_authors(text: str, roster: Sequence[Mapping[str, Any]]) -> List[Dict[str, Any]]:
+    appearances: List[Tuple[int, Dict[str, Any]]] = []
+    seen = set()
+    for item in sorted(roster, key=lambda person: len(str(person.get("name", ""))), reverse=True):
+        name = str(item.get("name", "")).strip()
+        key = str(item.get("key", ""))
+        if len(name) < 2 or key in seen:
+            continue
+        index = text.find(name)
+        if index < 0:
+            continue
+        appearances.append((index, dict(item)))
+        seen.add(key)
+    appearances.sort(key=lambda item: item[0])
+    return [item for _index, item in appearances]
+
+
+def extract_highlights(text: str, report: Mapping[str, Any], highlight_count: int) -> Tuple[str, List[Dict[str, Any]]]:
+    roster = report_author_roster(report)
+    praise, block = _split_highlight_block(text)
+    people: List[Dict[str, Any]] = []
+    if block is not None:
+        people = _parse_highlight_block(block, roster)
+    if len(people) < highlight_count:
+        seen = {item["key"] for item in people}
+        for item in _mentioned_authors(praise, roster):
+            if item["key"] in seen:
+                continue
+            people.append(dict(item))
+            seen.add(item["key"])
+            if len(people) >= highlight_count:
+                break
+    people = people[:highlight_count]
+    for index, item in enumerate(people, 1):
+        item["slot"] = index
+    return praise, people
+
+
+def empty_gift_history(timezone_name: str, tracking_start: Optional[date] = None) -> Dict[str, Any]:
+    start = tracking_start or GIFT_TRACKING_START
+    if not isinstance(start, date) or isinstance(start, datetime):
+        start = _parse_config_date(start, "tracking_start")
+    return {
+        "version": 1,
+        "timezone": timezone_name,
+        "tracking_start": start.isoformat(),
+        "people": {},
+        "counted_shas": [],
+        "days": [],
+    }
+
+
+def load_gift_history(path: Path, timezone_name: str, tracking_start: Optional[date] = None) -> Dict[str, Any]:
+    if not path.exists():
+        return empty_gift_history(timezone_name, tracking_start)
+    try:
+        history = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError) as exc:
+        raise ConfigError(f"Cannot read gift history {path}: {exc}") from exc
+    if not isinstance(history, dict) or history.get("version") != 1:
+        raise ConfigError(f"Unsupported gift history format: {path}")
+    if history.get("timezone") != timezone_name:
+        raise ConfigError(f"Gift history timezone does not match {timezone_name}: {path}")
+    if not isinstance(history.get("people"), dict):
+        raise ConfigError(f"Gift history people must be an object: {path}")
+    if not isinstance(history.get("counted_shas"), list):
+        raise ConfigError(f"Gift history counted_shas must be a list: {path}")
+    if not isinstance(history.get("days"), list):
+        raise ConfigError(f"Gift history days must be a list: {path}")
+    return history
+
+
+def write_gift_history(history: Mapping[str, Any], path: Path) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    temporary = path.with_suffix(path.suffix + ".tmp")
+    temporary.write_text(json.dumps(history, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+    temporary.replace(path)
+
+
+def _commit_day(commit: Mapping[str, Any]) -> Optional[date]:
+    raw = str(commit.get("authored_at") or "").strip()
+    if not raw:
+        return None
+    try:
+        parsed = datetime.fromisoformat(raw)
+    except ValueError:
+        return None
+    if parsed.tzinfo is not None:
+        parsed = parsed.astimezone(_timezone(DEFAULT_TIMEZONE))
+    return parsed.date()
+
+
+def collect_new_gift_commits(report: Mapping[str, Any], history: Mapping[str, Any]) -> List[Dict[str, str]]:
+    counted = {str(item) for item in history.get("counted_shas", []) if isinstance(item, str)}
+    try:
+        tracking = date.fromisoformat(str(history.get("tracking_start") or GIFT_TRACKING_START.isoformat()))
+    except ValueError:
+        tracking = GIFT_TRACKING_START
+    found: List[Dict[str, str]] = []
+    for repo_name, commit in iter_report_commits(report):
+        sha = str(commit.get("sha") or "").strip().lower()
+        if not sha:
+            continue
+        token = f"{repo_name}:{sha}"
+        if token in counted:
+            continue
+        identity = _author_identity(commit.get("author"), commit.get("email"))
+        if identity is None:
+            continue
+        when = _commit_day(commit)
+        if when is None or when < tracking:
+            continue
+        found.append({"token": token, "key": identity["key"], "name": identity["name"], "email": identity["email"]})
+        counted.add(token)
+    return found
+
+
+def _stats_map(history: Mapping[str, Any]) -> Dict[str, Dict[str, Any]]:
+    people = history.get("people")
+    if not isinstance(people, dict):
+        return {}
+    stats: Dict[str, Dict[str, Any]] = {}
+    for key, raw in people.items():
+        if not isinstance(raw, Mapping):
+            continue
+        stats[str(key)] = {
+            "name": str(raw.get("name") or ""),
+            "email": str(raw.get("email") or ""),
+            "highlights_since_gift": int(raw.get("highlights_since_gift") or 0),
+            "wins": int(raw.get("wins") or 0),
+            "commits_since_gift": int(raw.get("commits_since_gift") or 0),
+            "total_commits": int(raw.get("total_commits") or 0),
+            "last_gift_date": raw.get("last_gift_date"),
+        }
+    return stats
+
+
+def _touch_stats(stats: Dict[str, Dict[str, Any]], identity: Mapping[str, Any]) -> Dict[str, Any]:
+    key = str(identity.get("key") or "")
+    current = stats.get(key)
+    if current is None:
+        current = {
+            "name": str(identity.get("name") or ""),
+            "email": str(identity.get("email") or ""),
+            "highlights_since_gift": 0,
+            "wins": 0,
+            "commits_since_gift": 0,
+            "total_commits": 0,
+            "last_gift_date": None,
+        }
+        stats[key] = current
+        return current
+    if identity.get("name"):
+        current["name"] = str(identity["name"])
+    if identity.get("email"):
+        current["email"] = str(identity["email"])
+    return current
+
+
+def _day_has_win(item: Mapping[str, Any]) -> bool:
+    awards = item.get("awards")
+    return isinstance(awards, list) and any(isinstance(award, Mapping) and award.get("key") for award in awards)
+
+
+def _window_has_win(history: Mapping[str, Any], start: date, end: date) -> bool:
+    if end < start:
+        return False
+    days = history.get("days")
+    if not isinstance(days, list):
+        return False
+    for item in days:
+        if not isinstance(item, Mapping) or not _day_has_win(item):
+            continue
+        try:
+            day = date.fromisoformat(str(item.get("date") or "").strip())
+        except ValueError:
+            continue
+        if start <= day <= end:
+            return True
+    return False
+
+
+def resolve_gift_awards(
+    report: Mapping[str, Any],
+    highlights: Sequence[Mapping[str, Any]],
+    history: Mapping[str, Any],
+    highlight_count: int,
+    settings: Optional[Mapping[str, Any]] = None,
+    inventory: Optional[Mapping[str, Optional[int]]] = None,
+) -> Dict[str, Any]:
+    gifts = dict(settings or default_gift_settings())
+    reasons = _gift_reason_text(gifts)
+    labels = _gift_labels(gifts)
+    stock = dict(inventory) if inventory is not None else resolve_gift_inventory(gifts)
+    report_day = _report_date(report)
+    snapshot_highlights: List[Dict[str, Any]] = []
+    for index, item in enumerate(highlights, 1):
+        identity = _author_identity(item.get("name"), item.get("email"))
+        if identity is None:
+            continue
+        identity["slot"] = int(item.get("slot") or index)
+        snapshot_highlights.append(identity)
+
+    stats = _stats_map(history)
+    new_commits = collect_new_gift_commits(report, history)
+    for commit in new_commits:
+        current = _touch_stats(stats, commit)
+        current["commits_since_gift"] += 1
+        current["total_commits"] += 1
+
+    awards: List[Dict[str, Any]] = []
+    awarded_keys: set[str] = set()
+
+    def add_award(identity: Mapping[str, Any], kind: str, slot: Optional[int] = None, **extra: Any) -> bool:
+        key = str(identity["key"])
+        if key in awarded_keys:
+            return False
+        inventory_key = _award_inventory_key({"kind": kind, "special_id": extra.get("special_id")})
+        if not _take_stock(stock, inventory_key):
+            return False
+        awarded_keys.add(key)
+        person = stats.get(key, {})
+        awards.append({
+            "key": key,
+            "name": str(identity.get("name") or person.get("name") or key),
+            "email": str(identity.get("email") or person.get("email") or ""),
+            "kind": kind,
+            "reason": extra.get("reason") or reasons.get(kind, reasons[GIFT_KIND_RANDOM]),
+            "label": extra.get("label") or labels.get(kind, GIFT_KIND_LABELS.get(kind, "礼包")),
+            "slot": slot if slot is not None else identity.get("slot"),
+        })
+        for key_name, value in extra.items():
+            if key_name not in {"reason", "label"}:
+                awards[-1][key_name] = value
+        return True
+
+    def pick_candidate(salt: str, exclude: Optional[set[str]] = None) -> Optional[Dict[str, Any]]:
+        blocked = exclude or set()
+        pool = [item for item in snapshot_highlights if item["key"] not in blocked]
+        if not pool:
+            pool = [item for item in report_author_roster(report) if item["key"] not in blocked]
+        if not pool:
+            return None
+        return dict(pool[_stable_index(report, salt, len(pool))])
+
+    slot_people = {int(item["slot"]): item for item in snapshot_highlights if item.get("slot") is not None}
+    random_slots = random_gift_slots(report, highlight_count, gifts)
+    active_special = [gift for gift in gifts.get("special_gifts") or [] if _special_gift_active(gift, report_day)]
+    pity = False
+    if active_special:
+        for gift in active_special:
+            needed = int(gift["per_day"])
+            available = stock.get(str(gift["id"]))
+            if available is not None:
+                needed = min(needed, max(0, int(available)))
+            extra = {"label": gift["name"], "reason": reasons[gift["id"]], "special_id": gift["id"]}
+            have = 0
+            for slot in random_slots:
+                if have >= needed:
+                    break
+                person = slot_people.get(slot)
+                if person is None:
+                    continue
+                if add_award(person, str(gift["id"]), slot, **extra):
+                    have += 1
+                    pity = True
+            while have < needed:
+                person = pick_candidate(f"special:{gift['id']}:{have}", awarded_keys)
+                if person is None or not add_award(person, str(gift["id"]), person.get("slot"), **extra):
+                    break
+                have += 1
+                pity = True
+    else:
+        for slot in random_slots:
+            person = slot_people.get(slot)
+            if person is not None:
+                add_award(person, GIFT_KIND_RANDOM, slot)
+
+    highlight_pity = gifts["highlight_pity"]
+    if highlight_pity["enabled"] and not active_special:
+        threshold = int(highlight_pity["threshold"])
+        for person in snapshot_highlights:
+            current = _touch_stats(stats, person)
+            if person["key"] not in awarded_keys and int(current["highlights_since_gift"]) + 1 >= threshold:
+                if add_award(person, GIFT_KIND_HIGHLIGHT_PITY, person.get("slot")):
+                    pity = True
+
+    commit_pity = gifts["commit_pity"]
+    if commit_pity["enabled"] and not active_special:
+        threshold = int(commit_pity["threshold"])
+        for key, current in stats.items():
+            if key not in awarded_keys and int(current["commits_since_gift"]) >= threshold:
+                if add_award({"key": key, "name": current["name"], "email": current["email"]}, GIFT_KIND_COMMIT_PITY):
+                    pity = True
+
+    weekly_pity = gifts["weekly_pity"]
+    if weekly_pity["enabled"] and not active_special:
+        window_start = report_day - timedelta(days=int(weekly_pity["window_days"]) - 1)
+        if not awards and not _window_has_win(history, window_start, report_day - timedelta(days=1)):
+            person = pick_candidate("weekly-pity")
+            if person is not None and add_award(person, GIFT_KIND_WEEKLY_PITY, person.get("slot")):
+                pity = True
+
+    return {
+        "date": report_day.isoformat(),
+        "pity": pity,
+        "highlights": snapshot_highlights,
+        "awards": awards,
+        "new_commits": new_commits,
+        "inventory": dict(stock),
+    }
+
+
+def apply_gift_result(history: Dict[str, Any], result: Mapping[str, Any], report: Mapping[str, Any]) -> bool:
+    result_date = str(result.get("date") or "").strip()
+    days = history.setdefault("days", [])
+    if any(isinstance(item, Mapping) and item.get("date") == result_date for item in days):
+        return False
+    counted = history.setdefault("counted_shas", [])
+    counted_set = {str(item) for item in counted if isinstance(item, str)}
+    stats = _stats_map(history)
+    commits = result.get("new_commits")
+    if not isinstance(commits, list):
+        commits = collect_new_gift_commits(report, history)
+    for commit in commits:
+        if not isinstance(commit, Mapping) or not commit.get("key"):
+            continue
+        current = _touch_stats(stats, commit)
+        current["commits_since_gift"] += 1
+        current["total_commits"] += 1
+        token = str(commit.get("token") or "")
+        if token and token not in counted_set:
+            counted.append(token)
+            counted_set.add(token)
+    for item in result.get("highlights") or []:
+        if not isinstance(item, Mapping):
+            continue
+        identity = _author_identity(item.get("name"), item.get("email"))
+        if identity is None:
+            continue
+        current = _touch_stats(stats, identity)
+        current["highlights_since_gift"] += 1
+    for award in result.get("awards") or []:
+        if not isinstance(award, Mapping) or not award.get("key"):
+            continue
+        current = _touch_stats(stats, award)
+        current["wins"] += 1
+        current["highlights_since_gift"] = 0
+        current["commits_since_gift"] = 0
+        current["last_gift_date"] = result_date
+        current["last_gift_kind"] = award.get("kind")
+    history["people"] = stats
+    compact_fields = ("key", "name", "email", "kind", "label", "reason", "slot", "special_id")
+    days.append({
+        "date": result_date,
+        "pity": bool(result.get("pity")),
+        "highlights": [
+            {"key": item.get("key"), "name": item.get("name"), "email": item.get("email"), "slot": item.get("slot")}
+            for item in result.get("highlights") or []
+            if isinstance(item, Mapping)
+        ],
+        "awards": [
+            {field: award.get(field) for field in compact_fields}
+            for award in result.get("awards") or []
+            if isinstance(award, Mapping)
+        ],
+    })
+    return True
+
+
+def persist_gift_result(
+    data: Mapping[str, Any],
+    root_dir: Union[Path, str],
+    timezone_name: str,
+    result: Mapping[str, Any],
+    report: Mapping[str, Any],
+    config: Optional[Mapping[str, Any]] = None,
+) -> None:
+    root = Path(root_dir).resolve()
+    settings = gift_settings(config)
+    path = _configured_path(data, "gift_history", DEFAULT_GIFT_HISTORY, root)
+    history = load_gift_history(path, timezone_name, tracking_start=settings["tracking_start"])
+    applied = apply_gift_result(history, result, report)
+    write_gift_history(history, path)
+    if not applied:
+        return
+    delivery_path = _configured_path(data, "delivery_history", DEFAULT_DELIVERY_HISTORY, root)
+    delivery = load_delivery_history(delivery_path, timezone_name)
+    remaining = result.get("inventory")
+    if not isinstance(remaining, Mapping):
+        remaining = resolve_gift_inventory(settings, delivery)
+        for award in result.get("awards") or []:
+            if not isinstance(award, Mapping):
+                continue
+            key = _award_inventory_key(award)
+            if remaining.get(key) is None:
+                continue
+            remaining[key] = max(0, int(remaining[key]) - 1)
+    delivery["gift_inventory"] = serialize_gift_inventory(
+        remaining,
+        settings,
+        delivery.get("gift_inventory") if isinstance(delivery.get("gift_inventory"), Mapping) else {},
+    )
+    write_delivery_history(delivery, delivery_path)
+
+
+def format_gift_fallback(result: Mapping[str, Any]) -> str:
+    awards = result.get("awards") or []
+    if not awards:
+        return ""
+    lines = ["今日抽奖结果："]
+    for award in awards:
+        if not isinstance(award, Mapping):
+            continue
+        kind = str(award.get("kind") or "")
+        label = str(award.get("label") or GIFT_KIND_LABELS.get(kind, "礼包"))
+        name = str(award.get("name") or "未具名伙伴")
+        reason = str(award.get("reason") or "").strip()
+        if kind == GIFT_KIND_RANDOM or not reason:
+            lines.append(f"{label}：{name}")
+        else:
+            lines.append(f"{label}：{name}（{reason}）")
+    return "\n".join(lines)
+
+
+def format_award_source(result: Mapping[str, Any]) -> str:
+    lines = [f"日期：{result.get('date', '')}"]
+    highlights = [item for item in result.get("highlights") or [] if isinstance(item, Mapping)]
+    if highlights:
+        lines.append("今日表扬名单：")
+        for item in highlights:
+            email = str(item.get("email") or "").strip()
+            name = str(item.get("name") or "")
+            numbered = f"{item.get('slot', '')}. {name}"
+            lines.append(f"{numbered} <{email}>" if email else numbered)
+    lines.append("中奖名单（不要增删改）：")
+    awards = [item for item in result.get("awards") or [] if isinstance(item, Mapping)]
+    if not awards:
+        lines.append("（无人中奖）")
+    for award in awards:
+        lines.append(f"- {award.get('name')}：{award.get('label')}（{award.get('reason')}）")
+    return "\n".join(lines)
+
+
+def _public_gift_result(result: Mapping[str, Any]) -> Dict[str, Any]:
+    return {
+        "date": result.get("date"),
+        "pity": bool(result.get("pity")),
+        "highlights": result.get("highlights") or [],
+        "awards": result.get("awards") or [],
+        "inventory": result.get("inventory") or {},
+    }
+
+
+def _compose_talk_message(
+    report: Mapping[str, Any],
+    raw_ai_text: str,
+    selected_highlights: int,
+    history: Mapping[str, Any],
+    api: Mapping[str, Any],
+    opener: Any,
+    data: Mapping[str, Any],
+    root_dir: Union[Path, str],
+    calls_used: int,
+    settings: Optional[Mapping[str, Any]] = None,
+    inventory: Optional[Mapping[str, Optional[int]]] = None,
+) -> Tuple[str, Dict[str, Any]]:
+    praise, highlights = extract_highlights(raw_ai_text, report, selected_highlights)
+    result = resolve_gift_awards(report, highlights, history, selected_highlights, settings, inventory)
+    if not result["awards"]:
+        return praise, result
+    award_text = ""
+    if calls_used < int(api["max_api_calls"]):
+        try:
+            prompt = _prompt_text(data, root_dir, format_award_source(result), section="award")
+            award_budget = min(int(api["map_max_output_tokens"]), 600)
+            award_text = _call_local_api(prompt, api, opener, award_budget)
+            award_text, _block = _split_highlight_block(award_text)
+        except (LocalAPIError, XiangShanMonitorError):
+            award_text = ""
+    if not str(award_text).strip():
+        award_text = format_gift_fallback(result)
+    return f"{praise.rstrip()}\n\n{award_text.strip()}", result
 
 
 def _relative_path(path: Path, root: Path) -> str:
@@ -807,21 +1697,34 @@ def _split_text(text: str, budget_tokens: int) -> List[str]:
     return parts
 
 
-def talk(report: Mapping[str, Any], config: Mapping[str, Any], repository_data: Optional[Mapping[str, Any]] = None, *, root_dir: Union[Path, str] = ".", highlight_count: Optional[int] = None, opener: Optional[Any] = None) -> str:
+def talk(report: Mapping[str, Any], config: Mapping[str, Any], repository_data: Optional[Mapping[str, Any]] = None, *, root_dir: Union[Path, str] = ".", highlight_count: Optional[int] = None, opener: Optional[Any] = None, gift_history: Optional[Mapping[str, Any]] = None) -> Tuple[str, Dict[str, Any]]:
     data = repository_data or load_repository_data()
     api = local_api_settings(config, data)
     selected_highlights = resolve_highlight_count(data, report, highlight_count)
-    winning_slots = random_gift_slots(report, selected_highlights)
-    source = f"消息时间范围参考：{_report_period_hint(report)}。\n本次重点表扬人数：{selected_highlights} 人。\n\n{render_pull_summary(report)}"
+    timezone_name = str(report.get("timezone") or data.get("timezone") or DEFAULT_TIMEZONE)
+    gifts = gift_settings(config)
+    root = Path(root_dir).resolve()
+    history = gift_history if gift_history is not None else load_gift_history(
+        _configured_path(data, "gift_history", DEFAULT_GIFT_HISTORY, root),
+        timezone_name,
+        tracking_start=gifts["tracking_start"],
+    )
+    delivery = load_delivery_history(_configured_path(data, "delivery_history", DEFAULT_DELIVERY_HISTORY, root), timezone_name)
+    inventory = resolve_gift_inventory(gifts, delivery)
+    roster_text = format_author_roster(report_author_roster(report))
+    source = (
+        f"消息时间范围参考：{_report_period_hint(report)}。\n"
+        f"本次重点表扬人数：{selected_highlights} 人。\n"
+        f"{roster_text}\n\n"
+        f"{render_pull_summary(report)}"
+    )
     if opener is None:
         # DeepSeek is reachable directly; never inherit http(s)_proxy from the environment.
         opener = urllib.request.build_opener(urllib.request.ProxyHandler({}))
     direct_prompt = _prompt_text(data, root_dir, source).replace("{highlight_count}", str(selected_highlights))
     if estimate_tokens(direct_prompt) + api["max_output_tokens"] <= api["context_window_tokens"]:
-        return append_random_gift_result(
-            _call_local_api(direct_prompt, api, opener),
-            winning_slots,
-        )
+        raw = _call_local_api(direct_prompt, api, opener)
+        return _compose_talk_message(report, raw, selected_highlights, history, api, opener, data, root_dir, 1, gifts, inventory)
     strategy = str(data.get("overflow_strategy", "map_reduce")).lower()
     if strategy != "map_reduce":
         raise XiangShanMonitorError(
@@ -852,17 +1755,21 @@ def talk(report: Mapping[str, Any], config: Mapping[str, Any], repository_data: 
     if reduce_budget <= 0:
         raise XiangShanMonitorError("context_window_tokens 太小，无法为摘要压缩留出输入空间")
     while True:
-        final_source = "\n\n".join([f"消息时间范围参考：{_report_period_hint(report)}。", f"本次重点表扬人数：{selected_highlights} 人。", _work_summary(report), *[f"分块摘要 {i}:\n{summary}" for i, summary in enumerate(summaries, 1)]])
+        final_source = "\n\n".join([
+            f"消息时间范围参考：{_report_period_hint(report)}。",
+            f"本次重点表扬人数：{selected_highlights} 人。",
+            roster_text,
+            _work_summary(report),
+            *[f"分块摘要 {i}:\n{summary}" for i, summary in enumerate(summaries, 1)],
+        ])
         final_prompt = _prompt_text(data, root_dir, final_source).replace("{highlight_count}", str(selected_highlights))
         if estimate_tokens(final_prompt) + api["max_output_tokens"] <= api["context_window_tokens"]:
             if calls_used >= int(api["max_api_calls"]):
                 raise XiangShanMonitorError(
                     f"完整报告需要至少 {calls_used + 1} 次 API，超过 max_api_calls={api['max_api_calls']}；请缩短窗口或提高上限"
                 )
-            return append_random_gift_result(
-                _call_local_api(final_prompt, api, opener),
-                winning_slots,
-            )
+            raw = _call_local_api(final_prompt, api, opener)
+            return _compose_talk_message(report, raw, selected_highlights, history, api, opener, data, root_dir, calls_used + 1, gifts, inventory)
         if len(summaries) == 1:
             raise XiangShanMonitorError("摘要仍超过 context 上限，请提高 context_window_tokens")
         if calls_used + 1 >= int(api["max_api_calls"]):
@@ -1010,6 +1917,7 @@ def load_delivery_history(path: Path, timezone_name: str) -> Dict[str, Any]:
             "next_window_start": None,
             "last_successful_release": None,
             "attempts": [],
+            "gift_inventory": {},
         }
     try:
         history = json.loads(path.read_text(encoding="utf-8"))
@@ -1290,6 +2198,7 @@ def run_workday_delivery(
     debug_at = _scheduled_datetime(today, debug_time, timezone_name)
     history_path = _configured_path(data, "delivery_history", DEFAULT_DELIVERY_HISTORY, root)
     history = load_delivery_history(history_path, timezone_name)
+    ensure_gift_inventory(history, gift_settings(config))
     window = _history_window(today, analysis_end, timezone_name, calendar, history, window_spec)
 
     if dry_run:
@@ -1390,9 +2299,16 @@ def run_workday_delivery(
         print("Release skipped because Stars data is incomplete; AI was not called")
         return
 
+    gift_result: Dict[str, Any] = {}
     try:
-        message = talk(report, config, data, root_dir=root, highlight_count=highlight_count)
+        gift_history = load_gift_history(
+            _configured_path(data, "gift_history", DEFAULT_GIFT_HISTORY, root),
+            timezone_name,
+            tracking_start=gift_settings(config)["tracking_start"],
+        )
+        message, gift_result = talk(report, config, data, root_dir=root, highlight_count=highlight_count, gift_history=gift_history)
         attempt["ai_status"] = "success"
+        attempt["gifts"] = _public_gift_result(gift_result)
         valid_ai_result = True
     except LocalAPIError as exc:
         print(f"AI API unavailable: {exc}; using fallback DingTalk message", file=sys.stderr)
@@ -1422,6 +2338,8 @@ def run_workday_delivery(
                 history["next_window_start"] = window.end.isoformat()
                 history["last_successful_release"] = attempt[f"{layer}_sent_at"]
                 history["last_successful_stars"] = snapshot
+                if gift_result.get("date"):
+                    persist_gift_result(data, root, timezone_name, gift_result, report, config)
         except (ConfigError, DingTalkError, OSError, ValueError) as exc:
             errors.append(f"{layer}: {exc}")
             attempt[f"{layer}_status"] = "failed"
@@ -1446,6 +2364,7 @@ def run_once(config: Mapping[str, Any], *, repository_data: Optional[Mapping[str
         message_file = root / message_file
     report: Optional[Dict[str, Any]] = None
     message: Optional[str] = None
+    gift_result: Dict[str, Any] = {}
     if stage in {"all", "pull"}:
         report = pull_data(data, window.spec, root_dir=root, git_runner=git_runner)
         write_report(report, report_file)
@@ -1455,7 +2374,7 @@ def run_once(config: Mapping[str, Any], *, repository_data: Optional[Mapping[str
     if stage in {"all", "talk"}:
         assert report is not None
         try:
-            message = talk(report, config, data, root_dir=root, highlight_count=highlight_count, opener=opener)
+            message, gift_result = talk(report, config, data, root_dir=root, highlight_count=highlight_count, opener=opener)
         except LocalAPIError as exc:
             print(f"AI API unavailable: {exc}; using fallback DingTalk message", file=sys.stderr)
             message = API_FAILURE_MESSAGE
@@ -1468,6 +2387,8 @@ def run_once(config: Mapping[str, Any], *, repository_data: Optional[Mapping[str
         assert message is not None
         push(message, config, section=dingtalk_section, layer=dingtalk_layer, use_proxy=bool(data.get("dingtalk_use_proxy", False)))
         print("DingTalk message sent successfully")
+        if stage == "all" and report is not None and gift_result.get("date"):
+            persist_gift_result(data, root, str(report.get("timezone") or data.get("timezone") or DEFAULT_TIMEZONE), gift_result, report, config)
     return report, message
 
 
