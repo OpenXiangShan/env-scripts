@@ -5,8 +5,6 @@
 source [file join [file dirname [file normalize [info script]]] flow_common.tcl]
 set_working_space hw.dat
 
-# Keep PnR in the UVHS single-worker mode on hosts where the bundled Python
-# multiprocessing runtime cannot load its legacy libffi dependency.
 set_parallel_option -max_threads 4 -max_processes 8 -label fpga
 
 set_option time.auto_clock_config true

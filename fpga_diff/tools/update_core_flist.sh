@@ -158,7 +158,7 @@ generate_uvhs_filelist() {
   esac
   if [[ $hostif == GBUS ]]; then
     required_modules+=(
-      uvhs_axi3_to_axi4_adapter
+      uvhs_async_fifo
       uvhs_axilite_cdc_bridge
       uvhs_axis_async_fifo
       uvhs_gbus_axi_to_axis

@@ -29,8 +29,7 @@ module uvhs_generalbd_axilite_bridge (
     input wire [31:0] axil_rdata,
     input wire [1:0] axil_rresp,
     input wire axil_rvalid,
-    output reg axil_rready,
-    output reg h2c_active
+    output reg axil_rready
 );
     localparam S_IDLE = 3'd0, S_AW_W = 3'd1, S_B = 3'd2,
                S_AR = 3'd3, S_R = 3'd4;
@@ -38,15 +37,16 @@ module uvhs_generalbd_axilite_bridge (
     reg aw_done, w_done;
     reg [15:0] pending_addr;
     reg [31:0] pending_data;
-    reg pending_read;
 
     always @(posedge clk or negedge rstn) begin
         if (!rstn) begin
             state <= S_IDLE;
-            aw_done <= 1'b0; w_done <= 1'b0;
-            pending_addr <= 16'b0; pending_data <= 32'b0;
-            pending_read <= 1'b0; gbd_rdata <= 32'b0;
-            gbd_rdata_vld <= 1'b0; h2c_active <= 1'b0;
+            aw_done <= 1'b0;
+            w_done <= 1'b0;
+            pending_addr <= 16'b0;
+            pending_data <= 32'b0;
+            gbd_rdata <= 32'b0;
+            gbd_rdata_vld <= 1'b0;
         end else begin
             gbd_rdata_vld <= 1'b0;
             case (state)
@@ -54,14 +54,11 @@ module uvhs_generalbd_axilite_bridge (
                     if (gbd_wr_en) begin
                         pending_addr <= gbd_wr_addr;
                         pending_data <= gbd_wdata;
-                        pending_read <= 1'b0;
-                        aw_done <= 1'b0; w_done <= 1'b0;
+                        aw_done <= 1'b0;
+                        w_done <= 1'b0;
                         state <= S_AW_W;
-                        if (gbd_wr_addr == 16'h24)
-                            h2c_active <= (gbd_wdata[0]);
                     end else if (gbd_rd_en) begin
                         pending_addr <= gbd_rd_addr;
-                        pending_read <= 1'b1;
                         state <= S_AR;
                     end
                 end
@@ -69,7 +66,8 @@ module uvhs_generalbd_axilite_bridge (
                     if (axil_awvalid && axil_awready) aw_done <= 1'b1;
                     if (axil_wvalid && axil_wready) w_done <= 1'b1;
                     if ((aw_done || (axil_awvalid && axil_awready)) &&
-                        (w_done || (axil_wvalid && axil_wready))) state <= S_B;
+                        (w_done || (axil_wvalid && axil_wready)))
+                        state <= S_B;
                 end
                 S_B: if (axil_bvalid) state <= S_IDLE;
                 S_AR: if (axil_arvalid && axil_arready) state <= S_R;
@@ -95,5 +93,5 @@ module uvhs_generalbd_axilite_bridge (
         axil_rready = (state == S_R);
     end
 
-    wire _unused = &{1'b0, pending_read, axil_bresp, axil_rresp};
+    wire _unused = &{1'b0, axil_bresp, axil_rresp};
 endmodule

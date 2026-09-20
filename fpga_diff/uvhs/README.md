@@ -15,8 +15,8 @@ RTL selects the exclusive host path with `` `ifdef DIFFTEST_HOST_GBUS `` /
 define into the UVHS file list.
 
 The GBus build retains the shared `Difftest2AXIs` sender and buffers
-DiffTest output only in on-chip SRAM. Workload H2C converts the GeneralBus AXI3
-master to AXI4 and occupies the existing DifftestMemCtrl AXI-stream engine.
+DiffTest output only in on-chip SRAM. Workload H2C converts GeneralBus AXI3
+writes into the existing DifftestMemCtrl AXI-stream engine.
 `dma_core_*` stays idle so the two hostifs remain exclusive owners of their
 inbound masters. The CPU memory hierarchy and physical DDR path remain
 unchanged.
@@ -57,8 +57,8 @@ wrappers in `<work>/rtl/filelist.f`, which the UVHS frontend reads directly.
 ## GBus host paths
 
 The GBus C2H path uses the on-chip SRAM register window identified as GBS1.
-GBus H2C converts GeneralBus AXI3 into the existing DifftestMemCtrl AXI-stream
-engine; `H2CAXIs2Mem` ignores AXI addresses and writes physical DRAM from
+GBus H2C converts GeneralBus AXI3 writes into the existing DifftestMemCtrl
+AXI-stream engine; `H2CAXIs2Mem` ignores AXI addresses and writes physical DRAM from
 `0x80000000` using `HOST_IO_H2C_SIZE_MB`. The AXIS payload crosses from the
 free-running host clock to the gated CPU clock in `U_GBUS_H2C_CDC`. DiffTest
 C2H crosses the other way inside `U_GBUS_C2H_FIFO`. No DDR C2H ring,
@@ -109,7 +109,9 @@ orchestrator for repository Vivado IP, generated GeneralBus/GeneralBD
 checkpoints, and an external DDR checkpoint. The child
 `export_vivado_ip.tcl` must run inside Vivado because it uses project, IP, BD,
 and checkpoint commands. Owned GBus RTL lives in `uvhs/common` and is added to
-the UVHS file list only when `DIFFTEST_HOSTIF=GBUS`.
+the UVHS file list only when `DIFFTEST_HOSTIF=GBUS`. AXIS and AXI-Lite clock
+crossing use `uvhs_async_fifo`, a Gray-pointer dual-clock FIFO that uvsyn infers
+as block RAM. The UVHS frontend cannot instantiate Xilinx XPM.
 
 `uvhs_backend` follows the vendor implementation sequence: clock inference and
 transformation, remap, partition, localization, system routing, FPGA PnR,
@@ -446,7 +448,7 @@ before the UVHS timing worker reads it.
 | --- | --- |
 | `uvhs.mk` | Build and runtime target wiring. |
 | `../tools/update_core_flist.sh` | Shared Vivado/UVHS RTL file-list entry point. GBus adds `uvhs/common`. |
-| `common/` | Owned GBus RTL: AXI3-to-AXI4, AXI-to-AXIS, C2H SRAM FIFO, host/CPU AXIS CDC, AXI-Lite CDC, and GeneralBD bridge. |
+| `common/` | Owned GBus RTL: Gray-pointer async FIFO, AXI-to-AXIS, C2H SRAM FIFO, host/CPU AXIS CDC, AXI-Lite CDC, and GeneralBD bridge. |
 | `../tools/rtl_filelist_lib.sh` | Nested file-list parsing and path resolution. |
 | `../src/tcl/common/{blk_mem_gen_0,AXI_bridge,data_bridge,xdma_ep}.tcl` | Shared Vivado IP/BD generators used by UVHS IP export and Vivado project creation. XDMA exports `data_bridge`/`xdma_ep`; GBus skips them. |
 | `compilation/flow_common.tcl` | Shared UVHS path, environment, and source helpers. |

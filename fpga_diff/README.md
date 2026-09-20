@@ -8,8 +8,8 @@ and feeds workload H2C through the existing DifftestMemCtrl AXI-stream engine.
 The two interfaces are compile-time exclusive: RTL uses
 `` `ifdef DIFFTEST_HOST_GBUS `` / `` `elsif DIFFTEST_HOST_XDMA `` / `` `endif ``.
 `Makefile` maps `DIFFTEST_HOSTIF` to one of those defines
-(`DIFFTEST_HOST_DEFINE`) and passes it into the Vivado `verilog_define` list
-and the UVHS file list. GBus is UVHS-only.
+(`DIFFTEST_HOST_DEFINE`). The UVHS file list gets that define; the Vivado
+project always defines `DIFFTEST_HOST_XDMA` because GBus is UVHS-only.
 
 1. modify Makefile, assign CORE_DIR
 

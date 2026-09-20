@@ -1,28 +1,18 @@
 `timescale 1ns/1ps
 
-// Convert the GBus AXI4 write channel into the existing DifftestMemCtrl
-// AXI-stream H2C engine.  H2CAXIs2Mem ignores AXI addresses and writes
-// physical DRAM from 0x80000000 using HOST_IO_H2C_SIZE_MB, so this shim
-// only forwards write data, keep, and last.  Reads are completed with
-// DECERR because the H2C engine is write-only.
+// Convert GeneralBus AXI3 writes into the existing DifftestMemCtrl AXI-stream
+// H2C engine.  H2CAXIs2Mem ignores AXI addresses and writes physical DRAM from
+// 0x80000000 using HOST_IO_H2C_SIZE_MB, so this shim only forwards write data,
+// keep, and last.  Reads complete with DECERR because the H2C engine is
+// write-only.  AXI3 burst metadata is unused.
 module uvhs_gbus_axi_to_axis #(
-    parameter integer ADDR_WIDTH = 36,
-    parameter integer ID_WIDTH = 14,
+    parameter integer ID_WIDTH = 8,
     parameter integer DATA_WIDTH = 256
 ) (
     input wire clk,
     input wire rstn,
 
     input wire [ID_WIDTH-1:0] s_awid,
-    input wire [ADDR_WIDTH-1:0] s_awaddr,
-    input wire [7:0] s_awlen,
-    input wire [2:0] s_awsize,
-    input wire [1:0] s_awburst,
-    input wire s_awlock,
-    input wire [3:0] s_awcache,
-    input wire [2:0] s_awprot,
-    input wire [3:0] s_awqos,
-    input wire [3:0] s_awregion,
     input wire s_awvalid,
     output wire s_awready,
     input wire [DATA_WIDTH-1:0] s_wdata,
@@ -36,15 +26,6 @@ module uvhs_gbus_axi_to_axis #(
     input wire s_bready,
 
     input wire [ID_WIDTH-1:0] s_arid,
-    input wire [ADDR_WIDTH-1:0] s_araddr,
-    input wire [7:0] s_arlen,
-    input wire [2:0] s_arsize,
-    input wire [1:0] s_arburst,
-    input wire s_arlock,
-    input wire [3:0] s_arcache,
-    input wire [2:0] s_arprot,
-    input wire [3:0] s_arqos,
-    input wire [3:0] s_arregion,
     input wire s_arvalid,
     output wire s_arready,
     output wire [ID_WIDTH-1:0] s_rid,

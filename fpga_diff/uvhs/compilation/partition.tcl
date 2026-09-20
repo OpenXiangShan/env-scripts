@@ -193,11 +193,7 @@ if {[llength $uvhs_xiangshan_cell] == 1} {
     set uvhs_memory_path_cells [concat $uvhs_memory_path_cells \
         $uvhs_nocmisc_f0_cells]
     if {$uvhs_hostif eq "GBUS"} {
-        # The GBus AXI adapter and the legacy XDMA endpoint are intentionally
-        # not required hierarchy anchors.  The former is commonly flattened
-        # into the transport path by UVHS optimization and the latter is not
-        # instantiated in a GBus build.  The functional blocks that must stay
-        # explicitly partitioned are still checked individually below.
+        # XDMA is not instantiated.  Require the GBus host cells that stay on F2.
         set uvhs_missing_gbus_host_cells {}
         foreach uvhs_gbus_host_path_name $uvhs_gbus_host_path_names {
             set uvhs_gbus_host_path_cell \
@@ -215,9 +211,7 @@ if {[llength $uvhs_xiangshan_cell] == 1} {
         $uvhs_nocmisc_f2_cells]
     set uvhs_f0_cells [concat $uvhs_f0_cells $uvhs_memory_path_cells \
         $uvhs_config_path_cells]
-    if {[llength $uvhs_host_path_cells]} {
-        # Assembly keeps the physical F2 board FPGA; create the UVHS logical
-        # partition object here.
+    if {$uvhs_hostif ne "GBUS" || [llength $uvhs_host_path_cells]} {
         create_fpga -name b0.f2 -cells $uvhs_host_path_cells
     }
     puts "INFO: selected XiangShan LLC path: $uvhs_memory_root_cells"
@@ -230,7 +224,6 @@ if {[llength $uvhs_xiangshan_cell] == 1} {
 } else {
     puts "INFO: skip XiangShan partition constraints for this CPU"
 }
-# Assembly keeps the physical F0 board FPGA; create its logical partition.
 create_fpga -name b0.f0 -cells $uvhs_f0_cells
 set uvhs_ddr_connector b0.F0_FMC0
 set_property -name connector -value $uvhs_ddr_connector \

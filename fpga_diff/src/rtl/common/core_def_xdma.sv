@@ -1355,9 +1355,9 @@ wire [0:0]    br2cfg_wvalid;
 `ifdef DIFFTEST_HOST_GBUS
   // Optional GBus host interface.  XDMA is not instantiated.  DiffTest C2H
   // stays on the shared Difftest2AXIs stream and is parked in on-chip SRAM.
-  // Workload H2C converts GeneralBus AXI3 into the existing DifftestMemCtrl
-  // AXI-stream engine.  dma_core_* remains idle so the two hostifs stay
-  // compile-time exclusive owners of their inbound masters.
+  // Workload H2C converts GeneralBus AXI3 writes into the existing
+  // DifftestMemCtrl AXI-stream engine.  dma_core_* remains idle so the two
+  // hostifs stay compile-time exclusive owners of their inbound masters.
   wire difftest_c2h_rstn = cpu_rstn_pcie & difftest_stream_enable_pcie;
   wire gbus_cfg_wr_en;
   wire [15:0] gbus_cfg_wr_addr;
@@ -1400,22 +1400,6 @@ wire [0:0]    br2cfg_wvalid;
   wire [1:0] gbus_axi_rresp;
   wire gbus_axi_rlast, gbus_axi_rvalid, gbus_axi_rready;
 
-  wire [13:0] gbus_h2c_awid, gbus_h2c_arid;
-  wire [35:0] gbus_h2c_awaddr, gbus_h2c_araddr;
-  wire [7:0] gbus_h2c_awlen, gbus_h2c_arlen;
-  wire [2:0] gbus_h2c_awsize, gbus_h2c_arsize;
-  wire [1:0] gbus_h2c_awburst, gbus_h2c_arburst;
-  wire gbus_h2c_awlock, gbus_h2c_arlock;
-  wire [3:0] gbus_h2c_awcache, gbus_h2c_arcache, gbus_h2c_awqos, gbus_h2c_arqos;
-  wire [3:0] gbus_h2c_awregion, gbus_h2c_arregion;
-  wire [2:0] gbus_h2c_awprot, gbus_h2c_arprot;
-  wire gbus_h2c_awvalid, gbus_h2c_awready, gbus_h2c_wlast, gbus_h2c_wvalid, gbus_h2c_wready;
-  wire [255:0] gbus_h2c_wdata, gbus_h2c_rdata;
-  wire [31:0] gbus_h2c_wstrb;
-  wire [13:0] gbus_h2c_bid, gbus_h2c_rid;
-  wire [1:0] gbus_h2c_bresp, gbus_h2c_rresp;
-  wire gbus_h2c_bvalid, gbus_h2c_bready, gbus_h2c_arvalid, gbus_h2c_arready;
-  wire gbus_h2c_rlast, gbus_h2c_rvalid, gbus_h2c_rready;
   wire gbus_c2h_sready;
   wire gbus_h2c_axis_tvalid;
   wire gbus_h2c_axis_tready;
@@ -1467,7 +1451,7 @@ wire [0:0]    br2cfg_wvalid;
     .axil_araddr(XDMA_AXI_LITE_araddr), .axil_arvalid(XDMA_AXI_LITE_arvalid),
     .axil_arready(XDMA_AXI_LITE_arready), .axil_rdata(XDMA_AXI_LITE_rdata),
     .axil_rresp(XDMA_AXI_LITE_rresp), .axil_rvalid(XDMA_AXI_LITE_rvalid),
-    .axil_rready(XDMA_AXI_LITE_rready), .h2c_active()
+    .axil_rready(XDMA_AXI_LITE_rready)
   );
   assign XDMA_AXI_LITE_awprot = 3'b0;
   assign XDMA_AXI_LITE_arprot = 3'b0;
@@ -1510,81 +1494,34 @@ wire [0:0]    br2cfg_wvalid;
     .sysbus_ghbd_i (gbus_sysbus_to_generalbus)
   );
 
-  uvhs_axi3_to_axi4_adapter #(
-      .ADDR_WIDTH(36), .ID_WIDTH(14), .AXI3_ID_WIDTH(8), .DATA_WIDTH(256)
-  ) U_GBUS_AXI_ADAPTER (
+  uvhs_gbus_axi_to_axis #(
+      .ID_WIDTH(8), .DATA_WIDTH(256)
+  ) U_GBUS_H2C_AXIS (
     .clk(gbus_host_clk), .rstn(rstn_sw4),
-    .s_awid(gbus_axi_awid), .s_awaddr({4'b0, gbus_axi_awaddr}),
-    .s_awlen(gbus_axi_awlen), .s_awsize(gbus_axi_awsize),
-    .s_awburst(gbus_axi_awburst), .s_awlock(gbus_axi_awlock),
-    .s_awcache(gbus_axi_awcache), .s_awprot(gbus_axi_awprot),
-    .s_awqos(gbus_axi_awqos), .s_awvalid(gbus_axi_awvalid),
-    .s_awready(gbus_axi_awready), .s_wid(gbus_axi_wid),
+    .s_awid(gbus_axi_awid), .s_awvalid(gbus_axi_awvalid),
+    .s_awready(gbus_axi_awready),
     .s_wdata(gbus_axi_wdata), .s_wstrb(gbus_axi_wstrb),
     .s_wlast(gbus_axi_wlast), .s_wvalid(gbus_axi_wvalid),
     .s_wready(gbus_axi_wready), .s_bid(gbus_axi_bid),
     .s_bresp(gbus_axi_bresp), .s_bvalid(gbus_axi_bvalid),
     .s_bready(gbus_axi_bready), .s_arid(gbus_axi_arid),
-    .s_araddr({4'b0, gbus_axi_araddr}), .s_arlen(gbus_axi_arlen),
-    .s_arsize(gbus_axi_arsize), .s_arburst(gbus_axi_arburst),
-    .s_arlock(gbus_axi_arlock), .s_arcache(gbus_axi_arcache),
-    .s_arprot(gbus_axi_arprot), .s_arqos(gbus_axi_arqos),
     .s_arvalid(gbus_axi_arvalid), .s_arready(gbus_axi_arready),
     .s_rid(gbus_axi_rid), .s_rdata(gbus_axi_rdata),
     .s_rresp(gbus_axi_rresp), .s_rlast(gbus_axi_rlast),
     .s_rvalid(gbus_axi_rvalid), .s_rready(gbus_axi_rready),
-    .m_awid(gbus_h2c_awid), .m_awaddr(gbus_h2c_awaddr),
-    .m_awlen(gbus_h2c_awlen), .m_awsize(gbus_h2c_awsize),
-    .m_awburst(gbus_h2c_awburst), .m_awlock(gbus_h2c_awlock),
-    .m_awcache(gbus_h2c_awcache), .m_awprot(gbus_h2c_awprot),
-    .m_awqos(gbus_h2c_awqos), .m_awregion(gbus_h2c_awregion),
-    .m_awvalid(gbus_h2c_awvalid), .m_awready(gbus_h2c_awready),
-    .m_wdata(gbus_h2c_wdata), .m_wstrb(gbus_h2c_wstrb),
-    .m_wlast(gbus_h2c_wlast), .m_wvalid(gbus_h2c_wvalid),
-    .m_wready(gbus_h2c_wready), .m_bid(gbus_h2c_bid),
-    .m_bresp(gbus_h2c_bresp), .m_bvalid(gbus_h2c_bvalid),
-    .m_bready(gbus_h2c_bready), .m_arid(gbus_h2c_arid),
-    .m_araddr(gbus_h2c_araddr), .m_arlen(gbus_h2c_arlen),
-    .m_arsize(gbus_h2c_arsize), .m_arburst(gbus_h2c_arburst),
-    .m_arlock(gbus_h2c_arlock), .m_arcache(gbus_h2c_arcache),
-    .m_arprot(gbus_h2c_arprot), .m_arqos(gbus_h2c_arqos),
-    .m_arregion(gbus_h2c_arregion), .m_arvalid(gbus_h2c_arvalid),
-    .m_arready(gbus_h2c_arready), .m_rid(gbus_h2c_rid),
-    .m_rdata(gbus_h2c_rdata), .m_rresp(gbus_h2c_rresp),
-    .m_rlast(gbus_h2c_rlast), .m_rvalid(gbus_h2c_rvalid),
-    .m_rready(gbus_h2c_rready)
-  );
-
-  uvhs_gbus_axi_to_axis #(
-      .ADDR_WIDTH(36), .ID_WIDTH(14), .DATA_WIDTH(256)
-  ) U_GBUS_H2C_AXIS (
-    .clk(gbus_host_clk), .rstn(rstn_sw4),
-    .s_awid(gbus_h2c_awid), .s_awaddr(gbus_h2c_awaddr),
-    .s_awlen(gbus_h2c_awlen), .s_awsize(gbus_h2c_awsize),
-    .s_awburst(gbus_h2c_awburst), .s_awlock(gbus_h2c_awlock),
-    .s_awcache(gbus_h2c_awcache), .s_awprot(gbus_h2c_awprot),
-    .s_awqos(gbus_h2c_awqos), .s_awregion(gbus_h2c_awregion),
-    .s_awvalid(gbus_h2c_awvalid), .s_awready(gbus_h2c_awready),
-    .s_wdata(gbus_h2c_wdata), .s_wstrb(gbus_h2c_wstrb),
-    .s_wlast(gbus_h2c_wlast), .s_wvalid(gbus_h2c_wvalid),
-    .s_wready(gbus_h2c_wready), .s_bid(gbus_h2c_bid),
-    .s_bresp(gbus_h2c_bresp), .s_bvalid(gbus_h2c_bvalid),
-    .s_bready(gbus_h2c_bready), .s_arid(gbus_h2c_arid),
-    .s_araddr(gbus_h2c_araddr), .s_arlen(gbus_h2c_arlen),
-    .s_arsize(gbus_h2c_arsize), .s_arburst(gbus_h2c_arburst),
-    .s_arlock(gbus_h2c_arlock), .s_arcache(gbus_h2c_arcache),
-    .s_arprot(gbus_h2c_arprot), .s_arqos(gbus_h2c_arqos),
-    .s_arregion(gbus_h2c_arregion), .s_arvalid(gbus_h2c_arvalid),
-    .s_arready(gbus_h2c_arready), .s_rid(gbus_h2c_rid),
-    .s_rdata(gbus_h2c_rdata), .s_rresp(gbus_h2c_rresp),
-    .s_rlast(gbus_h2c_rlast), .s_rvalid(gbus_h2c_rvalid),
-    .s_rready(gbus_h2c_rready),
     .m_tvalid(gbus_h2c_axis_tvalid),
     .m_tdata(gbus_h2c_axis_tdata),
     .m_tkeep(gbus_h2c_axis_tkeep),
     .m_tlast(gbus_h2c_axis_tlast),
     .m_tready(gbus_h2c_axis_tready)
   );
+  // DifftestMemCtrl H2C ignores AXI addresses and burst metadata.
+  wire _unused_gbus_axi3 = &{1'b0,
+      gbus_axi_awaddr, gbus_axi_awlen, gbus_axi_awsize, gbus_axi_awburst,
+      gbus_axi_awlock, gbus_axi_awcache, gbus_axi_awprot, gbus_axi_awqos,
+      gbus_axi_wid, gbus_axi_araddr, gbus_axi_arlen, gbus_axi_arsize,
+      gbus_axi_arburst, gbus_axi_arlock, gbus_axi_arcache, gbus_axi_arprot,
+      gbus_axi_arqos};
 
   // GeneralBus H2C is on the free-running host clock.  DifftestMemCtrl's
   // AXIS engine is on the gated CPU clock, so cross before SimTop.
