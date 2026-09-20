@@ -381,6 +381,11 @@ class Server:
                     else ["--no-diff"]
                 )
                 + (
+                    ["-C", str(emu_config.max_cycles)]
+                    if emu_config.max_cycles is not None
+                    else []
+                )
+                + (
                     ["--cst-file", shlex.quote(str(emu_config.cst_file))]
                     if emu_config.cst_file
                     else []
