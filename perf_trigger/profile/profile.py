@@ -177,17 +177,13 @@ def _ordered_benchmarks(
     if sort == "avgtime":
         return sorted(
             benchmarks,
-            key=lambda benchmark: _sort_time(
-                benchmark_runtimes[benchmark], "avgtime"
-            ),
+            key=lambda benchmark: _sort_time(benchmark_runtimes[benchmark], "avgtime"),
             reverse=True,
         )
     if sort == "maxtime":
         return sorted(
             benchmarks,
-            key=lambda benchmark: _sort_time(
-                benchmark_runtimes[benchmark], "maxtime"
-            ),
+            key=lambda benchmark: _sort_time(benchmark_runtimes[benchmark], "maxtime"),
             reverse=True,
         )
     # Keep the historical --show ordering when no sort was requested.
@@ -356,14 +352,39 @@ def main():
         default=DEFAULT_PROFILE_PATH,
         help=f"Profile JSON to update or show (default: {DEFAULT_PROFILE_PATH})",
     )
+    parser.add_argument(
+        "--create-from",
+        type=Path,
+        default=None,
+        help="Create profile from checkpoint json file",
+    )
 
     args = parser.parse_args()
 
-    if not args.update and not args.show:
+    if not args.update and not args.show and not args.create_from:
         parser.print_help()
         return
     if not args.profile.is_file():
         raise FileNotFoundError(f"profile does not exist: {args.profile}")
+
+    if args.create_from:
+        if not args.create_from.is_file():
+            raise FileNotFoundError(
+                f"checkpoint json does not exist: {args.create_from}"
+            )
+        with args.create_from.open("r", encoding="utf-8") as f:
+            data = json.load(f)
+
+        profile_name = args.create_from.parent.parent.name
+        args.profile = args.profile.parent / f"{profile_name}.json"
+
+        for benchmark, d in data.items():
+            data[benchmark] = {p: 0 for p in d["points"].keys()}
+
+        with args.profile.open("w", encoding="utf-8") as f:
+            json.dump(data, f, indent=2, ensure_ascii=False)
+
+        print(f"Created profile {args.profile} from {args.create_from}")
 
     if args.update:
         if not args.log_root.is_dir():
