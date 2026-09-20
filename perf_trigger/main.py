@@ -67,14 +67,27 @@ PROFILE_DIR = Path(__file__).parent / "profile"
 class XiangShan:
     def __init__(
         self,
-        gcpt_path: Path,
-        json_path: Path,
         result_path: Path,
         benchmarks: str,
+        gcpt_path: Path | None = None,
+        json_path: Path | None = None,
     ):
         self.gcpt_path = gcpt_path
         self.json_path = json_path
         self.result_path = result_path
+        self.servers: list[Server] = []
+
+        # No checkpoint directory: json_path is a workload list (one image path per line)
+        if gcpt_path is None:
+            if json_path is None:
+                raise ValueError("json_path is required")
+            self.workload_list = json_path
+            self.__init_from_workload_list(json_path)
+            return
+
+        self.workload_list = None
+        if json_path is None:
+            raise ValueError("json_path is required")
 
         self.ckpt_version = self.__infer_ckpt_version()
 
@@ -142,19 +155,54 @@ class XiangShan:
                 self.ckpt_version,
             )
 
-        self.servers: list[Server] = []
+    def __init_from_workload_list(self, workload_list: Path) -> None:
+        self.ckpt_version = None
+        self.benchmarks = {}
+        self.checkpoints = []
+        seen: set[str] = set()
+        with workload_list.open("r", encoding="utf-8") as f:
+            for lineno, raw in enumerate(f, 1):
+                line = raw.strip()
+                if line == "" or line.startswith("#"):
+                    continue
+                image = Path(line).expanduser()
+                if not image.is_file():
+                    raise FileNotFoundError(
+                        f"workload list {workload_list}:{lineno} is not a file: {image}"
+                    )
+                gcpt = GCPT.from_image(image, self.result_path)
+                name = str(gcpt)
+                if name in seen:
+                    raise ValueError(f"duplicate workload in list: {image}")
+                seen.add(name)
+                self.checkpoints.append(gcpt)
+
+        if not self.checkpoints:
+            raise ValueError(f"workload list has no images: {workload_list}")
+
+        self.tracker = Tracker(
+            total=len(self.checkpoints), keys=["assigned", "completed"], with_keys=False
+        )
+        self.tracker.info(
+            "Loaded %d workloads from %s", len(self.checkpoints), workload_list
+        )
 
     def __infer_ckpt_version(self) -> str | None:
+        if self.gcpt_path is None:
+            return None
         if m := re.search(r"(spec\d\d[0-9a-zA-Z_]+)", str(self.gcpt_path)):
             return m.group(1)
         return None
 
     def __infer_spec_version(self) -> Spec.Version | None:
         # try infer from gcpt_path name
-        if m := re.search(r"spec(\d\d)", str(self.gcpt_path)):
-            return Spec.Version(m.group(1))
+        if self.gcpt_path is not None:
+            if m := re.search(r"spec(\d\d)", str(self.gcpt_path)):
+                return Spec.Version(m.group(1))
 
         # try infer from benchmarks
+        if self.json_path is None:
+            return None
         with self.json_path.open("r", encoding="utf-8") as f:
             benchmarks = json.load(f)
         for version in Spec.Version:
@@ -192,6 +240,12 @@ class XiangShan:
         ]
 
         open_server = [s for s in self.servers if s.hostname.startswith("open")]
+        if open_server and self.workload_list is not None:
+            logging.warning(
+                "Workload-list images are used as-is on remote hosts; "
+                "open servers do not share node NFS. Ensure every listed path "
+                "is visible on the selected servers."
+            )
         if open_server:
             logging.info("Using open servers, initializing binaries and libs...")
             target_result_path = Path(
@@ -357,6 +411,10 @@ class XiangShan:
         frequency: float,
         override_version: str | None = None,
     ) -> None:
+        if self.workload_list is not None or self.json_path is None:
+            logging.critical("Report is not supported for workload-list mode")
+            return
+
         version = (
             Spec.Version(override_version)
             if override_version is not None
@@ -540,10 +598,15 @@ def main():
 
     # general task configs
     parser.add_argument(
-        "--gcpt-path", type=str, required=True, help="Path to the GCPT checkpoints"
+        "--gcpt-path",
+        type=str,
+        help="Checkpoint directory. Omit to treat --json-path as a workload list",
     )
     parser.add_argument(
-        "--json-path", type=str, required=True, help="Path to the GCPT json"
+        "--json-path",
+        type=str,
+        required=True,
+        help="Checkpoint JSON, or workload list if --gcpt-path is omitted",
     )
     parser.add_argument(
         "--result-path", type=str, required=True, help="Path to store the results"
@@ -557,6 +620,13 @@ def main():
     )
     parser.add_argument(
         "--max-instr", "-I", default=40000000, type=int, help="max instr count"
+    )
+    parser.add_argument(
+        "--max-cycles",
+        "-C",
+        default=None,
+        type=int,
+        help="max cycle count (emu -C). Omit to leave unlimited",
     )
     parser.add_argument(
         "--threads", "-T", default=8, type=int, help="number of emu threads"
@@ -634,7 +704,7 @@ def main():
 
     args = parser.parse_args()
 
-    gcpt_path = Path(args.gcpt_path)
+    gcpt_path = Path(args.gcpt_path) if args.gcpt_path else None
     json_path = Path(args.json_path)
     result_path = Path(args.result_path)
 
@@ -671,10 +741,14 @@ def main():
         )
 
     # pre-checks
-    if not gcpt_path.is_dir():
-        raise FileNotFoundError(f"gcpt_path is not a directory: {gcpt_path}")
     if not json_path.is_file():
         raise FileNotFoundError(f"json_path is not a file: {json_path}")
+    if gcpt_path is None:
+        if args.report:
+            raise ValueError("--report requires --gcpt-path")
+    else:
+        if not gcpt_path.is_dir():
+            raise FileNotFoundError(f"gcpt_path is not a directory: {gcpt_path}")
 
     # if only args.report is specified, no need to acquire lock as it is read-only operation.
     need_lock = args.run or args.dry_run or args.reset_running
@@ -682,7 +756,11 @@ def main():
         logging.info("Only report is requested, skipping lock acquisition")
     # add lock per (result_path, gcpt_path) pair
     # to prevent the same checkpoint from being run by multiple instances with same result_path simultaneously
-    gcpt_hash = hashlib.sha256(str(gcpt_path.resolve()).encode()).hexdigest()[:8]
+    if gcpt_path is not None:
+        lock_src = str(gcpt_path.resolve())
+    else:
+        lock_src = str(json_path.resolve())
+    gcpt_hash = hashlib.sha256(lock_src.encode()).hexdigest()[:8]
     lock = (
         Heartbeat(f"trigger_{gcpt_hash}", result_path, HEARTBEAT_INTERVAL)
         if need_lock
@@ -701,10 +779,10 @@ def main():
 
     try:
         xiangshan = XiangShan(
-            gcpt_path=gcpt_path,
-            json_path=json_path,
             result_path=result_path,
             benchmarks=args.benchmarks,
+            gcpt_path=gcpt_path,
+            json_path=json_path,
         )
 
         if args.reset_running:
@@ -734,6 +812,7 @@ def main():
                     cst_file=cst_file,
                     dump_db=args.dump_db,
                     dry_run=args.dry_run,
+                    max_cycles=args.max_cycles,
                 ),
             )
 

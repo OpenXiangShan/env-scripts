@@ -1,4 +1,5 @@
 from enum import Enum
+import hashlib
 from pathlib import Path
 import re
 
@@ -18,16 +19,37 @@ class GCPT:
         checkpoint: str,
         weight: float,
         eta: int = 0,
+        bin_path: Path | None = None,
+        name: str | None = None,
     ):
         self.__gcpt_path = gcpt_path
         self.__benchmark = benchmark
         self.__checkpoint = checkpoint
         self.__weight = weight
         self.__eta = eta
+        self.__bin_path_override = bin_path
+        self.__name_override = name
         self.__state = GCPT.State.NONE
         self.__result_path = result_path / str(self)
 
+    @classmethod
+    def from_image(cls, image_path: Path, result_path: Path) -> "GCPT":
+        resolved = image_path.expanduser().resolve()
+        digest = hashlib.sha256(str(resolved).encode()).hexdigest()[:8]
+        safe_name = resolved.name.replace("/", "_")
+        return cls(
+            gcpt_path=resolved.parent,
+            result_path=result_path,
+            benchmark=resolved.stem,
+            checkpoint="image",
+            weight=1.0,
+            bin_path=resolved,
+            name=f"{safe_name}_{digest}",
+        )
+
     def __str__(self) -> str:
+        if self.__name_override is not None:
+            return self.__name_override
         return "_".join([self.__benchmark, self.__checkpoint, str(self.__weight)])
 
     @property
@@ -56,6 +78,8 @@ class GCPT:
 
     @property
     def bin_path(self) -> Path:
+        if self.__bin_path_override is not None:
+            return self.__bin_path_override
         return (
             self.__gcpt_path
             / self.__benchmark

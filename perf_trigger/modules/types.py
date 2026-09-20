@@ -15,6 +15,7 @@ class EmuConfig:
     cst_file: Path | None = None
     dump_db: bool = False
     dry_run: bool = False
+    max_cycles: int | None = None
 
 
 @dataclass
