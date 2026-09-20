@@ -1,9 +1,15 @@
 Core RTL to FPGA Steps
 ======================
 
-For UVHS GBus builds, see [the SRAM C2H interface and build flow](uvhs/README.md).
-`DIFFTEST_HOSTIF=GBUS` keeps DiffTest output in the GBS1 on-chip SRAM window.
-Workload H2C enters through the existing CPU-subsystem DMA AXI interface.
+XDMA remains the default DiffTest host interface. For the optional UVHS GBus
+path, see [the SRAM C2H interface and build flow](uvhs/README.md).
+`DIFFTEST_HOSTIF=GBUS` keeps DiffTest output in the GBS1 on-chip SRAM window
+and feeds workload H2C through the existing DifftestMemCtrl AXI-stream engine.
+The two interfaces are compile-time exclusive: RTL uses
+`` `ifdef DIFFTEST_HOST_GBUS `` / `` `elsif DIFFTEST_HOST_XDMA `` / `` `endif ``.
+`Makefile` maps `DIFFTEST_HOSTIF` to one of those defines
+(`DIFFTEST_HOST_DEFINE`) and passes it into the Vivado `verilog_define` list
+and the UVHS file list. GBus is UVHS-only.
 
 1. modify Makefile, assign CORE_DIR
 

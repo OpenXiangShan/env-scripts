@@ -57,12 +57,15 @@ module uvhs_gbus_c2h_fifo #(
     // One range is eight 96-byte packets, i.e. 24 beats of 32 bytes.
     parameter integer PACKET_BEATS = 24
 ) (
+    // AXIS producer is the CPU/SimTop clock.  Register reads and staging are
+    // on the free-running GBus host clock.
+    input  wire                       s_clk,
+    input  wire                       s_rstn,
     input  wire                       clk,
     input  wire                       rstn,
-    // C2H stream enable from the DiffTest reset gate.  Both clocks are the
-    // always-running GBus host clock today, so one combined reset keeps the FIFO
-    // pointers consistent; the async FIFO below still carries the Gray CDC
-    // structure so the clock binding can move later without a rewrite.
+    // Host-domain stream enable.  Each FIFO pointer side is reset in its own
+    // clock after this signal is synchronized, so a DiffTest disable flushes
+    // both Gray counters.
     input  wire                       stream_rstn,
 
     input  wire [AXIS_DATA_WIDTH-1:0] s_tdata,
@@ -93,6 +96,14 @@ module uvhs_gbus_c2h_fifo #(
   // unwritten register would happen to return.
   localparam [31:0] ID_MAGIC = 32'h4742_5331;
 
+  (* ASYNC_REG = "TRUE", SHREG_EXTRACT = "NO" *) reg [2:0] stream_rstn_s_sync;
+  always @(posedge s_clk or negedge s_rstn) begin
+    if (!s_rstn)
+      stream_rstn_s_sync <= 3'b0;
+    else
+      stream_rstn_s_sync <= {stream_rstn_s_sync[1:0], stream_rstn};
+  end
+  wire s_fifo_rstn = stream_rstn_s_sync[2];
   wire fifo_rstn = rstn & stream_rstn;
 
   wire [AXIS_DATA_WIDTH-1:0] fifo_tdata;
@@ -105,7 +116,7 @@ module uvhs_gbus_c2h_fifo #(
       .KEEP_WIDTH(AXIS_KEEP_WIDTH),
       .ADDR_WIDTH (FIFO_ADDR_WIDTH)
   ) u_c2h_fifo (
-      .s_clk(clk), .s_rstn(fifo_rstn),
+      .s_clk(s_clk), .s_rstn(s_fifo_rstn),
       .s_tdata(s_tdata), .s_tkeep(s_tkeep), .s_tlast(s_tlast),
       .s_tvalid(s_tvalid), .s_tready(s_tready), .s_has_data(fifo_s_has_data),
       .m_clk(clk), .m_rstn(fifo_rstn),
@@ -184,9 +195,9 @@ module uvhs_gbus_c2h_fifo #(
       beat_count <= 8'd0;
       for (k = 0; k < STAGE_WORDS; k = k + 1) stage_mem[k] <= 32'b0;
     end else begin
-      if (s_tvalid && s_tready) begin
-        if (s_tlast != (beat_count == 8'(PACKET_BEATS - 1))) frame_error <= 1'b1;
-        beat_count <= s_tlast ? 8'd0 : (beat_count + 8'd1);
+      if (fifo_tvalid && fifo_tready) begin
+        if (fifo_tlast != (beat_count == 8'(PACKET_BEATS - 1))) frame_error <= 1'b1;
+        beat_count <= fifo_tlast ? 8'd0 : (beat_count + 8'd1);
       end
 
       if (start_fill || start_drain) begin

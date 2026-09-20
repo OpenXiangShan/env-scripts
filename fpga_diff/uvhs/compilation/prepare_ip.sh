@@ -169,22 +169,6 @@ export VIVADO_HOME=$UV_XILINX_VIVADO XILINX_VIVADO=$UV_XILINX_VIVADO
 
 hostif=${DIFFTEST_HOSTIF:-XDMA}
 if [[ $hostif == GBUS ]]; then
-  dwidth_stub=$work_dir/rtl/stubs/uvhs_gbus_axi_dwidth.v
-  require_file "$work_dir/rtl/soc/uvhs_gbus_axi_dwidth.dcp"
-  require_file "$dwidth_stub"
-  require_stub_port "$dwidth_stub" \
-    'input[[:space:]]+\[255:0\][[:space:]]*s_axi_wdata' \
-    'slave data width; expected 256 bits'
-  require_stub_port "$dwidth_stub" \
-    'output[[:space:]]+\[63:0\][[:space:]]*m_axi_wdata' \
-    'master data width; expected 64 bits'
-  require_stub_port "$dwidth_stub" \
-    'input[[:space:]]+\[35:0\][[:space:]]*s_axi_awaddr' \
-    'address width; expected 36 bits'
-  require_stub_port "$dwidth_stub" \
-    'input[[:space:]]+\[13:0\][[:space:]]*s_axi_awid' \
-    'slave ID width; expected 14 bits'
-  echo "INFO: verified GBus AXI data width converter: 256-bit to 64-bit"
   generate_generalbus 256
   prepare_generalbd
 else

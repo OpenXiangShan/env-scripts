@@ -133,8 +133,6 @@ if {[string toupper [uvhs::env_or_default DIFFTEST_HOSTIF XDMA]] eq "XDMA"} {
     # metadata.
     uvhs::import_blackbox generalBD ./rtl/soc/generalBD.dcp \
         -clock_enable_pairs {i_clk i_clk_en 1} -generalbd
-    uvhs::import_blackbox uvhs_gbus_axi_dwidth \
-        ./rtl/soc/uvhs_gbus_axi_dwidth.dcp
     puts "INFO: skip data_bridge and xdma_ep blackbox import for DiffTest host interface [uvhs::env_or_default DIFFTEST_HOSTIF XDMA]"
 }
 uvhs::import_blackbox uvw_general_bus \

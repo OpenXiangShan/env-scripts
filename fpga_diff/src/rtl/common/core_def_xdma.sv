@@ -25,6 +25,9 @@ module core_def (
       input                                      cpu_rstn,
       input                                      rstn_sw4,
 `ifdef  XS_XDMA_EP
+`ifdef DIFFTEST_HOST_GBUS
+      // GBus omits the physical XDMA PCIe ports.
+`elsif DIFFTEST_HOST_XDMA
       input       [`XDMA_PCIE_LANES-1:0]         pci_ep_rxn,
       input       [`XDMA_PCIE_LANES-1:0]         pci_ep_rxp,
       output      [`XDMA_PCIE_LANES-1:0]         pci_ep_txn,
@@ -33,6 +36,7 @@ module core_def (
       input                                      pcie_ep_gt_ref_clk_p,
       output                                     pcie_ep_lnk_up,
       input                                      pcie_ep_perstn,
+`endif
 `endif
 `ifdef  XS_UART
       input                                      uart0_sin,
@@ -1236,6 +1240,7 @@ wire [0:0]    br2cfg_wvalid;
   wire        XDMA_AXI_LITE_rvalid;
   wire        XDMA_AXI_LITE_rready;
 
+`ifdef DIFFTEST_HOST_GBUS
   wire [31:0] difftest_cfg_axilite_awaddr;
   wire        difftest_cfg_axilite_awvalid;
   wire        difftest_cfg_axilite_awready;
@@ -1253,6 +1258,7 @@ wire [0:0]    br2cfg_wvalid;
   wire [1:0]  difftest_cfg_axilite_rresp;
   wire        difftest_cfg_axilite_rvalid;
   wire        difftest_cfg_axilite_rready;
+`endif
 
   wire        difftest_to_host_axis_tready_io;
   wire        difftest_to_host_axis_tvalid_io;
@@ -1267,28 +1273,26 @@ wire [0:0]    br2cfg_wvalid;
   wire [`CONFIG_DIFFTEST_HOST_AXIS_BYTES-1:0] difftest_from_host_axis_tkeep;
   wire        difftest_from_host_axis_tlast;
   wire        difftest_clock_enable;
+  wire        difftest_clock_gate_enable;
   wire        inter_soc_clk;
   wire        inter_soc_sync_rstn;
   wire        inter_rtc_clk;
 
   wire io_host_reset;
   wire io_host_diff_enable;
-  (*mark_debug = "true"*) wire io_host_ila_trigger;
+    (*mark_debug = "true"*) wire io_host_ila_trigger;
   wire clock_enable;
   wire sys_rstn_io;
   wire cpu_rstn_io;
   wire difftest_startup_ready_pcie;
   wire difftest_startup_done_pcie;
   wire cpu_rstn_pcie;
-  reg  cpu_rstn_pcie_src;
   wire io_host_diff_enable_pcie;
-  wire xdma_link_up_pcie;
   reg [19:0] difftest_startup_wait_pcie;
   reg difftest_stream_enable_pcie;
-  wire difftest_c2h_rstn;
-  wire difftest_clock_gate_enable = difftest_clock_enable;
+
   wire difftest_pcie_clock;
-`ifdef CONFIG_DIFFTEST_HOSTIF_GBUS
+`ifdef DIFFTEST_HOST_GBUS
   // GBus has no XDMA user-clock output.  The DiffTest host-side protocol and
   // the UVHS GeneralBD/GENERALBUS endpoints are synchronous to the always-on
   // GBus host/user interface clock: use the real always-running UVHS host
@@ -1296,33 +1300,11 @@ wire [0:0]    br2cfg_wvalid;
   wire gbus_host_clk = dev_clk_i;
   assign difftest_pcie_clock = gbus_host_clk;
 `endif
-  wire pcie_ep_lnk_up_raw;
-  (* ASYNC_REG = "TRUE" *) reg [1:0] pcie_lnk_sync;
   assign sys_rstn_io = sys_rstn & ~io_host_reset;
   assign cpu_rstn_io = cpu_rstn & ~io_host_reset;
-  assign difftest_c2h_rstn = cpu_rstn_pcie & difftest_stream_enable_pcie;
-`ifdef CONFIG_DIFFTEST_HOSTIF_GBUS
-  // GBus has no PCIe training state.  Expose a logical ready indication to
-  // the shared control/CDC gates; XDMA retains the physical link status.
-  assign pcie_ep_lnk_up = 1'b1;
-`else
-  assign pcie_ep_lnk_up = pcie_lnk_sync[1];
-`endif
-
-  always @(posedge sys_clk_i) begin
-      if (!sys_rstn) cpu_rstn_pcie_src <= 1'b0;
-      else           cpu_rstn_pcie_src <= cpu_rstn_io;
-  end
-
-  always @(posedge sys_clk_i) begin
-      if (!sys_rstn) pcie_lnk_sync <= 2'b00;
-      else           pcie_lnk_sync <= {pcie_lnk_sync[0], pcie_ep_lnk_up_raw};
-  end
-`ifdef CONFIG_DIFFTEST_HOSTIF_GBUS
-  wire xdma_link_up = 1'b1;
-`else
-  wire xdma_link_up = pcie_lnk_sync[1];
-`endif
+  assign difftest_clock_gate_enable =
+      difftest_clock_enable || ~io_host_diff_enable ||
+      ~sys_rstn_io || ~cpu_rstn_io;
 
   RST_SYNC #(
       .SYNC_STAGES(3),
@@ -1330,7 +1312,7 @@ wire [0:0]    br2cfg_wvalid;
       .INIT(1'b0)
   ) difftest_cpu_rstn_pcie_sync (
       .clk      (difftest_pcie_clock),
-      .async_in (cpu_rstn_pcie_src),
+      .async_in (cpu_rstn_io),
       .sync_out (cpu_rstn_pcie)
   );
 
@@ -1344,21 +1326,9 @@ wire [0:0]    br2cfg_wvalid;
       .sync_out (io_host_diff_enable_pcie)
   );
 
-`ifdef CONFIG_DIFFTEST_HOSTIF_GBUS
+  // Host enables DiffTest only after XDMA is accessible. Do not feed the
+  // physical XDMA link-status output back into fabric logic.
   assign difftest_startup_ready_pcie = cpu_rstn_pcie & io_host_diff_enable_pcie;
-`else
-  RST_SYNC #(
-      .SYNC_STAGES(3),
-      .PIPELINE_STAGES(1),
-      .INIT(1'b0)
-  ) difftest_link_up_pcie_sync (
-      .clk      (difftest_pcie_clock),
-      .async_in (xdma_link_up),
-      .sync_out (xdma_link_up_pcie)
-  );
-
-  assign difftest_startup_ready_pcie = cpu_rstn_pcie & io_host_diff_enable_pcie & xdma_link_up_pcie;
-`endif
   assign difftest_startup_done_pcie = &difftest_startup_wait_pcie;
 
   always @(posedge difftest_pcie_clock) begin
@@ -1372,105 +1342,23 @@ wire [0:0]    br2cfg_wvalid;
       end
   end
 
+`ifdef DIFFTEST_HOST_GBUS
+  // GBus C2H has a real CPU-to-host async FIFO.  Do not combinationally AND
+  // the host-clock stream enable onto the CPU-clock AXIS handshake.
+  assign difftest_to_host_axis_tready = difftest_to_host_axis_tready_io;
+  assign difftest_to_host_axis_tvalid_io = difftest_to_host_axis_tvalid;
+`elsif DIFFTEST_HOST_XDMA
   assign difftest_to_host_axis_tready = difftest_to_host_axis_tready_io & difftest_stream_enable_pcie;
   assign difftest_to_host_axis_tvalid_io = difftest_to_host_axis_tvalid & difftest_stream_enable_pcie;
-
-`ifdef CONFIG_DIFFTEST_HOSTIF_GBUS
-  // The GBus shell has no PCIe clock/link reset domain.  Its compatibility
-  // clock is the always-running host clock, so the AXI-Lite bridge must be
-  // released from the normal fabric reset rather than a nonexistent PCIe
-  // training indication.  Do not use sys_rstn_io here: that signal is
-  // intentionally masked by io_host_reset, and fpga-host asserts
-  // HOST_IO_CFG_RESET before issuing the remaining configuration writes.
-  // Using the masked signal would therefore hold this bridge in reset for the
-  // entire host initialization sequence, making successful GBus API calls
-  // disappear before they reach the DiffTest config block.
-  wire difftest_axil_cdc_s_resetn = sys_rstn;
-  wire difftest_axil_cdc_m_resetn = sys_rstn;
-`else
-  wire difftest_axil_cdc_s_resetn = xdma_link_up_pcie;
-  wire difftest_axil_cdc_m_resetn = sys_rstn & xdma_link_up;
 `endif
 
-  uvhs_axilite_cdc_bridge #(
-      .ADDR_WIDTH (32),
-      .DATA_WIDTH (32)
-  ) difftest_cfg_axilite_cdc (
-      .s_clk      (difftest_pcie_clock),
-      .s_resetn   (difftest_axil_cdc_s_resetn),
-      .s_awaddr   (XDMA_AXI_LITE_awaddr),
-      .s_awprot   (XDMA_AXI_LITE_awprot),
-      .s_awvalid  (XDMA_AXI_LITE_awvalid),
-      .s_awready  (XDMA_AXI_LITE_awready),
-      .s_wdata    (XDMA_AXI_LITE_wdata),
-      .s_wstrb    (XDMA_AXI_LITE_wstrb),
-      .s_wvalid   (XDMA_AXI_LITE_wvalid),
-      .s_wready   (XDMA_AXI_LITE_wready),
-      .s_bresp    (XDMA_AXI_LITE_bresp),
-      .s_bvalid   (XDMA_AXI_LITE_bvalid),
-      .s_bready   (XDMA_AXI_LITE_bready),
-      .s_araddr   (XDMA_AXI_LITE_araddr),
-      .s_arprot   (XDMA_AXI_LITE_arprot),
-      .s_arvalid  (XDMA_AXI_LITE_arvalid),
-      .s_arready  (XDMA_AXI_LITE_arready),
-      .s_rdata    (XDMA_AXI_LITE_rdata),
-      .s_rresp    (XDMA_AXI_LITE_rresp),
-      .s_rvalid   (XDMA_AXI_LITE_rvalid),
-      .s_rready   (XDMA_AXI_LITE_rready),
-
-      .m_clk      (sys_clk_i),
-      .m_resetn   (difftest_axil_cdc_m_resetn),
-      .m_awaddr   (difftest_cfg_axilite_awaddr),
-      .m_awprot   (),
-      .m_awvalid  (difftest_cfg_axilite_awvalid),
-      .m_awready  (difftest_cfg_axilite_awready),
-      .m_wdata    (difftest_cfg_axilite_wdata),
-      .m_wstrb    (difftest_cfg_axilite_wstrb),
-      .m_wvalid   (difftest_cfg_axilite_wvalid),
-      .m_wready   (difftest_cfg_axilite_wready),
-      .m_bresp    (difftest_cfg_axilite_bresp),
-      .m_bvalid   (difftest_cfg_axilite_bvalid),
-      .m_bready   (difftest_cfg_axilite_bready),
-      .m_araddr   (difftest_cfg_axilite_araddr),
-      .m_arprot   (),
-      .m_arvalid  (difftest_cfg_axilite_arvalid),
-      .m_arready  (difftest_cfg_axilite_arready),
-      .m_rdata    (difftest_cfg_axilite_rdata),
-      .m_rresp    (difftest_cfg_axilite_rresp),
-      .m_rvalid   (difftest_cfg_axilite_rvalid),
-      .m_rready   (difftest_cfg_axilite_rready)
-  );
-
-  wire [`CONFIG_DIFFTEST_HOST_AXIS_WIDTH-1:0] xdma_s00_axis_tdata;
-  wire [`CONFIG_DIFFTEST_HOST_AXIS_BYTES-1:0] xdma_s00_axis_tkeep;
-  wire xdma_s00_axis_tlast;
-  wire xdma_s00_axis_tvalid;
-  wire xdma_m00_axis_tready;
-  wire xdma_cpu_clk;
-  wire xdma_cpu_rstn;
-
-  assign xdma_s00_axis_tdata = difftest_to_host_axis_tdata;
-  assign xdma_s00_axis_tkeep = difftest_to_host_axis_tkeep;
-  assign xdma_s00_axis_tlast = difftest_to_host_axis_tlast;
-  assign xdma_s00_axis_tvalid = difftest_to_host_axis_tvalid_io;
-`ifndef CONFIG_DIFFTEST_HOSTIF_GBUS
-  assign xdma_m00_axis_tready = difftest_from_host_axis_tready;
-`endif
-  // Keep the XDMA user side in the clock domain exported by the XDMA DCP and
-  // do not let SoC reset
-  // hold the endpoint user logic while the host probes BARs.
-`ifdef CONFIG_DIFFTEST_HOSTIF_GBUS
-  // Keep the compatibility shell's CPU-side input on the 25-MHz SoC clock.
-  // Its legacy user-clock output is explicitly driven from host_clk below,
-  // so there is no clock loop and no reason to run the CPU-side shim at the
-  // 50-MHz GBus host rate.
-  assign xdma_cpu_clk = sys_clk_i;
-`else
-  assign xdma_cpu_clk = difftest_pcie_clock;
-`endif
-  assign xdma_cpu_rstn = 1'b1;
-
-`ifdef CONFIG_DIFFTEST_HOSTIF_GBUS
+`ifdef DIFFTEST_HOST_GBUS
+  // Optional GBus host interface.  XDMA is not instantiated.  DiffTest C2H
+  // stays on the shared Difftest2AXIs stream and is parked in on-chip SRAM.
+  // Workload H2C converts GeneralBus AXI3 into the existing DifftestMemCtrl
+  // AXI-stream engine.  dma_core_* remains idle so the two hostifs stay
+  // compile-time exclusive owners of their inbound masters.
+  wire difftest_c2h_rstn = cpu_rstn_pcie & difftest_stream_enable_pcie;
   wire gbus_cfg_wr_en;
   wire [15:0] gbus_cfg_wr_addr;
   wire [31:0] gbus_cfg_wdata;
@@ -1528,128 +1416,16 @@ wire [0:0]    br2cfg_wvalid;
   wire [1:0] gbus_h2c_bresp, gbus_h2c_rresp;
   wire gbus_h2c_bvalid, gbus_h2c_bready, gbus_h2c_arvalid, gbus_h2c_arready;
   wire gbus_h2c_rlast, gbus_h2c_rvalid, gbus_h2c_rready;
-  wire gbus_shell_sready;
   wire gbus_c2h_sready;
-  // The GENERALBD and GENERALBUS protected IPs share a 256-bit system-bus
-  // link.  UVHS metadata identifies the endpoint type, but the tool does not
-  // infer this connection when the ports are left open; an open port is
-  // explicitly tied to GND during elaboration.  Keep the link explicit so
-  // host commands and responses reach the GENERALBD endpoint.
+  wire gbus_h2c_axis_tvalid;
+  wire gbus_h2c_axis_tready;
+  wire gbus_h2c_axis_tlast;
+  wire [`CONFIG_DIFFTEST_HOST_AXIS_WIDTH-1:0] gbus_h2c_axis_tdata;
+  wire [`CONFIG_DIFFTEST_HOST_AXIS_BYTES-1:0] gbus_h2c_axis_tkeep;
   wire [255:0] gbus_sysbus_to_generalbus;
   wire [255:0] gbus_sysbus_to_generalbd;
-  // The endpoint shell remains only a clock/readiness shim in GBus mode.
-  // Actual GBus AXI and system-bus traffic is provided by the UVHS protected
-  // IPs below and is not presented as a PCIe endpoint.
-  uvhs_gbus_host_adapter xdma_ep_i(
-`else
-  xdma_ep xdma_ep_i(
-`endif
-    .cpu_clk              (xdma_cpu_clk),
-`ifdef CONFIG_DIFFTEST_HOSTIF_GBUS
-    .host_clk             (gbus_host_clk),
-`endif
-    .cpu_rstn             (xdma_cpu_rstn),
-    .S00_AXIS_0_tdata     (xdma_s00_axis_tdata),
-    .S00_AXIS_0_tkeep     (xdma_s00_axis_tkeep),
-    .S00_AXIS_0_tlast     (xdma_s00_axis_tlast),
-`ifdef CONFIG_DIFFTEST_HOSTIF_GBUS
-    .S00_AXIS_0_tready    (gbus_shell_sready),
-`else
-    .S00_AXIS_0_tready    (difftest_to_host_axis_tready_io),
-`endif
-    .S00_AXIS_0_tvalid    (xdma_s00_axis_tvalid),
-`ifdef CONFIG_DIFFTEST_HOSTIF_GBUS
-    // GBus occupies the existing DifftestMemCtrl AXI-stream H2C engine.
-    // Leave the compatibility shell's unused M00 stream disconnected.
-    .M00_AXIS_0_tdata     (),
-    .M00_AXIS_0_tkeep     (),
-    .M00_AXIS_0_tlast     (),
-    .M00_AXIS_0_tready    (1'b0),
-    .M00_AXIS_0_tvalid    (),
-`else
-    .M00_AXIS_0_tdata     (difftest_from_host_axis_tdata),
-    .M00_AXIS_0_tkeep     (difftest_from_host_axis_tkeep),
-    .M00_AXIS_0_tlast     (difftest_from_host_axis_tlast),
-    .M00_AXIS_0_tready    (xdma_m00_axis_tready),
-    .M00_AXIS_0_tvalid    (difftest_from_host_axis_tvalid),
-`endif
 
-`ifdef CONFIG_DIFFTEST_HOSTIF_GBUS
-    // The compatibility shell is not the GBus register master.  Leave its
-    // quiescent AXI-Lite pins disconnected; GENERALBD drives the real config
-    // path below.
-    .XDMA_AXI_LITE_awaddr (), .XDMA_AXI_LITE_awprot (), .XDMA_AXI_LITE_awvalid(),
-    .XDMA_AXI_LITE_awready(1'b0), .XDMA_AXI_LITE_wdata(), .XDMA_AXI_LITE_wstrb(),
-    .XDMA_AXI_LITE_wvalid (), .XDMA_AXI_LITE_wready(1'b0),
-    .XDMA_AXI_LITE_bresp  (2'b0), .XDMA_AXI_LITE_bvalid(1'b0), .XDMA_AXI_LITE_bready(),
-    .XDMA_AXI_LITE_araddr (), .XDMA_AXI_LITE_arprot(), .XDMA_AXI_LITE_arvalid(),
-    .XDMA_AXI_LITE_arready(1'b0), .XDMA_AXI_LITE_rdata(32'b0),
-    .XDMA_AXI_LITE_rresp  (2'b0), .XDMA_AXI_LITE_rvalid(1'b0), .XDMA_AXI_LITE_rready(),
-`else
-    .XDMA_AXI_LITE_awaddr (XDMA_AXI_LITE_awaddr),
-    .XDMA_AXI_LITE_awprot (XDMA_AXI_LITE_awprot),
-    .XDMA_AXI_LITE_awvalid(XDMA_AXI_LITE_awvalid),
-    .XDMA_AXI_LITE_awready(XDMA_AXI_LITE_awready),
-    .XDMA_AXI_LITE_wdata  (XDMA_AXI_LITE_wdata),
-    .XDMA_AXI_LITE_wstrb  (XDMA_AXI_LITE_wstrb),
-    .XDMA_AXI_LITE_wvalid (XDMA_AXI_LITE_wvalid),
-    .XDMA_AXI_LITE_wready (XDMA_AXI_LITE_wready),
-    .XDMA_AXI_LITE_bresp  (XDMA_AXI_LITE_bresp),
-    .XDMA_AXI_LITE_bvalid (XDMA_AXI_LITE_bvalid),
-    .XDMA_AXI_LITE_bready (XDMA_AXI_LITE_bready),
-    .XDMA_AXI_LITE_araddr (XDMA_AXI_LITE_araddr),
-    .XDMA_AXI_LITE_arprot (XDMA_AXI_LITE_arprot),
-    .XDMA_AXI_LITE_arvalid(XDMA_AXI_LITE_arvalid),
-    .XDMA_AXI_LITE_arready(XDMA_AXI_LITE_arready),
-    .XDMA_AXI_LITE_rdata  (XDMA_AXI_LITE_rdata),
-    .XDMA_AXI_LITE_rresp  (XDMA_AXI_LITE_rresp),
-    .XDMA_AXI_LITE_rvalid (XDMA_AXI_LITE_rvalid),
-    .XDMA_AXI_LITE_rready (XDMA_AXI_LITE_rready),
-`endif
-
-`ifdef CONFIG_DIFFTEST_HOSTIF_GBUS
-    // The GBus branch binds difftest_pcie_clock directly to the explicit
-    // gbus_host_clk above.  Do not expose a pseudo XDMA clock output to UVHS
-    // clock inference; the compatibility shell has no physical user clock.
-    .TO_DIFFTEST_PCIE_CLK (),
-`else
-    .TO_DIFFTEST_PCIE_CLK (difftest_pcie_clock),
-`endif
-    .pci_exp_rxn(pci_ep_rxn),
-    .pci_exp_rxp(pci_ep_rxp),
-    .pci_exp_txn(pci_ep_txn),
-    .pci_exp_txp(pci_ep_txp),
-    .pcie_ep_gt_ref_clk_n(pcie_ep_gt_ref_clk_n),
-    .pcie_ep_gt_ref_clk_p(pcie_ep_gt_ref_clk_p),
-    .pcie_ep_lnk_up(pcie_ep_lnk_up_raw),
-    .pcie_ep_perstn(pcie_ep_perstn)
-  );
-
-`ifdef CONFIG_DIFFTEST_HOSTIF_GBUS
-  // The shared DiffTest sender (`Difftest2AXIs` inside the generated SimTop --
-  // the very module the XDMA build streams straight into the XDMA IP) is the
-  // C2H producer in both hostif modes.  Only the interface layer below it
-  // differs.  The XDMA build has no DDR staging and neither does this one: the
-  // same 256-bit stream is buffered in on-chip SRAM and exposed as a GBus
-  // register window. The C2H path therefore does not enter the CPU memory
-  // hierarchy or the physical DDR interface.
   assign difftest_to_host_axis_tready_io = gbus_c2h_sready;
-  assign gbus_shell_sready = 1'b0;
-
-  // libuvgbus addresses everything through a 0x1000 config window, so every
-  // enable below is decoded on the *windowed* address while the downstream
-  // blocks take the zero-based register offset.  Do not mix the two: decoding
-  // an enable against the local offset compiles, elaborates, and then silently
-  // dead-ends the whole block.  That is exactly how the C2H control write was
-  // lost -- upstream a raw 0x2204 was compared against the local range
-  // 0x1200..0x1204, so the fill never started and staged_words stayed 0
-  // forever, while a status read only appeared to work because raw 0x2200
-  // happened to hit a window branch and subtract back to the status offset.
-  //
-  // The two forms are equivalent for raw >= 0x1000 and both cannot alias for
-  // raw < 0x1000 (the subtraction wraps to >= 0xf000, outside every range), so
-  // decoding on the local address is safe as well as clearer.  Declare these
-  // before the instances below; UVHS elaboration rejects forward references.
   assign gbus_cfg_local_wr_addr = gbus_cfg_wr_addr - 16'h1000;
   assign gbus_cfg_local_rd_addr = gbus_cfg_rd_addr - 16'h1000;
 
@@ -1662,11 +1438,10 @@ wire [0:0]    br2cfg_wvalid;
   wire gbus_axil_cfg_wr_en = gbus_cfg_wr_en && (gbus_cfg_local_wr_addr <= 16'h0030);
   wire gbus_axil_cfg_rd_en = gbus_cfg_rd_en && (gbus_cfg_local_rd_addr <= 16'h0030);
 
-  // The sender is the same Difftest2AXIs instance the XDMA build feeds to PCIe;
-  // only this interface layer differs, so nothing is staged in DDR.
   uvhs_gbus_c2h_fifo #(
       .AXIS_DATA_WIDTH(`CONFIG_DIFFTEST_HOST_AXIS_WIDTH)
   ) U_GBUS_C2H_FIFO (
+    .s_clk(inter_soc_clk), .s_rstn(inter_soc_sync_rstn),
     .clk(gbus_host_clk), .rstn(rstn_sw4),
     .stream_rstn(difftest_c2h_rstn),
     .s_tdata(difftest_to_host_axis_tdata), .s_tkeep(difftest_to_host_axis_tkeep),
@@ -1735,11 +1510,6 @@ wire [0:0]    br2cfg_wvalid;
     .sysbus_ghbd_i (gbus_sysbus_to_generalbus)
   );
 
-  // GBus occupies the existing DifftestMemCtrl AXI-stream H2C engine, not
-  // dma_core_*.  Host DMA writes stay at GeneralBus offset 0; H2CAXIs2Mem
-  // ignores AXI addresses and writes physical DRAM from 0x80000000 using
-  // HOST_IO_H2C_SIZE_MB.  Keep dma_core idle so GBus and XDMA remain
-  // compile-time exclusive owners of their respective inbound masters.
   uvhs_axi3_to_axi4_adapter #(
       .ADDR_WIDTH(36), .ID_WIDTH(14), .AXI3_ID_WIDTH(8), .DATA_WIDTH(256)
   ) U_GBUS_AXI_ADAPTER (
@@ -1809,11 +1579,87 @@ wire [0:0]    br2cfg_wvalid;
     .s_rdata(gbus_h2c_rdata), .s_rresp(gbus_h2c_rresp),
     .s_rlast(gbus_h2c_rlast), .s_rvalid(gbus_h2c_rvalid),
     .s_rready(gbus_h2c_rready),
-    .m_tvalid(difftest_from_host_axis_tvalid),
-    .m_tdata(difftest_from_host_axis_tdata),
-    .m_tkeep(difftest_from_host_axis_tkeep),
-    .m_tlast(difftest_from_host_axis_tlast),
-    .m_tready(difftest_from_host_axis_tready)
+    .m_tvalid(gbus_h2c_axis_tvalid),
+    .m_tdata(gbus_h2c_axis_tdata),
+    .m_tkeep(gbus_h2c_axis_tkeep),
+    .m_tlast(gbus_h2c_axis_tlast),
+    .m_tready(gbus_h2c_axis_tready)
+  );
+
+  // GeneralBus H2C is on the free-running host clock.  DifftestMemCtrl's
+  // AXIS engine is on the gated CPU clock, so cross before SimTop.
+  uvhs_axis_async_fifo #(
+      .DATA_WIDTH(`CONFIG_DIFFTEST_HOST_AXIS_WIDTH),
+      .KEEP_WIDTH(`CONFIG_DIFFTEST_HOST_AXIS_BYTES),
+      .ADDR_WIDTH(4)
+  ) U_GBUS_H2C_CDC (
+      .s_clk(gbus_host_clk),
+      .s_rstn(rstn_sw4),
+      .s_tdata(gbus_h2c_axis_tdata),
+      .s_tkeep(gbus_h2c_axis_tkeep),
+      .s_tlast(gbus_h2c_axis_tlast),
+      .s_tvalid(gbus_h2c_axis_tvalid),
+      .s_tready(gbus_h2c_axis_tready),
+      .s_has_data(),
+      .m_clk(inter_soc_clk),
+      .m_rstn(inter_soc_sync_rstn),
+      .m_tdata(difftest_from_host_axis_tdata),
+      .m_tkeep(difftest_from_host_axis_tkeep),
+      .m_tlast(difftest_from_host_axis_tlast),
+      .m_tvalid(difftest_from_host_axis_tvalid),
+      .m_tready(difftest_from_host_axis_tready),
+      .m_has_data()
+  );
+
+  // GeneralBD AXI-Lite is on the free-running GBus host clock.  The DiffTest
+  // config slave is on sys_clk_i, so cross only in the GBus build.
+  uvhs_axilite_cdc_bridge #(
+      .ADDR_WIDTH (32),
+      .DATA_WIDTH (32)
+  ) difftest_cfg_axilite_cdc (
+      .s_clk      (gbus_host_clk),
+      .s_resetn   (sys_rstn),
+      .s_awaddr   (XDMA_AXI_LITE_awaddr),
+      .s_awprot   (XDMA_AXI_LITE_awprot),
+      .s_awvalid  (XDMA_AXI_LITE_awvalid),
+      .s_awready  (XDMA_AXI_LITE_awready),
+      .s_wdata    (XDMA_AXI_LITE_wdata),
+      .s_wstrb    (XDMA_AXI_LITE_wstrb),
+      .s_wvalid   (XDMA_AXI_LITE_wvalid),
+      .s_wready   (XDMA_AXI_LITE_wready),
+      .s_bresp    (XDMA_AXI_LITE_bresp),
+      .s_bvalid   (XDMA_AXI_LITE_bvalid),
+      .s_bready   (XDMA_AXI_LITE_bready),
+      .s_araddr   (XDMA_AXI_LITE_araddr),
+      .s_arprot   (XDMA_AXI_LITE_arprot),
+      .s_arvalid  (XDMA_AXI_LITE_arvalid),
+      .s_arready  (XDMA_AXI_LITE_arready),
+      .s_rdata    (XDMA_AXI_LITE_rdata),
+      .s_rresp    (XDMA_AXI_LITE_rresp),
+      .s_rvalid   (XDMA_AXI_LITE_rvalid),
+      .s_rready   (XDMA_AXI_LITE_rready),
+
+      .m_clk      (sys_clk_i),
+      .m_resetn   (sys_rstn),
+      .m_awaddr   (difftest_cfg_axilite_awaddr),
+      .m_awprot   (),
+      .m_awvalid  (difftest_cfg_axilite_awvalid),
+      .m_awready  (difftest_cfg_axilite_awready),
+      .m_wdata    (difftest_cfg_axilite_wdata),
+      .m_wstrb    (difftest_cfg_axilite_wstrb),
+      .m_wvalid   (difftest_cfg_axilite_wvalid),
+      .m_wready   (difftest_cfg_axilite_wready),
+      .m_bresp    (difftest_cfg_axilite_bresp),
+      .m_bvalid   (difftest_cfg_axilite_bvalid),
+      .m_bready   (difftest_cfg_axilite_bready),
+      .m_araddr   (difftest_cfg_axilite_araddr),
+      .m_arprot   (),
+      .m_arvalid  (difftest_cfg_axilite_arvalid),
+      .m_arready  (difftest_cfg_axilite_arready),
+      .m_rdata    (difftest_cfg_axilite_rdata),
+      .m_rresp    (difftest_cfg_axilite_rresp),
+      .m_rvalid   (difftest_cfg_axilite_rvalid),
+      .m_rready   (difftest_cfg_axilite_rready)
   );
 
   assign data_cpu_bridge_m2s_awid = 14'b0;
@@ -1842,78 +1688,57 @@ wire [0:0]    br2cfg_wvalid;
   assign data_cpu_bridge_m2s_arqos = 4'b0;
   assign data_cpu_bridge_m2s_arvalid = 1'b0;
   assign data_cpu_bridge_m2s_rready = 1'b0;
+`elsif DIFFTEST_HOST_XDMA
+  xdma_ep xdma_ep_i(
+    .cpu_clk              (sys_clk_i),
+    .cpu_rstn             (sys_rstn),
+    .S00_AXIS_0_tdata     (difftest_to_host_axis_tdata),
+    .S00_AXIS_0_tkeep     (difftest_to_host_axis_tkeep),
+    .S00_AXIS_0_tlast     (difftest_to_host_axis_tlast),
+    .S00_AXIS_0_tready    (difftest_to_host_axis_tready_io),
+    .S00_AXIS_0_tvalid    (difftest_to_host_axis_tvalid_io),
+    .M00_AXIS_0_tdata     (difftest_from_host_axis_tdata),
+    .M00_AXIS_0_tkeep     (difftest_from_host_axis_tkeep),
+    .M00_AXIS_0_tlast     (difftest_from_host_axis_tlast),
+    .M00_AXIS_0_tready    (difftest_from_host_axis_tready),
+    .M00_AXIS_0_tvalid    (difftest_from_host_axis_tvalid),
 
+    .XDMA_AXI_LITE_awaddr (XDMA_AXI_LITE_awaddr),
+    .XDMA_AXI_LITE_awprot (XDMA_AXI_LITE_awprot),
+    .XDMA_AXI_LITE_awvalid(XDMA_AXI_LITE_awvalid),
+    .XDMA_AXI_LITE_awready(XDMA_AXI_LITE_awready),
+    .XDMA_AXI_LITE_wdata  (XDMA_AXI_LITE_wdata),
+    .XDMA_AXI_LITE_wstrb  (XDMA_AXI_LITE_wstrb),
+    .XDMA_AXI_LITE_wvalid (XDMA_AXI_LITE_wvalid),
+    .XDMA_AXI_LITE_wready (XDMA_AXI_LITE_wready),
+    .XDMA_AXI_LITE_bresp  (XDMA_AXI_LITE_bresp),
+    .XDMA_AXI_LITE_bvalid (XDMA_AXI_LITE_bvalid),
+    .XDMA_AXI_LITE_bready (XDMA_AXI_LITE_bready),
+    .XDMA_AXI_LITE_araddr (XDMA_AXI_LITE_araddr),
+    .XDMA_AXI_LITE_arprot (XDMA_AXI_LITE_arprot),
+    .XDMA_AXI_LITE_arvalid(XDMA_AXI_LITE_arvalid),
+    .XDMA_AXI_LITE_arready(XDMA_AXI_LITE_arready),
+    .XDMA_AXI_LITE_rdata  (XDMA_AXI_LITE_rdata),
+    .XDMA_AXI_LITE_rresp  (XDMA_AXI_LITE_rresp),
+    .XDMA_AXI_LITE_rvalid (XDMA_AXI_LITE_rvalid),
+    .XDMA_AXI_LITE_rready (XDMA_AXI_LITE_rready),
+
+    .TO_DIFFTEST_PCIE_CLK (difftest_pcie_clock),
+    .pci_exp_rxn(pci_ep_rxn),
+    .pci_exp_rxp(pci_ep_rxp),
+    .pci_exp_txn(pci_ep_txn),
+    .pci_exp_txp(pci_ep_txp),
+    .pcie_ep_gt_ref_clk_n(pcie_ep_gt_ref_clk_n),
+    .pcie_ep_gt_ref_clk_p(pcie_ep_gt_ref_clk_p),
+    .pcie_ep_lnk_up(pcie_ep_lnk_up),
+    .pcie_ep_perstn(pcie_ep_perstn)
+  );
 `endif
-
-  // CPU progress is controlled exclusively by the DiffTest ready/clock-enable
-  // handshake.  GBus FIFO activity must not be OR'ed into this signal:
-  // doing so lets the CPU retire while the formatter snapshot is waiting for
-  // transport backpressure, which mixes the architectural register snapshot
-  // with a later commit group.  This is the same verified gating contract used
-  // by the XDMA path.  The GBus drain path must therefore be provisioned with
-  // enough buffering (or moved to an independent always-running clock) rather
-  // than weakening CPU backpressure.
-  wire soc_clock_run_enable =
-      (difftest_clock_gate_enable & xdma_link_up) ||
-      ~io_host_diff_enable || ~sys_rstn_io || ~cpu_rstn_io;
 
   DifftestClockGate SOC_CLK_CTRL(
       .CK  (sys_clk_i),
-      .E   (soc_clock_run_enable),
+      .E   (difftest_clock_gate_enable),
       .Q   (inter_soc_clk)
-  );
-
-  wire difftest_clock_gate_enable_tmclk;
-  wire xdma_link_up_tmclk;
-  wire io_host_reset_tmclk;
-  wire io_host_diff_enable_tmclk;
-  wire sys_rstn_tmclk;
-  wire cpu_rstn_tmclk;
-
-  RST_SYNC #(.INIT(1'b0)) rtc_clock_gate_enable_sync (
-      .clk      (tmclk),
-      .async_in (difftest_clock_gate_enable),
-      .sync_out (difftest_clock_gate_enable_tmclk)
-  );
-
-  RST_SYNC #(.INIT(1'b0)) rtc_xdma_link_up_sync (
-      .clk      (tmclk),
-      .async_in (xdma_link_up),
-      .sync_out (xdma_link_up_tmclk)
-  );
-
-  RST_SYNC #(.INIT(1'b1)) rtc_host_reset_sync (
-      .clk      (tmclk),
-      .async_in (io_host_reset),
-      .sync_out (io_host_reset_tmclk)
-  );
-
-  RST_SYNC #(.INIT(1'b0)) rtc_host_diff_enable_sync (
-      .clk      (tmclk),
-      .async_in (io_host_diff_enable),
-      .sync_out (io_host_diff_enable_tmclk)
-  );
-
-  RST_SYNC #(.INIT(1'b0)) rtc_sys_rstn_sync (
-      .clk      (tmclk),
-      .async_in (sys_rstn),
-      .sync_out (sys_rstn_tmclk)
-  );
-
-  RST_SYNC #(.INIT(1'b0)) rtc_cpu_rstn_sync (
-      .clk      (tmclk),
-      .async_in (cpu_rstn),
-      .sync_out (cpu_rstn_tmclk)
-  );
-
-  wire sys_rstn_io_tmclk = sys_rstn_tmclk & ~io_host_reset_tmclk;
-  wire cpu_rstn_io_tmclk = cpu_rstn_tmclk & ~io_host_reset_tmclk;
-
-  DifftestClockGate RTC_CLK_CTRL(
-      .CK  (tmclk),
-      .E   ((difftest_clock_gate_enable_tmclk & xdma_link_up_tmclk)
-            || ~io_host_diff_enable_tmclk || ~sys_rstn_io_tmclk || ~cpu_rstn_io_tmclk),
-      .Q   (inter_rtc_clk)
   );
 
   RST_SYNC #(
@@ -1922,19 +1747,23 @@ wire [0:0]    br2cfg_wvalid;
       .INIT(1'b0)
   ) inter_soc_rstn_sync (
       .clk      (inter_soc_clk),
-      .async_in (axi_bclk_sync_rstn),
+      .async_in (cpu_rstn_io),
       .sync_out (inter_soc_sync_rstn)
+  );
+
+  DifftestClockGate RTC_CLK_CTRL(
+      .CK  (tmclk),
+      .E   (difftest_clock_enable || ~io_host_diff_enable || ~sys_rstn_io || ~cpu_rstn_io ),
+      .Q   (inter_rtc_clk)
   );
 `else
   wire inter_soc_clk;
   wire inter_rtc_clk;
-  wire inter_soc_sync_rstn;
   wire sys_rstn_io;
   wire cpu_rstn_io;
 
   assign inter_soc_clk = sys_clk_i;
   assign inter_rtc_clk = tmclk;
-  assign inter_soc_sync_rstn = axi_bclk_sync_rstn;
   assign sys_rstn_io = sys_rstn;
   assign cpu_rstn_io = cpu_rstn;
 `endif
@@ -2193,6 +2022,7 @@ SimTop_wrapper U_CPU_TOP(
     .difftest_hostCtrl_reset         (io_host_reset),
     .difftest_hostCtrl_diffEnable    (io_host_diff_enable),
     .difftest_hostCtrl_ilaTrigger    (io_host_ila_trigger),
+`ifdef DIFFTEST_HOST_GBUS
     .difftest_cfg_axilite_awaddr     (difftest_cfg_axilite_awaddr),
     .difftest_cfg_axilite_awvalid    (difftest_cfg_axilite_awvalid),
     .difftest_cfg_axilite_awready    (difftest_cfg_axilite_awready),
@@ -2210,6 +2040,25 @@ SimTop_wrapper U_CPU_TOP(
     .difftest_cfg_axilite_rresp      (difftest_cfg_axilite_rresp),
     .difftest_cfg_axilite_rvalid     (difftest_cfg_axilite_rvalid),
     .difftest_cfg_axilite_rready     (difftest_cfg_axilite_rready),
+`elsif DIFFTEST_HOST_XDMA
+    .difftest_cfg_axilite_awaddr     (XDMA_AXI_LITE_awaddr),
+    .difftest_cfg_axilite_awvalid    (XDMA_AXI_LITE_awvalid),
+    .difftest_cfg_axilite_awready    (XDMA_AXI_LITE_awready),
+    .difftest_cfg_axilite_wdata      (XDMA_AXI_LITE_wdata),
+    .difftest_cfg_axilite_wstrb      (XDMA_AXI_LITE_wstrb),
+    .difftest_cfg_axilite_wvalid     (XDMA_AXI_LITE_wvalid),
+    .difftest_cfg_axilite_wready     (XDMA_AXI_LITE_wready),
+    .difftest_cfg_axilite_bresp      (XDMA_AXI_LITE_bresp),
+    .difftest_cfg_axilite_bvalid     (XDMA_AXI_LITE_bvalid),
+    .difftest_cfg_axilite_bready     (XDMA_AXI_LITE_bready),
+    .difftest_cfg_axilite_araddr     (XDMA_AXI_LITE_araddr),
+    .difftest_cfg_axilite_arvalid    (XDMA_AXI_LITE_arvalid),
+    .difftest_cfg_axilite_arready    (XDMA_AXI_LITE_arready),
+    .difftest_cfg_axilite_rdata      (XDMA_AXI_LITE_rdata),
+    .difftest_cfg_axilite_rresp      (XDMA_AXI_LITE_rresp),
+    .difftest_cfg_axilite_rvalid     (XDMA_AXI_LITE_rvalid),
+    .difftest_cfg_axilite_rready     (XDMA_AXI_LITE_rready),
+`endif
 `endif
     .inter_soc_clk                  (inter_soc_clk),
     .sys_rstn_i                     (cpu_rstn_io  ),
@@ -2251,7 +2100,7 @@ SimTop_wrapper U_CPU_TOP(
     .io_systemjtag_jtag_TDO_driven  (io_systemjtag_jtag_TDO_driven),
 //    .io_systemjtag_reset            (io_systemjtag_reset),
     .io_systemjtag_reset            (~sys_rstn_io),
-    .io_sram_config                 (16'b0),
+    .io_sram_config                 (5'b0  ),
 
     .dma_core_awready               (data_cpu_bridge_s2m_awready),
     .dma_core_awvalid               (data_cpu_bridge_m2s_awvalid),
@@ -2347,7 +2196,7 @@ SimTop_wrapper U_CPU_TOP(
     .mem_core_wlast                 (cpu2ddr_m2s_wlast),
     .mem_core_bready                (cpu2ddr_m2s_bready),
     .mem_core_bvalid                (cpu2ddr_s2m_bvalid),
-    .mem_core_bid                   (cpu2ddr_s2m_bid[13:0]),
+    .mem_core_bid                   (cpu2ddr_s2m_bid),
     .mem_core_bresp                 (cpu2ddr_s2m_bresp),
     .mem_core_arready               (cpu2ddr_s2m_arready),
     .mem_core_arvalid               (cpu2ddr_m2s_arvalid),
@@ -2362,7 +2211,7 @@ SimTop_wrapper U_CPU_TOP(
     .mem_core_arqos                 (cpu2ddr_m2s_arqos),
     .mem_core_rready                (cpu2ddr_m2s_rready),
     .mem_core_rvalid                (cpu2ddr_s2m_rvalid),
-    .mem_core_rid                   (cpu2ddr_s2m_rid[13:0]),
+    .mem_core_rid                   (cpu2ddr_s2m_rid),
     .mem_core_rdata                 (cpu2ddr_s2m_rdata),
     .mem_core_rresp                 (cpu2ddr_s2m_rresp),
     .mem_core_rlast                 (cpu2ddr_s2m_rlast),
@@ -2391,10 +2240,10 @@ assign hpm_dig_result = 0;
 AXI_bridge CFG_AXI_bridge_i
        (.SYS_INTER_CLK          (inter_soc_clk),
 `ifdef UVHS
+        .SYS_INTER_ARESETN      (inter_soc_sync_rstn),
         .UART_ACLK              (uart_sclk),
         .UART_ARESETN           (uart_sclk_sync_rstn),
 `endif
-        .SYS_INTER_ARESETN      (inter_soc_sync_rstn),
         .ACLK                   (sys_clk_i),
         .ARESETN                (axi_bclk_sync_rstn),
 
@@ -2540,7 +2389,9 @@ AXI_bridge CFG_AXI_bridge_i
         );
 
 `ifndef NO_DIFF
-`ifndef CONFIG_DIFFTEST_HOSTIF_GBUS
+`ifdef DIFFTEST_HOST_GBUS
+  // GBus leaves dma_core_* idle and does not instantiate data_bridge.
+`elsif DIFFTEST_HOST_XDMA
   data_bridge data_bridge_i
        (.ACLK                   (axi_bus_clk),
         .ARESETN                (axi_bclk_sync_rstn),

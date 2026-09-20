@@ -81,26 +81,19 @@ set uvhs_host_path_names {
 if {$uvhs_hostif eq "XDMA"} {
     lappend uvhs_host_path_names core_def/xdma_ep_i
 } elseif {$uvhs_hostif eq "GBUS"} {
-    # Keep the protected GBus endpoints, AXI-stream H2C converter, and C2H SRAM
-    # staging interface together with the CPU host path on F2.  GBus occupies
-    # DifftestMemCtrl's existing stream engine, so the converter stays on F2
-    # with memCtrl; do not require the deleted U_GBUS_H2C_CDC bridge.
+    # Keep the protected GBus endpoints, AXI-stream H2C converter, C2H SRAM
+    # staging FIFO, and host-to-CPU AXIS CDC together with the CPU host path
+    # on F2.  GBus occupies DifftestMemCtrl's existing stream engine, so the
+    # converter and CDC stay on F2 with memCtrl.
     set uvhs_gbus_host_path_names {\
         core_def/U_GBUS_CONFIG_BRIDGE \
         core_def/U_GBUS_GENERALBD \
         core_def/U_GBUS_GENERAL_BUS \
         core_def/U_GBUS_H2C_AXIS \
+        core_def/U_GBUS_H2C_CDC \
         core_def/U_GBUS_C2H_FIFO}
     set uvhs_host_path_names \
         [concat $uvhs_host_path_names $uvhs_gbus_host_path_names]
-    set uvhs_gbus_dwidth_cells \
-        [get_cells -quiet {core_def/U_GBUS_H2C_DWIDTH}]
-    if {[llength $uvhs_gbus_dwidth_cells] > 1} {
-        error "expected at most one GBus H2C width converter"
-    }
-    if {[llength $uvhs_gbus_dwidth_cells] == 1} {
-        lappend uvhs_host_path_names core_def/U_GBUS_H2C_DWIDTH
-    }
 } else {
     error "unsupported DIFFTEST_HOSTIF: $uvhs_hostif"
 }
@@ -288,7 +281,7 @@ unset -nocomplain uvhs_ddr_cell uvhs_ddr_connector \
     uvhs_host_path_names uvhs_host_path_cells \
     uvhs_gbus_host_path_names uvhs_gbus_host_path_name \
     uvhs_gbus_host_path_cell uvhs_missing_gbus_host_cells \
-    uvhs_gbus_dwidth_cells uvhs_hostif \
+    uvhs_hostif \
     uvhs_nocmisc_path uvhs_nocmisc_prefix uvhs_nocmisc_f0_anchors \
     uvhs_nocmisc_f2_children uvhs_nocmisc_direct_cells \
     uvhs_nocmisc_direct_names uvhs_nocmisc_f0_cells uvhs_nocmisc_f0_names \

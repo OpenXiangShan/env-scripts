@@ -12,17 +12,9 @@ proc pin_name {top port} {
     return "${top}.${port}"
 }
 
-proc assign_pin_env_or_default {name fallback} {
-    if {[info exists ::env($name)] && $::env($name) ne ""} {
-        return $::env($name)
-    }
-    return $fallback
-}
-
-set fpga_diff_hostif [string toupper [assign_pin_env_or_default DIFFTEST_HOSTIF XDMA]]
-set default_top [expr {$fpga_diff_hostif eq "GBUS" ? "none" : "fpga_top_debug"}]
-set top [assign_pin_env_or_default UVHS_ASSIGN_PIN_TOP $default_top]
-set xdma_link_width [string toupper [string trim [assign_pin_env_or_default XDMA_LINK_WIDTH X4]]]
+set top [uvhs::env_or_default UVHS_ASSIGN_PIN_TOP fpga_top_debug]
+set fpga_diff_hostif [string toupper [uvhs::env_or_default DIFFTEST_HOSTIF XDMA]]
+set xdma_link_width [string toupper [string trim [uvhs::env_or_default XDMA_LINK_WIDTH X4]]]
 if {$xdma_link_width ni {X4 X8}} {
     error "XDMA_LINK_WIDTH must be one of X4/X8, got '$xdma_link_width'"
 }
@@ -43,33 +35,37 @@ proc apc16_pin {port slot} {
 
 # Low-speed debug/control pins on the unused F2 APC16 connector.
 # rstn_sw* are exported as UVHS global resets and must not also be assign_pin'd.
-if {$fpga_diff_hostif eq "GBUS"} {
-    # The GBus release exposes only this reduced set of low-speed ports.
-    foreach {port slot} {
-        led0 3 led2 4 led3 5
-        uart0_sout 6 uart0_sin 7 uart1_sout 8 uart2_sout 10
-        JTAG_TCK 12 JTAG_TMS 13 JTAG_TDI 14 JTAG_TDO 15 JTAG_TRSTn 16
-        SD_CLK 17 SD_DECT 22
-    } {
-        apc16_pin $port $slot
-    }
-} else {
-    apc16_pin led0 3
-    apc16_pin led2 4
-    assign_pin -port [pin_name $top led3] -connector b0.F0_FMC1 -index 311
+apc16_pin led0 3
+apc16_pin led2 4
+# led3 is driven by the user-DDR calibration status on F0.
+assign_pin -port [pin_name $top led3] -connector b0.F0_FMC1 -index 311
 
-    set uvhs_uart0_connector b0.F1_FMC0
-    assign_pin -port [pin_name $top uart0_sout] -connector $uvhs_uart0_connector -index 311
-    assign_pin -port [pin_name $top uart0_sin] -connector $uvhs_uart0_connector -index 270
-    foreach {port slot} {
-        uart1_sout 8 uart1_sin 9 uart2_sout 10 uart2_sin 11
-        JTAG_TCK 12 JTAG_TMS 13 JTAG_TDI 14 JTAG_TDO 15 JTAG_TRSTn 16
-        SD_CLK 17 SD_CMD 18 SD_DATA0 19 SD_DATA1 20
-        SD_DATA2 21 SD_DATA3 22 SD_DECT 23
-    } {
-        apc16_pin $port $slot
-    }
-}
+# UV_FMCH_FLASH drives USB_UART_RX at FMC[270] and receives USB_UART_TX at
+# FMC[311], so the FPGA RX/TX directions map to 270/311 respectively.
+set uvhs_uart0_connector b0.F1_FMC0
+set uvhs_uart0_tx_index 311
+set uvhs_uart0_rx_index 270
+puts "INFO: UART0 pins: TX ${uvhs_uart0_connector}\[$uvhs_uart0_tx_index\], RX ${uvhs_uart0_connector}\[$uvhs_uart0_rx_index\]"
+assign_pin -port [pin_name $top uart0_sout] -connector $uvhs_uart0_connector -index $uvhs_uart0_tx_index
+assign_pin -port [pin_name $top uart0_sin] -connector $uvhs_uart0_connector -index $uvhs_uart0_rx_index
+apc16_pin uart1_sout 8
+apc16_pin uart1_sin 9
+apc16_pin uart2_sout 10
+apc16_pin uart2_sin 11
+
+apc16_pin JTAG_TCK 12
+apc16_pin JTAG_TMS 13
+apc16_pin JTAG_TDI 14
+apc16_pin JTAG_TDO 15
+apc16_pin JTAG_TRSTn 16
+
+apc16_pin SD_CLK 17
+apc16_pin SD_CMD 18
+apc16_pin SD_DATA0 19
+apc16_pin SD_DATA1 20
+apc16_pin SD_DATA2 21
+apc16_pin SD_DATA3 22
+apc16_pin SD_DECT 23
 
 # U2 global clocks on F2 use the package pins declared by the board file.
 assign_pin -port [pin_name $top clk6_p] -fpga b0.f2 -pin CA39
@@ -79,21 +75,15 @@ assign_pin -port [pin_name $top clk8_n] -fpga b0.f2 -pin F36
 assign_pin -port [pin_name $top clk5_p] -fpga b0.f2 -pin AW17
 assign_pin -port [pin_name $top clk5_n] -fpga b0.f2 -pin AY17
 
-assign_pin -port [pin_name $top pcie_ep_lnk_up] -connector b0.F2_APC16 -index 58
-
-# XDMA endpoint signals. X4 uses the HGC7 lane group from the Hejian official
-# XDMA EP example; bind HGC6 only when X8 is explicitly selected.
 if {$fpga_diff_hostif eq "GBUS"} {
-    puts "INFO: assign quiescent GBus PCIe TX ports to APC16 pins"
-    foreach {port index} {
-        {pci_ep_txp[0]} 101 {pci_ep_txn[0]} 102
-        {pci_ep_txp[1]} 104 {pci_ep_txn[1]} 85
-        {pci_ep_txp[2]} 64  {pci_ep_txn[2]} 65
-        {pci_ep_txp[3]} 74  {pci_ep_txn[3]} 75
-    } {
-        assign_pin -port [pin_name $top $port] -connector b0.F2_APC16 -index $index
-    }
+    # GBus does not instantiate the XDMA endpoint, so the top-level PCIe ports
+    # are compile-time omitted.  Do not assign unused GT or PERST pins.
+    puts "INFO: skip XDMA PCIe pin assignment for DiffTest host interface GBUS"
 } else {
+    assign_pin -port [pin_name $top pcie_ep_lnk_up] -connector b0.F2_APC16 -index 58
+
+    # XDMA endpoint signals. X4 uses the HGC7 lane group from the Hejian official
+    # XDMA EP example; bind HGC6 only when X8 is explicitly selected.
     puts "INFO: assign XDMA PCIe pins for $xdma_link_width"
     assign_pin -port [pin_name $top pcie_ep_gt_ref_clk_p] -connector b0.F2_HGC7 -index 29
     assign_pin -port [pin_name $top pcie_ep_gt_ref_clk_n] -connector b0.F2_HGC7 -index 30

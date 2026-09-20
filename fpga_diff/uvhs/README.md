@@ -4,16 +4,22 @@ This directory contains the UVHS build and runtime flow for FPGA-Diff. UVHS
 commands use the `uvhs_*` prefix and do not replace the existing Vivado, PCIe,
 or JTAG commands.
 
-## GBus SRAM C2H
+## Optional GBus host interface
 
-`DIFFTEST_HOSTIF=GBUS` retains the shared `Difftest2AXIs` sender and buffers
+XDMA remains the default DiffTest host interface. `DIFFTEST_HOSTIF=GBUS` is an
+additive UVHS compile-time option; it does not replace the XDMA endpoint, pinout,
+or IP export on the default path. The Vivado FPGA-Diff flow stays XDMA-only.
+RTL selects the exclusive host path with `` `ifdef DIFFTEST_HOST_GBUS `` /
+`` `elsif DIFFTEST_HOST_XDMA `` / `` `endif ``. `Makefile` maps
+`DIFFTEST_HOSTIF` to `DIFFTEST_HOST_DEFINE` and `uvhs_project` writes that
+define into the UVHS file list.
+
+The GBus build retains the shared `Difftest2AXIs` sender and buffers
 DiffTest output only in on-chip SRAM. Workload H2C converts the GeneralBus AXI3
-master to AXI4, crosses into the CPU clock domain, and occupies the CPU
-subsystem's existing `dma_core_*` inbound interface. KMH retains the 256-bit
-interface; NutShell uses the generated AXI data-width converter before its
-64-bit frontend, so no GeneralBus data lanes are discarded. The CPU memory
-hierarchy and physical DDR path remain unchanged. The obsolete C2H DDR-ring
-writer and DDR trace sink are not included.
+master to AXI4 and occupies the existing DifftestMemCtrl AXI-stream engine.
+`dma_core_*` stays idle so the two hostifs remain exclusive owners of their
+inbound masters. The CPU memory hierarchy and physical DDR path remain
+unchanged.
 
 GBS1 is a register-drained SRAM window. Backpressure reaches the DiffTest
 sender and pauses the CPU while the host transport clock continues to run.
@@ -51,19 +57,25 @@ wrappers in `<work>/rtl/filelist.f`, which the UVHS frontend reads directly.
 ## GBus host paths
 
 The GBus C2H path uses the on-chip SRAM register window identified as GBS1.
-GBus H2C occupies the existing `dma_core_*` inbound AXI interface during the
-workload load phase; no DDR C2H ring or GBus-specific physical-DDR path is part
-of the UVHS RTL flow. Host DMA offsets stay relative to the GeneralBus start
-address (`GBUS_DDR_BASE=0`). The wrapper maps that offset onto CPU DRAM at
-`0x80000000` before `dma_core_*`. During that load, `HOST_IO_RESET` still
-halts the cores, but the SoC fabric and inbound DMA slave stay out of reset
-so the AXI writes can complete.
+GBus H2C converts GeneralBus AXI3 into the existing DifftestMemCtrl AXI-stream
+engine; `H2CAXIs2Mem` ignores AXI addresses and writes physical DRAM from
+`0x80000000` using `HOST_IO_H2C_SIZE_MB`. The AXIS payload crosses from the
+free-running host clock to the gated CPU clock in `U_GBUS_H2C_CDC`. DiffTest
+C2H crosses the other way inside `U_GBUS_C2H_FIFO`. No DDR C2H ring,
+GBus-specific physical-DDR path, or 256-to-64 AXI converter is part of this
+flow. Host DMA offsets stay relative to the GeneralBus start address
+(`GBUS_DDR_BASE=0`).
 
 ## Build
 
 ```sh
+# Default XDMA host interface
 make uvhs CPU=<design> CORE_DIR=/path/to/release/build \
   RTL_INCLUDE=/path/to/extra.f SUFFIX=<tag>
+
+# Optional GBus host interface
+make uvhs CPU=<design> CORE_DIR=/path/to/release/build \
+  DIFFTEST_HOSTIF=GBUS RTL_INCLUDE=/path/to/extra.f SUFFIX=<tag>
 ```
 
 `RTL_INCLUDE` is optional. `uvhs` is the stable build entry point: it runs the
@@ -73,9 +85,10 @@ the runtime database.
 `uvhs_project` performs these steps:
 
 1. Copies the vendor board template into an isolated work directory.
-2. Prepares repository-owned Vivado IP, including the NutShell 256-to-64 AXI
-   converter, and generates the protected GeneralBus and GeneralBD checkpoints
-   from the local UVHS installation.
+2. Prepares repository-owned Vivado IP. XDMA still exports `data_bridge` and
+   `xdma_ep`. GBus instead generates the 256-bit GeneralBus and GeneralBD
+   checkpoints from the local UVHS installation, while XDMA keeps the existing
+   64-bit GeneralBus used by the UVHS flash path.
 3. Imports the selected DDR DCP and validates its AXI width.
 4. Builds the complete RTL file list and checks the expected top module.
 
@@ -95,7 +108,8 @@ IP preparation intentionally retains two files. `prepare_ip.sh` is the outer
 orchestrator for repository Vivado IP, generated GeneralBus/GeneralBD
 checkpoints, and an external DDR checkpoint. The child
 `export_vivado_ip.tcl` must run inside Vivado because it uses project, IP, BD,
-and checkpoint commands. Owned GBus RTL lives in `uvhs/common`.
+and checkpoint commands. Owned GBus RTL lives in `uvhs/common` and is added to
+the UVHS file list only when `DIFFTEST_HOSTIF=GBUS`.
 
 `uvhs_backend` follows the vendor implementation sequence: clock inference and
 transformation, remap, partition, localization, system routing, FPGA PnR,
@@ -124,11 +138,12 @@ per-bit TDM skew on the time value. The remaining logic is partitioned
 automatically. XiangShan uses these path constraints together with high
 partition effort and the `uv_placer_balance_slrs` PnR strategy.
 
-UVHS drives the AXI UART16550 and the GBus/DiffTest host interface from
-`clk6_p`, while the CPU/SoC uses `clk5_p`. At runtime, both clocks are restored
-to the sign-off frequencies stored in the selected runtime database, so each
-partition and PnR result runs at its reported frequency. Keeping UART and GBus
-on the free-running transport clock makes them independent of CPU clock gating.
+UVHS drives the AXI UART16550 from `clk6_p` at a fixed 50 MHz. The CPU/SoC
+`clk5_p` frequency comes from the system sign-off result committed in the
+selected runtime database, so each partition and PnR result runs at its own
+reported frequency. The GBus DiffTest host interface also uses this
+free-running UART/host clock, independent of CPU clock gating. The fixed UART
+clock matches the 50 MHz clock declared by the XiangShan FPGA device tree.
 
 `clk8_p` is then derived at a fixed 50:1 CPU-to-TMCLK
 ratio, so a 14 MHz CPU clock uses approximately 280 kHz TMCLK. The optional
@@ -430,11 +445,10 @@ before the UVHS timing worker reads it.
 | File | Role |
 | --- | --- |
 | `uvhs.mk` | Build and runtime target wiring. |
-| `../tools/update_core_flist.sh` | Shared Vivado/UVHS RTL file-list entry point, including `uvhs/common`. |
-| `common/` | Owned GBus/UVHS RTL wrappers, CDC, and blackbox stubs. |
+| `../tools/update_core_flist.sh` | Shared Vivado/UVHS RTL file-list entry point. GBus adds `uvhs/common`. |
+| `common/` | Owned GBus RTL: AXI3-to-AXI4, AXI-to-AXIS, C2H SRAM FIFO, host/CPU AXIS CDC, AXI-Lite CDC, and GeneralBD bridge. |
 | `../tools/rtl_filelist_lib.sh` | Nested file-list parsing and path resolution. |
 | `../src/tcl/common/{blk_mem_gen_0,AXI_bridge,data_bridge,xdma_ep}.tcl` | Shared Vivado IP/BD generators used by UVHS IP export and Vivado project creation. XDMA exports `data_bridge`/`xdma_ep`; GBus skips them. |
-| `tcl/uvhs_gbus_axi_dwidth.tcl` | GBus-only 256-to-64 AXI converter generator. |
 | `compilation/flow_common.tcl` | Shared UVHS path, environment, and source helpers. |
 | `compilation/frontend_run.tcl` | RTL/IP import, elaboration, and uvsyn frontend. |
 | `compilation/backend_run.tcl` | Fill-rate setup, partition, routing, PnR, and database commit. |

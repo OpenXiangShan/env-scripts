@@ -246,6 +246,20 @@ if {$no_diff} {
     fpga_append_unique defines "NO_DIFF"
     puts "INFO: standalone CPU RTL selected; DiffTest and XDMA are disabled"
 }
+if {!$no_diff} {
+  set difftest_hostif XDMA
+  if {[info exists ::env(DIFFTEST_HOSTIF)] && [string trim $::env(DIFFTEST_HOSTIF)] ne ""} {
+    set difftest_hostif [string toupper [string trim $::env(DIFFTEST_HOSTIF)]]
+  }
+  if {$difftest_hostif ni {XDMA GBUS}} {
+    error "DIFFTEST_HOSTIF must be XDMA or GBUS, got '$difftest_hostif'"
+  }
+  if {$difftest_hostif eq "GBUS"} {
+    error "DIFFTEST_HOSTIF=GBUS is UVHS-only"
+  }
+  fpga_append_unique defines "DIFFTEST_HOST_XDMA"
+  puts "INFO: DiffTest host interface define DIFFTEST_HOST_XDMA"
+}
 if {$cpu_files_has_dma} {
     fpga_append_unique defines "CONFIG_SIMTOP_HAS_DMA"
     puts "INFO: SimTop DMA ports detected"
