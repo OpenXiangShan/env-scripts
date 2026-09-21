@@ -1393,25 +1393,6 @@ wire [0:0]    br2cfg_wvalid;
       .difftest_cfg_axilite_rready      (difftest_cfg_axilite_rready)
   );
 
-  // data_bridge is XDMA-only, so nothing drives the shared master-side channel
-  // in this build.  Hold the whole generated DMA slave idle with one
-  // concatenated zero assignment instead of listing every AXI signal.
-  assign {
-      data_cpu_bridge_m2s_awid, data_cpu_bridge_m2s_awaddr,
-      data_cpu_bridge_m2s_awlen, data_cpu_bridge_m2s_awsize,
-      data_cpu_bridge_m2s_awburst, data_cpu_bridge_m2s_awlock,
-      data_cpu_bridge_m2s_awcache, data_cpu_bridge_m2s_awprot,
-      data_cpu_bridge_m2s_awqos, data_cpu_bridge_m2s_awvalid,
-      data_cpu_bridge_m2s_wdata, data_cpu_bridge_m2s_wstrb,
-      data_cpu_bridge_m2s_wlast, data_cpu_bridge_m2s_wvalid,
-      data_cpu_bridge_m2s_bready,
-      data_cpu_bridge_m2s_arid, data_cpu_bridge_m2s_araddr,
-      data_cpu_bridge_m2s_arlen, data_cpu_bridge_m2s_arsize,
-      data_cpu_bridge_m2s_arburst, data_cpu_bridge_m2s_arlock,
-      data_cpu_bridge_m2s_arcache, data_cpu_bridge_m2s_arprot,
-      data_cpu_bridge_m2s_arqos, data_cpu_bridge_m2s_arvalid,
-      data_cpu_bridge_m2s_rready
-  } = '0;
 `elsif DIFFTEST_HOST_XDMA
   wire [2:0] xdma_axil_awprot;
   wire [2:0] xdma_axil_arprot;
