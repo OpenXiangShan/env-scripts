@@ -25,9 +25,6 @@ module core_def (
       input                                      cpu_rstn,
       input                                      rstn_sw4,
 `ifdef  XS_XDMA_EP
-`ifdef DIFFTEST_HOST_GBUS
-      // GBus omits the physical XDMA PCIe ports.
-`elsif DIFFTEST_HOST_XDMA
       input       [`XDMA_PCIE_LANES-1:0]         pci_ep_rxn,
       input       [`XDMA_PCIE_LANES-1:0]         pci_ep_rxp,
       output      [`XDMA_PCIE_LANES-1:0]         pci_ep_txn,
@@ -36,7 +33,6 @@ module core_def (
       input                                      pcie_ep_gt_ref_clk_p,
       output                                     pcie_ep_lnk_up,
       input                                      pcie_ep_perstn,
-`endif
 `endif
 `ifdef  XS_UART
       input                                      uart0_sin,

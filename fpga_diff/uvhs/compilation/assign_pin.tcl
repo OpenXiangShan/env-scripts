@@ -13,7 +13,6 @@ proc pin_name {top port} {
 }
 
 set top [uvhs::env_or_default UVHS_ASSIGN_PIN_TOP fpga_top_debug]
-set fpga_diff_hostif [string toupper [uvhs::env_or_default DIFFTEST_HOSTIF XDMA]]
 set xdma_link_width [string toupper [string trim [uvhs::env_or_default XDMA_LINK_WIDTH X4]]]
 if {$xdma_link_width ni {X4 X8}} {
     error "XDMA_LINK_WIDTH must be one of X4/X8, got '$xdma_link_width'"
@@ -75,32 +74,29 @@ assign_pin -port [pin_name $top clk8_n] -fpga b0.f2 -pin F36
 assign_pin -port [pin_name $top clk5_p] -fpga b0.f2 -pin AW17
 assign_pin -port [pin_name $top clk5_n] -fpga b0.f2 -pin AY17
 
-if {$fpga_diff_hostif eq "GBUS"} {
-    # GBus does not instantiate the XDMA endpoint, so the top-level PCIe ports
-    # are compile-time omitted.  Do not assign unused GT or PERST pins.
-    puts "INFO: skip XDMA PCIe pin assignment for DiffTest host interface GBUS"
-} else {
-    assign_pin -port [pin_name $top pcie_ep_lnk_up] -connector b0.F2_APC16 -index 58
+# The physical XDMA PCIe ports are declared for every DiffTest build, so their
+# pins are assigned in both host modes.  Only the endpoint instantiation is
+# host-mode dependent: GBus leaves these ports unused.
+assign_pin -port [pin_name $top pcie_ep_lnk_up] -connector b0.F2_APC16 -index 58
 
-    # XDMA endpoint signals. X4 uses the HGC7 lane group from the Hejian official
-    # XDMA EP example; bind HGC6 only when X8 is explicitly selected.
-    puts "INFO: assign XDMA PCIe pins for $xdma_link_width"
-    assign_pin -port [pin_name $top pcie_ep_gt_ref_clk_p] -connector b0.F2_HGC7 -index 29
-    assign_pin -port [pin_name $top pcie_ep_gt_ref_clk_n] -connector b0.F2_HGC7 -index 30
-    assign_pin -port [pin_name $top pcie_ep_perstn] -connector b0.F2_APC16 -index 118
+# XDMA endpoint signals. X4 uses the HGC7 lane group from the Hejian official
+# XDMA EP example; bind HGC6 only when X8 is explicitly selected.
+puts "INFO: assign XDMA PCIe pins for $xdma_link_width"
+assign_pin -port [pin_name $top pcie_ep_gt_ref_clk_p] -connector b0.F2_HGC7 -index 29
+assign_pin -port [pin_name $top pcie_ep_gt_ref_clk_n] -connector b0.F2_HGC7 -index 30
+assign_pin -port [pin_name $top pcie_ep_perstn] -connector b0.F2_APC16 -index 118
 
-    set xdma_rx_connectors {b0.F2_HGC7 b0.F2_HGC7 b0.F2_HGC7 b0.F2_HGC7 b0.F2_HGC6 b0.F2_HGC6 b0.F2_HGC6 b0.F2_HGC6}
-    set xdma_tx_connectors {b0.F2_HGC7 b0.F2_HGC7 b0.F2_HGC7 b0.F2_HGC7 b0.F2_HGC6 b0.F2_HGC6 b0.F2_HGC6 b0.F2_HGC6}
-    set xdma_rxp_indices {16 13 4 1 16 13 4 1}
-    set xdma_rxn_indices {17 14 5 2 17 14 5 2}
-    set xdma_txp_indices {35 32 23 20 35 32 23 20}
-    set xdma_txn_indices {36 33 24 21 36 33 24 21}
-    for {set i 0} {$i < $xdma_lane_count} {incr i} {
-        assign_pin -port [pin_name $top [format {pci_ep_rxp[%d]} $i]] -connector [lindex $xdma_rx_connectors $i] -index [lindex $xdma_rxp_indices $i]
-        assign_pin -port [pin_name $top [format {pci_ep_rxn[%d]} $i]] -connector [lindex $xdma_rx_connectors $i] -index [lindex $xdma_rxn_indices $i]
-        assign_pin -port [pin_name $top [format {pci_ep_txp[%d]} $i]] -connector [lindex $xdma_tx_connectors $i] -index [lindex $xdma_txp_indices $i]
-        assign_pin -port [pin_name $top [format {pci_ep_txn[%d]} $i]] -connector [lindex $xdma_tx_connectors $i] -index [lindex $xdma_txn_indices $i]
-    }
+set xdma_rx_connectors {b0.F2_HGC7 b0.F2_HGC7 b0.F2_HGC7 b0.F2_HGC7 b0.F2_HGC6 b0.F2_HGC6 b0.F2_HGC6 b0.F2_HGC6}
+set xdma_tx_connectors {b0.F2_HGC7 b0.F2_HGC7 b0.F2_HGC7 b0.F2_HGC7 b0.F2_HGC6 b0.F2_HGC6 b0.F2_HGC6 b0.F2_HGC6}
+set xdma_rxp_indices {16 13 4 1 16 13 4 1}
+set xdma_rxn_indices {17 14 5 2 17 14 5 2}
+set xdma_txp_indices {35 32 23 20 35 32 23 20}
+set xdma_txn_indices {36 33 24 21 36 33 24 21}
+for {set i 0} {$i < $xdma_lane_count} {incr i} {
+    assign_pin -port [pin_name $top [format {pci_ep_rxp[%d]} $i]] -connector [lindex $xdma_rx_connectors $i] -index [lindex $xdma_rxp_indices $i]
+    assign_pin -port [pin_name $top [format {pci_ep_rxn[%d]} $i]] -connector [lindex $xdma_rx_connectors $i] -index [lindex $xdma_rxn_indices $i]
+    assign_pin -port [pin_name $top [format {pci_ep_txp[%d]} $i]] -connector [lindex $xdma_tx_connectors $i] -index [lindex $xdma_txp_indices $i]
+    assign_pin -port [pin_name $top [format {pci_ep_txn[%d]} $i]] -connector [lindex $xdma_tx_connectors $i] -index [lindex $xdma_txn_indices $i]
 }
 
 # The vendor DDR DCP declares its PDDR4DME binding through UV_HW_IP metadata.

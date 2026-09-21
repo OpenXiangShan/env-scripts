@@ -47,9 +47,6 @@ module fpga_top_debug
 `endif
 `endif
 `ifdef XS_XDMA_EP
-`ifdef DIFFTEST_HOST_GBUS
-   // GBus omits the physical XDMA PCIe ports.
-`elsif DIFFTEST_HOST_XDMA
    input    [`XDMA_PCIE_LANES-1:0] pci_ep_rxn,
    input    [`XDMA_PCIE_LANES-1:0] pci_ep_rxp,
    output   [`XDMA_PCIE_LANES-1:0] pci_ep_txn,
@@ -58,7 +55,6 @@ module fpga_top_debug
    input                 pcie_ep_gt_ref_clk_p,
    output                pcie_ep_lnk_up,
    input                 pcie_ep_perstn,
-`endif
 `endif 
    //DDR
 `ifndef UVHS
@@ -386,9 +382,6 @@ core_def core_def
   .dft_crg_rst_n        (1'b1),
   // pcie
 `ifdef XS_XDMA_EP
-`ifdef DIFFTEST_HOST_GBUS
-  // GBus omits the physical XDMA PCIe ports.
-`elsif DIFFTEST_HOST_XDMA
   .pci_ep_rxn           (pci_ep_rxn),
   .pci_ep_rxp           (pci_ep_rxp),
   .pci_ep_txn           (pci_ep_txn),
@@ -397,7 +390,6 @@ core_def core_def
   .pcie_ep_gt_ref_clk_p (pcie_ep_gt_ref_clk_p),
   .pcie_ep_lnk_up       (pcie_ep_lnk_up),
   .pcie_ep_perstn       (pcie_ep_perstn),
-`endif
 `endif
 `ifdef XS_UART
   // uart
