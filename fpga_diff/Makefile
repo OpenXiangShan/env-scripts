@@ -16,6 +16,11 @@ DIFFTEST_HOSTIF ?= XDMA
 ifeq ($(filter XDMA GBUS,$(DIFFTEST_HOSTIF)),)
 $(error DIFFTEST_HOSTIF must be XDMA or GBUS, got $(DIFFTEST_HOSTIF))
 endif
+# GBus C2H drain: SRAM is the register window, DMA is the GBD1 AXI-read bank.
+GBUS_C2H ?= SRAM
+ifeq ($(filter SRAM DMA,$(GBUS_C2H)),)
+$(error GBUS_C2H must be SRAM or DMA, got $(GBUS_C2H))
+endif
 ifeq ($(DIFFTEST_HOSTIF),GBUS)
 ifeq ($(FPGA_BACKEND),vivado)
 $(error DIFFTEST_HOSTIF=GBUS is UVHS-only; use FPGA_BACKEND=uvhs)
@@ -23,10 +28,16 @@ endif
 # GBus is opt-in and selected by its define; XDMA is the default interface and
 # needs none.
 DIFFTEST_HOST_DEFINE := DIFFTEST_HOST_GBUS
+ifeq ($(GBUS_C2H),DMA)
+GBUS_C2H_DEFINE := UVHS_GBUS_C2H_DMA
+else
+GBUS_C2H_DEFINE :=
+endif
 else
 DIFFTEST_HOST_DEFINE :=
+GBUS_C2H_DEFINE :=
 endif
-export DIFFTEST_HOSTIF DIFFTEST_HOST_DEFINE
+export DIFFTEST_HOSTIF DIFFTEST_HOST_DEFINE GBUS_C2H GBUS_C2H_DEFINE
 FPGA_RUNTIME ?=
 REMOTE_ENV ?= source ~/.bash_profile &&
 BIND_UART ?= 1

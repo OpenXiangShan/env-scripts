@@ -138,15 +138,88 @@ module uvhs_gbus_host_wrapper (
   assign gbus_cfg_local_wr_addr = gbus_cfg_wr_addr - 16'h1000;
   assign gbus_cfg_local_rd_addr = gbus_cfg_rd_addr - 16'h1000;
 
+`ifdef UVHS_GBUS_C2H_DMA
+  // GBD1: one control register, the diagnostic registers through 0x1220, and a
+  // 1 KiB published bank.
+  wire gbus_c2h_cfg_wr_en =
+      gbus_cfg_wr_en && (gbus_cfg_local_wr_addr == 16'h1204);
+  wire gbus_c2h_cfg_rd_en =
+      gbus_cfg_rd_en &&
+      (((gbus_cfg_local_rd_addr >= 16'h1200) && (gbus_cfg_local_rd_addr <= 16'h1220)) ||
+       ((gbus_cfg_local_rd_addr >= 16'h2000) && (gbus_cfg_local_rd_addr <= 16'h23fc)));
+`else
   wire gbus_c2h_cfg_wr_en =
       gbus_cfg_wr_en && (gbus_cfg_local_wr_addr >= 16'h1200) && (gbus_cfg_local_wr_addr <= 16'h1208);
   wire gbus_c2h_cfg_rd_en =
       gbus_cfg_rd_en &&
       (((gbus_cfg_local_rd_addr >= 16'h1200) && (gbus_cfg_local_rd_addr <= 16'h1208)) ||
        ((gbus_cfg_local_rd_addr >= 16'h2000) && (gbus_cfg_local_rd_addr <= 16'h2ffc)));
+`endif
   wire gbus_axil_cfg_wr_en = gbus_cfg_wr_en && (gbus_cfg_local_wr_addr <= 16'h0030);
   wire gbus_axil_cfg_rd_en = gbus_cfg_rd_en && (gbus_cfg_local_rd_addr <= 16'h0030);
 
+`ifdef UVHS_GBUS_C2H_DMA
+  // C2H DMA version.  The host drains the published bank with AXI3 DMA reads
+  // instead of 32-bit register reads; the read router sends reads inside the
+  // 4 KiB aperture here and every other read to the H2C converter's existing
+  // DECERR responder.  H2C writes keep using the DifftestMemCtrl stream path.
+  wire [7:0]   gbus_local_arid, gbus_local_rid;
+  wire [31:0]  gbus_local_araddr;
+  wire [3:0]   gbus_local_arlen;
+  wire [2:0]   gbus_local_arsize;
+  wire [1:0]   gbus_local_arburst, gbus_local_rresp;
+  wire         gbus_local_arvalid, gbus_local_arready;
+  wire [255:0] gbus_local_rdata;
+  wire         gbus_local_rlast, gbus_local_rvalid, gbus_local_rready;
+  wire [7:0]   gbus_routed_arid, gbus_routed_rid;
+  wire [31:0]  gbus_routed_araddr;
+  wire [3:0]   gbus_routed_arlen, gbus_routed_arcache, gbus_routed_arqos;
+  wire [2:0]   gbus_routed_arsize, gbus_routed_arprot;
+  wire [1:0]   gbus_routed_arburst, gbus_routed_arlock, gbus_routed_rresp;
+  wire         gbus_routed_arvalid, gbus_routed_arready;
+  wire [255:0] gbus_routed_rdata;
+  wire         gbus_routed_rlast, gbus_routed_rvalid, gbus_routed_rready;
+
+  uvhs_gbus_axi_read_router U_GBUS_C2H_READ_ROUTER (
+    .clk(gbus_host_clk), .rstn(rstn_sw4),
+    .s_arid(gbus_axi_arid), .s_araddr(gbus_axi_araddr), .s_arlen(gbus_axi_arlen),
+    .s_arsize(gbus_axi_arsize), .s_arburst(gbus_axi_arburst), .s_arlock(gbus_axi_arlock),
+    .s_arcache(gbus_axi_arcache), .s_arprot(gbus_axi_arprot), .s_arqos(gbus_axi_arqos),
+    .s_arvalid(gbus_axi_arvalid), .s_arready(gbus_axi_arready),
+    .s_rid(gbus_axi_rid), .s_rdata(gbus_axi_rdata), .s_rresp(gbus_axi_rresp),
+    .s_rlast(gbus_axi_rlast), .s_rvalid(gbus_axi_rvalid), .s_rready(gbus_axi_rready),
+    .c_arid(gbus_local_arid), .c_araddr(gbus_local_araddr), .c_arlen(gbus_local_arlen),
+    .c_arsize(gbus_local_arsize), .c_arburst(gbus_local_arburst),
+    .c_arvalid(gbus_local_arvalid), .c_arready(gbus_local_arready),
+    .c_rid(gbus_local_rid), .c_rdata(gbus_local_rdata), .c_rresp(gbus_local_rresp),
+    .c_rlast(gbus_local_rlast), .c_rvalid(gbus_local_rvalid), .c_rready(gbus_local_rready),
+    .d_arid(gbus_routed_arid), .d_araddr(gbus_routed_araddr), .d_arlen(gbus_routed_arlen),
+    .d_arsize(gbus_routed_arsize), .d_arburst(gbus_routed_arburst), .d_arlock(gbus_routed_arlock),
+    .d_arcache(gbus_routed_arcache), .d_arprot(gbus_routed_arprot), .d_arqos(gbus_routed_arqos),
+    .d_arvalid(gbus_routed_arvalid), .d_arready(gbus_routed_arready),
+    .d_rid(gbus_routed_rid), .d_rdata(gbus_routed_rdata), .d_rresp(gbus_routed_rresp),
+    .d_rlast(gbus_routed_rlast), .d_rvalid(gbus_routed_rvalid), .d_rready(gbus_routed_rready)
+  );
+
+  uvhs_gbus_c2h_dma #(
+      .AXIS_DATA_WIDTH(`CONFIG_DIFFTEST_HOST_AXIS_WIDTH)
+  ) U_GBUS_C2H_FIFO (
+    .clk(gbus_host_clk), .rstn(rstn_sw4),
+    .stream_rstn(difftest_c2h_rstn),
+    .s_tdata(difftest_to_host_axis_tdata), .s_tkeep(difftest_to_host_axis_tkeep),
+    .s_tlast(difftest_to_host_axis_tlast), .s_tvalid(difftest_to_host_axis_tvalid_io),
+    .s_tready(gbus_c2h_sready),
+    .cfg_wr_en(gbus_c2h_cfg_wr_en), .cfg_wr_addr(gbus_cfg_local_wr_addr),
+    .cfg_wdata(gbus_cfg_wdata), .cfg_rd_en(gbus_c2h_cfg_rd_en),
+    .cfg_rd_addr(gbus_cfg_local_rd_addr), .cfg_rdata(gbus_c2h_cfg_rdata),
+    .cfg_rdata_vld(gbus_c2h_cfg_rdata_vld),
+    .s_arid(gbus_local_arid), .s_araddr(gbus_local_araddr), .s_arlen(gbus_local_arlen),
+    .s_arsize(gbus_local_arsize), .s_arburst(gbus_local_arburst),
+    .s_arvalid(gbus_local_arvalid), .s_arready(gbus_local_arready),
+    .s_rid(gbus_local_rid), .s_rdata(gbus_local_rdata), .s_rresp(gbus_local_rresp),
+    .s_rlast(gbus_local_rlast), .s_rvalid(gbus_local_rvalid), .s_rready(gbus_local_rready)
+  );
+`else
   uvhs_gbus_c2h_fifo #(
       .AXIS_DATA_WIDTH(`CONFIG_DIFFTEST_HOST_AXIS_WIDTH)
   ) U_GBUS_C2H_FIFO (
@@ -161,6 +234,7 @@ module uvhs_gbus_host_wrapper (
     .cfg_rd_addr(gbus_cfg_local_rd_addr), .cfg_rdata(gbus_c2h_cfg_rdata),
     .cfg_rdata_vld(gbus_c2h_cfg_rdata_vld)
   );
+`endif
 
   uvhs_generalbd_axilite_bridge U_GBUS_CONFIG_BRIDGE (
     .clk(gbus_host_clk), .rstn(rstn_sw4),
@@ -229,11 +303,20 @@ module uvhs_gbus_host_wrapper (
     .s_wlast(gbus_axi_wlast), .s_wvalid(gbus_axi_wvalid),
     .s_wready(gbus_axi_wready), .s_bid(gbus_axi_bid),
     .s_bresp(gbus_axi_bresp), .s_bvalid(gbus_axi_bvalid),
-    .s_bready(gbus_axi_bready), .s_arid(gbus_axi_arid),
+    .s_bready(gbus_axi_bready),
+`ifdef UVHS_GBUS_C2H_DMA
+    .s_arid(gbus_routed_arid),
+    .s_arvalid(gbus_routed_arvalid), .s_arready(gbus_routed_arready),
+    .s_rid(gbus_routed_rid), .s_rdata(gbus_routed_rdata),
+    .s_rresp(gbus_routed_rresp), .s_rlast(gbus_routed_rlast),
+    .s_rvalid(gbus_routed_rvalid), .s_rready(gbus_routed_rready),
+`else
+    .s_arid(gbus_axi_arid),
     .s_arvalid(gbus_axi_arvalid), .s_arready(gbus_axi_arready),
     .s_rid(gbus_axi_rid), .s_rdata(gbus_axi_rdata),
     .s_rresp(gbus_axi_rresp), .s_rlast(gbus_axi_rlast),
     .s_rvalid(gbus_axi_rvalid), .s_rready(gbus_axi_rready),
+`endif
     .m_tvalid(gbus_h2c_axis_tvalid),
     .m_tdata(gbus_h2c_axis_tdata),
     .m_tkeep(gbus_h2c_axis_tkeep),

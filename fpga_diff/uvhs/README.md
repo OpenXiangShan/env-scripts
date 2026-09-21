@@ -35,6 +35,42 @@ GBS1 is a register-drained SRAM window. Backpressure reaches the DiffTest
 sender and pauses the CPU while the host transport clock continues to run.
 The matching fpga-host selects the same GBS1 register-window protocol.
 
+### C2H drain: SRAM window or DMA bank
+
+`GBUS_C2H` selects how the host drains the staged DiffTest output; both share
+the same producer, backpressure, and H2C path.
+
+| `GBUS_C2H` | RTL | Host drain |
+| --- | --- | --- |
+| `SRAM` (default) | `uvhs_gbus_c2h_fifo` (GBS1) | 32-bit register reads of the published window |
+| `DMA` | `uvhs_gbus_c2h_dma` (GBD1) + `uvhs_gbus_axi_read_router` | AXI3 burst reads of the 4 KiB aperture at `0x1000_0000` |
+
+The DMA build keeps the same GeneralBus AXI3 write path for H2C and routes the
+GeneralBus reads through the router: reads inside the aperture are served by the
+published GBD1 bank, and every other read still gets the H2C converter's DECERR
+response. `Makefile` maps `GBUS_C2H=DMA` to `UVHS_GBUS_C2H_DMA` in the UVHS file
+list, and the two builds are otherwise identical, so the same fpga-host can
+compare them: it reads the ID register at `0x1208` and picks the GBS1
+(`0x47425331`) or GBD1 (`0x47424431`) drain automatically.
+
+GBD1 registers, local offsets (the host adds its config base `0x1000`):
+
+| Local offset | Access | Meaning |
+| --- | --- | --- |
+| `0x1200` | R | status: present[31], frame error[30], protocol error[29], staged words[16:8], filling[7], FIFO data[6], frozen[5], AXI active[4] |
+| `0x1204` | W | `FILL=1`, `ACK=2`, clear protocol error `=4` |
+| `0x1208` | R | ID `0x47424431` (`GBD1`) |
+| `0x120c` | R | publication sequence |
+| `0x1210` | R | AXI aperture `0x1000_0000` |
+| `0x1214` | R | published capacity (1024 B) |
+| `0x1218` | R | last AXI read address |
+| `0x121c` | R | last AXI read `{id,burst,size,len}` |
+| `0x1220` | R | AXI read count |
+| `0x2000..0x23fc` | R | frozen 1 KiB bank (register-debug reads) |
+
+The host reads the bank with AXI3 bursts of at most 512 B and retries a bank
+that fails without an ACK, so a DMA build reports the same 768-byte ranges.
+
 GeneralBD local offsets are below; the host adds its config base (`0x1000`).
 
 | Local offset | GBS1 register |

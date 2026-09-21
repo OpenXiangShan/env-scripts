@@ -100,9 +100,18 @@ generate_uvhs_filelist() {
         rtl_flist_fail \
           "DIFFTEST_HOST_DEFINE=$host_define does not match DIFFTEST_HOSTIF=$hostif"
       printf '+define+%s\n' "$host_define"
+      c2h_define=${GBUS_C2H_DEFINE:-}
+      if [[ -n $c2h_define ]]; then
+        [[ $c2h_define == UVHS_GBUS_C2H_DMA ]] ||
+          rtl_flist_fail "GBUS_C2H_DEFINE must be UVHS_GBUS_C2H_DMA, got $c2h_define"
+        printf '+define+%s\n' "$c2h_define"
+      fi
     elif [[ -n $host_define ]]; then
       rtl_flist_fail \
         "DIFFTEST_HOST_DEFINE must be empty for DIFFTEST_HOSTIF=$hostif, got $host_define"
+    fi
+    if [[ $hostif != GBUS && -n ${GBUS_C2H_DEFINE:-} ]]; then
+      rtl_flist_fail "GBUS_C2H_DEFINE is only valid for DIFFTEST_HOSTIF=GBUS"
     fi
     printf '+define+DDR4_16G_X8\n+define+DQ64\n+define+DDR4_2400\n'
     printf '+define+DQ=64\n+define+MICRON_DDR\n+define+DDR4_16Gbx8\n'
@@ -156,6 +165,9 @@ generate_uvhs_filelist() {
     kmh|nutshell) required_modules=(SimTop) ;;
     nanhu) required_modules=(XlnFpgaTop) ;;
   esac
+  if [[ $hostif == GBUS && -n ${GBUS_C2H_DEFINE:-} ]]; then
+    required_modules+=(uvhs_gbus_c2h_dma uvhs_gbus_axi_read_router)
+  fi
   if [[ $hostif == GBUS ]]; then
     required_modules+=(
       uvhs_async_fifo
