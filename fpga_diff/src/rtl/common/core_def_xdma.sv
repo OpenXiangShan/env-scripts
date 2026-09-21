@@ -1393,32 +1393,25 @@ wire [0:0]    br2cfg_wvalid;
       .difftest_cfg_axilite_rready      (difftest_cfg_axilite_rready)
   );
 
-  assign data_cpu_bridge_m2s_awid = 14'b0;
-  assign data_cpu_bridge_m2s_awaddr = 36'b0;
-  assign data_cpu_bridge_m2s_awlen = 8'b0;
-  assign data_cpu_bridge_m2s_awsize = 3'b0;
-  assign data_cpu_bridge_m2s_awburst = 2'b0;
-  assign data_cpu_bridge_m2s_awlock = 1'b0;
-  assign data_cpu_bridge_m2s_awcache = 4'b0;
-  assign data_cpu_bridge_m2s_awprot = 3'b0;
-  assign data_cpu_bridge_m2s_awqos = 4'b0;
-  assign data_cpu_bridge_m2s_awvalid = 1'b0;
-  assign data_cpu_bridge_m2s_wdata = 256'b0;
-  assign data_cpu_bridge_m2s_wstrb = 32'b0;
-  assign data_cpu_bridge_m2s_wlast = 1'b0;
-  assign data_cpu_bridge_m2s_wvalid = 1'b0;
-  assign data_cpu_bridge_m2s_bready = 1'b0;
-  assign data_cpu_bridge_m2s_arid = 14'b0;
-  assign data_cpu_bridge_m2s_araddr = 36'b0;
-  assign data_cpu_bridge_m2s_arlen = 8'b0;
-  assign data_cpu_bridge_m2s_arsize = 3'b0;
-  assign data_cpu_bridge_m2s_arburst = 2'b0;
-  assign data_cpu_bridge_m2s_arlock = 1'b0;
-  assign data_cpu_bridge_m2s_arcache = 4'b0;
-  assign data_cpu_bridge_m2s_arprot = 3'b0;
-  assign data_cpu_bridge_m2s_arqos = 4'b0;
-  assign data_cpu_bridge_m2s_arvalid = 1'b0;
-  assign data_cpu_bridge_m2s_rready = 1'b0;
+  // data_bridge is XDMA-only, so nothing drives the shared master-side channel
+  // in this build.  Hold the whole generated DMA slave idle with one
+  // concatenated zero assignment instead of listing every AXI signal.
+  assign {
+      data_cpu_bridge_m2s_awid, data_cpu_bridge_m2s_awaddr,
+      data_cpu_bridge_m2s_awlen, data_cpu_bridge_m2s_awsize,
+      data_cpu_bridge_m2s_awburst, data_cpu_bridge_m2s_awlock,
+      data_cpu_bridge_m2s_awcache, data_cpu_bridge_m2s_awprot,
+      data_cpu_bridge_m2s_awqos, data_cpu_bridge_m2s_awvalid,
+      data_cpu_bridge_m2s_wdata, data_cpu_bridge_m2s_wstrb,
+      data_cpu_bridge_m2s_wlast, data_cpu_bridge_m2s_wvalid,
+      data_cpu_bridge_m2s_bready,
+      data_cpu_bridge_m2s_arid, data_cpu_bridge_m2s_araddr,
+      data_cpu_bridge_m2s_arlen, data_cpu_bridge_m2s_arsize,
+      data_cpu_bridge_m2s_arburst, data_cpu_bridge_m2s_arlock,
+      data_cpu_bridge_m2s_arcache, data_cpu_bridge_m2s_arprot,
+      data_cpu_bridge_m2s_arqos, data_cpu_bridge_m2s_arvalid,
+      data_cpu_bridge_m2s_rready
+  } = '0;
 `elsif DIFFTEST_HOST_XDMA
   wire [2:0] xdma_axil_awprot;
   wire [2:0] xdma_axil_arprot;
