@@ -52,7 +52,6 @@ DEFAULT_CLONE_DIR = "dingtalk_robot/xiangshan_monitor/repos"
 DEFAULT_REPORT_PATH = "dingtalk_robot/xiangshan_monitor/reports/{date}-{window}.json"
 DEFAULT_MESSAGE_PATH = "dingtalk_robot/xiangshan_monitor/reports/{date}-{window}.md"
 DEFAULT_GIT_TIMEOUT = 900.0
-DEFAULT_API_TIMEOUT = 90.0
 DEFAULT_CONTEXT_WINDOW_TOKENS = 120000
 DEFAULT_MAX_OUTPUT_TOKENS = 1800
 DEFAULT_MAX_API_CALLS = 1
@@ -87,9 +86,8 @@ GIFT_REASON_TEXT = {
     GIFT_KIND_COMMIT_PITY: "连续50个commit未中奖保底",
     GIFT_KIND_WEEKLY_PITY: "过去一周无人中奖，今日保底一份",
 }
-DEFAULT_ANALYSIS_START_TIME = "17:39"
-DEFAULT_DEBUG_SEND_TIME = "17:45"
-DEFAULT_RELEASE_SEND_TIME = "18:00"
+DEFAULT_ANALYSIS_START_TIME = "18:00"
+DEFAULT_RELEASE_SEND_TIME = "18:30"
 API_FAILURE_MESSAGE = "呜呜呜，API访问不通，我今天不知道该说什么了"
 _DINGTALK_LAYERS = frozenset({"debug", "release"})
 _REPOSITORY_NAME = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]*$")
@@ -1484,15 +1482,19 @@ def local_api_settings(config: Mapping[str, Any], data: Mapping[str, Any]) -> Di
     context_tokens = ai.get("context_window_tokens", DEFAULT_CONTEXT_WINDOW_TOKENS)
     max_output = ai.get("max_output_tokens", DEFAULT_MAX_OUTPUT_TOKENS)
     map_output = ai.get("map_max_output_tokens", min(max_output, 800))
-    timeout = ai.get("timeout_seconds", DEFAULT_API_TIMEOUT)
+    timeout = ai.get("timeout_seconds")
     max_api_calls = ai.get("max_api_calls", DEFAULT_MAX_API_CALLS)
     reasoning_effort = ai.get("reasoning_effort", DEFAULT_REASONING_EFFORT)
     store = ai.get("store", False)
     http_headers = ai.get("http_headers", {})
     if any(isinstance(value, bool) or not isinstance(value, int) or value <= 0 for value in (context_tokens, max_output, map_output, max_api_calls)):
         raise ConfigError("repositories.json.ai token/call limits must be positive integers")
-    if isinstance(timeout, bool) or not isinstance(timeout, (int, float)) or timeout <= 0:
-        raise ConfigError("repositories.json.ai.timeout_seconds must be positive")
+    if timeout is None:
+        parsed_timeout = None
+    elif isinstance(timeout, bool) or not isinstance(timeout, (int, float)) or timeout <= 0:
+        raise ConfigError("repositories.json.ai.timeout_seconds must be a positive number when set")
+    else:
+        parsed_timeout = float(timeout)
     if reasoning_effort is not None and (not isinstance(reasoning_effort, str) or not reasoning_effort.strip()):
         raise ConfigError("repositories.json.ai.reasoning_effort must be a non-empty string when set")
     if not isinstance(store, bool):
@@ -1510,7 +1512,7 @@ def local_api_settings(config: Mapping[str, Any], data: Mapping[str, Any]) -> Di
         endpoint = base if base.endswith("/chat/completions") else f"{base}/chat/completions"
     else:
         raise ConfigError("repositories.json.ai.wire_api must be responses or chat_completions")
-    return {"api_key": api_key, "endpoint": endpoint, "model": model.strip(), "wire_api": wire, "context_window_tokens": context_tokens, "max_output_tokens": max_output, "map_max_output_tokens": map_output, "timeout": float(timeout), "max_api_calls": max_api_calls, "reasoning_effort": reasoning_effort.strip() if reasoning_effort else None, "store": store, "proxy": "", "http_headers": {key.strip(): value for key, value in http_headers.items()}}
+    return {"api_key": api_key, "endpoint": endpoint, "model": model.strip(), "wire_api": wire, "context_window_tokens": context_tokens, "max_output_tokens": max_output, "map_max_output_tokens": map_output, "timeout": parsed_timeout, "max_api_calls": max_api_calls, "reasoning_effort": reasoning_effort.strip() if reasoning_effort else None, "store": store, "proxy": "", "http_headers": {key.strip(): value for key, value in http_headers.items()}}
 
 
 def _prompt_path(data: Mapping[str, Any], root_dir: Union[Path, str]) -> Path:
@@ -1550,6 +1552,67 @@ def estimate_tokens(text: str) -> int:
     return max(1, math.ceil(len(text.encode("utf-8")) / 3))
 
 
+def _content_text(value: Any) -> str:
+    if isinstance(value, str):
+        return value.strip()
+    if not isinstance(value, list):
+        return ""
+    parts: List[str] = []
+    for part in value:
+        if isinstance(part, str) and part.strip():
+            parts.append(part.strip())
+        elif isinstance(part, dict):
+            text = part.get("text")
+            if isinstance(text, str) and text.strip():
+                parts.append(text.strip())
+    return "\n".join(parts).strip()
+
+
+def _choice_payload(result: Mapping[str, Any]) -> Tuple[Optional[Mapping[str, Any]], Optional[Mapping[str, Any]]]:
+    choices = result.get("choices")
+    if not isinstance(choices, list) or not choices or not isinstance(choices[0], dict):
+        return None, None
+    choice = choices[0]
+    message = choice.get("message", choice)
+    return choice, message if isinstance(message, dict) else None
+
+
+def _reasoning_char_count(message: Optional[Mapping[str, Any]]) -> int:
+    if not message:
+        return 0
+    reasoning = message.get("reasoning_content")
+    if reasoning is None:
+        reasoning = message.get("reasoning")
+    if isinstance(reasoning, str):
+        return len(reasoning)
+    if isinstance(reasoning, dict) and isinstance(reasoning.get("content"), str):
+        return len(reasoning["content"])
+    return 0
+
+
+def _usage_summary(usage: Any) -> str:
+    if not isinstance(usage, dict):
+        return ""
+    parts: List[str] = []
+    for key in ("prompt_tokens", "completion_tokens", "total_tokens"):
+        if key in usage:
+            parts.append(f"{key}={usage[key]}")
+    details = usage.get("completion_tokens_details")
+    if isinstance(details, dict) and "reasoning_tokens" in details:
+        parts.append(f"reasoning_tokens={details['reasoning_tokens']}")
+    return ", ".join(parts)
+
+
+def _empty_api_text_error(result: Mapping[str, Any]) -> str:
+    choice, message = _choice_payload(result)
+    finish_reason = choice.get("finish_reason") if choice else result.get("finish_reason")
+    usage = _usage_summary(result.get("usage"))
+    details = [f"finish_reason={finish_reason!r}", f"reasoning_chars={_reasoning_char_count(message)}"]
+    if usage:
+        details.append(usage)
+    return "Local AI API response did not contain message text (" + ", ".join(details) + ")"
+
+
 def _response_text(result: Mapping[str, Any]) -> str:
     direct = result.get("output_text")
     if isinstance(direct, str) and direct.strip():
@@ -1560,20 +1623,17 @@ def _response_text(result: Mapping[str, Any]) -> str:
         for item in output:
             if not isinstance(item, dict):
                 continue
-            content = item.get("content")
-            if isinstance(content, str):
+            content = _content_text(item.get("content"))
+            if content:
                 chunks.append(content)
-            elif isinstance(content, list):
-                chunks.extend(part["text"] for part in content if isinstance(part, dict) and isinstance(part.get("text"), str))
             elif isinstance(item.get("text"), str):
                 chunks.append(item["text"])
     if chunks:
         return "\n".join(chunk.strip() for chunk in chunks if chunk.strip()).strip()
-    choices = result.get("choices")
-    if isinstance(choices, list) and choices and isinstance(choices[0], dict):
-        message = choices[0].get("message", choices[0])
-        if isinstance(message, dict) and isinstance(message.get("content"), str):
-            return message["content"].strip()
+    _, message = _choice_payload(result)
+    if message:
+        # Visible answer only. reasoning_content is CoT and must not be posted.
+        return _content_text(message.get("content"))
     return ""
 
 
@@ -1585,9 +1645,9 @@ def _call_local_api(prompt: str, api: Mapping[str, Any], opener: Any, max_output
         payload = {
             "model": api["model"],
             "messages": [{"role": "user", "content": prompt}],
-            # DeepSeek thinking tokens also count against max_tokens. Leave
-            # headroom so the final answer is not truncated after xhigh thinking.
-            "max_tokens": max(output_tokens, 8192),
+            # DeepSeek thinking counts against max_tokens. Omit the field so
+            # the API uses its thinking default (64K; 128K when effort is max)
+            # instead of truncating CoT before any visible answer.
             "thinking": {"type": "enabled"},
             "reasoning_effort": api.get("reasoning_effort") or DEFAULT_REASONING_EFFORT,
         }
@@ -1608,7 +1668,7 @@ def _call_local_api(prompt: str, api: Mapping[str, Any], opener: Any, max_output
     headers.update(api.get("http_headers", {}))
     request = urllib.request.Request(api["endpoint"], data=json.dumps(payload, ensure_ascii=False).encode("utf-8"), headers=headers, method="POST")
     try:
-        with opener.open(request, timeout=api["timeout"]) as response:
+        with opener.open(request, timeout=api.get("timeout")) as response:
             result = json.loads(response.read().decode("utf-8"))
     except urllib.error.HTTPError as exc:
         raise LocalAPIError(f"Local AI API HTTP error {exc.code}: {exc.read().decode('utf-8', errors='replace')}") from exc
@@ -1620,7 +1680,7 @@ def _call_local_api(prompt: str, api: Mapping[str, Any], opener: Any, max_output
         raise LocalAPIError("Local AI API returned an unexpected JSON value")
     text = _response_text(result)
     if not text:
-        raise LocalAPIError("Local AI API response did not contain message text")
+        raise LocalAPIError(_empty_api_text_error(result))
     return text
 
 
@@ -1861,15 +1921,24 @@ def _configured_path(data: Mapping[str, Any], key: str, default: Path, root: Pat
     return path if path.is_absolute() else root / path
 
 
-def _delivery_times(data: Mapping[str, Any]) -> Tuple[str, str]:
+def _optional_schedule(value: Any) -> Optional[str]:
+    if value is None:
+        return None
+    text = str(value).strip()
+    if not text or text.lower() in {"immediate", "now"}:
+        return None
+    _parse_schedule(text)
+    return text
+
+
+def _delivery_times(data: Mapping[str, Any]) -> Tuple[Optional[str], str]:
     delivery = data.get("scheduled_delivery", {})
     if not isinstance(delivery, Mapping):
         raise ConfigError("repositories.json.scheduled_delivery must be an object")
-    debug_time = str(delivery.get("debug_time", DEFAULT_DEBUG_SEND_TIME))
+    debug_time = _optional_schedule(delivery.get("debug_time"))
     release_time = str(delivery.get("release_time", DEFAULT_RELEASE_SEND_TIME))
-    debug_parts = _parse_schedule(debug_time)
     release_parts = _parse_schedule(release_time)
-    if release_parts <= debug_parts:
+    if debug_time is not None and release_parts <= _parse_schedule(debug_time):
         raise ConfigError("scheduled_delivery.release_time must be later than debug_time")
     return debug_time, release_time
 
@@ -1880,9 +1949,11 @@ def _analysis_start_time(data: Mapping[str, Any]) -> str:
         raise ConfigError("repositories.json.scheduled_delivery must be an object")
     value = str(delivery.get("analysis_start_time", DEFAULT_ANALYSIS_START_TIME))
     start = _parse_schedule(value)
-    debug, _ = _delivery_times(data)
-    if start >= _parse_schedule(debug):
+    debug_time, release_time = _delivery_times(data)
+    if debug_time is not None and start >= _parse_schedule(debug_time):
         raise ConfigError("scheduled_delivery.analysis_start_time must be earlier than debug_time")
+    if start >= _parse_schedule(release_time):
+        raise ConfigError("scheduled_delivery.analysis_start_time must be earlier than release_time")
     return value
 
 
@@ -2195,14 +2266,16 @@ def run_workday_delivery(
     debug_time, release_time = _delivery_times(data)
     analysis_start_time = _analysis_start_time(data)
     analysis_end = current if debug_now else _scheduled_datetime(today, analysis_start_time, timezone_name)
-    debug_at = _scheduled_datetime(today, debug_time, timezone_name)
+    start_deadline = _scheduled_datetime(today, debug_time or release_time, timezone_name)
     history_path = _configured_path(data, "delivery_history", DEFAULT_DELIVERY_HISTORY, root)
     history = load_delivery_history(history_path, timezone_name)
     ensure_gift_inventory(history, gift_settings(config))
     window = _history_window(today, analysis_end, timezone_name, calendar, history, window_spec)
 
     if dry_run:
-        delivery_plan = "debug immediately (release skipped)" if debug_now else f"debug {debug_time}, release {release_time}"
+        delivery_plan = "debug immediately (release skipped)" if debug_now else (
+            f"debug immediately, release {release_time}" if debug_time is None else f"debug {debug_time}, release {release_time}"
+        )
         print(
             f"Dry run: {today.isoformat()} is a send day; no Git, AI, or DingTalk request was made. "
             f"Planned window: {window.start.isoformat()} to {window.end.isoformat()}; "
@@ -2210,10 +2283,11 @@ def run_workday_delivery(
         )
         return
 
-    if not debug_now and (current < analysis_end or current >= debug_at):
+    if not debug_now and (current < analysis_end or current >= start_deadline):
+        window_end = debug_time or release_time
         print(
             f"{current.isoformat(timespec='seconds')} is outside the permitted analysis start window "
-            f"[{analysis_start_time}, {debug_time}); no Git, AI, or DingTalk request was made"
+            f"[{analysis_start_time}, {window_end}); no Git, AI, or DingTalk request was made"
         )
         return
 
@@ -2254,7 +2328,7 @@ def run_workday_delivery(
             history["next_window_start"] = window.start.isoformat()
         write_delivery_history(history, history_path)
         warning = _pull_failure_message(failures)
-        if not debug_now:
+        if not debug_now and debug_time is not None:
             _wait_until_today(debug_time, timezone_name, today)
         try:
             push(warning, config, section="xiangshan_monitor", layer="debug", use_proxy=bool(data.get("dingtalk_use_proxy", False)))
@@ -2283,7 +2357,7 @@ def run_workday_delivery(
             history["next_window_start"] = window.start.isoformat()
         write_delivery_history(history, history_path)
         warning = _metadata_failure_message(exc)
-        if not debug_now:
+        if not debug_now and debug_time is not None:
             _wait_until_today(debug_time, timezone_name, today)
         try:
             push(warning, config, section="xiangshan_monitor", layer="debug", use_proxy=bool(data.get("dingtalk_use_proxy", False)))
@@ -2327,7 +2401,7 @@ def run_workday_delivery(
     if debug_now:
         attempt["release_status"] = "skipped_debug_only"
     for layer, schedule in deliveries:
-        if not debug_now:
+        if not debug_now and schedule:
             _wait_until_today(schedule, timezone_name, today)
         try:
             push(message, config, section="xiangshan_monitor", layer=layer, use_proxy=use_proxy)
