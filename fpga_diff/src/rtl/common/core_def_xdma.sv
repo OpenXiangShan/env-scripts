@@ -1236,27 +1236,6 @@ wire [0:0]    br2cfg_wvalid;
   wire        difftest_cfg_axilite_rvalid;
   wire        difftest_cfg_axilite_rready;
 
-`ifdef DIFFTEST_HOST_GBUS
-  wire [31:0] XDMA_AXI_LITE_awaddr;
-  wire [2:0]  XDMA_AXI_LITE_awprot;
-  wire        XDMA_AXI_LITE_awvalid;
-  wire        XDMA_AXI_LITE_awready;
-  wire [31:0] XDMA_AXI_LITE_wdata;
-  wire [3:0]  XDMA_AXI_LITE_wstrb;
-  wire        XDMA_AXI_LITE_wvalid;
-  wire        XDMA_AXI_LITE_wready;
-  wire [1:0]  XDMA_AXI_LITE_bresp;
-  wire        XDMA_AXI_LITE_bvalid;
-  wire        XDMA_AXI_LITE_bready;
-  wire [31:0] XDMA_AXI_LITE_araddr;
-  wire [2:0]  XDMA_AXI_LITE_arprot;
-  wire        XDMA_AXI_LITE_arvalid;
-  wire        XDMA_AXI_LITE_arready;
-  wire [31:0] XDMA_AXI_LITE_rdata;
-  wire [1:0]  XDMA_AXI_LITE_rresp;
-  wire        XDMA_AXI_LITE_rvalid;
-  wire        XDMA_AXI_LITE_rready;
-`endif
 
   wire        difftest_to_host_axis_tready_io;
   wire        difftest_to_host_axis_tvalid_io;
@@ -2077,9 +2056,6 @@ AXI_bridge CFG_AXI_bridge_i
         );
 
 `ifndef NO_DIFF
-`ifdef DIFFTEST_HOST_GBUS
-  // GBus leaves dma_core_* idle and does not instantiate data_bridge.
-`elsif DIFFTEST_HOST_XDMA
   data_bridge data_bridge_i
        (.ACLK                   (axi_bus_clk),
         .ARESETN                (axi_bclk_sync_rstn),
@@ -2202,7 +2178,6 @@ AXI_bridge CFG_AXI_bridge_i
         .S01_AXI_wready         (gmac_m_wready),
         .S01_AXI_wstrb          (gmac_m_wstrb),
         .S01_AXI_wvalid         (gmac_m_wvalid));
-`endif
 `endif
 
 

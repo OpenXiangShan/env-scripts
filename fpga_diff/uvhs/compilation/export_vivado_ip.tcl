@@ -317,17 +317,19 @@ proc export_bd_ip {name script out_file jobs force} {
     verify_checkpoint "BD $name" $out_file
 }
 
+# data_bridge is instantiated in every DiffTest build, so it is exported for
+# both host modes.  Only the physical XDMA endpoint is host-mode specific.
 set exports [list \
     [list xci blk_mem_gen_0 [file join $tcl_dir blk_mem_gen_0.tcl] [file join $out_dir rtl soc blk_mem_gen_0.dcp]] \
     [list bd  AXI_bridge    [file join $tcl_dir AXI_bridge.tcl]    [file join $out_dir rtl soc AXI_bridge.dcp]] \
+    [list bd data_bridge [file join $tcl_dir data_bridge.tcl] \
+        [file join $out_dir rtl soc data_bridge.dcp]] \
 ]
 if {$hostif eq "XDMA"} {
-    lappend exports [list bd data_bridge [file join $tcl_dir data_bridge.tcl] \
-        [file join $out_dir rtl soc data_bridge.dcp]]
     lappend exports [list bd xdma_ep [file join $tcl_dir xdma_ep.tcl] \
         [file join $out_dir rtl device pcie xdma_ep.dcp]]
 } else {
-    puts "INFO: skip data_bridge and xdma_ep export for DiffTest host interface $hostif"
+    puts "INFO: skip xdma_ep export for DiffTest host interface $hostif"
 }
 
 set failed_exports [list]

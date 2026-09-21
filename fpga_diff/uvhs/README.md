@@ -95,10 +95,11 @@ the runtime database.
 `uvhs_project` performs these steps:
 
 1. Copies the vendor board template into an isolated work directory.
-2. Prepares repository-owned Vivado IP. XDMA still exports `data_bridge` and
-   `xdma_ep`. GBus instead generates the 256-bit GeneralBus and GeneralBD
-   checkpoints from the local UVHS installation, while XDMA keeps the existing
-   64-bit GeneralBus used by the UVHS flash path.
+2. Prepares repository-owned Vivado IP. `data_bridge` is instantiated in every
+   DiffTest build and is always exported; only `xdma_ep` is XDMA-specific. GBus
+   instead generates the 256-bit GeneralBus and GeneralBD checkpoints from the
+   local UVHS installation, while XDMA keeps the existing 64-bit GeneralBus used
+   by the UVHS flash path.
 3. Imports the selected DDR DCP and validates its AXI width.
 4. Builds the complete RTL file list and checks the expected top module.
 
@@ -460,7 +461,7 @@ before the UVHS timing worker reads it.
 | `../tools/update_core_flist.sh` | Shared Vivado/UVHS RTL file-list entry point. GBus adds `uvhs/common`. |
 | `common/` | Owned GBus RTL: Gray-pointer async FIFO, AXI-to-AXIS, C2H SRAM FIFO, host/CPU AXIS CDC, AXI-Lite CDC, and GeneralBD bridge. |
 | `../tools/rtl_filelist_lib.sh` | Nested file-list parsing and path resolution. |
-| `../src/tcl/common/{blk_mem_gen_0,AXI_bridge,data_bridge,xdma_ep}.tcl` | Shared Vivado IP/BD generators used by UVHS IP export and Vivado project creation. XDMA exports `data_bridge`/`xdma_ep`; GBus skips them. |
+| `../src/tcl/common/{blk_mem_gen_0,AXI_bridge,data_bridge,xdma_ep}.tcl` | Shared Vivado IP/BD generators used by UVHS IP export and Vivado project creation. `data_bridge` is exported for both host modes; only `xdma_ep` is XDMA-specific. |
 | `compilation/flow_common.tcl` | Shared UVHS path, environment, and source helpers. |
 | `compilation/frontend_run.tcl` | RTL/IP import, elaboration, and uvsyn frontend. |
 | `compilation/backend_run.tcl` | Fill-rate setup, partition, routing, PnR, and database commit. |

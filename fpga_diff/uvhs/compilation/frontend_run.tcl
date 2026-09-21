@@ -124,8 +124,10 @@ foreach reset_port {rstn_sw6 rstn_sw5 rstn_sw4} {
 
 uvhs::import_blackbox blk_mem_gen_0 ./rtl/soc/blk_mem_gen_0.dcp
 uvhs::import_blackbox AXI_bridge ./rtl/soc/AXI_bridge.dcp
+# data_bridge is instantiated in every DiffTest build; only the physical XDMA
+# endpoint depends on the host mode.
+uvhs::import_blackbox data_bridge ./rtl/soc/data_bridge.dcp
 if {[string toupper [uvhs::env_or_default DIFFTEST_HOSTIF XDMA]] eq "XDMA"} {
-    uvhs::import_blackbox data_bridge ./rtl/soc/data_bridge.dcp
     uvhs::import_blackbox xdma_ep ./rtl/device/pcie/xdma_ep.dcp
 } else {
     # GeneralBD must be registered as a UVHS general-bus endpoint. Use the
@@ -133,7 +135,7 @@ if {[string toupper [uvhs::env_or_default DIFFTEST_HOSTIF XDMA]] eq "XDMA"} {
     # metadata.
     uvhs::import_blackbox generalBD ./rtl/soc/generalBD.dcp \
         -clock_enable_pairs {i_clk i_clk_en 1} -generalbd
-    puts "INFO: skip data_bridge and xdma_ep blackbox import for DiffTest host interface [uvhs::env_or_default DIFFTEST_HOSTIF XDMA]"
+    puts "INFO: skip xdma_ep blackbox import for DiffTest host interface [uvhs::env_or_default DIFFTEST_HOSTIF XDMA]"
 }
 uvhs::import_blackbox uvw_general_bus \
     ./rtl/soc/uvw_general_bus/uvw_general_bus.dcp \
