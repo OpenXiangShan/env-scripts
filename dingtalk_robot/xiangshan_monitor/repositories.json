@@ -25,9 +25,8 @@
   "delivery_history": "dingtalk_robot/xiangshan_monitor/delivery_history.json",
   "gift_history": "dingtalk_robot/xiangshan_monitor/gift_history.json",
   "scheduled_delivery": {
-    "analysis_start_time": "17:39",
-    "debug_time": "17:45",
-    "release_time": "18:00"
+    "analysis_start_time": "18:00",
+    "release_time": "18:30"
   },
   "analysis_window": "24h",
   "highlight_count": null,
@@ -43,7 +42,6 @@
     "model": "deepseek-flash",
     "context_window_tokens": 1000000,
     "max_api_calls": 32,
-    "timeout_seconds": 300,
     "max_output_tokens": 1800,
     "reasoning_effort": "xhigh",
     "store": false

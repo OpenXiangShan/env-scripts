@@ -156,6 +156,9 @@ key and both layered DingTalk credentials belong in the ignored
 `config.json`; all are required and there is no `.codex` or public OpenAI
 fallback. The DeepSeek chat-completions endpoint is always reached directly
 and never reuses `github.proxy` or process proxy environment variables.
+Chat requests enable thinking and omit `max_tokens`, so DeepSeek uses its
+thinking-mode default (64K) instead of truncating the chain of thought.
+The client does not set an HTTP timeout for that call.
 
 Run the complete job once, which is suitable for cron or a systemd timer:
 
@@ -167,11 +170,12 @@ The installed workday delivery mode resumes from the analysis cutoff of the
 last successful release, stored in the ignored local
 `xiangshan_monitor/delivery_history.json`. A failed day therefore remains in
 the next successful report instead of creating a gap. It reuses the same
-generated message for both robots: debug at 17:45 and release at 18:00.
+generated message for both robots: debug as soon as generation finishes,
+then release at 18:30.
 It reads `xiangshan_monitor/workdays.json` before doing any repository or AI
 work, so normal weekends and official holidays are skipped while official
-makeup workdays are included. It accepts scheduled starts only from 17:39 up
-to 17:45, so starting the delivery entry point at another time makes no Git,
+makeup workdays are included. It accepts scheduled starts only from 18:00 up
+to 18:30, so starting the delivery entry point at another time makes no Git,
 GitHub, AI, or DingTalk request. If any repository pull or Stars lookup fails,
 AI is not called, release is skipped, and only debug receives an error. A
 successful release advances the local cutoff and saves all repositories'

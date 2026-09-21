@@ -12,6 +12,7 @@ from dingtalk_robot.xiangshan_monitor.xiangshan_monitor import (
     GIFT_KIND_HIGHLIGHT_PITY,
     GIFT_KIND_MID_AUTUMN,
     GIFT_KIND_WEEKLY_PITY,
+    LocalAPIError,
     RANDOM_GIFT_DENOMINATOR,
     RepositorySpec,
     apply_gift_result,
@@ -27,7 +28,9 @@ from dingtalk_robot.xiangshan_monitor.xiangshan_monitor import (
     resolve_gift_awards,
     talk,
     _analysis_start_time,
+    _call_local_api,
     _delivery_times,
+    _response_text,
 )
 
 
@@ -207,12 +210,12 @@ class XiangShanGiftPityTest(unittest.TestCase):
             result = resolve_gift_awards(report, [_person()], history, 1, settings)
         self.assertEqual(result["awards"][0]["kind"], GIFT_KIND_HIGHLIGHT_PITY)
 
-    def test_workday_debug_moves_to_1745(self):
+    def test_workday_schedule_starts_at_1800(self):
         data = load_repository_data()
         debug_time, release_time = _delivery_times(data)
-        self.assertEqual(debug_time, "17:45")
-        self.assertEqual(release_time, "18:00")
-        self.assertEqual(_analysis_start_time(data), "17:39")
+        self.assertIsNone(debug_time)
+        self.assertEqual(release_time, "18:30")
+        self.assertEqual(_analysis_start_time(data), "18:00")
 
     def test_extract_highlights_from_structured_block(self):
         report = _gift_report(commits=[_commit("Alice", "alice@example.com", "1" * 40)])
@@ -541,6 +544,99 @@ class XiangShanGiftPityTest(unittest.TestCase):
             }]
         })
         self.assertIn("中秋礼物：Alice", text)
+
+
+class _FakeAPIResponse:
+    def __init__(self, payload):
+        self._payload = payload
+
+    def read(self):
+        return json.dumps(self._payload).encode("utf-8")
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, exc_type, exc, tb):
+        return False
+
+
+class _CapturingOpener:
+    def __init__(self, payload):
+        self.payload = payload
+        self.body = None
+
+    def open(self, request, timeout=None):
+        self.body = json.loads(request.data.decode("utf-8"))
+        self.timeout = timeout
+        return _FakeAPIResponse(self.payload)
+
+
+def _chat_api():
+    return {
+        "model": "deepseek-flash",
+        "wire_api": "chat_completions",
+        "endpoint": "http://example.invalid/v1/chat/completions",
+        "api_key": "x",
+        "max_output_tokens": 1800,
+        "context_window_tokens": 100000,
+        "timeout": None,
+        "store": False,
+        "reasoning_effort": "xhigh",
+        "http_headers": {},
+    }
+
+
+class XiangShanMonitorAPITest(unittest.TestCase):
+    def test_chat_completions_omits_max_tokens(self):
+        opener = _CapturingOpener({
+            "choices": [{"message": {"content": "hello"}, "finish_reason": "stop"}]
+        })
+        text = _call_local_api("prompt", _chat_api(), opener)
+        self.assertEqual(text, "hello")
+        self.assertNotIn("max_tokens", opener.body)
+        self.assertIsNone(opener.timeout)
+        self.assertEqual(opener.body["thinking"], {"type": "enabled"})
+        self.assertEqual(opener.body["reasoning_effort"], "xhigh")
+
+    def test_response_text_keeps_visible_answer_only(self):
+        self.assertEqual(
+            _response_text({
+                "choices": [{
+                    "message": {"content": None, "reasoning_content": "long chain of thought"},
+                    "finish_reason": "length",
+                }]
+            }),
+            "",
+        )
+        self.assertEqual(
+            _response_text({
+                "choices": [{
+                    "message": {"content": [{"type": "text", "text": "  可见回复  "}]},
+                    "finish_reason": "stop",
+                }]
+            }),
+            "可见回复",
+        )
+
+    def test_empty_content_error_includes_finish_reason(self):
+        opener = _CapturingOpener({
+            "choices": [{
+                "message": {"content": None, "reasoning_content": "abcd"},
+                "finish_reason": "length",
+            }],
+            "usage": {
+                "prompt_tokens": 10,
+                "completion_tokens": 8192,
+                "total_tokens": 8202,
+                "completion_tokens_details": {"reasoning_tokens": 8192},
+            },
+        })
+        with self.assertRaises(LocalAPIError) as ctx:
+            _call_local_api("prompt", _chat_api(), opener)
+        message = str(ctx.exception)
+        self.assertIn("finish_reason='length'", message)
+        self.assertIn("reasoning_chars=4", message)
+        self.assertIn("reasoning_tokens=8192", message)
 
 
 if __name__ == "__main__":
