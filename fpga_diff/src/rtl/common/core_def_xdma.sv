@@ -1216,25 +1216,26 @@ wire [7:0]    br2cfg_wstrb;
 wire [0:0]    br2cfg_wvalid;
 
 `ifndef NO_DIFF
-  wire [31:0] XDMA_AXI_LITE_awaddr;
-  wire [2:0]  XDMA_AXI_LITE_awprot;
-  wire        XDMA_AXI_LITE_awvalid;
-  wire        XDMA_AXI_LITE_awready;
-  wire [31:0] XDMA_AXI_LITE_wdata;
-  wire [3:0]  XDMA_AXI_LITE_wstrb;
-  wire        XDMA_AXI_LITE_wvalid;
-  wire        XDMA_AXI_LITE_wready;
-  wire [1:0]  XDMA_AXI_LITE_bresp;
-  wire        XDMA_AXI_LITE_bvalid;
-  wire        XDMA_AXI_LITE_bready;
-  wire [31:0] XDMA_AXI_LITE_araddr;
-  wire [2:0]  XDMA_AXI_LITE_arprot;
-  wire        XDMA_AXI_LITE_arvalid;
-  wire        XDMA_AXI_LITE_arready;
-  wire [31:0] XDMA_AXI_LITE_rdata;
-  wire [1:0]  XDMA_AXI_LITE_rresp;
-  wire        XDMA_AXI_LITE_rvalid;
-  wire        XDMA_AXI_LITE_rready;
+  // CPU-side DiffTest AXI-Lite.  XDMA drives it directly; GBus crosses from
+  // the host-clock XDMA_AXI_LITE wires below.
+  wire [31:0] difftest_cfg_axilite_awaddr;
+  wire        difftest_cfg_axilite_awvalid;
+  wire        difftest_cfg_axilite_awready;
+  wire [31:0] difftest_cfg_axilite_wdata;
+  wire [3:0]  difftest_cfg_axilite_wstrb;
+  wire        difftest_cfg_axilite_wvalid;
+  wire        difftest_cfg_axilite_wready;
+  wire [1:0]  difftest_cfg_axilite_bresp;
+  wire        difftest_cfg_axilite_bvalid;
+  wire        difftest_cfg_axilite_bready;
+  wire [31:0] difftest_cfg_axilite_araddr;
+  wire        difftest_cfg_axilite_arvalid;
+  wire        difftest_cfg_axilite_arready;
+  wire [31:0] difftest_cfg_axilite_rdata;
+  wire [1:0]  difftest_cfg_axilite_rresp;
+  wire        difftest_cfg_axilite_rvalid;
+  wire        difftest_cfg_axilite_rready;
+
 
   wire        difftest_to_host_axis_tready_io;
   wire        difftest_to_host_axis_tvalid_io;
@@ -1268,6 +1269,14 @@ wire [0:0]    br2cfg_wvalid;
   reg difftest_stream_enable_pcie;
 
   wire difftest_pcie_clock;
+`ifdef DIFFTEST_HOST_GBUS
+  // GBus has no XDMA user-clock output.  The DiffTest host-side protocol and
+  // the UVHS GeneralBD/GENERALBUS endpoints are synchronous to the always-on
+  // GBus host/user interface clock: use the real always-running UVHS host
+  // clock (dev_clk_i/clk6_p), not the gated CPU clock or infer_clock output.
+  wire gbus_host_clk = dev_clk_i;
+  assign difftest_pcie_clock = gbus_host_clk;
+`endif
   assign sys_rstn_io = sys_rstn & ~io_host_reset;
   assign cpu_rstn_io = cpu_rstn & ~io_host_reset;
   assign difftest_clock_gate_enable =
@@ -1310,9 +1319,63 @@ wire [0:0]    br2cfg_wvalid;
       end
   end
 
+`ifdef DIFFTEST_HOST_GBUS
+  // GBus C2H has a real CPU-to-host async FIFO.  Do not combinationally AND
+  // the host-clock stream enable onto the CPU-clock AXIS handshake.
+  assign difftest_to_host_axis_tready = difftest_to_host_axis_tready_io;
+  assign difftest_to_host_axis_tvalid_io = difftest_to_host_axis_tvalid;
+`else
   assign difftest_to_host_axis_tready = difftest_to_host_axis_tready_io & difftest_stream_enable_pcie;
   assign difftest_to_host_axis_tvalid_io = difftest_to_host_axis_tvalid & difftest_stream_enable_pcie;
+`endif
 
+`ifdef DIFFTEST_HOST_GBUS
+  // Optional GBus host interface.  The GBus protocol implementation lives in
+  // uvhs/common/uvhs_gbus_host_wrapper.sv and is instantiated here so the
+  // shared core keeps one DiffTest host instance for every CPU family.  XDMA
+  // and GBus stay compile-time exclusive owners of their inbound masters.
+  uvhs_gbus_host_wrapper U_GBUS_HOST (
+      .sys_clk_i                        (sys_clk_i),
+      .sys_rstn                         (sys_rstn),
+      .gbus_host_clk                    (gbus_host_clk),
+      .rstn_sw4                         (rstn_sw4),
+      .inter_soc_clk                    (inter_soc_clk),
+      .inter_soc_sync_rstn              (inter_soc_sync_rstn),
+      .cpu_rstn_pcie                    (cpu_rstn_pcie),
+      .difftest_stream_enable_pcie      (difftest_stream_enable_pcie),
+      .difftest_to_host_axis_tvalid_io  (difftest_to_host_axis_tvalid_io),
+      .difftest_to_host_axis_tdata      (difftest_to_host_axis_tdata),
+      .difftest_to_host_axis_tkeep      (difftest_to_host_axis_tkeep),
+      .difftest_to_host_axis_tlast      (difftest_to_host_axis_tlast),
+      .difftest_to_host_axis_tready_io  (difftest_to_host_axis_tready_io),
+      .difftest_from_host_axis_tready   (difftest_from_host_axis_tready),
+      .difftest_from_host_axis_tvalid   (difftest_from_host_axis_tvalid),
+      .difftest_from_host_axis_tdata    (difftest_from_host_axis_tdata),
+      .difftest_from_host_axis_tkeep    (difftest_from_host_axis_tkeep),
+      .difftest_from_host_axis_tlast    (difftest_from_host_axis_tlast),
+      .difftest_cfg_axilite_awaddr      (difftest_cfg_axilite_awaddr),
+      .difftest_cfg_axilite_awvalid     (difftest_cfg_axilite_awvalid),
+      .difftest_cfg_axilite_awready     (difftest_cfg_axilite_awready),
+      .difftest_cfg_axilite_wdata       (difftest_cfg_axilite_wdata),
+      .difftest_cfg_axilite_wstrb       (difftest_cfg_axilite_wstrb),
+      .difftest_cfg_axilite_wvalid      (difftest_cfg_axilite_wvalid),
+      .difftest_cfg_axilite_wready      (difftest_cfg_axilite_wready),
+      .difftest_cfg_axilite_bresp       (difftest_cfg_axilite_bresp),
+      .difftest_cfg_axilite_bvalid      (difftest_cfg_axilite_bvalid),
+      .difftest_cfg_axilite_bready      (difftest_cfg_axilite_bready),
+      .difftest_cfg_axilite_araddr      (difftest_cfg_axilite_araddr),
+      .difftest_cfg_axilite_arvalid     (difftest_cfg_axilite_arvalid),
+      .difftest_cfg_axilite_arready     (difftest_cfg_axilite_arready),
+      .difftest_cfg_axilite_rdata       (difftest_cfg_axilite_rdata),
+      .difftest_cfg_axilite_rresp       (difftest_cfg_axilite_rresp),
+      .difftest_cfg_axilite_rvalid      (difftest_cfg_axilite_rvalid),
+      .difftest_cfg_axilite_rready      (difftest_cfg_axilite_rready)
+  );
+
+`else
+  wire [2:0] xdma_axil_awprot;
+  wire [2:0] xdma_axil_arprot;
+  wire _unused_xdma_axil_prot = &{1'b0, xdma_axil_awprot, xdma_axil_arprot};
   xdma_ep xdma_ep_i(
     .cpu_clk              (sys_clk_i),
     .cpu_rstn             (sys_rstn),
@@ -1327,25 +1390,25 @@ wire [0:0]    br2cfg_wvalid;
     .M00_AXIS_0_tready    (difftest_from_host_axis_tready),
     .M00_AXIS_0_tvalid    (difftest_from_host_axis_tvalid),
 
-    .XDMA_AXI_LITE_awaddr (XDMA_AXI_LITE_awaddr),
-    .XDMA_AXI_LITE_awprot (XDMA_AXI_LITE_awprot),
-    .XDMA_AXI_LITE_awvalid(XDMA_AXI_LITE_awvalid),
-    .XDMA_AXI_LITE_awready(XDMA_AXI_LITE_awready),
-    .XDMA_AXI_LITE_wdata  (XDMA_AXI_LITE_wdata),
-    .XDMA_AXI_LITE_wstrb  (XDMA_AXI_LITE_wstrb),
-    .XDMA_AXI_LITE_wvalid (XDMA_AXI_LITE_wvalid),
-    .XDMA_AXI_LITE_wready (XDMA_AXI_LITE_wready),
-    .XDMA_AXI_LITE_bresp  (XDMA_AXI_LITE_bresp),
-    .XDMA_AXI_LITE_bvalid (XDMA_AXI_LITE_bvalid),
-    .XDMA_AXI_LITE_bready (XDMA_AXI_LITE_bready),
-    .XDMA_AXI_LITE_araddr (XDMA_AXI_LITE_araddr),
-    .XDMA_AXI_LITE_arprot (XDMA_AXI_LITE_arprot),
-    .XDMA_AXI_LITE_arvalid(XDMA_AXI_LITE_arvalid),
-    .XDMA_AXI_LITE_arready(XDMA_AXI_LITE_arready),
-    .XDMA_AXI_LITE_rdata  (XDMA_AXI_LITE_rdata),
-    .XDMA_AXI_LITE_rresp  (XDMA_AXI_LITE_rresp),
-    .XDMA_AXI_LITE_rvalid (XDMA_AXI_LITE_rvalid),
-    .XDMA_AXI_LITE_rready (XDMA_AXI_LITE_rready),
+    .XDMA_AXI_LITE_awaddr (difftest_cfg_axilite_awaddr),
+    .XDMA_AXI_LITE_awprot (xdma_axil_awprot),
+    .XDMA_AXI_LITE_awvalid(difftest_cfg_axilite_awvalid),
+    .XDMA_AXI_LITE_awready(difftest_cfg_axilite_awready),
+    .XDMA_AXI_LITE_wdata  (difftest_cfg_axilite_wdata),
+    .XDMA_AXI_LITE_wstrb  (difftest_cfg_axilite_wstrb),
+    .XDMA_AXI_LITE_wvalid (difftest_cfg_axilite_wvalid),
+    .XDMA_AXI_LITE_wready (difftest_cfg_axilite_wready),
+    .XDMA_AXI_LITE_bresp  (difftest_cfg_axilite_bresp),
+    .XDMA_AXI_LITE_bvalid (difftest_cfg_axilite_bvalid),
+    .XDMA_AXI_LITE_bready (difftest_cfg_axilite_bready),
+    .XDMA_AXI_LITE_araddr (difftest_cfg_axilite_araddr),
+    .XDMA_AXI_LITE_arprot (xdma_axil_arprot),
+    .XDMA_AXI_LITE_arvalid(difftest_cfg_axilite_arvalid),
+    .XDMA_AXI_LITE_arready(difftest_cfg_axilite_arready),
+    .XDMA_AXI_LITE_rdata  (difftest_cfg_axilite_rdata),
+    .XDMA_AXI_LITE_rresp  (difftest_cfg_axilite_rresp),
+    .XDMA_AXI_LITE_rvalid (difftest_cfg_axilite_rvalid),
+    .XDMA_AXI_LITE_rready (difftest_cfg_axilite_rready),
 
     .TO_DIFFTEST_PCIE_CLK (difftest_pcie_clock),
     .pci_exp_rxn(pci_ep_rxn),
@@ -1357,6 +1420,7 @@ wire [0:0]    br2cfg_wvalid;
     .pcie_ep_lnk_up(pcie_ep_lnk_up),
     .pcie_ep_perstn(pcie_ep_perstn)
   );
+`endif
 
   DifftestClockGate SOC_CLK_CTRL(
       .CK  (sys_clk_i),
@@ -1645,23 +1709,23 @@ SimTop_wrapper U_CPU_TOP(
     .difftest_hostCtrl_reset         (io_host_reset),
     .difftest_hostCtrl_diffEnable    (io_host_diff_enable),
     .difftest_hostCtrl_ilaTrigger    (io_host_ila_trigger),
-    .difftest_cfg_axilite_awaddr     (XDMA_AXI_LITE_awaddr),
-    .difftest_cfg_axilite_awvalid    (XDMA_AXI_LITE_awvalid),
-    .difftest_cfg_axilite_awready    (XDMA_AXI_LITE_awready),
-    .difftest_cfg_axilite_wdata      (XDMA_AXI_LITE_wdata),
-    .difftest_cfg_axilite_wstrb      (XDMA_AXI_LITE_wstrb),
-    .difftest_cfg_axilite_wvalid     (XDMA_AXI_LITE_wvalid),
-    .difftest_cfg_axilite_wready     (XDMA_AXI_LITE_wready),
-    .difftest_cfg_axilite_bresp      (XDMA_AXI_LITE_bresp),
-    .difftest_cfg_axilite_bvalid     (XDMA_AXI_LITE_bvalid),
-    .difftest_cfg_axilite_bready     (XDMA_AXI_LITE_bready),
-    .difftest_cfg_axilite_araddr     (XDMA_AXI_LITE_araddr),
-    .difftest_cfg_axilite_arvalid    (XDMA_AXI_LITE_arvalid),
-    .difftest_cfg_axilite_arready    (XDMA_AXI_LITE_arready),
-    .difftest_cfg_axilite_rdata      (XDMA_AXI_LITE_rdata),
-    .difftest_cfg_axilite_rresp      (XDMA_AXI_LITE_rresp),
-    .difftest_cfg_axilite_rvalid     (XDMA_AXI_LITE_rvalid),
-    .difftest_cfg_axilite_rready     (XDMA_AXI_LITE_rready),
+    .difftest_cfg_axilite_awaddr     (difftest_cfg_axilite_awaddr),
+    .difftest_cfg_axilite_awvalid    (difftest_cfg_axilite_awvalid),
+    .difftest_cfg_axilite_awready    (difftest_cfg_axilite_awready),
+    .difftest_cfg_axilite_wdata      (difftest_cfg_axilite_wdata),
+    .difftest_cfg_axilite_wstrb      (difftest_cfg_axilite_wstrb),
+    .difftest_cfg_axilite_wvalid     (difftest_cfg_axilite_wvalid),
+    .difftest_cfg_axilite_wready     (difftest_cfg_axilite_wready),
+    .difftest_cfg_axilite_bresp      (difftest_cfg_axilite_bresp),
+    .difftest_cfg_axilite_bvalid     (difftest_cfg_axilite_bvalid),
+    .difftest_cfg_axilite_bready     (difftest_cfg_axilite_bready),
+    .difftest_cfg_axilite_araddr     (difftest_cfg_axilite_araddr),
+    .difftest_cfg_axilite_arvalid    (difftest_cfg_axilite_arvalid),
+    .difftest_cfg_axilite_arready    (difftest_cfg_axilite_arready),
+    .difftest_cfg_axilite_rdata      (difftest_cfg_axilite_rdata),
+    .difftest_cfg_axilite_rresp      (difftest_cfg_axilite_rresp),
+    .difftest_cfg_axilite_rvalid     (difftest_cfg_axilite_rvalid),
+    .difftest_cfg_axilite_rready     (difftest_cfg_axilite_rready),
 `endif
     .inter_soc_clk                  (inter_soc_clk),
     .sys_rstn_i                     (cpu_rstn_io  ),

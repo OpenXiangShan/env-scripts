@@ -12,6 +12,7 @@ if {[llength $uvhs_ddr_cell] != 1} {
 # core and DiffTest host path with XDMA. UART pins remain on the physical F1
 # daughter card.
 set uvhs_f0_cells $uvhs_ddr_cell
+set uvhs_hostif [string toupper [uvhs::env_or_default DIFFTEST_HOSTIF XDMA]]
 # The LLC wrapper name depends on the XiangShan configuration: external-LLC
 # builds instantiate chi_extllc_opt, while the default OpenLLC build uses
 # chi_openllc_opt. Keep the variable root separate from the shared memory path
@@ -19,6 +20,9 @@ set uvhs_f0_cells $uvhs_ddr_cell
 set uvhs_memory_root_names {
     core_def/U_CPU_TOP/u_XSTop/soc/chi_extllc_opt
     core_def/U_CPU_TOP/u_XSTop/soc/chi_openllc_opt
+}
+if {$uvhs_hostif eq "GBUS"} {
+    lappend uvhs_memory_root_names core_def/U_CPU_TOP/u_XSTop/soc/l3cacheOpt
 }
 # These blocks are shared memory-path siblings of either LLC root.
 set uvhs_memory_path_names {
@@ -28,6 +32,20 @@ set uvhs_memory_path_names {
     core_def/U_CPU_TOP/u_XSTop/soc/tl2axi4
     core_def/U_CPU_TOP/u_XSTop/soc/axi4yank
     core_def/U_CPU_TOP/u_XSTop/soc/axi4buf
+}
+proc uvhs_existing_cells {names} {
+    set cells {}
+    foreach name $names {
+        set matches [get_cells -quiet $name]
+        if {[llength $matches] == 1} {
+            lappend cells [lindex $matches 0]
+        } elseif {[llength $matches] > 1} {
+            puts "WARNING: candidate cell $name matched multiple cells; skip ambiguous match"
+        } else {
+            puts "WARNING: candidate cell not present after optimization: $name"
+        }
+    }
+    return $cells
 }
 set uvhs_nocmisc_path core_def/U_CPU_TOP/u_XSTop/soc/nocMisc
 set uvhs_nocmisc_f0_anchors {
@@ -59,7 +77,25 @@ set uvhs_host_path_names {
     core_def/U_CPU_TOP/u_XSTop/difftest_host
     core_def/U_CPU_TOP/u_XSTop/difftest_memCtrl
     core_def/U_CPU_TOP/u_XSTop/soc/time_sink
-    core_def/xdma_ep_i
+}
+if {$uvhs_hostif eq "XDMA"} {
+    lappend uvhs_host_path_names core_def/xdma_ep_i
+} elseif {$uvhs_hostif eq "GBUS"} {
+    # Keep the protected GBus endpoints, AXI-stream H2C converter, C2H SRAM
+    # staging FIFO, and host-to-CPU AXIS CDC together with the CPU host path
+    # on F2.  GBus occupies DifftestMemCtrl's existing stream engine, so the
+    # converter and CDC stay on F2 with memCtrl.
+    set uvhs_gbus_host_path_names {\
+        core_def/U_GBUS_HOST/U_GBUS_CONFIG_BRIDGE \
+        core_def/U_GBUS_HOST/U_GBUS_GENERALBD \
+        core_def/U_GBUS_HOST/U_GBUS_GENERAL_BUS \
+        core_def/U_GBUS_HOST/U_GBUS_H2C_AXIS \
+        core_def/U_GBUS_HOST/U_GBUS_H2C_CDC \
+        core_def/U_GBUS_HOST/U_GBUS_C2H_FIFO}
+    set uvhs_host_path_names \
+        [concat $uvhs_host_path_names $uvhs_gbus_host_path_names]
+} else {
+    error "unsupported DIFFTEST_HOSTIF: $uvhs_hostif"
 }
 set uvhs_xiangshan_cell [get_cells -quiet {core_def/U_CPU_TOP/u_XSTop}]
 if {[llength $uvhs_xiangshan_cell] == 1} {
@@ -77,7 +113,12 @@ if {[llength $uvhs_xiangshan_cell] == 1} {
     set uvhs_nocmisc_direct_cells \
         [lsort -unique $uvhs_nocmisc_direct_cells]
     if {![llength $uvhs_nocmisc_direct_cells]} {
-        error "no direct child cells found below $uvhs_nocmisc_path"
+        if {$uvhs_hostif eq "GBUS"} {
+            puts "WARNING: no direct nocMisc children found; skip nocMisc sub-partition"
+            set uvhs_nocmisc_direct_cells {}
+        } else {
+            error "no direct child cells found below $uvhs_nocmisc_path"
+        }
     }
 
     set uvhs_nocmisc_f0_cells {}
@@ -96,10 +137,12 @@ if {[llength $uvhs_xiangshan_cell] == 1} {
             lappend uvhs_nocmisc_f0_names $uvhs_nocmisc_name
         }
     }
-    foreach uvhs_nocmisc_name [concat $uvhs_nocmisc_f0_anchors \
-            $uvhs_nocmisc_f2_children] {
-        if {$uvhs_nocmisc_name ni $uvhs_nocmisc_direct_names} {
-            error "missing required nocMisc child: $uvhs_nocmisc_name"
+    if {[llength $uvhs_nocmisc_direct_cells]} {
+        foreach uvhs_nocmisc_name [concat $uvhs_nocmisc_f0_anchors \
+                $uvhs_nocmisc_f2_children] {
+            if {$uvhs_nocmisc_name ni $uvhs_nocmisc_direct_names} {
+                error "missing required nocMisc child: $uvhs_nocmisc_name"
+            }
         }
     }
     if {[llength $uvhs_nocmisc_direct_cells] !=
@@ -108,38 +151,69 @@ if {[llength $uvhs_xiangshan_cell] == 1} {
         error "incomplete nocMisc direct-child partition"
     }
 
-    set uvhs_memory_root_cells [get_cells -quiet $uvhs_memory_root_names]
-    if {[llength $uvhs_memory_root_cells] != 1} {
-        error [format "expected exactly one XiangShan LLC path, got %d: %s" \
-            [llength $uvhs_memory_root_cells] $uvhs_memory_root_cells]
-    }
-    set uvhs_memory_path_cells [concat $uvhs_memory_root_cells \
-        [get_cells -quiet $uvhs_memory_path_names]]
-    if {[llength $uvhs_memory_path_cells] !=
-        [expr {[llength $uvhs_memory_path_names] + 1}]} {
-        error [format "incomplete XiangShan memory path: expected %d cells, got %d" \
-            [expr {[llength $uvhs_memory_path_names] + 1}] \
-            [llength $uvhs_memory_path_cells]]
+    if {$uvhs_hostif eq "GBUS"} {
+        set uvhs_memory_root_cells [uvhs_existing_cells $uvhs_memory_root_names]
+        if {[llength $uvhs_memory_root_cells] == 0} {
+            puts "WARNING: no explicit XiangShan LLC wrapper found; skip LLC partition anchor"
+        } elseif {[llength $uvhs_memory_root_cells] > 1} {
+            error [format "ambiguous XiangShan LLC paths, got %d: %s" \
+                [llength $uvhs_memory_root_cells] $uvhs_memory_root_cells]
+        }
+        set uvhs_memory_path_cells [concat $uvhs_memory_root_cells \
+            [uvhs_existing_cells $uvhs_memory_path_names]]
+        set uvhs_config_path_cells [uvhs_existing_cells $uvhs_config_path_names]
+        set uvhs_host_path_cells [uvhs_existing_cells $uvhs_host_path_names]
+    } else {
+        set uvhs_memory_root_cells [get_cells -quiet $uvhs_memory_root_names]
+        if {[llength $uvhs_memory_root_cells] != 1} {
+            error [format "expected exactly one XiangShan LLC path, got %d: %s" \
+                [llength $uvhs_memory_root_cells] $uvhs_memory_root_cells]
+        }
+        set uvhs_memory_path_cells [concat $uvhs_memory_root_cells \
+            [get_cells -quiet $uvhs_memory_path_names]]
+        if {[llength $uvhs_memory_path_cells] != \
+                [expr {[llength $uvhs_memory_path_names] + 1}]} {
+            error [format "incomplete XiangShan memory path: expected %d cells, got %d" \
+                [expr {[llength $uvhs_memory_path_names] + 1}] \
+                [llength $uvhs_memory_path_cells]]
+        }
+        set uvhs_config_path_cells [get_cells -quiet $uvhs_config_path_names]
+        if {[llength $uvhs_config_path_cells] != [llength $uvhs_config_path_names]} {
+            error [format "incomplete XiangShan configuration path: expected %d cells, got %d" \
+                [llength $uvhs_config_path_names] \
+                [llength $uvhs_config_path_cells]]
+        }
+        set uvhs_host_path_cells [get_cells -quiet $uvhs_host_path_names]
+        if {[llength $uvhs_host_path_cells] != [llength $uvhs_host_path_names]} {
+            error [format "incomplete XiangShan host path: expected %d cells, got %d" \
+                [llength $uvhs_host_path_names] \
+                [llength $uvhs_host_path_cells]]
+        }
     }
     set uvhs_memory_path_cells [concat $uvhs_memory_path_cells \
         $uvhs_nocmisc_f0_cells]
-    set uvhs_config_path_cells [get_cells -quiet $uvhs_config_path_names]
-    if {[llength $uvhs_config_path_cells] != [llength $uvhs_config_path_names]} {
-        error [format "incomplete XiangShan configuration path: expected %d cells, got %d" \
-            [llength $uvhs_config_path_names] \
-            [llength $uvhs_config_path_cells]]
-    }
-    set uvhs_host_path_cells [get_cells -quiet $uvhs_host_path_names]
-    if {[llength $uvhs_host_path_cells] != [llength $uvhs_host_path_names]} {
-        error [format "incomplete XiangShan host path: expected %d cells, got %d" \
-            [llength $uvhs_host_path_names] \
-            [llength $uvhs_host_path_cells]]
+    if {$uvhs_hostif eq "GBUS"} {
+        # XDMA is not instantiated.  Require the GBus host cells that stay on F2.
+        set uvhs_missing_gbus_host_cells {}
+        foreach uvhs_gbus_host_path_name $uvhs_gbus_host_path_names {
+            set uvhs_gbus_host_path_cell \
+                [get_cells -quiet $uvhs_gbus_host_path_name]
+            if {[llength $uvhs_gbus_host_path_cell] != 1} {
+                lappend uvhs_missing_gbus_host_cells \
+                    $uvhs_gbus_host_path_name
+            }
+        }
+        if {[llength $uvhs_missing_gbus_host_cells]} {
+            error "missing required GBus F2 cells: $uvhs_missing_gbus_host_cells"
+        }
     }
     set uvhs_host_path_cells [concat $uvhs_host_path_cells \
         $uvhs_nocmisc_f2_cells]
     set uvhs_f0_cells [concat $uvhs_f0_cells $uvhs_memory_path_cells \
         $uvhs_config_path_cells]
-    create_fpga -name b0.f2 -cells $uvhs_host_path_cells
+    if {$uvhs_hostif ne "GBUS" || [llength $uvhs_host_path_cells]} {
+        create_fpga -name b0.f2 -cells $uvhs_host_path_cells
+    }
     puts "INFO: selected XiangShan LLC path: $uvhs_memory_root_cells"
     puts "INFO: nocMisc direct children on b0.f0: $uvhs_nocmisc_f0_names"
     puts "INFO: nocMisc direct children on b0.f2: $uvhs_nocmisc_f2_names"
@@ -168,26 +242,39 @@ if {[llength $uvhs_xiangshan_cell] == 1} {
     set uvhs_clock_enable_net \
         [get_nets -quiet {core_def/difftest_clock_gate_enable}]
     if {[llength $uvhs_clock_enable_net] != 1} {
-        error "expected one DiffTest clock-enable net, got [llength $uvhs_clock_enable_net]"
+        if {$uvhs_hostif eq "GBUS"} {
+            puts "WARNING: DiffTest clock-enable net is unavailable; skip explicit route"
+        } else {
+            error "expected one DiffTest clock-enable net, got [llength $uvhs_clock_enable_net]"
+        }
+    } else {
+        assign_route -signals $uvhs_clock_enable_net -path {b0.f2 b0.f0}
+        puts "INFO: constrain DiffTest clock enable to direct b0.f2-b0.f0 route"
     }
-    assign_route -signals $uvhs_clock_enable_net -path {b0.f2 b0.f0}
-    puts "INFO: constrain DiffTest clock enable to direct b0.f2-b0.f0 route"
 
     set uvhs_syscnt_path core_def/U_CPU_TOP/u_XSTop/soc/nocMisc/syscnt
     set uvhs_syscnt_time_nets [concat \
         [get_nets -quiet ${uvhs_syscnt_path}/time_0*] \
         [get_nets -quiet ${uvhs_syscnt_path}/time_en]]
     if {[llength $uvhs_syscnt_time_nets] != 65} {
-        error "expected 65 syscnt time nets, got [llength $uvhs_syscnt_time_nets]"
+        if {$uvhs_hostif eq "GBUS"} {
+            puts "WARNING: syscnt time bus is unavailable/optimized (got [llength $uvhs_syscnt_time_nets]); skip explicit route"
+        } else {
+            error "expected 65 syscnt time nets, got [llength $uvhs_syscnt_time_nets]"
+        }
+    } else {
+        assign_route -signals $uvhs_syscnt_time_nets -path {b0.f2 b0.f0}
+        puts "INFO: constrain syscnt time bus to direct b0.f2-b0.f0 route"
     }
-    assign_route -signals $uvhs_syscnt_time_nets -path {b0.f2 b0.f0}
-    puts "INFO: constrain syscnt time bus to direct b0.f2-b0.f0 route"
 }
 unset -nocomplain uvhs_ddr_cell uvhs_ddr_connector \
     uvhs_bound_ddr_connector uvhs_f0_cells uvhs_memory_root_names \
     uvhs_memory_root_cells uvhs_memory_path_names uvhs_memory_path_cells \
     uvhs_config_path_names uvhs_config_path_cells \
     uvhs_host_path_names uvhs_host_path_cells \
+    uvhs_gbus_host_path_names uvhs_gbus_host_path_name \
+    uvhs_gbus_host_path_cell uvhs_missing_gbus_host_cells \
+    uvhs_hostif \
     uvhs_nocmisc_path uvhs_nocmisc_prefix uvhs_nocmisc_f0_anchors \
     uvhs_nocmisc_f2_children uvhs_nocmisc_direct_cells \
     uvhs_nocmisc_direct_names uvhs_nocmisc_f0_cells uvhs_nocmisc_f0_names \

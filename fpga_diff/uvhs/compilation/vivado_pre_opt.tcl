@@ -106,8 +106,17 @@ foreach {fpga_diff_clock fpga_diff_master fpga_diff_gate} {
         -divide_by 1 $fpga_diff_gate_output
 }
 
+set fpga_diff_hostif XDMA
+if {[info exists ::env(DIFFTEST_HOSTIF)] && $::env(DIFFTEST_HOSTIF) ne ""} {
+    set fpga_diff_hostif $::env(DIFFTEST_HOSTIF)
+}
+
 set fpga_diff_async_groups [list]
-foreach fpga_diff_clock {TMCLK ddr_ref_clk CPU_CLK_IN jtag_vclk pcie_ep_refclk} {
+set fpga_diff_async_clock_names {TMCLK ddr_ref_clk CPU_CLK_IN jtag_vclk pcie_ep_refclk}
+if {[string toupper $fpga_diff_hostif] eq "GBUS"} {
+    lappend fpga_diff_async_clock_names UART_CLK_IN
+}
+foreach fpga_diff_clock $fpga_diff_async_clock_names {
     lappend fpga_diff_async_groups -group \
         [get_clocks -include_generated_clocks $fpga_diff_clock]
 }

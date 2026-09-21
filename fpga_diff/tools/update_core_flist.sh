@@ -73,6 +73,10 @@ generate_uvhs_filelist() {
   local -a required_modules=()
   shift 4
 
+  local hostif=${DIFFTEST_HOSTIF:-XDMA}
+  [[ $hostif == XDMA || $hostif == GBUS ]] ||
+    rtl_flist_fail "DIFFTEST_HOSTIF must be XDMA or GBUS: $hostif"
+
   core_dir=$(realpath -e -- "$core_dir")
   work_dir=$(realpath -e -- "$work_dir")
   core_rtl_dir=$core_dir/rtl
@@ -87,6 +91,19 @@ generate_uvhs_filelist() {
 
   {
     printf '+define+SYNTHESIS\n+define+XIANGSHAN_FPGA\n+define+UVHS\n'
+    host_define=${DIFFTEST_HOST_DEFINE:-}
+    if [[ -z $host_define ]]; then
+      if [[ $hostif == GBUS ]]; then
+        host_define=DIFFTEST_HOST_GBUS
+      else
+        host_define=DIFFTEST_HOST_XDMA
+      fi
+    fi
+    if [[ $hostif == GBUS && $host_define != DIFFTEST_HOST_GBUS ]] ||
+       [[ $hostif == XDMA && $host_define != DIFFTEST_HOST_XDMA ]]; then
+      rtl_flist_fail "DIFFTEST_HOST_DEFINE=$host_define does not match DIFFTEST_HOSTIF=$hostif"
+    fi
+    printf '+define+%s\n' "$host_define"
     printf '+define+DDR4_16G_X8\n+define+DQ64\n+define+DDR4_2400\n'
     printf '+define+DQ=64\n+define+MICRON_DDR\n+define+DDR4_16Gbx8\n'
     printf '+define+DDR4\n+define+SRAM_SYN\n+define+DATA_VERSION=0\n'
@@ -103,10 +120,18 @@ generate_uvhs_filelist() {
       printf '+incdir+%s\n' "$core_generated_dir"
     fi
     printf '+incdir+%s/src/rtl/common\n' "$fpga_diff_dir"
+    if [[ $hostif == GBUS ]]; then
+      printf '+incdir+%s/uvhs/common\n' "$fpga_diff_dir"
+    fi
 
     find "$fpga_diff_dir/src/rtl/common" -type f \
       \( -name '*.v' -o -name '*.sv' -o -name '*.vh' -o -name '*.svh' \) \
       ! -name 'u0_xdma.v' -print | LC_ALL=C sort
+    if [[ $hostif == GBUS && -d $fpga_diff_dir/uvhs/common ]]; then
+      find "$fpga_diff_dir/uvhs/common" -type f \
+        \( -name '*.v' -o -name '*.sv' -o -name '*.vh' -o -name '*.svh' \) \
+        -print | LC_ALL=C sort
+    fi
     if [[ -d $work_dir/rtl/stubs ]]; then
       find "$work_dir/rtl/stubs" -type f -name '*.v' -print | LC_ALL=C sort
     fi
@@ -131,6 +156,17 @@ generate_uvhs_filelist() {
     kmh|nutshell) required_modules=(SimTop) ;;
     nanhu) required_modules=(XlnFpgaTop) ;;
   esac
+  if [[ $hostif == GBUS ]]; then
+    required_modules+=(
+      uvhs_async_fifo
+      uvhs_axilite_cdc_bridge
+      uvhs_axis_async_fifo
+      uvhs_gbus_axi_to_axis
+      uvhs_gbus_c2h_fifo
+      uvhs_gbus_host_wrapper
+      uvhs_generalbd_axilite_bridge
+    )
+  fi
   for module_name in "${required_modules[@]}"; do
     found=0
     while IFS= read -r source_file; do

@@ -74,6 +74,9 @@ assign_pin -port [pin_name $top clk8_n] -fpga b0.f2 -pin F36
 assign_pin -port [pin_name $top clk5_p] -fpga b0.f2 -pin AW17
 assign_pin -port [pin_name $top clk5_n] -fpga b0.f2 -pin AY17
 
+# The physical XDMA PCIe ports are declared for every DiffTest build, so their
+# pins are assigned in both host modes.  Only the endpoint instantiation is
+# host-mode dependent: GBus leaves these ports unused.
 assign_pin -port [pin_name $top pcie_ep_lnk_up] -connector b0.F2_APC16 -index 58
 
 # XDMA endpoint signals. X4 uses the HGC7 lane group from the Hejian official

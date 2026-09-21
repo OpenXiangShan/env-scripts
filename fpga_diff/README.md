@@ -1,6 +1,19 @@
 Core RTL to FPGA Steps
 ======================
 
+XDMA remains the default DiffTest host interface. For the optional UVHS GBus
+path, see [the SRAM C2H interface and build flow](uvhs/README.md).
+`DIFFTEST_HOSTIF=GBUS` keeps DiffTest output in the GBS1 on-chip SRAM window
+and feeds workload H2C through the existing DifftestMemCtrl AXI-stream engine.
+The two interfaces are compile-time exclusive: RTL uses
+`` `ifdef DIFFTEST_HOST_GBUS `` / `` `elsif DIFFTEST_HOST_XDMA `` / `` `endif ``.
+`Makefile` maps `DIFFTEST_HOSTIF` to one of those defines
+(`DIFFTEST_HOST_DEFINE`). The UVHS file list gets that define; the Vivado
+project always defines `DIFFTEST_HOST_XDMA` because GBus is UVHS-only.
+Host selection is CPU-independent: `core_def` instantiates either the XDMA
+endpoint or the GBus host wrapper (`uvhs/common/uvhs_gbus_host_wrapper.sv`), so
+the same KMH, NutShell, and Nanhu wrappers serve both modes.
+
 1. modify Makefile, assign CORE_DIR
 
 2. make vivado CPU=XXX

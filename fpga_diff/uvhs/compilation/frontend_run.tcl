@@ -67,7 +67,14 @@ proc uvhs::start_frontend_shell_compat {} {
         error "UVHS shell compatibility helper not found: $helper"
     }
     set module_makefile [file join [pwd] hw.dat Synthesis Uvsyn Script module.makefile]
-    exec bash $helper wait-module $module_makefile &
+    if {[string toupper [uvhs::env_or_default DIFFTEST_HOSTIF XDMA]] eq "GBUS"} {
+        # Do not let the GBus compatibility helper keep the frontend output pipe
+        # open after uv_shell exits.
+        set module_log [file join [pwd] uvhs_module_shell_compat.log]
+        exec bash $helper wait-module $module_makefile > $module_log < /dev/null 2>@1 &
+    } else {
+        exec bash $helper wait-module $module_makefile &
+    }
     puts "INFO: started UVHS frontend shell compatibility helper"
 }
 
@@ -76,6 +83,12 @@ set_option syn.computeFeCheckSum true
 
 set_parallel_option -max_threads 4 -max_processes 16 -label frontend
 set_parallel_option -max_threads 16 -label runtime
+if {[string toupper [uvhs::env_or_default DIFFTEST_HOSTIF XDMA]] eq "GBUS"} {
+    # The GBus protected-IP worker makefiles use bash-only redirection.
+    set ::env(SHELL) /bin/bash
+    set ::env(MAKE) /usr/bin/make
+    set ::env(BASH_ENV) ""
+}
 
 set_option global.log.label MEMORY
 set_option syn.checkMultiDriver false
@@ -111,8 +124,19 @@ foreach reset_port {rstn_sw6 rstn_sw5 rstn_sw4} {
 
 uvhs::import_blackbox blk_mem_gen_0 ./rtl/soc/blk_mem_gen_0.dcp
 uvhs::import_blackbox AXI_bridge ./rtl/soc/AXI_bridge.dcp
+# data_bridge is instantiated in every DiffTest build; only the physical XDMA
+# endpoint depends on the host mode.
 uvhs::import_blackbox data_bridge ./rtl/soc/data_bridge.dcp
-uvhs::import_blackbox xdma_ep ./rtl/device/pcie/xdma_ep.dcp
+if {[string toupper [uvhs::env_or_default DIFFTEST_HOSTIF XDMA]] eq "XDMA"} {
+    uvhs::import_blackbox xdma_ep ./rtl/device/pcie/xdma_ep.dcp
+} else {
+    # GeneralBD must be registered as a UVHS general-bus endpoint. Use the
+    # vendor's set_blackbox -generalbd form while retaining clock-enable
+    # metadata.
+    uvhs::import_blackbox generalBD ./rtl/soc/generalBD.dcp \
+        -clock_enable_pairs {i_clk i_clk_en 1} -generalbd
+    puts "INFO: skip xdma_ep blackbox import for DiffTest host interface [uvhs::env_or_default DIFFTEST_HOSTIF XDMA]"
+}
 uvhs::import_blackbox uvw_general_bus \
     ./rtl/soc/uvw_general_bus/uvw_general_bus.dcp \
     -clock_enable_pairs {dut_axi_aclk dut_axi_aclk_en 1}
