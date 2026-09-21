@@ -163,6 +163,7 @@ generate_uvhs_filelist() {
       uvhs_axis_async_fifo
       uvhs_gbus_axi_to_axis
       uvhs_gbus_c2h_fifo
+      uvhs_gbus_host_wrapper
       uvhs_generalbd_axilite_bridge
     )
   fi

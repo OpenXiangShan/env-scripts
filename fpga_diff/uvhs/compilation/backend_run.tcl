@@ -58,8 +58,8 @@ if {[string toupper [uvhs::env_or_default DIFFTEST_HOSTIF XDMA]] eq "XDMA"} {
     # the same host net appear as two unrelated clocks and lets infer_clock
     # rediscover the old pseudo-XDMA clock.
     set gbus_host_clock_pins [get_pins -quiet {
-        core_def/U_GBUS_GENERALBD/i_clk
-        core_def/U_GBUS_GENERAL_BUS/dut_axi_aclk
+        core_def/U_GBUS_HOST/U_GBUS_GENERALBD/i_clk
+        core_def/U_GBUS_HOST/U_GBUS_GENERAL_BUS/dut_axi_aclk
     }]
     if {[llength $gbus_host_clock_pins] != 2} {
         error "required GBus host clock pins not found: $gbus_host_clock_pins"
@@ -112,10 +112,10 @@ if {[string toupper [uvhs::env_or_default DIFFTEST_HOSTIF XDMA]] eq "GBUS"} {
     # linking (the exact indexed pin does exist).  Enumerate all bits and use
     # literal braced names, so config_clock receives the actual payload pins.
     foreach gbus_payload_bus {
-        core_def/U_GBUS_GENERALBD/gbd_sysbus_i
-        core_def/U_GBUS_GENERALBD/gbd_sysbus_o
-        core_def/U_GBUS_GENERAL_BUS/sysbus_ghbd_i
-        core_def/U_GBUS_GENERAL_BUS/sysbus_ghbd_o
+        core_def/U_GBUS_HOST/U_GBUS_GENERALBD/gbd_sysbus_i
+        core_def/U_GBUS_HOST/U_GBUS_GENERALBD/gbd_sysbus_o
+        core_def/U_GBUS_HOST/U_GBUS_GENERAL_BUS/sysbus_ghbd_i
+        core_def/U_GBUS_HOST/U_GBUS_GENERAL_BUS/sysbus_ghbd_o
         core_def/U_UVHS_UVW_AXI4_TO_DDR4/sysbus_ghbd_i
         core_def/U_UVHS_UVW_AXI4_TO_DDR4/sysbus_ghbd_o
     } {

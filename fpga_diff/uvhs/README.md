@@ -21,6 +21,16 @@ writes into the existing DifftestMemCtrl AXI-stream engine.
 inbound masters. The CPU memory hierarchy and physical DDR path remain
 unchanged.
 
+Host selection is not CPU-specific: the shared core instantiates either the
+XDMA endpoint or, for GBus, `uvhs/common/uvhs_gbus_host_wrapper.sv` as
+`core_def/U_GBUS_HOST`, and the only compile-time switch is
+`` `DIFFTEST_HOST_GBUS `` / `` `elsif DIFFTEST_HOST_XDMA ``. The GBus wrapper
+holds the C2H staging FIFO, the GeneralBD configuration bridge, both protected
+GBus endpoints, the AXI3-to-AXIS H2C converter, and the H2C AXIS CDC, so
+`core_def` keeps one DiffTest host instance for every CPU family and the
+generated `SimTop` RTL stays unchanged. The UVHS scripts name the wrapper
+hierarchy in their clock, payload, and partition paths.
+
 GBS1 is a register-drained SRAM window. Backpressure reaches the DiffTest
 sender and pauses the CPU while the host transport clock continues to run.
 The matching fpga-host selects the same GBS1 register-window protocol.

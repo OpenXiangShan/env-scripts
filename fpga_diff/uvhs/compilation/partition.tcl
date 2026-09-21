@@ -86,12 +86,12 @@ if {$uvhs_hostif eq "XDMA"} {
     # on F2.  GBus occupies DifftestMemCtrl's existing stream engine, so the
     # converter and CDC stay on F2 with memCtrl.
     set uvhs_gbus_host_path_names {\
-        core_def/U_GBUS_CONFIG_BRIDGE \
-        core_def/U_GBUS_GENERALBD \
-        core_def/U_GBUS_GENERAL_BUS \
-        core_def/U_GBUS_H2C_AXIS \
-        core_def/U_GBUS_H2C_CDC \
-        core_def/U_GBUS_C2H_FIFO}
+        core_def/U_GBUS_HOST/U_GBUS_CONFIG_BRIDGE \
+        core_def/U_GBUS_HOST/U_GBUS_GENERALBD \
+        core_def/U_GBUS_HOST/U_GBUS_GENERAL_BUS \
+        core_def/U_GBUS_HOST/U_GBUS_H2C_AXIS \
+        core_def/U_GBUS_HOST/U_GBUS_H2C_CDC \
+        core_def/U_GBUS_HOST/U_GBUS_C2H_FIFO}
     set uvhs_host_path_names \
         [concat $uvhs_host_path_names $uvhs_gbus_host_path_names]
 } else {

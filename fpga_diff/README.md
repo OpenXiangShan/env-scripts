@@ -10,6 +10,9 @@ The two interfaces are compile-time exclusive: RTL uses
 `Makefile` maps `DIFFTEST_HOSTIF` to one of those defines
 (`DIFFTEST_HOST_DEFINE`). The UVHS file list gets that define; the Vivado
 project always defines `DIFFTEST_HOST_XDMA` because GBus is UVHS-only.
+Host selection is CPU-independent: `core_def` instantiates either the XDMA
+endpoint or the GBus host wrapper (`uvhs/common/uvhs_gbus_host_wrapper.sv`), so
+the same KMH, NutShell, and Nanhu wrappers serve both modes.
 
 1. modify Makefile, assign CORE_DIR
 
