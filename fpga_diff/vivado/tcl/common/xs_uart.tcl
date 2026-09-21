@@ -245,8 +245,6 @@ set_property -name "top_auto_set" -value "0" -objects $obj
 if {$no_diff} {
     fpga_append_unique defines "NO_DIFF"
     puts "INFO: standalone CPU RTL selected; DiffTest and XDMA are disabled"
-} else {
-    fpga_append_unique defines "DIFFTEST_HOST_XDMA"
 }
 if {$cpu_files_has_dma} {
     fpga_append_unique defines "CONFIG_SIMTOP_HAS_DMA"

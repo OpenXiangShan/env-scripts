@@ -1324,7 +1324,7 @@ wire [0:0]    br2cfg_wvalid;
   // the host-clock stream enable onto the CPU-clock AXIS handshake.
   assign difftest_to_host_axis_tready = difftest_to_host_axis_tready_io;
   assign difftest_to_host_axis_tvalid_io = difftest_to_host_axis_tvalid;
-`elsif DIFFTEST_HOST_XDMA
+`else
   assign difftest_to_host_axis_tready = difftest_to_host_axis_tready_io & difftest_stream_enable_pcie;
   assign difftest_to_host_axis_tvalid_io = difftest_to_host_axis_tvalid & difftest_stream_enable_pcie;
 `endif
@@ -1372,7 +1372,7 @@ wire [0:0]    br2cfg_wvalid;
       .difftest_cfg_axilite_rready      (difftest_cfg_axilite_rready)
   );
 
-`elsif DIFFTEST_HOST_XDMA
+`else
   wire [2:0] xdma_axil_awprot;
   wire [2:0] xdma_axil_arprot;
   wire _unused_xdma_axil_prot = &{1'b0, xdma_axil_awprot, xdma_axil_arprot};
