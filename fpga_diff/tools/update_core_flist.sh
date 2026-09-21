@@ -91,19 +91,19 @@ generate_uvhs_filelist() {
 
   {
     printf '+define+SYNTHESIS\n+define+XIANGSHAN_FPGA\n+define+UVHS\n'
+    # XDMA is the default host interface and needs no define; GBus is opt-in
+    # through DIFFTEST_HOST_GBUS, which the RTL selects with `ifdef.
     host_define=${DIFFTEST_HOST_DEFINE:-}
-    if [[ -z $host_define ]]; then
-      if [[ $hostif == GBUS ]]; then
-        host_define=DIFFTEST_HOST_GBUS
-      else
-        host_define=DIFFTEST_HOST_XDMA
-      fi
+    if [[ $hostif == GBUS ]]; then
+      [[ -n $host_define ]] || host_define=DIFFTEST_HOST_GBUS
+      [[ $host_define == DIFFTEST_HOST_GBUS ]] ||
+        rtl_flist_fail \
+          "DIFFTEST_HOST_DEFINE=$host_define does not match DIFFTEST_HOSTIF=$hostif"
+      printf '+define+%s\n' "$host_define"
+    elif [[ -n $host_define ]]; then
+      rtl_flist_fail \
+        "DIFFTEST_HOST_DEFINE must be empty for DIFFTEST_HOSTIF=$hostif, got $host_define"
     fi
-    if [[ $hostif == GBUS && $host_define != DIFFTEST_HOST_GBUS ]] ||
-       [[ $hostif == XDMA && $host_define != DIFFTEST_HOST_XDMA ]]; then
-      rtl_flist_fail "DIFFTEST_HOST_DEFINE=$host_define does not match DIFFTEST_HOSTIF=$hostif"
-    fi
-    printf '+define+%s\n' "$host_define"
     printf '+define+DDR4_16G_X8\n+define+DQ64\n+define+DDR4_2400\n'
     printf '+define+DQ=64\n+define+MICRON_DDR\n+define+DDR4_16Gbx8\n'
     printf '+define+DDR4\n+define+SRAM_SYN\n+define+DATA_VERSION=0\n'

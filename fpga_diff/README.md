@@ -5,11 +5,11 @@ XDMA remains the default DiffTest host interface. For the optional UVHS GBus
 path, see [the SRAM C2H interface and build flow](uvhs/README.md).
 `DIFFTEST_HOSTIF=GBUS` keeps DiffTest output in the GBS1 on-chip SRAM window
 and feeds workload H2C through the existing DifftestMemCtrl AXI-stream engine.
-The two interfaces are compile-time exclusive: RTL uses
-`` `ifdef DIFFTEST_HOST_GBUS `` / `` `elsif DIFFTEST_HOST_XDMA `` / `` `endif ``.
-`Makefile` maps `DIFFTEST_HOSTIF` to one of those defines
-(`DIFFTEST_HOST_DEFINE`). The UVHS file list gets that define; the Vivado
-project always defines `DIFFTEST_HOST_XDMA` because GBus is UVHS-only.
+The two interfaces are compile-time exclusive and GBus is opt-in: RTL selects it
+with `` `ifdef DIFFTEST_HOST_GBUS `` / `` `else `` / `` `endif ``, so an XDMA
+build needs no host define. `Makefile` maps `DIFFTEST_HOSTIF` to
+`DIFFTEST_HOST_DEFINE`, which is set only for GBus; the UVHS file list emits it
+and the Vivado project never defines it.
 Host selection is CPU-independent: `core_def` instantiates either the XDMA
 endpoint or the GBus host wrapper (`uvhs/common/uvhs_gbus_host_wrapper.sv`), so
 the same KMH, NutShell, and Nanhu wrappers serve both modes.

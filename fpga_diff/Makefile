@@ -20,9 +20,11 @@ ifeq ($(DIFFTEST_HOSTIF),GBUS)
 ifeq ($(FPGA_BACKEND),vivado)
 $(error DIFFTEST_HOSTIF=GBUS is UVHS-only; use FPGA_BACKEND=uvhs)
 endif
+# GBus is opt-in and selected by its define; XDMA is the default interface and
+# needs none.
 DIFFTEST_HOST_DEFINE := DIFFTEST_HOST_GBUS
 else
-DIFFTEST_HOST_DEFINE := DIFFTEST_HOST_XDMA
+DIFFTEST_HOST_DEFINE :=
 endif
 export DIFFTEST_HOSTIF DIFFTEST_HOST_DEFINE
 FPGA_RUNTIME ?=

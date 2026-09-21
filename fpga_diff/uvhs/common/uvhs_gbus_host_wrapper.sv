@@ -5,9 +5,9 @@
 // GBus DiffTest host wrapper.
 //
 // This is the GBus host interface extracted from core_def so the shared core
-// keeps a single DiffTest host instance.  XDMA and GBus remain compile-time
-// exclusive and are distinguished only by DIFFTEST_HOST_GBUS /
-// DIFFTEST_HOST_XDMA; nothing here is CPU-family specific.
+// keeps a single DiffTest host instance.  GBus is opt-in through
+// DIFFTEST_HOST_GBUS and XDMA is the default host; nothing here is CPU-family
+// specific.
 //
 // The GBus C2H stream is parked in on-chip SRAM and drained through the GBS1
 // register window.  H2C converts GeneralBus AXI3 writes into the existing

@@ -10,9 +10,9 @@ XDMA remains the default DiffTest host interface. `DIFFTEST_HOSTIF=GBUS` is an
 additive UVHS compile-time option; it does not replace the XDMA endpoint, pinout,
 or IP export on the default path. The Vivado FPGA-Diff flow stays XDMA-only.
 RTL selects the exclusive host path with `` `ifdef DIFFTEST_HOST_GBUS `` /
-`` `elsif DIFFTEST_HOST_XDMA `` / `` `endif ``. `Makefile` maps
-`DIFFTEST_HOSTIF` to `DIFFTEST_HOST_DEFINE` and `uvhs_project` writes that
-define into the UVHS file list.
+`` `else `` / `` `endif ``, so only a GBus build carries a define. `Makefile`
+maps `DIFFTEST_HOSTIF` to `DIFFTEST_HOST_DEFINE`, which is empty for XDMA, and
+`uvhs_project` writes it into the UVHS file list.
 
 The GBus build retains the shared `Difftest2AXIs` sender and buffers
 DiffTest output only in on-chip SRAM. Workload H2C converts GeneralBus AXI3
@@ -24,7 +24,7 @@ unchanged.
 Host selection is not CPU-specific: the shared core instantiates either the
 XDMA endpoint or, for GBus, `uvhs/common/uvhs_gbus_host_wrapper.sv` as
 `core_def/U_GBUS_HOST`, and the only compile-time switch is
-`` `DIFFTEST_HOST_GBUS `` / `` `elsif DIFFTEST_HOST_XDMA ``. The GBus wrapper
+`` `ifdef DIFFTEST_HOST_GBUS `` / `` `else ``. The GBus wrapper
 holds the C2H staging FIFO, the GeneralBD configuration bridge, both protected
 GBus endpoints, the AXI3-to-AXIS H2C converter, and the H2C AXIS CDC, so
 `core_def` keeps one DiffTest host instance for every CPU family and the
