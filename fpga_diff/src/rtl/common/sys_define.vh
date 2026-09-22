@@ -3,7 +3,11 @@
 `define XS_UART         // 11
 `define XS_QSPI2ROM     // 10
 `ifndef NO_DIFF
+// GBus reaches the host through the GeneralBus endpoint, so it has no XDMA
+// PCIe endpoint and must not declare its ports.
+`ifndef DIFFTEST_HOST_GBUS
 `define XS_XDMA_EP
+`endif
 `endif
 //`define XS_GMAC       // 18 cpu_int = {} xs_core_def(top_debug)
 
