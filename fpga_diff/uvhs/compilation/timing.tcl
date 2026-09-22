@@ -18,7 +18,12 @@ create_clock -name ddr_ref_clk -period 12.5 [get_ports [fpga_diff_top_port clk7_
 create_clock -name CPU_CLK_IN -period 40 [get_ports [fpga_diff_top_port clk5_p]]
 create_clock -name UART_CLK_IN -period 20 [get_ports [fpga_diff_top_port clk6_p]]
 create_clock -name jtag_vclk -period 83.333 [get_ports [fpga_diff_top_port JTAG_TCK]]
-create_clock -name pcie_ep_refclk -period 10 [get_ports [fpga_diff_top_port pcie_ep_gt_ref_clk_p]]
+# GBus builds do not define XS_XDMA_EP, so this port does not exist. UVHS
+# protects every port a constraint names and aborts elaboration when it is
+# missing, so the clock has to be omitted rather than queried.
+if {[string toupper [uvhs::env_or_default DIFFTEST_HOSTIF XDMA]] eq "XDMA"} {
+    create_clock -name pcie_ep_refclk -period 10 [get_ports [fpga_diff_top_port pcie_ep_gt_ref_clk_p]]
+}
 
 proc fpga_diff_set_async_clock_groups {} {
     set groups [list]
