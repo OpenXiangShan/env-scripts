@@ -176,7 +176,9 @@ It reads `xiangshan_monitor/workdays.json` before doing any repository or AI
 work, so normal weekends and official holidays are skipped while official
 makeup workdays are included. It accepts scheduled starts only from 18:00 up
 to 18:30, so starting the delivery entry point at another time makes no Git,
-GitHub, AI, or DingTalk request. If any repository pull or Stars lookup fails,
+GitHub, AI, or DingTalk request. Failed git updates are retried until 18:20;
+any repositories still failing then are left out, and Stars/AI/release continue
+with the data that did arrive. If Stars lookup fails,
 AI is not called, release is skipped, and only debug receives an error. A
 successful release advances the local cutoff and saves all repositories'
 current Stars as the next growth baseline. Calendar years that are not present

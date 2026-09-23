@@ -26,6 +26,7 @@
   "gift_history": "dingtalk_robot/xiangshan_monitor/gift_history.json",
   "scheduled_delivery": {
     "analysis_start_time": "18:00",
+    "pull_retry_until": "18:20",
     "release_time": "18:30"
   },
   "analysis_window": "24h",
