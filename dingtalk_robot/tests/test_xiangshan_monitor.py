@@ -18,6 +18,7 @@ from dingtalk_robot.xiangshan_monitor.xiangshan_monitor import (
     apply_gift_result,
     clone_or_pull,
     default_gift_settings,
+    pull_data,
     empty_gift_history,
     persist_gift_result,
     extract_highlights,
@@ -27,9 +28,12 @@ from dingtalk_robot.xiangshan_monitor.xiangshan_monitor import (
     random_gift_slots,
     resolve_gift_awards,
     talk,
+    XiangShanMonitorError,
     _analysis_start_time,
     _call_local_api,
     _delivery_times,
+    _pull_retry_until_time,
+    _repository_head_snapshot,
     _response_text,
 )
 
@@ -94,6 +98,94 @@ class XiangShanMonitorSyncTest(unittest.TestCase):
         self.assertEqual(calls[0][0], "clone")
         self.assertNotIn("--branch", calls[0])
         self.assertFalse(any(call and call[0] == "pull" for call in calls))
+
+    def test_pull_retries_failed_repository_until_success(self):
+        attempts = {"ZhuJiang": 0}
+
+        def fake_clone(spec, organization, clone_root, git_runner, timeout):
+            if spec.name == "ZhuJiang":
+                attempts["ZhuJiang"] += 1
+                if attempts["ZhuJiang"] < 3:
+                    raise XiangShanMonitorError("tls handshake failed")
+            return clone_root / spec.name, "master"
+
+        def fake_git(args, cwd=None, timeout=None):
+            return "a" * 40 + "\n"
+
+        with tempfile.TemporaryDirectory() as directory_name, patch(
+            "dingtalk_robot.xiangshan_monitor.xiangshan_monitor.clone_or_pull",
+            side_effect=fake_clone,
+        ), patch(
+            "dingtalk_robot.xiangshan_monitor.xiangshan_monitor.collect_repository_commits",
+            return_value=[],
+        ):
+            from datetime import datetime, timedelta, timezone
+            now = datetime.now(timezone.utc)
+            report = pull_data(
+                {
+                    "organization": "OpenXiangShan",
+                    "repositories": ["XiangShan", "ZhuJiang"],
+                    "clone_dir": directory_name,
+                    "timezone": "Asia/Shanghai",
+                    "git_timeout_seconds": 5,
+                },
+                root_dir=directory_name,
+                git_runner=fake_git,
+                retry_until=now + timedelta(minutes=5),
+                sleeper=lambda _seconds: None,
+            )
+        by_name = {item["name"]: item for item in report["repositories"]}
+        self.assertEqual(by_name["XiangShan"]["status"], "updated")
+        self.assertEqual(by_name["ZhuJiang"]["status"], "updated")
+        self.assertEqual(attempts["ZhuJiang"], 3)
+        self.assertEqual(report["totals"]["repositories_with_errors"], 0)
+
+    def test_pull_keeps_partial_data_after_retry_deadline(self):
+        def fake_clone(spec, organization, clone_root, git_runner, timeout):
+            if spec.name == "ZhuJiang":
+                raise XiangShanMonitorError("tls handshake failed")
+            return clone_root / spec.name, "master"
+
+        def fake_git(args, cwd=None, timeout=None):
+            return "a" * 40 + "\n"
+
+        with tempfile.TemporaryDirectory() as directory_name, patch(
+            "dingtalk_robot.xiangshan_monitor.xiangshan_monitor.clone_or_pull",
+            side_effect=fake_clone,
+        ), patch(
+            "dingtalk_robot.xiangshan_monitor.xiangshan_monitor.collect_repository_commits",
+            return_value=[],
+        ):
+            from datetime import datetime, timedelta, timezone
+            now = datetime.now(timezone.utc)
+            report = pull_data(
+                {
+                    "organization": "OpenXiangShan",
+                    "repositories": ["XiangShan", "ZhuJiang"],
+                    "clone_dir": directory_name,
+                    "timezone": "Asia/Shanghai",
+                    "git_timeout_seconds": 5,
+                },
+                root_dir=directory_name,
+                git_runner=fake_git,
+                retry_until=now - timedelta(seconds=1),
+                sleeper=lambda _seconds: None,
+            )
+        by_name = {item["name"]: item for item in report["repositories"]}
+        self.assertEqual(by_name["XiangShan"]["status"], "updated")
+        self.assertEqual(by_name["ZhuJiang"]["status"], "error")
+        self.assertEqual(report["totals"]["updated_repositories"], 1)
+        self.assertEqual(report["totals"]["repositories_with_errors"], 1)
+
+    def test_gift_snapshot_skips_failed_repositories(self):
+        snapshot = _repository_head_snapshot({
+            "repositories": [
+                {"name": "XiangShan", "head_sha": "a" * 40, "status": "updated"},
+                {"name": "ZhuJiang", "head_sha": None, "status": "error", "error": "tls"},
+            ]
+        })
+        self.assertIn("XiangShan:" + "a" * 40, snapshot)
+        self.assertNotIn("ZhuJiang", snapshot)
 
     def test_random_gift_odds_are_one_in_five(self):
         self.assertEqual(RANDOM_GIFT_DENOMINATOR, 5)
@@ -216,6 +308,7 @@ class XiangShanGiftPityTest(unittest.TestCase):
         self.assertIsNone(debug_time)
         self.assertEqual(release_time, "18:30")
         self.assertEqual(_analysis_start_time(data), "18:00")
+        self.assertEqual(_pull_retry_until_time(data), "18:20")
 
     def test_extract_highlights_from_structured_block(self):
         report = _gift_report(commits=[_commit("Alice", "alice@example.com", "1" * 40)])

@@ -87,6 +87,8 @@ GIFT_REASON_TEXT = {
     GIFT_KIND_WEEKLY_PITY: "过去一周无人中奖，今日保底一份",
 }
 DEFAULT_ANALYSIS_START_TIME = "18:00"
+DEFAULT_PULL_RETRY_UNTIL = "18:20"
+DEFAULT_PULL_RETRY_INTERVAL = 20.0
 DEFAULT_RELEASE_SEND_TIME = "18:30"
 API_FAILURE_MESSAGE = "呜呜呜，API访问不通，我今天不知道该说什么了"
 _DINGTALK_LAYERS = frozenset({"debug", "release"})
@@ -713,10 +715,12 @@ def _repository_head_snapshot(report: Mapping[str, Any]) -> str:
     for repository in repositories:
         if not isinstance(repository, Mapping):
             raise XiangShanMonitorError("Random gift found an invalid repository entry")
+        if repository.get("status") == "error" or repository.get("error"):
+            continue
         name = str(repository.get("name", "")).strip()
         head_sha = str(repository.get("head_sha") or "").strip().lower()
         if not name or not re.fullmatch(r"[0-9a-f]{40}|[0-9a-f]{64}", head_sha):
-            raise XiangShanMonitorError(f"Random gift requires a head hash for {name or 'unknown'}")
+            continue
         heads.append((name, head_sha))
     return "\n".join(f"{name}:{head_sha}" for name, head_sha in sorted(heads))
 
@@ -1367,7 +1371,63 @@ def _data_path(value: Any, default: Path, root: Path) -> Path:
     return configured if configured.is_absolute() else root / configured
 
 
-def pull_data(repository_data: Optional[Mapping[str, Any]] = None, window_spec: Optional[str] = None, *, root_dir: Union[Path, str] = ".", now: Optional[datetime] = None, analysis_window: Optional[AnalysisWindow] = None, git_runner: Callable[..., str] = _run_git) -> Dict[str, Any]:
+def _empty_repository_item(spec: RepositorySpec, organization: str, clone_root: Path, root: Path) -> Dict[str, Any]:
+    return {
+        "name": spec.name,
+        "remote": spec.remote or f"https://github.com/{organization}/{spec.name}.git",
+        "path": _relative_path(clone_root / spec.name, root),
+        "status": "error",
+        "branch": spec.branch,
+        "head_sha": None,
+        "commits": [],
+    }
+
+
+def _git_attempt_timeout(base_timeout: float, retry_until: Optional[datetime]) -> Optional[float]:
+    if retry_until is None:
+        return float(base_timeout)
+    remaining = (retry_until - datetime.now(retry_until.tzinfo)).total_seconds()
+    if remaining <= 0:
+        return None
+    return max(1.0, min(float(base_timeout), remaining))
+
+
+def _refresh_repository_item(
+    item: Dict[str, Any],
+    spec: RepositorySpec,
+    organization: str,
+    clone_root: Path,
+    root: Path,
+    window: AnalysisWindow,
+    max_commits: Optional[int],
+    git_runner: Callable[..., str],
+    timeout: float,
+) -> None:
+    item["status"] = "error"
+    item["head_sha"] = None
+    item["commits"] = []
+    try:
+        path, branch = clone_or_pull(spec, organization, clone_root, git_runner, float(timeout))
+        item["path"], item["branch"] = _relative_path(path, root), branch
+        item["head_sha"] = git_runner(["rev-parse", "HEAD"], cwd=path).strip()
+        item["commits"] = collect_repository_commits(path, "HEAD", window, organization, spec.name, max_commits, git_runner)
+        item["status"] = "updated"
+        item.pop("error", None)
+    except (OSError, XiangShanMonitorError, ValueError) as exc:
+        item["error"] = str(exc)
+
+
+def pull_data(
+    repository_data: Optional[Mapping[str, Any]] = None,
+    window_spec: Optional[str] = None,
+    *,
+    root_dir: Union[Path, str] = ".",
+    now: Optional[datetime] = None,
+    analysis_window: Optional[AnalysisWindow] = None,
+    git_runner: Callable[..., str] = _run_git,
+    retry_until: Optional[datetime] = None,
+    sleeper: Callable[[float], None] = time.sleep,
+) -> Dict[str, Any]:
     data = repository_data or load_repository_data()
     organization = data.get("organization")
     if not isinstance(organization, str) or not organization.strip():
@@ -1382,18 +1442,36 @@ def pull_data(repository_data: Optional[Mapping[str, Any]] = None, window_spec: 
     timeout = data.get("git_timeout_seconds", DEFAULT_GIT_TIMEOUT)
     if isinstance(timeout, bool) or not isinstance(timeout, (int, float)) or timeout <= 0:
         raise ConfigError("repositories.json.git_timeout_seconds must be positive")
+    specs = repository_specs(data)
     repositories: List[Dict[str, Any]] = []
-    for spec in repository_specs(data):
-        item: Dict[str, Any] = {"name": spec.name, "remote": spec.remote or f"https://github.com/{organization}/{spec.name}.git", "path": _relative_path(clone_root / spec.name, root), "status": "error", "branch": spec.branch, "head_sha": None, "commits": []}
-        try:
-            path, branch = clone_or_pull(spec, organization, clone_root, git_runner, float(timeout))
-            item["path"], item["branch"] = _relative_path(path, root), branch
-            item["head_sha"] = git_runner(["rev-parse", "HEAD"], cwd=path).strip()
-            item["commits"] = collect_repository_commits(path, "HEAD", window, organization, spec.name, max_commits, git_runner)
-            item["status"] = "updated"
-        except (OSError, XiangShanMonitorError, ValueError) as exc:
-            item["error"] = str(exc)
+    pending: List[Tuple[RepositorySpec, Dict[str, Any]]] = []
+    for spec in specs:
+        item = _empty_repository_item(spec, organization, clone_root, root)
         repositories.append(item)
+        pending.append((spec, item))
+        _refresh_repository_item(item, spec, organization, clone_root, root, window, max_commits, git_runner, float(timeout))
+
+    def failed_pairs() -> List[Tuple[RepositorySpec, Dict[str, Any]]]:
+        return [(spec, item) for spec, item in pending if item.get("status") != "updated"]
+
+    while retry_until is not None and failed_pairs():
+        now_ts = datetime.now(retry_until.tzinfo)
+        if now_ts >= retry_until:
+            break
+        remaining = failed_pairs()
+        for spec, item in remaining:
+            attempt_timeout = _git_attempt_timeout(float(timeout), retry_until)
+            if attempt_timeout is None:
+                break
+            print(f"Retrying git update for {spec.name}", file=sys.stderr)
+            _refresh_repository_item(item, spec, organization, clone_root, root, window, max_commits, git_runner, attempt_timeout)
+        if not failed_pairs():
+            break
+        now_ts = datetime.now(retry_until.tzinfo)
+        if now_ts >= retry_until:
+            break
+        sleeper(min(float(DEFAULT_PULL_RETRY_INTERVAL), (retry_until - now_ts).total_seconds()))
+
     totals = {"repositories": len(repositories), "updated_repositories": sum(item["status"] == "updated" for item in repositories), "repositories_with_errors": sum(item["status"] == "error" for item in repositories), "commits": sum(len(item["commits"]) for item in repositories)}
     totals.update(_pr_counts(repositories))
     return {"kind": "xiangshan-monitor", "organization": organization, "date": window.label, "analysis_window": window.spec, "timezone": window.timezone_name, "window": {"start": window.start.isoformat(), "end": window.end.isoformat()}, "generated_at": datetime.now(timezone.utc).isoformat(), "repositories": repositories, "totals": totals}
@@ -1957,6 +2035,15 @@ def _analysis_start_time(data: Mapping[str, Any]) -> str:
     return value
 
 
+def _pull_retry_until_time(data: Mapping[str, Any]) -> str:
+    delivery = data.get("scheduled_delivery", {})
+    if not isinstance(delivery, Mapping):
+        raise ConfigError("repositories.json.scheduled_delivery must be an object")
+    value = str(delivery.get("pull_retry_until", DEFAULT_PULL_RETRY_UNTIL)).strip()
+    _parse_schedule(value)
+    return value
+
+
 def previous_workday(day: date, calendar: Mapping[str, Any]) -> date:
     """Find the closest earlier workday, including holiday and makeup overrides."""
     candidate = day - timedelta(days=1)
@@ -2051,15 +2138,6 @@ def _pull_failures(report: Mapping[str, Any]) -> List[Dict[str, str]]:
                 "error": str(repository["error"]),
             })
     return failures
-
-
-def _pull_failure_message(failures: Sequence[Mapping[str, str]]) -> str:
-    names = "、".join(str(item.get("name", "unknown")) for item in failures)
-    return (
-        f"呜呜呜，今天有 {len(failures)} 个仓库拉取失败，数据不完整。"
-        f"这次不会调用 AI，也不会发送 release，下一次会从本次尚未完成的时间起点继续汇总。"
-        f"失败仓库：{names}"
-    )
 
 
 def _github_metadata_settings(config: Mapping[str, Any], config_path: Path) -> Dict[str, Any]:
@@ -2296,7 +2374,12 @@ def run_workday_delivery(
     if debug_now:
         report_file = report_file.with_name(f"{report_file.stem}-debug{report_file.suffix}")
         message_file = message_file.with_name(f"{message_file.stem}-debug{message_file.suffix}")
-    report = pull_data(data, root_dir=root, analysis_window=window)
+    report = pull_data(
+        data,
+        root_dir=root,
+        analysis_window=window,
+        retry_until=_scheduled_datetime(today, _pull_retry_until_time(data), timezone_name),
+    )
     write_report(report, report_file)
     totals = report.get("totals", {})
     print(
@@ -2321,28 +2404,13 @@ def run_workday_delivery(
 
     failures = _pull_failures(report)
     if failures:
-        attempt["pull_status"] = "failed"
+        attempt["pull_status"] = "partial"
         attempt["pull_failures"] = failures
-        attempt["release_status"] = "skipped_incomplete_pull"
-        if history.get("next_window_start") is None:
-            history["next_window_start"] = window.start.isoformat()
-        write_delivery_history(history, history_path)
-        warning = _pull_failure_message(failures)
-        if not debug_now and debug_time is not None:
-            _wait_until_today(debug_time, timezone_name, today)
-        try:
-            push(warning, config, section="xiangshan_monitor", layer="debug", use_proxy=bool(data.get("dingtalk_use_proxy", False)))
-            attempt["debug_status"] = "sent"
-            attempt["debug_sent_at"] = datetime.now(tz).isoformat()
-            print(f"DingTalk debug pull-failure message sent at {datetime.now(tz).isoformat(timespec='seconds')}")
-        except (ConfigError, DingTalkError, OSError, ValueError) as exc:
-            attempt["debug_status"] = "failed"
-            attempt["debug_error"] = str(exc)
-            write_delivery_history(history, history_path)
-            raise XiangShanMonitorError(f"debug: {exc}") from exc
-        write_delivery_history(history, history_path)
-        print("Release skipped because repository data is incomplete; AI was not called")
-        return
+        names = "、".join(str(item.get("name", "unknown")) for item in failures)
+        print(
+            f"Git pull incomplete after retries ({names}); continuing with available repositories",
+            file=sys.stderr,
+        )
 
     try:
         snapshot = collect_star_snapshot(config, data, config_file, datetime.now(tz))
