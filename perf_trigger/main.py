@@ -1,4 +1,5 @@
 import argparse
+from enum import Enum
 import hashlib
 import json
 import logging
@@ -65,12 +66,16 @@ PROFILE_DIR = Path(__file__).parent / "profile"
 
 
 class XiangShan:
+    class Mode(Enum):
+        CKPT_JSON = 0
+        WORKLOAD_LIST = 2
+
     def __init__(
         self,
+        json_path: Path,
         result_path: Path,
         benchmarks: str,
         gcpt_path: Path | None = None,
-        json_path: Path | None = None,
     ):
         self.gcpt_path = gcpt_path
         self.json_path = json_path
@@ -79,16 +84,14 @@ class XiangShan:
 
         # No checkpoint directory: json_path is a workload list (one image path per line)
         if gcpt_path is None:
-            if json_path is None:
-                raise ValueError("json_path is required")
-            self.workload_list = json_path
+            self.mode = XiangShan.Mode.WORKLOAD_LIST
+            logging.info(
+                "GCPT path is not provided, treating %s as a workload list", json_path
+            )
             self.__init_from_workload_list(json_path)
             return
 
-        self.workload_list = None
-        if json_path is None:
-            raise ValueError("json_path is required")
-
+        self.mode = XiangShan.Mode.CKPT_JSON
         self.ckpt_version = self.__infer_ckpt_version()
 
         with json_path.open("r", encoding="utf-8") as f:
@@ -97,9 +100,9 @@ class XiangShan:
         profile_path = PROFILE_DIR / f"{self.ckpt_version}.json"
         if profile_path.is_file():
             with profile_path.open("r", encoding="utf-8") as f:
-                profile = json.load(f)
+                self.profile = json.load(f)
         else:
-            profile = {}
+            self.profile = {}
 
         if benchmarks != "":
             benchmark_filter = benchmarks.replace(" ", "").split(",")
@@ -118,7 +121,7 @@ class XiangShan:
 
         self.checkpoints: list[GCPT] = []
         for benchmark_name, benchmark_config in self.benchmarks.items():
-            benchmark_profile = profile.get(benchmark_name, {})
+            benchmark_profile = self.profile.get(benchmark_name, {})
             for point, weight in benchmark_config["points"].items():
                 self.checkpoints.append(
                     GCPT(
@@ -130,30 +133,6 @@ class XiangShan:
                         eta=benchmark_profile.get(point, 0),
                     )
                 )
-
-        self.tracker = Tracker(
-            total=len(self.checkpoints), keys=["assigned", "completed"], with_keys=False
-        )
-
-        # run checkpoints with higher ETA first, to avoid long-running checkpoints blocking the whole run
-        if profile:
-            self.tracker.info(
-                "Profile found for %s, sorting checkpoints by ETA", self.ckpt_version
-            )
-            self.tracker.debug(
-                "Origin first 5:\n\t%s",
-                "\n\t".join([f"{str(c)} ({c.eta})" for c in self.checkpoints[:5]]),
-            )
-            self.checkpoints.sort(key=lambda x: x.eta, reverse=True)
-            self.tracker.debug(
-                "Sorted first 5:\n\t%s",
-                "\n\t".join([f"{str(c)} ({c.eta})" for c in self.checkpoints[:5]]),
-            )
-        else:
-            self.tracker.info(
-                "No profile found for %s, running checkpoints in json order",
-                self.ckpt_version,
-            )
 
     def __init_from_workload_list(self, workload_list: Path) -> None:
         self.ckpt_version = None
@@ -180,29 +159,26 @@ class XiangShan:
         if not self.checkpoints:
             raise ValueError(f"workload list has no images: {workload_list}")
 
-        self.tracker = Tracker(
-            total=len(self.checkpoints), keys=["assigned", "completed"], with_keys=False
-        )
-        self.tracker.info(
-            "Loaded %d workloads from %s", len(self.checkpoints), workload_list
-        )
+        logging.info("Loaded %d workloads", len(self.checkpoints))
 
-    def __infer_ckpt_version(self) -> str | None:
+    def __infer_ckpt_version(self) -> str:
         if self.gcpt_path is None:
-            return None
-        if m := re.search(r"(spec\d\d[0-9a-zA-Z_]+)", str(self.gcpt_path)):
-            return m.group(1)
-        return None
+            raise ValueError(
+                "__infer_ckpt_version should not be called when gcpt_path is None"
+            )
+        return self.gcpt_path.parent.name
 
     def __infer_spec_version(self) -> Spec.Version | None:
-        # try infer from gcpt_path name
-        if self.gcpt_path is not None:
-            if m := re.search(r"spec(\d\d)", str(self.gcpt_path)):
-                return Spec.Version(m.group(1))
+        if self.gcpt_path is None:
+            raise ValueError(
+                "__infer_ckpt_version should not be called when gcpt_path is None"
+            )
+
+        # try infer from dir name in gcpt_path
+        if m := re.search(r"spec(\d\d)", str(self.gcpt_path)):
+            return Spec.Version(m.group(1))
 
         # try infer from benchmarks
-        if self.json_path is None:
-            return None
         with self.json_path.open("r", encoding="utf-8") as f:
             benchmarks = json.load(f)
         for version in Spec.Version:
@@ -240,7 +216,7 @@ class XiangShan:
         ]
 
         open_server = [s for s in self.servers if s.hostname.startswith("open")]
-        if open_server and self.workload_list is not None:
+        if open_server and self.mode == XiangShan.Mode.WORKLOAD_LIST:
             logging.warning(
                 "Workload-list images are used as-is on remote hosts; "
                 "open servers do not share node NFS. Ensure every listed path "
@@ -266,16 +242,37 @@ class XiangShan:
                 server.emu_path = target_emu_path
                 server.nemu_so_path = target_nemu_so_path
 
+    def __init_tracker(self):
+        self.tracker = Tracker(
+            total=len(self.checkpoints), keys=["assigned", "completed"], with_keys=False
+        )
+
+    def __reorder_by_eta(self):
+        if not self.profile:
+            return
+        logging.info(
+            "Profile found for %s, sorting checkpoints by ETA", self.ckpt_version
+        )
+        logging.debug(
+            "Origin first 5:\n\t%s",
+            "\n\t".join([f"{str(c)} ({c.eta})" for c in self.checkpoints[:5]]),
+        )
+        self.checkpoints.sort(key=lambda x: x.eta, reverse=True)
+        logging.debug(
+            "Sorted first 5:\n\t%s",
+            "\n\t".join([f"{str(c)} ({c.eta})" for c in self.checkpoints[:5]]),
+        )
+
     def __run(
         self,
         emu_config: EmuConfig,
     ) -> None:
-        logging.info(
+        self.tracker.info(
             "Start running %d checkpoints on %d servers",
             len(self.checkpoints),
             len(self.servers),
         )
-        logging.debug(
+        self.tracker.debug(
             "Server list: %s", ", ".join(map(lambda s: s.hostname, self.servers))
         )
         failed_checkpoints: list[str] = []
@@ -391,11 +388,13 @@ class XiangShan:
         emu_config: EmuConfig,
     ) -> None:
         try:
+            self.__init_tracker()
             self.__init_servers(
                 emu_path,
                 nemu_so_path,
                 server_list,
             )
+            self.__reorder_by_eta()
             self.__run(emu_config)
         except KeyboardInterrupt as e:
             logging.info("SIGINT received")
@@ -411,171 +410,221 @@ class XiangShan:
         frequency: float,
         override_version: str | None = None,
     ) -> None:
-        if self.workload_list is not None or self.json_path is None:
-            logging.critical("Report is not supported for workload-list mode")
-            return
-
-        version = (
-            Spec.Version(override_version)
-            if override_version is not None
-            else self.__infer_spec_version()
-        )
-
-        if version is None:
-            logging.critical(
-                "Failed to infer SPEC version from gcpt_path, please specify it with --spec-version"
-            )
-            return
-
-        spec = Spec(version)
-
         # collect checkpoint -> benchmark, i.e. astar_biglakes_2972, astar_biglakes_3421 -> astar_biglakes
         result_queue = Queue()
         failed_queue = Queue()
 
-        def collect_benchmark(benchmark: str) -> None:
+        def collect_checkpoints(checkpoints: list[GCPT]) -> None:
             weighted_cpi_sum = 0.0
             weight_sum = 0.0
 
-            for gcpt in self.checkpoints:
-                if gcpt.benchmark != benchmark:
-                    continue
+            for gcpt in checkpoints:
                 cpi = gcpt.get_cpi()
                 if cpi is None:
                     logging.warning("No valid result for checkpoint %s, skipping", gcpt)
-                    failed_queue.put(str(gcpt))
+                    failed_queue.put(
+                        str(gcpt)
+                        if self.mode == XiangShan.Mode.CKPT_JSON
+                        else str(gcpt.bin_path)
+                    )
                     continue
                 # do not need lock as each threading is responsible for a different benchmark
                 weighted_cpi_sum += cpi * gcpt.weight
                 weight_sum += gcpt.weight
 
-            result_queue.put((benchmark, weighted_cpi_sum, weight_sum))
+            # in CKPT_JSON mode, checkpoints[] are guaranteed to be in the same benchmark, so we can just use checkpoints[0].benchmark
+            # in WORKLOAD_LIST mode, we don't care about it
+            result_queue.put((checkpoints[0].benchmark, weighted_cpi_sum, weight_sum))
 
-        processes = [
-            Process(target=collect_benchmark, args=(benchmark,))
-            for benchmark in self.benchmarks.keys()
-        ]
+        if self.mode == XiangShan.Mode.CKPT_JSON:
+            processes = [
+                Process(
+                    target=collect_checkpoints,
+                    args=(
+                        [
+                            ckpt
+                            for ckpt in self.checkpoints
+                            if ckpt.benchmark == benchmark
+                        ],
+                    ),
+                )
+                for benchmark in self.benchmarks.keys()
+            ]
+        else:
+            threads = (
+                len(self.checkpoints) // 16 + 1
+            )  # magic number: each process handles 16 checkpoints
+            processes = [
+                Process(
+                    target=collect_checkpoints, args=(self.checkpoints[i::threads],)
+                )
+                for i in range(threads)
+            ]
         for p in processes:
             p.start()
         for p in processes:
             p.join()
 
-        benchmark_weighted_cpis = {}
-        benchmark_weights = {}
-        while not result_queue.empty():
-            benchmark, weighted_cpi, weight = result_queue.get()
-            if weight == 0:
-                logging.warning(
-                    "Total weight is 0 for benchmark %s, skipping", benchmark
-                )
-            benchmark_weighted_cpis[benchmark] = weighted_cpi
-            benchmark_weights[benchmark] = weight
-
         failed_checkpoints = []
         while not failed_queue.empty():
             failed_checkpoints.append(failed_queue.get())
 
-        benchmark_times = {}
-        for benchmark, weight in benchmark_weights.items():
-            if weight == 0:
-                benchmark_times[benchmark] = float("nan")
-                continue
+        if self.mode == XiangShan.Mode.CKPT_JSON:
+            benchmark_weighted_cpis = {}
+            benchmark_weights = {}
+            while not result_queue.empty():
+                benchmark, weighted_cpi, weight = result_queue.get()
+                if weight == 0:
+                    logging.warning(
+                        "Total weight is 0 for benchmark %s, skipping", benchmark
+                    )
+                benchmark_weighted_cpis[benchmark] = weighted_cpi
+                benchmark_weights[benchmark] = weight
 
-            benchmark_times[benchmark] = (  # weighted_avg_cpi * inst / freq
-                benchmark_weighted_cpis[benchmark]
-                / weight
-                * float(self.benchmarks[benchmark]["insts"])
-                / (frequency * 1e9)
-            )
-
-        def collect_benchmark_group(
-            group: str,
-        ) -> tuple[float, float, float, float]:  # run_time, ref_time, score, coverage
-            run_time = 0.0
-            ref_time = spec.get_ref_time(group)
-            if ref_time is None:
-                logging.warning(
-                    "No valid reftime for benchmark group %s, skipping", group
-                )
-                return 0.0, 0.0, 0.0, 0.0
-
-            weighted_coverage_sum = 0.0
-            instruction_sum = 0.0
-
-            for benchmark in self.benchmarks.keys():
-                if not benchmark.startswith(group):
+            benchmark_times = {}
+            for benchmark, weight in benchmark_weights.items():
+                if weight == 0:
+                    benchmark_times[benchmark] = float("nan")
                     continue
-                run_time += benchmark_times[benchmark]
-                weighted_coverage_sum += benchmark_weights[benchmark] * float(
-                    self.benchmarks[benchmark]["insts"]
+
+                benchmark_times[benchmark] = (  # weighted_avg_cpi * inst / freq
+                    benchmark_weighted_cpis[benchmark]
+                    / weight
+                    * float(self.benchmarks[benchmark]["insts"])
+                    / (frequency * 1e9)
                 )
-                instruction_sum += float(self.benchmarks[benchmark]["insts"])
 
-            if instruction_sum == 0:
-                logging.warning(
-                    "Total instruction count is 0 for benchmark group %s, skipping",
-                    group,
-                )
-                return run_time, ref_time, float("nan"), float("nan")
-
-            coverage = weighted_coverage_sum / instruction_sum
-            score = ref_time / run_time / frequency
-
-            return run_time, ref_time, score, coverage
-
-        def render_line(
-            name: str,
-            run_time: float,
-            ref_time: float,
-            score: float,
-            coverage: float,
-        ) -> None:
-            print(
-                f"{name:<19s} {run_time:>8.3f} {ref_time:>8.0f} {score:>8.3f} {coverage:>8.3f}",
+            version = (
+                Spec.Version(override_version)
+                if override_version is not None
+                else self.__infer_spec_version()
             )
 
-        def render_groups(
-            name: str, group_names: list[str]
-        ) -> tuple[list[float], list[float]]:
-            scores = []
-            coverages = []
-            for group in group_names:
-                fullname = spec.get_benchmark_fullname(group)
-                run_time, ref_time, score, coverage = collect_benchmark_group(group)
-                scores.append(score)
-                coverages.append(coverage)
-                render_line(fullname, run_time, ref_time, score, coverage)
-            render_line(
-                f"{name}/GHz", float("nan"), float("nan"), geomean(scores), float("nan")
-            )
-            return scores, coverages
+            spec = Spec(version) if version is not None else None
 
-        print("======================== Score ========================")
-        print("                        time ref_time    score coverage")
-        int_scores, int_coverages = render_groups(
-            spec.get_int_name(), spec.get_int_benchmarks()
-        )
-        fp_scores, fp_coverages = render_groups(
-            spec.get_fp_name(), spec.get_fp_benchmarks()
-        )
-        final_name = spec.get_name()
-        final_geomean = geomean(int_scores + fp_scores)
-        render_line(final_name, float("nan"), float("nan"), final_geomean, float("nan"))
-        print()
-        print(f"{final_name}/GHz:    {final_geomean:.3f}")
-        print(f"{final_name}@{frequency:2.1f}GHz: {final_geomean * frequency:.3f}")
-        print()
-        print("================ Other Information ===============")
-        final_coverage = min(c for c in int_coverages + fp_coverages if not isnan(c))
-        final_checkpoints = len(self.checkpoints)
-        final_success_checkpoints = final_checkpoints - len(failed_checkpoints)
-        print(f"Checkpoint Version : {self.gcpt_path}")
-        print(f"DRAMSIM3 Config    : {self.checkpoints[0].get_dramsim3_config()}")
-        print(f"Data Directory     : {self.result_path.resolve()}")
-        print(f"Minimal Coverage   : {final_coverage:.2f}/1.00")
-        print(f"Checkpoints Number : {final_success_checkpoints}/{final_checkpoints}")
-        print()
-        print("=============== Failed Checkpoints ===============")
+            def collect_benchmark_group(
+                group: str,
+            ) -> tuple[
+                float, float, float, float
+            ]:  # run_time, ref_time, score, coverage
+                run_time = 0.0
+                ref_time = spec.get_ref_time(group) if spec is not None else None
+                if ref_time is None:
+                    ref_time = float("nan")
+
+                weighted_coverage_sum = 0.0
+                instruction_sum = 0.0
+
+                for benchmark in self.benchmarks.keys():
+                    if not benchmark.startswith(group):
+                        continue
+                    run_time += benchmark_times[benchmark]
+                    weighted_coverage_sum += benchmark_weights[benchmark] * float(
+                        self.benchmarks[benchmark]["insts"]
+                    )
+                    instruction_sum += float(self.benchmarks[benchmark]["insts"])
+
+                if instruction_sum == 0:
+                    logging.warning(
+                        "Total instruction count is 0 for benchmark group %s, skipping",
+                        group,
+                    )
+                    return run_time, ref_time, float("nan"), float("nan")
+
+                coverage = weighted_coverage_sum / instruction_sum
+                score = ref_time / run_time / frequency
+
+                return run_time, ref_time, score, coverage
+
+            def render_line(
+                name: str,
+                run_time: float,
+                ref_time: float,
+                score: float,
+                coverage: float,
+            ) -> None:
+                if spec is not None:
+                    print(
+                        f"{name:<19s} {run_time:>8.3f} {ref_time:>8.0f} {score:>8.3f} {coverage:>8.3f}",
+                    )
+                else:
+                    print(f"{name:<19s} {run_time:>8.3f} {coverage:>8.3f}")
+
+            def render_groups(
+                name: str, group_names: list[str]
+            ) -> tuple[list[float], list[float]]:
+                scores = []
+                coverages = []
+                for group in group_names:
+                    fullname = (
+                        spec.get_benchmark_fullname(group)
+                        if spec is not None
+                        else group
+                    )
+                    run_time, ref_time, score, coverage = collect_benchmark_group(group)
+                    scores.append(score)
+                    coverages.append(coverage)
+                    render_line(fullname, run_time, ref_time, score, coverage)
+                render_line(
+                    f"{name}/GHz",
+                    float("nan"),
+                    float("nan"),
+                    geomean(scores),
+                    float("nan"),
+                )
+                return scores, coverages
+
+            print("======================== Score ========================")
+            if spec is not None:
+                print("                        time ref_time    score coverage")
+                int_scores, int_coverages = render_groups(
+                    spec.get_int_name(), spec.get_int_benchmarks()
+                )
+                fp_scores, fp_coverages = render_groups(
+                    spec.get_fp_name(), spec.get_fp_benchmarks()
+                )
+                final_name = spec.get_name()
+                final_geomean = geomean(int_scores + fp_scores)
+                render_line(
+                    final_name, float("nan"), float("nan"), final_geomean, float("nan")
+                )
+                print()
+                print(f"{final_name}/GHz:    {final_geomean:.3f}")
+                print(
+                    f"{final_name}@{frequency:2.1f}GHz: {final_geomean * frequency:.3f}"
+                )
+                final_coverage = min(
+                    c for c in int_coverages + fp_coverages if not isnan(c)
+                )
+            else:
+                print("                        time coverage")
+                scores, coverages = render_groups(
+                    "All Benchmarks", list(self.benchmarks.keys())
+                )
+                final_coverage = min(c for c in coverages if not isnan(c))
+            print()
+            print("================ Other Information ===============")
+            final_checkpoints = len(self.checkpoints)
+            final_success_checkpoints = final_checkpoints - len(failed_checkpoints)
+            print(f"Checkpoint Json : {self.json_path}")
+            print(f"Ckpt Version    : {self.ckpt_version}")
+            if spec is not None:
+                print(f"SPEC Version    : {spec.version.name}")
+            print(f"DRAMSIM3 Config : {self.checkpoints[0].get_dramsim3_config()}")
+            print(f"Data Directory  : {self.result_path}")
+            print(f"Minimal Coverage: {final_coverage:.2f}/1.00")
+            print(f"Checkpoints     : {final_success_checkpoints}/{final_checkpoints}")
+            print()
+        else:
+            print("================ Information ===============")
+            final_checkpoints = len(self.checkpoints)
+            final_success_checkpoints = final_checkpoints - len(failed_checkpoints)
+            print(f"Workload List  : {self.json_path}")
+            print(f"DRAMSIM3 Config: {self.checkpoints[0].get_dramsim3_config()}")
+            print(f"Data Directory : {self.result_path}")
+            print(f"Workloads      : {final_success_checkpoints}/{final_checkpoints}")
+            print()
+        print("=============== Failed Workloads ===============")
         print(json.dumps(failed_checkpoints, indent=2, separators=(",", ": ")))
 
     def reset_running_gcpt(self):
@@ -704,9 +753,9 @@ def main():
 
     args = parser.parse_args()
 
-    gcpt_path = Path(args.gcpt_path) if args.gcpt_path else None
-    json_path = Path(args.json_path)
-    result_path = Path(args.result_path)
+    gcpt_path = Path(args.gcpt_path).resolve() if args.gcpt_path else None
+    json_path = Path(args.json_path).resolve()
+    result_path = Path(args.result_path).resolve()
 
     result_path.mkdir(parents=True, exist_ok=True)
 
@@ -743,10 +792,7 @@ def main():
     # pre-checks
     if not json_path.is_file():
         raise FileNotFoundError(f"json_path is not a file: {json_path}")
-    if gcpt_path is None:
-        if args.report:
-            raise ValueError("--report requires --gcpt-path")
-    else:
+    if gcpt_path is not None:
         if not gcpt_path.is_dir():
             raise FileNotFoundError(f"gcpt_path is not a directory: {gcpt_path}")
 
@@ -757,9 +803,9 @@ def main():
     # add lock per (result_path, gcpt_path) pair
     # to prevent the same checkpoint from being run by multiple instances with same result_path simultaneously
     if gcpt_path is not None:
-        lock_src = str(gcpt_path.resolve())
+        lock_src = str(gcpt_path)
     else:
-        lock_src = str(json_path.resolve())
+        lock_src = str(json_path)
     gcpt_hash = hashlib.sha256(lock_src.encode()).hexdigest()[:8]
     lock = (
         Heartbeat(f"trigger_{gcpt_hash}", result_path, HEARTBEAT_INTERVAL)
@@ -779,19 +825,21 @@ def main():
 
     try:
         xiangshan = XiangShan(
+            json_path=json_path,
             result_path=result_path,
             benchmarks=args.benchmarks,
             gcpt_path=gcpt_path,
-            json_path=json_path,
         )
 
         if args.reset_running:
             xiangshan.reset_running_gcpt()
 
         if args.run or args.dry_run:
-            emu_path = Path(args.emu_path) if args.emu_path else None
-            nemu_so_path = Path(args.nemu_so_path) if args.nemu_so_path else None
-            cst_file = Path(args.cst_file) if args.cst_file else None
+            emu_path = Path(args.emu_path).resolve() if args.emu_path else None
+            nemu_so_path = (
+                Path(args.nemu_so_path).resolve() if args.nemu_so_path else None
+            )
+            cst_file = Path(args.cst_file).resolve() if args.cst_file else None
 
             if emu_path is None:
                 raise ValueError("emu_path is required for --run")
