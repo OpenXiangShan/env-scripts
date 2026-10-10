@@ -88,6 +88,9 @@ print(detect({n}))
 
 MIN_ALLOC_CORES = 8
 LOG_TRUNCATE_LIMIT = 2048
+RETRYABLE_ERRORS = [
+    "Connection closed by UNKNOWN port 65535",
+]
 
 
 class Server:
@@ -175,77 +178,75 @@ class Server:
             return f"{s[:half]} ... truncated ... {s[-half:]}"
         return s
 
-    def __read_output(self, source: IO[Any] | Path) -> str:
-        """Read process output without assuming that its original handle is readable."""
-        try:
-            if isinstance(source, Path):
-                size = source.stat().st_size
-                marker = b"\n... truncated ...\n"
-                read_size = (LOG_TRUNCATE_LIMIT - len(marker)) // 2
-                with source.open("rb") as output_file:
-                    if size <= LOG_TRUNCATE_LIMIT:
-                        output = output_file.read()
-                    else:
-                        head = output_file.read(read_size)
-                        output_file.seek(-read_size, os.SEEK_END)
-                        output = head + marker + output_file.read(read_size)
-            else:
-                output = source.read()
-        except (OSError, ValueError) as e:
-            return f"<unable to read output: {type(e).__name__}: {e}>"
-
-        if isinstance(output, bytes):
-            return output.decode(errors="replace")
-        return str(output)
-
-    def __format_output(
+    def __read_output(
         self,
         name: str,
-        stream: IO[Any] | None,
+        stream: int | IO[Any] | Path | None,
         destination: int | IO[Any] | None = None,
         path: Path | None = None,
-    ) -> str:
-        source: IO[Any] | Path | None = stream
-        location = ""
-
+    ) -> tuple[bool, str, str]:
+        """Return readability, display name, and full data or an unavailable reason."""
         if path is not None:
             source = path
-            location = f" ({path})"
-        elif source is None and destination is not None:
-            if isinstance(destination, int):
-                if destination == subprocess.DEVNULL:
-                    return f"=== {name} ===\n<redirected to /dev/null>\n"
-                if destination == subprocess.STDOUT:
-                    return f"=== {name} ===\n<redirected to stdout>\n"
-                if destination == subprocess.PIPE:
-                    return f"=== {name} ===\n<capture pipe unavailable>\n"
-                return (
-                    f"=== {name} ===\n"
-                    f"<redirected to file descriptor {destination}; output unavailable>\n"
-                )
-
-            try:
-                destination.flush()
-            except (OSError, ValueError):
-                pass
-
-            destination_name = getattr(destination, "name", None)
-            if isinstance(destination_name, (str, os.PathLike)):
-                output_path = Path(destination_name)
-                source = output_path
-                location = f" ({output_path})"
-            else:
-                source = destination
+        else:
+            source = stream if stream is not None else destination
 
         if source is None:
-            return f"=== {name} ===\n<not captured>\n"
+            return False, name, "not captured"
+        if isinstance(source, int):
+            if source == subprocess.DEVNULL:
+                return False, name, "redirected to /dev/null"
+            if source == subprocess.STDOUT:
+                return False, name, "redirected to stdout"
+            if source == subprocess.PIPE:
+                return False, name, "capture pipe unavailable"
+            return (
+                False,
+                name,
+                f"redirected to file descriptor {source}; output unavailable",
+            )
 
-        output = self.__log_str(self.__read_output(source))
-        return f"=== {name}{location} ===\n{output}\n"
+        if isinstance(source, Path):
+            output_path = source
+        else:
+            try:
+                source.flush()
+            except (OSError, ValueError):
+                pass
+            source_name = getattr(source, "name", None)
+            output_path = (
+                Path(source_name)
+                if isinstance(source_name, (str, os.PathLike))
+                else None
+            )
 
-    def poll(self) -> tuple[list[str], list[str], list[str]]:
+        if output_path is not None:
+            name = f"{name} ({output_path})"
+        try:
+            output = (
+                output_path.read_bytes() if output_path is not None else source.read()
+            )
+        except (OSError, ValueError) as e:
+            return False, name, f"unable to read output: {type(e).__name__}: {e}"
+
+        data = (
+            output.decode(errors="replace")
+            if isinstance(output, bytes)
+            else str(output)
+        )
+        return True, name, data
+
+    def __format_output(self, readable: bool, name: str, data: str) -> str:
+        output = self.__log_str(data) if readable else f"<{data}>"
+        return f"=== {name} ===\n{output}\n"
+
+    def __has_retryable_error(self, data: str) -> bool:
+        return any(error in data for error in RETRYABLE_ERRORS)
+
+    def poll(self) -> tuple[list[str], list[str], list[str], list[str]]:
         still_pending: list[PendingTask] = []
         failed: list[str] = []
+        retry: list[str] = []
         success: list[str] = []
         for task in self.pending_task:
             result = task.proc.poll()
@@ -255,6 +256,16 @@ class Server:
 
             # process finished, check result and call .wait() to cleanup
             if result != 0:
+                stdout = self.__read_output(
+                    "stdout", task.proc.stdout, path=task.stdout_path
+                )
+                stderr = self.__read_output(
+                    "stderr", task.proc.stderr, path=task.stderr_path
+                )
+                retryable = any(
+                    readable and self.__has_retryable_error(data)
+                    for readable, _, data in (stdout, stderr)
+                )
                 self.tracker.error(
                     "%s failed \twith code %d \ton %s \tin %s\n"
                     "=== Command ===\n%s\n%s%s",
@@ -267,14 +278,13 @@ class Server:
                         if task.command
                         else "<unknown>"
                     ),
-                    self.__format_output(
-                        "stdout", task.proc.stdout, path=task.stdout_path
-                    ),
-                    self.__format_output(
-                        "stderr", task.proc.stderr, path=task.stderr_path
-                    ),
+                    self.__format_output(*stdout),
+                    self.__format_output(*stderr),
                 )
-                failed.append(task.name)
+                if retryable:
+                    retry.append(task.name)
+                else:
+                    failed.append(task.name)
             else:
                 self.tracker.info(
                     "%s succeeded \ton %s \tin %s",
@@ -299,7 +309,7 @@ class Server:
                 else "None"
             ),
         )
-        return success, failed, [t.name for t in self.pending_task]
+        return success, failed, retry, [t.name for t in self.pending_task]
 
     def run(
         self,
@@ -331,11 +341,13 @@ class Server:
         if block or check:
             p.wait()
         if check and p.returncode != 0:
+            stdout_output = self.__read_output("stdout", p.stdout, destination=stdout)
+            stderr_output = self.__read_output("stderr", p.stderr, destination=stderr)
             raise RuntimeError(
                 f"Remote command failed({p.returncode}) on {self.hostname}\n"
                 + f"=== Command ===\n{self.__log_str(shlex.join(cmd))}\n"
-                + self.__format_output("stdout", p.stdout, destination=stdout)
-                + self.__format_output("stderr", p.stderr, destination=stderr)
+                + self.__format_output(*stdout_output)
+                + self.__format_output(*stderr_output)
             )
         return p
 
