@@ -250,7 +250,7 @@ class XiangShan:
         )
 
     def __reorder_by_eta(self, checkpoints: list[GCPT] | None = None):
-        if not self.profile:
+        if not hasattr(self, "profile") or not self.profile:
             return
         checkpoints = self.checkpoints if checkpoints is None else checkpoints
         logging.info(
