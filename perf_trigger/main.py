@@ -279,11 +279,10 @@ class XiangShan:
             "Server list: %s", ", ".join(map(lambda s: s.hostname, self.servers))
         )
         unassigned_checkpoints = self.checkpoints.copy()
-        all_assigned = False
         last_pending_count = 0
 
         def poll_servers() -> bool:
-            nonlocal all_assigned, last_pending_count
+            nonlocal last_pending_count
             pending = False
             all_pending = []
             for server in self.servers:
@@ -307,13 +306,12 @@ class XiangShan:
                         self.tracker.step("assigned", -1)
                         unassigned_checkpoints.extend(matches)
                     self.__reorder_by_eta(unassigned_checkpoints)
-                    all_assigned = False
                 if len(pending_list) > 0:
                     pending = True
 
             pending_count = len(all_pending)
             if (
-                all_assigned
+                not unassigned_checkpoints
                 and 0 < len(all_pending) <= 5
                 and last_pending_count != pending_count
             ):
@@ -386,12 +384,15 @@ class XiangShan:
         while unassigned_checkpoints or pending:
             if unassigned_checkpoints:
                 assign(unassigned_checkpoints.pop(0))
+                if not unassigned_checkpoints:
+                    self.tracker.info("All checkpoints assigned, waiting for completion...")
 
-            all_assigned = not unassigned_checkpoints
             pending = poll_servers()
             if not unassigned_checkpoints and pending:
                 self.tracker.debug("Still running, checking again in 60 seconds...")
                 time.sleep(60)
+
+        self.tracker.info("All checkpoints completed")
 
     def __stop(self):
         logging.info("Stopping all servers...")
