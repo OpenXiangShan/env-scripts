@@ -12,79 +12,9 @@ from .gcpt import GCPT
 from .types import EmuConfig, FreeCoreInfo, PendingTask
 from .tracker import Tracker
 
-# NOTE: This script is from OpenXiangShan/XiangShan/scripts/xiangshan.py get_free_cores()
-#       with comments removed, will be sent to remote servers through stdin.
-GET_FREE_CORE_SCRIPT = """
-import os
-import pathlib
-import psutil
-import random
-import time
-
-def get_numa_count():
-    node_dir = pathlib.Path("/sys/devices/system/node/")
-    return len(list(node_dir.glob("node*")))
-
-def get_cpu_usage():
-    return psutil.cpu_percent(interval=0.5, percpu=True)
-
-def get_physical_cores():
-    count = psutil.cpu_count(logical=False)
-    if count is None:
-        raise RuntimeError("Failed to get physical core count")
-    return set(range(count))
-
-def get_usable_cores():
-    return os.sched_getaffinity(0)
-
-def get_bound_cores():
-    valid_list = ["running", "disk-sleep", "waking", "waiting"]
-    cores = set()
-    for proc in psutil.process_iter(["pid", "name", "cpu_affinity", "status"]):
-        try:
-            if not proc.info["status"] in valid_list or len(proc.info["cpu_affinity"]) > 16:
-                continue
-            cores |= set(proc.info["cpu_affinity"])
-        except (psutil.NoSuchProcess, psutil.AccessDenied, psutil.ZombieProcess):
-            pass
-    return cores
-
-def detect(n):
-    numa_count = get_numa_count()
-    phy_cores = get_physical_cores() # invariant, get once
-    num_core = len(phy_cores)
-    num_window = num_core // n
-    def check(i):
-        window = range(i * n, i * n + n)
-        candidates = phy_cores & get_usable_cores()
-        if not set(window).issubset(candidates): # fail-fast
-            return False
-        candidates -= get_bound_cores()
-        if not set(window).issubset(candidates): # fail-fast
-            return False
-        core_usage = get_cpu_usage()
-        window_usage = core_usage[i * n : i * n + n]
-        return (
-            sum(window_usage) < 30 * n and
-            sum(map(lambda x: x > 80, window_usage)) < 1
-        )
-    for i in random.sample(range(num_window), num_window):
-        if not check(i):
-            continue
-        time.sleep(random.uniform(0, 10))
-        if not check(i):
-            continue
-        return (
-            True,
-            (int)(((i * n) % num_core) // (num_core // numa_count)),
-            (int)(i * n),
-            (int)(i * n + n - 1),
-            num_core,
-        )
-    return (False, 0, 0, 0, num_core)
-
-print(detect({n}))
-"""
+GET_FREE_CORE_SCRIPT_PATH = Path(__file__).parent / "get_free_cores.py"
+with GET_FREE_CORE_SCRIPT_PATH.open("r", encoding="utf-8") as f:
+    GET_FREE_CORE_SCRIPT = f.read()
 
 MIN_ALLOC_CORES = 8
 LOG_TRUNCATE_LIMIT = 2048
@@ -125,31 +55,75 @@ class Server:
             return self.free_info.split(threads)
         return FreeCoreInfo.none()
 
+    def __detect_free_core_script(self) -> None:
+        # check if script path exists on remote server, if true, use it to get free cores, otherwise fallback to inline script
+        p = self.run(
+            [
+                "test",
+                "-e",
+                shlex.quote(str(GET_FREE_CORE_SCRIPT_PATH)),
+            ],
+        )
+        if p.returncode == 0:
+            self.__use_inline_script = False
+            logging.debug(
+                "get_free_cores.py found on %s, using it to detect free cores", self.hostname
+            )
+        else:
+            self.__use_inline_script = True
+            logging.warning(
+                "get_free_cores.py not found on %s, fallback to inline script", self.hostname
+            )
+
+    @property
+    def use_inline_script(self) -> bool:
+        if not hasattr(self, "_Server__use_inline_script"):
+            self.__detect_free_core_script()
+        return self.__use_inline_script
+
     def get_free_cores(self, threads: int) -> FreeCoreInfo:
         try:
-            p = self.run(
-                [
-                    "python3",
-                    "-c",
-                    shlex.quote(
-                        GET_FREE_CORE_SCRIPT.format(n=max(threads, MIN_ALLOC_CORES))
-                    ),
-                ],
-                check=True,
-            )
+            if self.use_inline_script:
+                p = self.run(
+                    [
+                        "python3",
+                        "-c",
+                        shlex.quote(
+                            GET_FREE_CORE_SCRIPT.format(n=max(threads, MIN_ALLOC_CORES))
+                        ),
+                    ],
+                    check=True,
+                )
+            else:
+                p = self.run(
+                    [
+                        "python3",
+                        "-P",
+                        shlex.quote(str(GET_FREE_CORE_SCRIPT_PATH)),
+                        str(max(threads, MIN_ALLOC_CORES)),
+                    ],
+                    check=True,
+                )
         except RuntimeError as e:
             logging.error(e)
             return FreeCoreInfo.none()
 
         if p.stdout is None:
+            logging.error("No stdout from get_free_cores.py on %s", self.hostname)
             return FreeCoreInfo.none()
 
         result = p.stdout.read().decode().strip()
         if len(result) == 0:
+            logging.error("Empty output from get_free_cores.py on %s", self.hostname)
             return FreeCoreInfo.none()
 
         result = re.match(r"\((True|False), (\d+), (\d+), (\d+), (\d+)\)", result)
         if result is None:
+            logging.error(
+                "Unexpected output from get_free_cores.py on %s: %s",
+                self.hostname,
+                result,
+            )
             return FreeCoreInfo.none()
 
         info = FreeCoreInfo(
