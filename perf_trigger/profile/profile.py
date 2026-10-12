@@ -10,9 +10,6 @@ import statistics
 from typing import Deque, Literal
 
 DEFAULT_LOG_ROOT = Path("/nfs/home/ci-runner/perf-report")
-DEFAULT_PROFILE_PATH = (
-    Path(__file__).resolve().parent / "spec06_gcc15_rv64gcb_base_260604.json"
-)
 SortMode = Literal["json", "avgtime", "maxtime"]
 
 NEW_SUCCESS_RE = re.compile(
@@ -349,8 +346,8 @@ def main():
     parser.add_argument(
         "--profile",
         type=Path,
-        default=DEFAULT_PROFILE_PATH,
-        help=f"Profile JSON to update or show (default: {DEFAULT_PROFILE_PATH})",
+        required=True,
+        help=f"Profile JSON to update or show",
     )
     parser.add_argument(
         "--create-from",
