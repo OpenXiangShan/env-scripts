@@ -64,12 +64,14 @@ class Server:
         if p.returncode == 0:
             self.__use_inline_script = False
             logging.debug(
-                "get_free_cores.py found on %s, using it to detect free cores", self.hostname
+                "get_free_cores.py found on %s, using it to detect free cores",
+                self.hostname,
             )
         else:
             self.__use_inline_script = True
             logging.warning(
-                "get_free_cores.py not found on %s, fallback to inline script", self.hostname
+                "get_free_cores.py not found on %s, fallback to inline script",
+                self.hostname,
             )
 
     @property
@@ -211,10 +213,10 @@ class Server:
         output = self.__log_str(data) if readable else f"<{data}>"
         return f"=== {name} ===\n{output}\n"
 
-    def poll(self) -> tuple[list[str], list[str], list[str]]:
+    def poll(self) -> tuple[list[PendingTask], list[PendingTask], list[PendingTask]]:
         still_pending: list[PendingTask] = []
-        failed: list[str] = []
-        success: list[str] = []
+        failed: list[PendingTask] = []
+        success: list[PendingTask] = []
         for task in self.pending_task:
             result = task.proc.poll()
             if result is None:
@@ -244,7 +246,7 @@ class Server:
                     self.__format_output(*stdout),
                     self.__format_output(*stderr),
                 )
-                failed.append(task.name)
+                failed.append(task)
             else:
                 self.tracker.info(
                     "%s succeeded \ton %s \tin %s",
@@ -252,24 +254,23 @@ class Server:
                     self.hostname,
                     time.strftime("%Hh %Mm %Ss", time.gmtime(task.elapsed)),
                 )
-                success.append(task.name)
+                success.append(task)
             task.proc.wait()
         self.pending_task = still_pending
-        self.tracker.debug(
-            "Pending tasks on %s: %s",
-            self.hostname,
-            (
-                ", ".join([t.name for t in self.pending_task[:5]])
-                + (
-                    f" ({len(self.pending_task) - 5}) hidden)"
-                    if len(self.pending_task) > 5
-                    else ""
-                )
-                if self.pending_task
-                else "None"
-            ),
-        )
-        return success, failed, [t.name for t in self.pending_task]
+        if self.pending_task:
+            self.tracker.debug(
+                "Pending tasks on %s: %s",
+                self.hostname,
+                (
+                    ", ".join([t.name for t in self.pending_task[:5]])
+                    + (
+                        f" (+{len(self.pending_task) - 5})"
+                        if len(self.pending_task) > 5
+                        else ""
+                    )
+                ),
+            )
+        return success, failed, self.pending_task.copy()
 
     def run(
         self,
@@ -389,6 +390,7 @@ class Server:
                 command=tuple(run_cmd),
                 stdout_path=gcpt.stdout_path,
                 stderr_path=gcpt.stderr_path,
+                gcpt=gcpt,
             )
         )
         self.tracker.info("Started %s on %s", gcpt, self.hostname)

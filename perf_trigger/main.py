@@ -291,14 +291,13 @@ class XiangShan:
                 success, fail, pending_list = server.poll()
                 all_pending.extend(pending_list)
                 retry_count = 0
-                for name in fail:
-                    matches = [gcpt for gcpt in self.checkpoints if str(gcpt) == name]
-                    if len(matches) != 1:
+                for task in fail:
+                    gcpt = task.gcpt
+                    if gcpt is None:
                         self.tracker.error(
-                            "Unknown checkpoint %s failed on server %s", name, server
+                            "Failed task %s has no checkpoint reference", task.name
                         )
                         continue
-                    gcpt = matches[0]
                     gcpt.clear_state()
                     match gcpt.refresh_state():
                         case GCPT.State.NONE | GCPT.State.RUNNING:
@@ -334,7 +333,10 @@ class XiangShan:
                 and 0 < len(all_pending) <= 5
                 and last_pending_count != pending_count
             ):
-                self.tracker.info("Remaining checkpoints: %s", ", ".join(all_pending))
+                self.tracker.info(
+                    "Remaining checkpoints: %s",
+                    ", ".join(t.name for t in all_pending),
+                )
             last_pending_count = pending_count
             return pending
 
