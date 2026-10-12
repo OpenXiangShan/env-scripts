@@ -18,9 +18,6 @@ with GET_FREE_CORE_SCRIPT_PATH.open("r", encoding="utf-8") as f:
 
 MIN_ALLOC_CORES = 8
 LOG_TRUNCATE_LIMIT = 2048
-RETRYABLE_ERRORS = [
-    "Connection closed by UNKNOWN port 65535",
-]
 
 
 class Server:
@@ -214,13 +211,9 @@ class Server:
         output = self.__log_str(data) if readable else f"<{data}>"
         return f"=== {name} ===\n{output}\n"
 
-    def __has_retryable_error(self, data: str) -> bool:
-        return any(error in data for error in RETRYABLE_ERRORS)
-
-    def poll(self) -> tuple[list[str], list[str], list[str], list[str]]:
+    def poll(self) -> tuple[list[str], list[str], list[str]]:
         still_pending: list[PendingTask] = []
         failed: list[str] = []
-        retry: list[str] = []
         success: list[str] = []
         for task in self.pending_task:
             result = task.proc.poll()
@@ -235,10 +228,6 @@ class Server:
                 )
                 stderr = self.__read_output(
                     "stderr", task.proc.stderr, path=task.stderr_path
-                )
-                retryable = any(
-                    readable and self.__has_retryable_error(data)
-                    for readable, _, data in (stdout, stderr)
                 )
                 self.tracker.error(
                     "%s failed \twith code %d \ton %s \tin %s\n"
@@ -255,10 +244,7 @@ class Server:
                     self.__format_output(*stdout),
                     self.__format_output(*stderr),
                 )
-                if retryable:
-                    retry.append(task.name)
-                else:
-                    failed.append(task.name)
+                failed.append(task.name)
             else:
                 self.tracker.info(
                     "%s succeeded \ton %s \tin %s",
@@ -283,7 +269,7 @@ class Server:
                 else "None"
             ),
         )
-        return success, failed, retry, [t.name for t in self.pending_task]
+        return success, failed, [t.name for t in self.pending_task]
 
     def run(
         self,

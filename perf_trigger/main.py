@@ -64,6 +64,8 @@ SERVER_POOL = [
 HEARTBEAT_INTERVAL = 60
 PROFILE_DIR = Path(__file__).parent / "profile"
 
+RETRY_LIMIT = 3
+
 
 class XiangShan:
     class Mode(Enum):
@@ -286,26 +288,43 @@ class XiangShan:
             pending = False
             all_pending = []
             for server in self.servers:
-                success, fail, retry, pending_list = server.poll()
+                success, fail, pending_list = server.poll()
                 all_pending.extend(pending_list)
-                self.tracker.step("completed", len(success) + len(fail))
-                self.tracker.step("failed", len(fail))
-                if retry:
-                    for name in retry:
-                        matches = [
-                            gcpt for gcpt in self.checkpoints if str(gcpt) == name
-                        ]
-                        if not matches:
-                            self.tracker.error(
-                                "Retry requested for unknown checkpoint %s", name
-                            )
-                            continue
-                        self.tracker.warning(
-                            "%s failed with retryable error, retrying", name
+                retry_count = 0
+                for name in fail:
+                    matches = [gcpt for gcpt in self.checkpoints if str(gcpt) == name]
+                    if len(matches) != 1:
+                        self.tracker.error(
+                            "Unknown checkpoint %s failed on server %s", name, server
                         )
-                        self.tracker.step("assigned", -1)
-                        unassigned_checkpoints.extend(matches)
-                    self.__reorder_by_eta(unassigned_checkpoints)
+                        continue
+                    gcpt = matches[0]
+                    gcpt.clear_state()
+                    match gcpt.refresh_state():
+                        case GCPT.State.NONE | GCPT.State.RUNNING:
+                            if not gcpt.retry(RETRY_LIMIT):
+                                self.tracker.error(
+                                    "%s has exceeded retry limit (%d), treat as failed, rerun the script if needed",
+                                    gcpt,
+                                    RETRY_LIMIT,
+                                )
+                                continue
+                            self.tracker.warning(
+                                "%s seems to have failed with retryable error (e.g. network failure), retrying",
+                                gcpt,
+                            )
+                            retry_count += 1
+                            # insert to the front to retry it ASAP
+                            unassigned_checkpoints.insert(0, gcpt)
+                        case _:
+                            self.tracker.error(
+                                "%s failed with non-retryable error", gcpt
+                            )
+
+                self.tracker.step("completed", len(success) + len(fail) - retry_count)
+                self.tracker.step("failed", len(fail) - retry_count)
+                self.tracker.step("assigned", -retry_count)
+
                 if len(pending_list) > 0:
                     pending = True
 
@@ -385,7 +404,9 @@ class XiangShan:
             if unassigned_checkpoints:
                 assign(unassigned_checkpoints.pop(0))
                 if not unassigned_checkpoints:
-                    self.tracker.info("All checkpoints assigned, waiting for completion...")
+                    self.tracker.info(
+                        "All checkpoints assigned, waiting for completion..."
+                    )
 
             pending = poll_servers()
             if not unassigned_checkpoints and pending:
