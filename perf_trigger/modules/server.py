@@ -12,79 +12,9 @@ from .gcpt import GCPT
 from .types import EmuConfig, FreeCoreInfo, PendingTask
 from .tracker import Tracker
 
-# NOTE: This script is from OpenXiangShan/XiangShan/scripts/xiangshan.py get_free_cores()
-#       with comments removed, will be sent to remote servers through stdin.
-GET_FREE_CORE_SCRIPT = """
-import os
-import pathlib
-import psutil
-import random
-import time
-
-def get_numa_count():
-    node_dir = pathlib.Path("/sys/devices/system/node/")
-    return len(list(node_dir.glob("node*")))
-
-def get_cpu_usage():
-    return psutil.cpu_percent(interval=0.5, percpu=True)
-
-def get_physical_cores():
-    count = psutil.cpu_count(logical=False)
-    if count is None:
-        raise RuntimeError("Failed to get physical core count")
-    return set(range(count))
-
-def get_usable_cores():
-    return os.sched_getaffinity(0)
-
-def get_bound_cores():
-    valid_list = ["running", "disk-sleep", "waking", "waiting"]
-    cores = set()
-    for proc in psutil.process_iter(["pid", "name", "cpu_affinity", "status"]):
-        try:
-            if not proc.info["status"] in valid_list or len(proc.info["cpu_affinity"]) > 16:
-                continue
-            cores |= set(proc.info["cpu_affinity"])
-        except (psutil.NoSuchProcess, psutil.AccessDenied, psutil.ZombieProcess):
-            pass
-    return cores
-
-def detect(n):
-    numa_count = get_numa_count()
-    phy_cores = get_physical_cores() # invariant, get once
-    num_core = len(phy_cores)
-    num_window = num_core // n
-    def check(i):
-        window = range(i * n, i * n + n)
-        candidates = phy_cores & get_usable_cores()
-        if not set(window).issubset(candidates): # fail-fast
-            return False
-        candidates -= get_bound_cores()
-        if not set(window).issubset(candidates): # fail-fast
-            return False
-        core_usage = get_cpu_usage()
-        window_usage = core_usage[i * n : i * n + n]
-        return (
-            sum(window_usage) < 30 * n and
-            sum(map(lambda x: x > 80, window_usage)) < 1
-        )
-    for i in random.sample(range(num_window), num_window):
-        if not check(i):
-            continue
-        time.sleep(random.uniform(0, 10))
-        if not check(i):
-            continue
-        return (
-            True,
-            (int)(((i * n) % num_core) // (num_core // numa_count)),
-            (int)(i * n),
-            (int)(i * n + n - 1),
-            num_core,
-        )
-    return (False, 0, 0, 0, num_core)
-
-print(detect({n}))
-"""
+GET_FREE_CORE_SCRIPT_PATH = Path(__file__).parent / "get_free_cores.py"
+with GET_FREE_CORE_SCRIPT_PATH.open("r", encoding="utf-8") as f:
+    GET_FREE_CORE_SCRIPT = f.read()
 
 MIN_ALLOC_CORES = 8
 LOG_TRUNCATE_LIMIT = 2048
@@ -122,31 +52,77 @@ class Server:
             return self.free_info.split(threads)
         return FreeCoreInfo.none()
 
+    def __detect_free_core_script(self) -> None:
+        # check if script path exists on remote server, if true, use it to get free cores, otherwise fallback to inline script
+        p = self.run(
+            [
+                "test",
+                "-e",
+                shlex.quote(str(GET_FREE_CORE_SCRIPT_PATH)),
+            ],
+        )
+        if p.returncode == 0:
+            self.__use_inline_script = False
+            logging.debug(
+                "get_free_cores.py found on %s, using it to detect free cores",
+                self.hostname,
+            )
+        else:
+            self.__use_inline_script = True
+            logging.warning(
+                "get_free_cores.py not found on %s, fallback to inline script",
+                self.hostname,
+            )
+
+    @property
+    def use_inline_script(self) -> bool:
+        if not hasattr(self, "_Server__use_inline_script"):
+            self.__detect_free_core_script()
+        return self.__use_inline_script
+
     def get_free_cores(self, threads: int) -> FreeCoreInfo:
         try:
-            p = self.run(
-                [
-                    "python3",
-                    "-c",
-                    shlex.quote(
-                        GET_FREE_CORE_SCRIPT.format(n=max(threads, MIN_ALLOC_CORES))
-                    ),
-                ],
-                check=True,
-            )
+            if self.use_inline_script:
+                p = self.run(
+                    [
+                        "python3",
+                        "-c",
+                        shlex.quote(
+                            GET_FREE_CORE_SCRIPT.format(n=max(threads, MIN_ALLOC_CORES))
+                        ),
+                    ],
+                    check=True,
+                )
+            else:
+                p = self.run(
+                    [
+                        "python3",
+                        "-P",
+                        shlex.quote(str(GET_FREE_CORE_SCRIPT_PATH)),
+                        str(max(threads, MIN_ALLOC_CORES)),
+                    ],
+                    check=True,
+                )
         except RuntimeError as e:
             logging.error(e)
             return FreeCoreInfo.none()
 
         if p.stdout is None:
+            logging.error("No stdout from get_free_cores.py on %s", self.hostname)
             return FreeCoreInfo.none()
 
         result = p.stdout.read().decode().strip()
         if len(result) == 0:
+            logging.error("Empty output from get_free_cores.py on %s", self.hostname)
             return FreeCoreInfo.none()
 
         result = re.match(r"\((True|False), (\d+), (\d+), (\d+), (\d+)\)", result)
         if result is None:
+            logging.error(
+                "Unexpected output from get_free_cores.py on %s: %s",
+                self.hostname,
+                result,
+            )
             return FreeCoreInfo.none()
 
         info = FreeCoreInfo(
@@ -175,78 +151,72 @@ class Server:
             return f"{s[:half]} ... truncated ... {s[-half:]}"
         return s
 
-    def __read_output(self, source: IO[Any] | Path) -> str:
-        """Read process output without assuming that its original handle is readable."""
-        try:
-            if isinstance(source, Path):
-                size = source.stat().st_size
-                marker = b"\n... truncated ...\n"
-                read_size = (LOG_TRUNCATE_LIMIT - len(marker)) // 2
-                with source.open("rb") as output_file:
-                    if size <= LOG_TRUNCATE_LIMIT:
-                        output = output_file.read()
-                    else:
-                        head = output_file.read(read_size)
-                        output_file.seek(-read_size, os.SEEK_END)
-                        output = head + marker + output_file.read(read_size)
-            else:
-                output = source.read()
-        except (OSError, ValueError) as e:
-            return f"<unable to read output: {type(e).__name__}: {e}>"
-
-        if isinstance(output, bytes):
-            return output.decode(errors="replace")
-        return str(output)
-
-    def __format_output(
+    def __read_output(
         self,
         name: str,
-        stream: IO[Any] | None,
+        stream: int | IO[Any] | Path | None,
         destination: int | IO[Any] | None = None,
         path: Path | None = None,
-    ) -> str:
-        source: IO[Any] | Path | None = stream
-        location = ""
-
+    ) -> tuple[bool, str, str]:
+        """Return readability, display name, and full data or an unavailable reason."""
         if path is not None:
             source = path
-            location = f" ({path})"
-        elif source is None and destination is not None:
-            if isinstance(destination, int):
-                if destination == subprocess.DEVNULL:
-                    return f"=== {name} ===\n<redirected to /dev/null>\n"
-                if destination == subprocess.STDOUT:
-                    return f"=== {name} ===\n<redirected to stdout>\n"
-                if destination == subprocess.PIPE:
-                    return f"=== {name} ===\n<capture pipe unavailable>\n"
-                return (
-                    f"=== {name} ===\n"
-                    f"<redirected to file descriptor {destination}; output unavailable>\n"
-                )
-
-            try:
-                destination.flush()
-            except (OSError, ValueError):
-                pass
-
-            destination_name = getattr(destination, "name", None)
-            if isinstance(destination_name, (str, os.PathLike)):
-                output_path = Path(destination_name)
-                source = output_path
-                location = f" ({output_path})"
-            else:
-                source = destination
+        else:
+            source = stream if stream is not None else destination
 
         if source is None:
-            return f"=== {name} ===\n<not captured>\n"
+            return False, name, "not captured"
+        if isinstance(source, int):
+            if source == subprocess.DEVNULL:
+                return False, name, "redirected to /dev/null"
+            if source == subprocess.STDOUT:
+                return False, name, "redirected to stdout"
+            if source == subprocess.PIPE:
+                return False, name, "capture pipe unavailable"
+            return (
+                False,
+                name,
+                f"redirected to file descriptor {source}; output unavailable",
+            )
 
-        output = self.__log_str(self.__read_output(source))
-        return f"=== {name}{location} ===\n{output}\n"
+        if isinstance(source, Path):
+            output_path = source
+        else:
+            try:
+                source.flush()
+            except (OSError, ValueError):
+                pass
+            source_name = getattr(source, "name", None)
+            output_path = (
+                Path(source_name)
+                if isinstance(source_name, (str, os.PathLike))
+                else None
+            )
 
-    def poll(self) -> tuple[list[str], list[str], list[str]]:
+        if output_path is not None:
+            name = f"{name} ({output_path})"
+        try:
+            output = (
+                output_path.read_bytes() if output_path is not None else source.read()
+            )
+        except (OSError, ValueError) as e:
+            return False, name, f"unable to read output: {type(e).__name__}: {e}"
+
+        data = (
+            output.decode(errors="replace")
+            if isinstance(output, bytes)
+            else str(output)
+        )
+        return True, name, data
+
+    def __format_output(self, readable: bool, name: str, data: str) -> str:
+        output = self.__log_str(data) if readable else f"<{data}>"
+        return f"=== {name} ===\n{output}\n"
+
+    def poll(self) -> tuple[list[PendingTask], list[PendingTask], list[PendingTask]]:
         still_pending: list[PendingTask] = []
-        failed: list[str] = []
-        success: list[str] = []
+        failed: list[PendingTask] = []
+        success: list[PendingTask] = []
         for task in self.pending_task:
             result = task.proc.poll()
             if result is None:
@@ -255,6 +225,12 @@ class Server:
 
             # process finished, check result and call .wait() to cleanup
             if result != 0:
+                stdout = self.__read_output(
+                    "stdout", task.proc.stdout, path=task.stdout_path
+                )
+                stderr = self.__read_output(
+                    "stderr", task.proc.stderr, path=task.stderr_path
+                )
                 self.tracker.error(
                     "%s failed \twith code %d \ton %s \tin %s\n"
                     "=== Command ===\n%s\n%s%s",
@@ -267,14 +243,10 @@ class Server:
                         if task.command
                         else "<unknown>"
                     ),
-                    self.__format_output(
-                        "stdout", task.proc.stdout, path=task.stdout_path
-                    ),
-                    self.__format_output(
-                        "stderr", task.proc.stderr, path=task.stderr_path
-                    ),
+                    self.__format_output(*stdout),
+                    self.__format_output(*stderr),
                 )
-                failed.append(task.name)
+                failed.append(task)
             else:
                 self.tracker.info(
                     "%s succeeded \ton %s \tin %s",
@@ -282,24 +254,23 @@ class Server:
                     self.hostname,
                     time.strftime("%Hh %Mm %Ss", time.gmtime(task.elapsed)),
                 )
-                success.append(task.name)
+                success.append(task)
             task.proc.wait()
         self.pending_task = still_pending
-        self.tracker.debug(
-            "Pending tasks on %s: %s",
-            self.hostname,
-            (
-                ", ".join([t.name for t in self.pending_task[:5]])
-                + (
-                    f" ({len(self.pending_task) - 5}) hidden)"
-                    if len(self.pending_task) > 5
-                    else ""
-                )
-                if self.pending_task
-                else "None"
-            ),
-        )
-        return success, failed, [t.name for t in self.pending_task]
+        if self.pending_task:
+            self.tracker.debug(
+                "Pending tasks on %s: %s",
+                self.hostname,
+                (
+                    ", ".join([t.name for t in self.pending_task[:5]])
+                    + (
+                        f" (+{len(self.pending_task) - 5})"
+                        if len(self.pending_task) > 5
+                        else ""
+                    )
+                ),
+            )
+        return success, failed, self.pending_task.copy()
 
     def run(
         self,
@@ -331,11 +302,13 @@ class Server:
         if block or check:
             p.wait()
         if check and p.returncode != 0:
+            stdout_output = self.__read_output("stdout", p.stdout, destination=stdout)
+            stderr_output = self.__read_output("stderr", p.stderr, destination=stderr)
             raise RuntimeError(
                 f"Remote command failed({p.returncode}) on {self.hostname}\n"
                 + f"=== Command ===\n{self.__log_str(shlex.join(cmd))}\n"
-                + self.__format_output("stdout", p.stdout, destination=stdout)
-                + self.__format_output("stderr", p.stderr, destination=stderr)
+                + self.__format_output(*stdout_output)
+                + self.__format_output(*stderr_output)
             )
         return p
 
@@ -417,6 +390,7 @@ class Server:
                 command=tuple(run_cmd),
                 stdout_path=gcpt.stdout_path,
                 stderr_path=gcpt.stderr_path,
+                gcpt=gcpt,
             )
         )
         self.tracker.info("Started %s on %s", gcpt, self.hostname)

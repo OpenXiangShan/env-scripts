@@ -64,6 +64,8 @@ SERVER_POOL = [
 HEARTBEAT_INTERVAL = 60
 PROFILE_DIR = Path(__file__).parent / "profile"
 
+RETRY_LIMIT = 3
+
 
 class XiangShan:
     class Mode(Enum):
@@ -244,23 +246,26 @@ class XiangShan:
 
     def __init_tracker(self):
         self.tracker = Tracker(
-            total=len(self.checkpoints), keys=["assigned", "completed"], with_keys=False
+            total=len(self.checkpoints),
+            keys=["assigned", "completed", "failed"],
+            with_keys=False,
         )
 
-    def __reorder_by_eta(self):
-        if not self.profile:
+    def __reorder_by_eta(self, checkpoints: list[GCPT] | None = None):
+        if not hasattr(self, "profile") or not self.profile:
             return
+        checkpoints = self.checkpoints if checkpoints is None else checkpoints
         logging.info(
             "Profile found for %s, sorting checkpoints by ETA", self.ckpt_version
         )
         logging.debug(
             "Origin first 5:\n\t%s",
-            "\n\t".join([f"{str(c)} ({c.eta})" for c in self.checkpoints[:5]]),
+            "\n\t".join([f"{str(c)} ({c.eta})" for c in checkpoints[:5]]),
         )
-        self.checkpoints.sort(key=lambda x: x.eta, reverse=True)
+        checkpoints.sort(key=lambda x: x.eta, reverse=True)
         logging.debug(
             "Sorted first 5:\n\t%s",
-            "\n\t".join([f"{str(c)} ({c.eta})" for c in self.checkpoints[:5]]),
+            "\n\t".join([f"{str(c)} ({c.eta})" for c in checkpoints[:5]]),
         )
 
     def __run(
@@ -275,8 +280,7 @@ class XiangShan:
         self.tracker.debug(
             "Server list: %s", ", ".join(map(lambda s: s.hostname, self.servers))
         )
-        failed_checkpoints: list[str] = []
-        all_assigned = False
+        unassigned_checkpoints = self.checkpoints.copy()
         last_pending_count = 0
 
         def poll_servers() -> bool:
@@ -285,23 +289,58 @@ class XiangShan:
             all_pending = []
             for server in self.servers:
                 success, fail, pending_list = server.poll()
-                failed_checkpoints.extend(fail)
                 all_pending.extend(pending_list)
-                self.tracker.step("completed", len(success) + len(fail))
+                retry_count = 0
+                for task in fail:
+                    gcpt = task.gcpt
+                    if gcpt is None:
+                        self.tracker.error(
+                            "Failed task %s has no checkpoint reference", task.name
+                        )
+                        continue
+                    gcpt.clear_state()
+                    match gcpt.refresh_state():
+                        case GCPT.State.NONE | GCPT.State.RUNNING:
+                            if not gcpt.retry(RETRY_LIMIT):
+                                self.tracker.error(
+                                    "%s has exceeded retry limit (%d), treat as failed, rerun the script if needed",
+                                    gcpt,
+                                    RETRY_LIMIT,
+                                )
+                                continue
+                            self.tracker.warning(
+                                "%s seems to have failed with retryable error (e.g. network failure), retrying",
+                                gcpt,
+                            )
+                            retry_count += 1
+                            # insert to the front to retry it ASAP
+                            unassigned_checkpoints.insert(0, gcpt)
+                        case _:
+                            self.tracker.error(
+                                "%s failed with non-retryable error", gcpt
+                            )
+
+                self.tracker.step("completed", len(success) + len(fail) - retry_count)
+                self.tracker.step("failed", len(fail) - retry_count)
+                self.tracker.step("assigned", -retry_count)
+
                 if len(pending_list) > 0:
                     pending = True
 
             pending_count = len(all_pending)
             if (
-                all_assigned
+                not unassigned_checkpoints
                 and 0 < len(all_pending) <= 5
                 and last_pending_count != pending_count
             ):
-                self.tracker.info("Remaining checkpoints: %s", ", ".join(all_pending))
+                self.tracker.info(
+                    "Remaining checkpoints: %s",
+                    ", ".join(t.name for t in all_pending),
+                )
             last_pending_count = pending_count
             return pending
 
-        for gcpt in self.checkpoints:
+        def assign(gcpt: GCPT) -> None:
             # check state from disk
             state = gcpt.refresh_state()
             if emu_config.dry_run:
@@ -322,7 +361,9 @@ class XiangShan:
                     )
                     self.tracker.step("assigned", 1)
                     self.tracker.step("completed", 1)
-                    continue
+                    if state == GCPT.State.ABORTED:
+                        self.tracker.step("failed", 1)
+                    return
 
             # loop until task is assigned
             assigned = False
@@ -360,20 +401,21 @@ class XiangShan:
                 assigned = True
                 self.tracker.step("assigned", 1)
 
-        # wait for all servers to complete
-        self.tracker.info("All checkpoints assigned, waiting for completion...")
-        all_assigned = True
-        pending = poll_servers()
-        while pending:
-            self.tracker.debug("Still running, checking again in 60 seconds...")
-            time.sleep(60)
-            pending = poll_servers()
+        pending = True
+        while unassigned_checkpoints or pending:
+            if unassigned_checkpoints:
+                assign(unassigned_checkpoints.pop(0))
+                if not unassigned_checkpoints:
+                    self.tracker.info(
+                        "All checkpoints assigned, waiting for completion..."
+                    )
 
-        # report all failed jobs
-        if len(failed_checkpoints) > 0:
-            logging.error("Failed checkpoints:")
-            for gcpt in failed_checkpoints:
-                logging.error("- %s", gcpt)
+            pending = poll_servers()
+            if not unassigned_checkpoints and pending:
+                self.tracker.debug("Still running, checking again in 60 seconds...")
+                time.sleep(60)
+
+        self.tracker.info("All checkpoints completed")
 
     def __stop(self):
         logging.info("Stopping all servers...")

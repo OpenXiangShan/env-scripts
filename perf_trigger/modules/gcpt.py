@@ -31,6 +31,7 @@ class GCPT:
         self.__name_override = name
         self.__state = GCPT.State.NONE
         self.__result_path = result_path / str(self)
+        self.__retry_count = 0
 
     @classmethod
     def from_image(cls, image_path: Path, result_path: Path) -> "GCPT":
@@ -180,3 +181,10 @@ class GCPT:
                 if "DRAMSIM3 config:" in line:
                     return line.split("DRAMSIM3 config:")[1].strip()
         return ""
+
+    def retry(self, limit: int = 3) -> bool:
+        if self.__retry_count >= limit:
+            return False
+        self.__retry_count += 1
+        self.clear_state()
+        return True
