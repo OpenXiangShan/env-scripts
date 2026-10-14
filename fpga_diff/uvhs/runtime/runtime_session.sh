@@ -59,6 +59,22 @@ tcl_quote() {
   printf '"%s"' "$value"
 }
 
+runtime_guard() {
+  local operation=$1
+  local directory=$2
+  local helper=${UVHS_RUNTIME_SAFETY_HELPER:-}
+  local python=${UVHS_RUNTIME_PYTHON:-/usr/bin/python3}
+  [[ $python == /* && -x $python ]] || {
+    echo "ERROR: explicit executable runtime Python path required" >&2
+    return 13
+  }
+  [[ -n $helper && -f $helper && ! -L $helper && -n ${GBUS_OWNER_TOKEN:-} ]] || {
+    echo "ERROR: owned runtime safety helper/token required; session preserved" >&2
+    return 13
+  }
+  "$python" "$helper" runtime-guard "$directory" "$GBUS_OWNER_TOKEN" "$operation"
+}
+
 action=${1:-}
 [[ -n $action ]] || usage
 shift
@@ -82,7 +98,11 @@ case $action in
 
     mkdir -p "$(dirname "$pid_file")" "$(dirname "$ready_file")" \
       "$(dirname "$log_file")" "$(dirname "$command_file")"
-    rm -f "$pid_file" "$ready_file" "$command_file" "${command_file}.running"
+    runtime_guard launch "$(dirname "$pid_file")"
+    if [[ -e $pid_file || -e $ready_file || -e $command_file || -e $command_file.running ]]; then
+      echo "ERROR: runtime evidence already exists; choose a new owned session directory" >&2
+      exit 2
+    fi
 
     nohup "$@" </dev/null >"$log_file" 2>&1 &
     pid=$!
@@ -95,26 +115,21 @@ case $action in
         wait "$pid"
         status=$?
         set -e
-        rm -f "$pid_file" "$ready_file"
         show_log_tail "$log_file"
-        echo "ERROR: UVHS runtime exited before it became ready (status $status)" >&2
+        echo "ERROR: UVHS runtime exited before it became ready (status $status); evidence preserved" >&2
         exit 3
       fi
       if (( SECONDS >= deadline )); then
-        kill "$pid" 2>/dev/null || true
-        wait "$pid" 2>/dev/null || true
-        rm -f "$pid_file" "$ready_file"
         show_log_tail "$log_file"
-        echo "ERROR: timed out waiting for UVHS runtime after ${timeout}s" >&2
+        echo "ERROR: timed out waiting for UVHS runtime; session and evidence preserved" >&2
         exit 4
       fi
       sleep 0.2
     done
 
     if ! runtime_pid=$(read_pid "$ready_file") || ! process_is_alive "$runtime_pid"; then
-      rm -f "$pid_file" "$ready_file"
       show_log_tail "$log_file"
-      echo "ERROR: UVHS runtime published an invalid ready PID" >&2
+      echo "ERROR: UVHS runtime published an invalid ready PID; evidence preserved" >&2
       exit 5
     fi
     write_pid "$pid_file" "$runtime_pid"
@@ -151,6 +166,9 @@ case $action in
       exit 9
     fi
 
+    operation=command
+    [[ $1 != stop ]] || operation=stop-check
+    runtime_guard "$operation" "$(dirname "$command_file")"
     result_file="${command_file}.result.$$"
     temp_file="${command_file}.tmp.$$"
     mkdir -p "$(dirname "$command_file")"

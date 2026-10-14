@@ -4,10 +4,23 @@ UVHS_RUNTIME_DIR := $(UVHS_ROOT_DIR)/uvhs/runtime
 
 UVHS_TEMPLATE_DIR ?=
 UVHS_UVW_AXI4_TO_DDR4_SRC ?=
+UVHS_GBUS_C2H_DMA ?= 0
+UVHS_FUNCTIONAL_DDR_REMOTE_LINK ?= $(UVHS_GBUS_C2H_DMA)
+ifneq ($(filter $(UVHS_GBUS_C2H_DMA),0 1),$(UVHS_GBUS_C2H_DMA))
+$(error UVHS_GBUS_C2H_DMA must be 0 or 1)
+endif
+ifneq ($(filter $(UVHS_FUNCTIONAL_DDR_REMOTE_LINK),0 1),$(UVHS_FUNCTIONAL_DDR_REMOTE_LINK))
+$(error UVHS_FUNCTIONAL_DDR_REMOTE_LINK must be 0 or 1)
+endif
+ifeq ($(UVHS_GBUS_C2H_DMA),1)
+ifneq ($(DIFFTEST_HOSTIF),GBUS)
+$(error UVHS_GBUS_C2H_DMA=1 requires DIFFTEST_HOSTIF=GBUS)
+endif
+endif
 # KMH is the XiangShan target; keep the larger CPU profile enabled by default.
 UVHS_PROBE_TCL ?= $(if $(filter kmh xiangshan,$(CPU)),$(UVHS_COMPILATION_DIR)/probe_kmh.tcl,$(UVHS_COMPILATION_DIR)/probe_ila.tcl)
 UVHS_PROBE_PATH := $(if $(strip $(UVHS_PROBE_TCL)),$(abspath $(UVHS_PROBE_TCL)),)
-UVHS_DDR_AXI_WIDTH := $(if $(filter nutshell,$(CPU)),64,256)
+UVHS_DDR_AXI_WIDTH := $(if $(filter 1,$(UVHS_GBUS_C2H_DMA)),256,$(if $(filter nutshell,$(CPU)),64,256))
 UVHS_WORK_DIR := $(ENV_SCRIPTS_HOME)/$(PRJ_NAME)
 UVHS_FILELIST := $(UVHS_WORK_DIR)/rtl/filelist.f
 
@@ -55,6 +68,8 @@ UVHS_FLOW_ENV = \
 	XDMA_LINK_WIDTH="$(XDMA_LINK_WIDTH)" \
 	DIFFTEST_HOSTIF="$(DIFFTEST_HOSTIF)" \
 	DIFFTEST_HOST_DEFINE="$(DIFFTEST_HOST_DEFINE)" \
+	UVHS_GBUS_C2H_DMA="$(UVHS_GBUS_C2H_DMA)" \
+	UVHS_FUNCTIONAL_DDR_REMOTE_LINK="$(UVHS_FUNCTIONAL_DDR_REMOTE_LINK)" \
 	UVHS_KEEP_FPGAS="$(UVHS_KEEP_FPGAS)" \
 	UVHS_LUT_FILL_RATE="$(UVHS_LUT_FILL_RATE)" \
 	UVHS_LUT6_FILL_RATE="$(UVHS_LUT6_FILL_RATE)"
@@ -73,9 +88,10 @@ uvhs_preflight: check_project_name
 			[[ -n "$${!variable:-}" ]] || { echo "ERROR: $$variable is not set" >&2; exit 1; }; \
 		done; \
 		[[ -n "$(CPU)" ]] || { echo "ERROR: CPU is not set" >&2; exit 1; }; \
-		for command in bash python3 gzip ldconfig; do \
+		for command in bash python3 gzip ldconfig csh; do \
 			command -v "$$command" >/dev/null || { echo "ERROR: command not found: $$command" >&2; exit 1; }; \
 		done; \
+		csh -fc limit >/dev/null || { echo "ERROR: csh resource-limit query failed" >&2; exit 1; }; \
 		for executable in \
 			"$$UV_ROOT/bin/uv_shell" "$$UV_ROOT/bin/uv_shell_exec" \
 			"$$UV_XILINX_VIVADO/bin/vivado" \
@@ -117,6 +133,8 @@ uvhs_prepare: uvhs_preflight
 		"$(UVHS_UVW_AXI4_TO_DDR4_SRC)" "$(UVHS_DDR_AXI_WIDTH)"
 
 uvhs_project: uvhs_prepare
+	DIFFTEST_HOSTIF="$(DIFFTEST_HOSTIF)" DIFFTEST_HOST_DEFINE="$(DIFFTEST_HOST_DEFINE)" \
+	UVHS_GBUS_C2H_DMA="$(UVHS_GBUS_C2H_DMA)" UVHS_FUNCTIONAL_DDR_REMOTE_LINK="$(UVHS_FUNCTIONAL_DDR_REMOTE_LINK)" \
 	bash "$(UVHS_ROOT_DIR)/tools/update_core_flist.sh" uvhs \
 		"$(CORE_DIR)" "$(UVHS_WORK_DIR)" "$(CPU)" "$(UVHS_FILELIST)" \
 		-- $(RTL_INCLUDE)
@@ -192,11 +210,11 @@ uvhs_stage_bitstream:
 	@test -d "$(UVHS_RUNTIME_DB)"
 	@mkdir -p "$(FPGA_BIT_ARTIFACT_DIR)/runtime"
 	@test ! -e "$(FPGA_BIT_ARTIFACT_DIR)/runtime/$(PRJ_NAME)" || { \
-		echo "ERROR: runtime artifact already exists; clean the bit archive first" >&2; exit 2; \
+		echo "ERROR: runtime artifact already exists; choose a new bit archive" >&2; exit 2; \
 	}
-	@mkdir -p "$(FPGA_BIT_ARTIFACT_DIR)/runtime/$(PRJ_NAME)"
-	@cp -a --reflink=auto "$(UVHS_RUNTIME_DB)" \
-		"$(FPGA_BIT_ARTIFACT_DIR)/runtime/$(PRJ_NAME)/"
+	@python3 "$(UVHS_ROOT_DIR)/tools/uvhs_runtime_package.py" \
+		"$(UVHS_RUNTIME_DB)" "$(FPGA_BIT_ARTIFACT_DIR)/runtime/$(PRJ_NAME)/hw.dat" \
+		--proof "$(FPGA_BIT_ARTIFACT_DIR)/runtime/$(PRJ_NAME)/runtime-package-proof.json"
 	@echo "FPGA_RUNTIME_ARTIFACT=$(FPGA_BIT_ARTIFACT_DIR)/runtime/$(PRJ_NAME)"
 	@echo "FPGA_RUNTIME_DEST=env-scripts/fpga_diff/$(PRJ_NAME)"
 

@@ -295,6 +295,33 @@ proc export_bd_ip {name script out_file jobs force} {
 
     open_bd_design $bd
     current_bd_design $name
+    set flash_width_stamp ""
+    if {$name eq "AXI_bridge" && [info exists ::env(UVHS_FLOW)] && $::env(UVHS_FLOW) eq "1"} {
+        global hostif
+        set flash [get_bd_intf_ports -quiet UVHS_FLASH_AXI]
+        if {[llength $flash] != 1} {
+            error "cached AXI_bridge lacks the UVHS flash port; rebuild with UVHS_EXPORT_IP_FORCE=1"
+        }
+        set expected_width [expr {$hostif eq "GBUS" ? 256 : 64}]
+        if {[get_property CONFIG.DATA_WIDTH $flash] != $expected_width} {
+            set_property CONFIG.DATA_WIDTH $expected_width $flash
+            set force 1
+            puts "INFO: refresh cached AXI_bridge flash width to $expected_width and rebuild its checkpoint"
+        }
+        set flash_width_stamp ${out_file}.flash-width
+        set cached_width ""
+        if {[file exists $flash_width_stamp]} {
+            set stamp [open $flash_width_stamp r]
+            set cached_width [string trim [read $stamp]]
+            close $stamp
+        }
+        if {$cached_width ne $expected_width} {
+            set force 1
+        }
+        if {$force && [file exists $flash_width_stamp]} {
+            file delete $flash_width_stamp
+        }
+    }
     validate_bd_design
     save_bd_design
     generate_target all $bd
@@ -315,6 +342,12 @@ proc export_bd_ip {name script out_file jobs force} {
     update_compile_order -fileset sources_1
     run_and_write_opened_dcp synth_1 $out_file $jobs $force
     verify_checkpoint "BD $name" $out_file
+    if {$flash_width_stamp ne ""} {
+        set stamp [open ${flash_width_stamp}.tmp w]
+        puts $stamp $expected_width
+        close $stamp
+        file rename -force ${flash_width_stamp}.tmp $flash_width_stamp
+    }
 }
 
 # data_bridge is instantiated in every DiffTest build, so it is exported for
