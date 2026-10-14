@@ -130,7 +130,7 @@ class GCPT:
 
         with self.stderr_path.open("r", encoding="utf-8") as stderr:
             for line in stderr:
-                if "Assertion failed" in line:
+                if "Assertion" in line and "failed" in line:
                     self.__state = GCPT.State.ABORTED
 
         return self.__state
