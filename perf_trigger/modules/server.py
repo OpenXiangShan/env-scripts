@@ -32,9 +32,10 @@ class Server:
         self.emu_path = emu_path
         self.nemu_so_path = nemu_so_path
         self.pending_task: list[PendingTask] = []
-        self.free_info: FreeCoreInfo = FreeCoreInfo(
+        self.cached_free_info: FreeCoreInfo = FreeCoreInfo(
             free=False, mem_node=0, start=0, end=0, total=0
         )
+        self.cached_timestamp: float = 0.0
         self.tracker = tracker
 
     def __str__(self) -> str:
@@ -44,12 +45,16 @@ class Server:
         return self.run(["hostname"]).wait() == 0
 
     def has_cached_free_core(self, threads: int) -> bool:
-        return self.free_info.free and self.free_info.num() >= threads
+        return (
+            time.time() <= self.cached_timestamp + 30
+            and self.cached_free_info.free
+            and self.cached_free_info.num() >= threads
+        )
 
     def get_cached_free_cores(self, threads: int) -> FreeCoreInfo:
         # if we have enough cached free cores, split and return
         if self.has_cached_free_core(threads):
-            return self.free_info.split(threads)
+            return self.cached_free_info.split(threads)
         return FreeCoreInfo.none()
 
     def __detect_free_core_script(self) -> None:
@@ -135,8 +140,9 @@ class Server:
 
         # if we got more than needed, cache the remaining cores
         if info.free and MIN_ALLOC_CORES > threads:
-            self.free_info = info
-            info = self.free_info.split(threads)
+            self.cached_timestamp = time.time()
+            self.cached_free_info = info
+            info = self.cached_free_info.split(threads)
 
         # there is already a pending task using the same free cores, it may not started properly yet
         # return not free in this case, let higher level wait and retry
