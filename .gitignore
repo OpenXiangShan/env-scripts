@@ -11,6 +11,7 @@ __pycache__
 .vscode
 
 *.txt
+!oss_stats/requirements.txt
 !dingtalk_robot/xiangshan_monitor/prompt.txt
 *.log
 *.csv
@@ -32,8 +33,12 @@ psutil/
 # Local robot credentials and generated reports
 dingtalk_robot/config.json
 dingtalk_robot/token
-dingtalk_robot/oss_stats/reports/*.json
-dingtalk_robot/oss_stats/reports/*.xlsx
+
+# Local OSS statistics configuration and generated data
+oss_stats/config.json
+oss_stats/reports/
+oss_stats/star_history.json
+oss_stats/star_history.json.tmp
 
 # OpenXiangShan daily monitor clones and generated reports
 dingtalk_robot/xiangshan_monitor/repos/

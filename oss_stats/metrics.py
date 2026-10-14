@@ -11,6 +11,7 @@ from zoneinfo import ZoneInfo
 
 from .ci import GitHubActionsMetrics, collect_github_actions
 from .github import GitHubClient, GitHubError
+from .stars import apply_star_baseline
 
 
 ISSUE_LINK = re.compile(
@@ -28,13 +29,17 @@ query RepositoryMonth(
   $until: GitTimestamp!
   $issueQuery: String!
   $pullRequestQuery: String!
+  $mergedPullRequestQuery: String!
   $commitCursor: String
   $issueCursor: String
   $pullRequestCursor: String
+  $mergedPullRequestCursor: String
   $forkCursor: String
   $includeCommits: Boolean!
+  $includeChangedLines: Boolean!
   $includeIssues: Boolean!
   $includePullRequests: Boolean!
+  $includeMergedPullRequests: Boolean!
   $includeForks: Boolean!
 ) {
   repository(owner: $owner, name: $name) {
@@ -51,8 +56,8 @@ query RepositoryMonth(
             pageInfo { hasNextPage endCursor }
             nodes {
               oid
-              additions
-              deletions
+              additions @include(if: $includeChangedLines)
+              deletions @include(if: $includeChangedLines)
               author { name email user { login } }
             }
           }
@@ -120,6 +125,21 @@ query RepositoryMonth(
       }
     }
   }
+  mergedPullRequests: search(
+    query: $mergedPullRequestQuery
+    type: ISSUE
+    first: 100
+    after: $mergedPullRequestCursor
+  ) @include(if: $includeMergedPullRequests) {
+    issueCount
+    pageInfo { hasNextPage endCursor }
+    nodes {
+      ... on PullRequest {
+        number
+        mergedAt
+      }
+    }
+  }
   rateLimit { cost limit remaining resetAt used }
 }
 """
@@ -156,10 +176,11 @@ class RepoMetrics:
     url: str
     archived: bool = False
     fork: bool = False
+    created_at: Optional[datetime] = None
+    changed_lines_status: str = "available"
     stars_total: int = 0
     forks_total: int = 0
     open_items: int = 0
-    stars_added: Optional[int] = None
     forks_added: int = 0
     commits: int = 0
     additions: int = 0
@@ -173,6 +194,7 @@ class RepoMetrics:
     pr_reviews: int = 0
     prs_closed: int = 0
     prs_merged: int = 0
+    created_prs_merged: int = 0
     prs_responded: int = 0
     prs_reviewed: int = 0
     linked_prs: int = 0
@@ -211,8 +233,9 @@ class RepoMetrics:
     def add_commits(self, nodes: Iterable[Dict[str, Any]]) -> None:
         for node in nodes:
             self.commits += 1
-            self.additions += int(node.get("additions") or 0)
-            self.deletions += int(node.get("deletions") or 0)
+            if self.changed_lines_status == "available":
+                self.additions += int(node.get("additions") or 0)
+                self.deletions += int(node.get("deletions") or 0)
             oid = str(node.get("oid") or "")
             if oid:
                 self.commit_keys.add(f"{self.full_name}@{oid}")
@@ -311,7 +334,14 @@ class RepoMetrics:
             self.pr_close_hours.append((closed_at - created_at).total_seconds() / 3600)
         merged_at = parse_time(pull_request.get("mergedAt"))
         if merged_at and start <= merged_at < end:
-            self.prs_merged += 1
+            self.created_prs_merged += 1
+
+    def add_merged_pull_requests(
+        self, nodes: Iterable[Dict[str, Any]], start: datetime, end: datetime
+    ) -> None:
+        self.prs_merged += sum(
+            1 for node in nodes if _in_period(node.get("mergedAt"), start, end)
+        )
 
     def _period_nodes(
         self,
@@ -344,23 +374,26 @@ class RepoMetrics:
             "url": self.url,
             "archived": self.archived,
             "fork": self.fork,
+            "created_at": self.created_at.isoformat() if self.created_at else None,
             "current": {
                 "stars": self.stars_total,
                 "forks": self.forks_total,
                 "open_issues_and_prs": self.open_items,
             },
             "community_vitality": {
-                "stars_added": self.stars_added,
-                "stars_added_status": "unavailable_github_access_restriction",
+                "stars_net_change": None,
+                "stars_comparison_status": "missing_baseline",
                 "forks_added": self.forks_added,
                 "commits": self.commits,
                 "additions": self.additions,
                 "deletions": self.deletions,
                 "lines_changed": self.additions + self.deletions,
+                "changed_lines_status": self.changed_lines_status,
                 "commit_scope": "default_branch",
                 "issues_opened": self.issues_opened,
                 "issue_comments": self.issue_comments,
                 "prs_opened": self.prs_opened,
+                "prs_opened_scope": "created_in_period",
                 "pr_comments": self.pr_comments,
             },
             "developer_base": {
@@ -377,7 +410,10 @@ class RepoMetrics:
                 "issue_resolution_hours": _average(self.issue_close_hours),
                 "prs_closed": self.prs_closed,
                 "prs_merged": self.prs_merged,
-                "pr_merge_rate": _ratio(self.prs_merged, self.prs_opened),
+                "prs_merged_scope": "merged_in_period",
+                "created_prs_merged": self.created_prs_merged,
+                "pr_merge_rate": _ratio(self.created_prs_merged, self.prs_opened),
+                "pr_merge_rate_scope": "created_in_period_and_merged_in_period",
                 "pr_unresponsive_rate": _ratio(
                     self.prs_opened - self.prs_responded, self.prs_opened
                 ),
@@ -412,6 +448,7 @@ def _repo_from_api(repo: Dict[str, Any]) -> RepoMetrics:
         url=repo.get("html_url", ""),
         archived=bool(repo.get("archived")),
         fork=bool(repo.get("fork")),
+        created_at=parse_time(repo.get("created_at")),
         stars_total=int(repo.get("stargazers_count") or 0),
         forks_total=int(repo.get("forks_count") or 0),
         open_items=int(repo.get("open_issues_count") or 0),
@@ -423,15 +460,21 @@ def _github_timestamp(value: datetime) -> str:
 
 
 def _search_query(
-    full_name: str, start: datetime, end: datetime, item_type: str
+    full_name: str,
+    start: datetime,
+    end: datetime,
+    item_type: str,
+    timestamp_field: str = "created",
 ) -> str:
     if item_type not in {"issue", "pr"}:
         raise ValueError(f"Unsupported GitHub search item type: {item_type}")
+    if timestamp_field not in {"created", "merged"}:
+        raise ValueError(f"Unsupported GitHub search timestamp: {timestamp_field}")
     first_date = start.astimezone(timezone.utc).date().isoformat()
     last_date = (end - timedelta(microseconds=1)).astimezone(timezone.utc).date().isoformat()
     return (
         f"repo:{full_name} is:{item_type} "
-        f"created:{first_date}..{last_date}"
+        f"{timestamp_field}:{first_date}..{last_date}"
     )
 
 
@@ -442,22 +485,35 @@ def _collect_repository_history(
     end: datetime,
     max_pages: int,
 ) -> None:
+    if metrics.created_at and metrics.created_at >= start:
+        metrics.changed_lines_status = "zero_repository_created_in_or_after_period"
+    if metrics.created_at and metrics.created_at >= end:
+        metrics.history_status = "available"
+        return
     owner, name = metrics.full_name.split("/", 1)
     commit_cursor: Optional[str] = None
     issue_cursor: Optional[str] = None
     pull_request_cursor: Optional[str] = None
+    merged_pull_request_cursor: Optional[str] = None
     fork_cursor: Optional[str] = None
     include_commits = True
     include_issues = True
     include_pull_requests = True
+    include_merged_pull_requests = True
     include_forks = True
     expected_issues: Optional[int] = None
     expected_pull_requests: Optional[int] = None
+    expected_merged_pull_requests: Optional[int] = None
     loaded_issues = 0
     loaded_pull_requests = 0
+    loaded_merged_pull_requests = 0
 
     while (
-        include_commits or include_issues or include_pull_requests or include_forks
+        include_commits
+        or include_issues
+        or include_pull_requests
+        or include_merged_pull_requests
+        or include_forks
     ) and metrics.history_pages < max_pages:
         data = client.graphql(
             REPOSITORY_MONTH_QUERY,
@@ -468,13 +524,19 @@ def _collect_repository_history(
                 "until": _github_timestamp(end),
                 "issueQuery": _search_query(metrics.full_name, start, end, "issue"),
                 "pullRequestQuery": _search_query(metrics.full_name, start, end, "pr"),
+                "mergedPullRequestQuery": _search_query(
+                    metrics.full_name, start, end, "pr", timestamp_field="merged"
+                ),
                 "commitCursor": commit_cursor,
                 "issueCursor": issue_cursor,
                 "pullRequestCursor": pull_request_cursor,
+                "mergedPullRequestCursor": merged_pull_request_cursor,
                 "forkCursor": fork_cursor,
                 "includeCommits": include_commits,
+                "includeChangedLines": metrics.changed_lines_status == "available",
                 "includeIssues": include_issues,
                 "includePullRequests": include_pull_requests,
+                "includeMergedPullRequests": include_merged_pull_requests,
                 "includeForks": include_forks,
             },
         )
@@ -519,6 +581,17 @@ def _collect_repository_history(
             include_pull_requests = bool(page_info.get("hasNextPage"))
             pull_request_cursor = page_info.get("endCursor")
 
+        if include_merged_pull_requests:
+            search = data.get("mergedPullRequests") or {}
+            if expected_merged_pull_requests is None:
+                expected_merged_pull_requests = int(search.get("issueCount") or 0)
+            nodes = [node for node in search.get("nodes") or [] if isinstance(node, dict)]
+            loaded_merged_pull_requests += len(nodes)
+            metrics.add_merged_pull_requests(nodes, start, end)
+            page_info = search.get("pageInfo") or {}
+            include_merged_pull_requests = bool(page_info.get("hasNextPage"))
+            merged_pull_request_cursor = page_info.get("endCursor")
+
         if include_forks:
             forks = repository.get("forks") or {}
             nodes = [node for node in forks.get("nodes") or [] if isinstance(node, dict)]
@@ -546,6 +619,11 @@ def _collect_repository_history(
         and loaded_pull_requests < expected_pull_requests
     ):
         metrics.truncated_sections.append("pull_requests")
+    if include_merged_pull_requests or (
+        expected_merged_pull_requests is not None
+        and loaded_merged_pull_requests < expected_merged_pull_requests
+    ):
+        metrics.truncated_sections.append("merged_pull_requests")
     if include_forks:
         metrics.truncated_sections.append("forks")
     metrics.history_status = "truncated" if metrics.truncated_sections else "available"
@@ -579,6 +657,7 @@ def _aggregate(
             "pr_reviews",
             "prs_closed",
             "prs_merged",
+            "created_prs_merged",
             "prs_responded",
             "prs_reviewed",
             "linked_prs",
@@ -694,7 +773,7 @@ def collect_statistics(
         and local_start.time().replace(tzinfo=None) == datetime.min.time()
         and local_end == next_month
     )
-    return {
+    report = {
         "generated_at": datetime.now(timezone.utc).isoformat(),
         "organization": organization,
         "period": {
@@ -719,7 +798,10 @@ def collect_statistics(
             "interaction_connections_truncated": sum(
                 item.interaction_connections_truncated for item in metrics
             ),
-            "new_stars": "unavailable_since_2026_07_github_access_restriction",
+            "changed_lines_zero_repositories": [
+                item.full_name for item in metrics
+                if item.changed_lines_status == "zero_repository_created_in_or_after_period"
+            ],
             "github_actions": {
                 "provider": "github_actions",
                 "complete_repositories": actions_complete,
@@ -743,14 +825,17 @@ def collect_statistics(
         "repositories": repository_results,
         "limitations": [
             "Commit counts and changed lines cover each repository's default branch only.",
-            "Issue and pull request interaction metrics use items created in the period and interactions on those items within the same period.",
+            "Added, deleted, and changed lines are zero for repositories created in or after the reporting period; their line-count fields are not queried.",
+            "New pull requests are counted by createdAt; merged pull requests are counted independently by mergedAt, including pull requests created before the period.",
+            "Issue and pull request interaction metrics and PR merge rate use items created in the period and interactions or merges within the same period.",
             "GitHub GraphQL returns at most 100 comments or reviews per item in this report; coverage records truncated connections.",
-            "GitHub restricted stargazer identity/timestamp lists in July 2026, so period star additions are unavailable without repository collaborator access.",
             "Organization/individual manager roles are not available reliably from public GitHub data.",
             "The organization summary excludes fork repositories by default to avoid counting imported upstream activity; per-repository results still include them.",
             "CI metrics cover GitHub Actions only. Run duration uses updated_at minus run_started_at and is an API-level approximation.",
         ],
     }
+    apply_star_baseline(report, None)
+    return report
 
 
 def _markdown_table(headers: List[str], rows: Iterable[Iterable[Any]]) -> List[str]:
@@ -813,18 +898,33 @@ def render_markdown(report: Dict[str, Any], top_repositories: int = 10) -> str:
         )
     )
     lines.extend([""])
+    stars = report["star_growth"]
+    lines.extend(["#### Star 净增（上月快照至本次采集）", ""])
+    lines.extend(_markdown_table(
+        ["上月快照时间", "本次采集时间", "可比仓库"],
+        [[stars["baseline_at"] or "待建立基线", stars["current_at"],
+          f"{stars['comparable_repositories']}/{stars['aggregate_repositories']}"]],
+    ))
+    lines.extend([""])
+    lines.extend(_markdown_table(
+        ["上月 Stars（可比仓库）", "本次 Stars（可比仓库）", "净增（可比仓库）", "组织净增"],
+        [[_number(stars["baseline_total_comparable"]), _number(stars["current_total_comparable"]),
+          _number(stars["comparable_net_change"]), _number(stars["net_change"])]],
+    ))
+    if stars["status"] != "available":
+        lines.extend(["", "> 部分仓库缺少上月快照，组织 Star 净增待建立完整基线。"])
+    lines.extend(["", "#### 当期活跃度", ""])
     lines.extend(
         _markdown_table(
             ["当月指标", "数值"],
             [
-                ["新增 Stars", "N/A"],
                 ["新增 Forks", vitality["forks_added"]],
                 ["默认分支 Commits", vitality["commits"]],
                 ["代码变更行", _number(vitality["lines_changed"])],
                 ["新建 Issue", vitality["issues_opened"]],
                 ["Issue 评论", vitality["issue_comments"]],
-                ["新建 PR", vitality["prs_opened"]],
-                ["合并 PR", collaboration["prs_merged"]],
+                ["本期创建 PR", vitality["prs_opened"]],
+                ["本期合并 PR", collaboration["prs_merged"]],
                 ["PR 评审", collaboration["pr_reviews"]],
                 ["活跃贡献者", developers["contributors"]],
                 ["代码贡献者", developers["code_contributors"]],
@@ -857,7 +957,7 @@ def render_markdown(report: Dict[str, Any], top_repositories: int = 10) -> str:
         _markdown_table(
             ["PR 指标", "数值"],
             [
-                ["合并率", _percent(collaboration["pr_merge_rate"])],
+                ["本期创建 PR 的期内合并率", _percent(collaboration["pr_merge_rate"])],
                 [
                     "评审参与率",
                     _percent(collaboration["pr_review_participation_rate"]),
@@ -945,7 +1045,7 @@ def render_markdown(report: Dict[str, Any], top_repositories: int = 10) -> str:
         lines.extend(["#### 仓库活跃度", ""])
         lines.extend(
             _markdown_table(
-                ["仓库", "Commits", "变更行", "Issue", "PR", "合并"],
+                ["仓库", "Commits", "变更行", "Issue", "创建 PR", "合并 PR"],
                 [
                     [
                         f"{index}. [{repo['name']}]({repo['url']})",
@@ -963,7 +1063,7 @@ def render_markdown(report: Dict[str, Any], top_repositories: int = 10) -> str:
         lines.extend(["", "#### 协作质量", ""])
         lines.extend(
             _markdown_table(
-                ["仓库", "Issue 响应", "PR 响应", "评审参与", "合并率"],
+                ["仓库", "Issue 响应", "PR 响应", "评审参与", "创建 PR 期内合并率"],
                 [
                     [
                         f"{index}. [{repo['name']}]({repo['url']})",
@@ -1053,14 +1153,21 @@ def render_markdown(report: Dict[str, Any], top_repositories: int = 10) -> str:
         )
     if not active:
         lines.append("本期没有采集到公开活动。")
+    zero_line_repositories = coverage.get("changed_lines_zero_repositories", [])
+    if zero_line_repositories:
+        lines.extend([
+            "",
+            "> 代码行口径：统计期开始时尚未创建的仓库，新增、删除和变更行均记为0："
+            + "、".join(zero_line_repositories) + "。",
+        ])
     lines.extend(
         [
             "",
             f"> 指标参考 OSS Compass V3。仓库历史完整覆盖 "
             f"{coverage['complete_repositories']}/{coverage['total_repositories']}；"
             f"Actions 完整覆盖 {coverage['github_actions']['complete_repositories']}/"
-            f"{coverage['github_actions']['total_repositories']}。新增 Stars 因 GitHub "
-            "访问限制为 N/A；完整仓库明细见 JSON 报告。",
+            f"{coverage['github_actions']['total_repositories']}。Star 净增按总数快照相减；"
+            "完整仓库明细见 JSON 报告。",
         ]
     )
     return "\n".join(lines)

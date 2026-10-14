@@ -1,0 +1,21 @@
+{
+  "github": {
+    "organization": "OpenXiangShan",
+    "api_url": "https://api.github.com",
+    "api_version": "2026-03-10",
+    "proxy": "",
+    "timeout_seconds": 30
+  },
+  "oss_stats": {
+    "timezone": "Asia/Shanghai",
+    "top_repositories": 10,
+    "include_archived": true,
+    "include_forks": true,
+    "aggregate_forks": false,
+    "max_history_pages": 50,
+    "max_actions_requests": 500,
+    "star_history": "star_history.json",
+    "output": "reports/{period}.json",
+    "xlsx_output": "reports/{period}.xlsx"
+  }
+}
