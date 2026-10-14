@@ -271,6 +271,7 @@ class XiangShan:
     def __run(
         self,
         emu_config: EmuConfig,
+        parallel: int,
     ) -> None:
         self.tracker.info(
             "Start running %d checkpoints on %d servers",
@@ -281,10 +282,10 @@ class XiangShan:
             "Server list: %s", ", ".join(map(lambda s: s.hostname, self.servers))
         )
         unassigned_checkpoints = self.checkpoints.copy()
-        last_pending_count = 0
+        pending_count = 0
 
         def poll_servers() -> bool:
-            nonlocal last_pending_count
+            nonlocal pending_count
             pending = False
             all_pending = []
             for server in self.servers:
@@ -327,17 +328,16 @@ class XiangShan:
                 if len(pending_list) > 0:
                     pending = True
 
-            pending_count = len(all_pending)
             if (
                 not unassigned_checkpoints
                 and 0 < len(all_pending) <= 5
-                and last_pending_count != pending_count
+                and len(all_pending) != pending_count # print only on change
             ):
                 self.tracker.info(
                     "Remaining checkpoints: %s",
                     ", ".join(t.name for t in all_pending),
                 )
-            last_pending_count = pending_count
+            pending_count = len(all_pending)
             return pending
 
         def assign(gcpt: GCPT) -> None:
@@ -370,6 +370,16 @@ class XiangShan:
             while not assigned:
                 # check completion
                 poll_servers()
+
+                # limit parallelism
+                if pending_count >= parallel:
+                    self.tracker.debug(
+                        "Parallel limit (%d) exceeded, waiting for 60 seconds...",
+                        parallel,
+                    )
+                    time.sleep(60)
+                    continue
+
                 # assign task to the first available server
                 free_server = None
                 free_cores = FreeCoreInfo.none()
@@ -428,6 +438,7 @@ class XiangShan:
         nemu_so_path: Path | None,
         server_list: str,
         emu_config: EmuConfig,
+        parallel: int,
     ) -> None:
         try:
             self.__init_tracker()
@@ -437,7 +448,7 @@ class XiangShan:
                 server_list,
             )
             self.__reorder_by_eta()
-            self.__run(emu_config)
+            self.__run(emu_config, parallel)
         except KeyboardInterrupt as e:
             logging.info("SIGINT received")
             self.__stop()
@@ -733,6 +744,12 @@ def main():
         action="store_true",
         help="Run emu with --dump-db and store simulator.db in each checkpoint result directory",
     )
+    parser.add_argument(
+        "--parallel",
+        type=int,
+        default=256,
+        help="Number of max parallel checkpoints to run, default 256",
+    )
 
     # report configs
     parser.add_argument(
@@ -904,6 +921,7 @@ def main():
                     dry_run=args.dry_run,
                     max_cycles=args.max_cycles,
                 ),
+                parallel=args.parallel,
             )
 
         if args.report:
