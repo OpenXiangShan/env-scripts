@@ -1,30 +1,35 @@
-"""CLI entry point for the OpenXiangShan OSS statistics robot."""
+"""CLI entry point for local OpenXiangShan OSS statistics reports."""
 
 from __future__ import annotations
 
 import argparse
 import json
+import os
 import sys
 from pathlib import Path
 from typing import Any, Dict
 
-from dingtalk_robot.config import ConfigError, DEFAULT_CONFIG_PATH, load_config, require_string
-from dingtalk_robot.robot import DingTalkError, send_markdown
+from .config import ConfigError, DEFAULT_CONFIG_PATH, load_config, require_string
 
 from .excel import export_xlsx
 from .github import GitHubClient, GitHubError
 from .metrics import collect_statistics, render_markdown
 from .period import resolve_period
+from .stars import apply_star_baseline, load_history, load_snapshot, previous_month_snapshot, save_snapshot
 
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(
-        description="Collect OpenXiangShan GitHub statistics and notify DingTalk"
+        description="Collect OpenXiangShan GitHub statistics and export local reports"
     )
     parser.add_argument("--config", type=Path, default=DEFAULT_CONFIG_PATH)
     parser.add_argument("--output", type=Path, help="Override the JSON output path")
     parser.add_argument(
         "--xlsx-output", type=Path, help="Override the Excel output path"
+    )
+    parser.add_argument(
+        "--star-baseline", type=Path,
+        help="Compare current Stars with a saved snapshot or monitor report",
     )
     parser.add_argument(
         "--month", metavar="YYYY-MM", help="Report a calendar month instead of the previous month"
@@ -34,9 +39,6 @@ def parse_args() -> argparse.Namespace:
     )
     parser.add_argument(
         "--end", help="Custom exclusive ISO date or datetime (requires --start)"
-    )
-    parser.add_argument(
-        "--dry-run", action="store_true", help="Collect and print without sending DingTalk"
     )
     return parser.parse_args()
 
@@ -48,26 +50,6 @@ def integer_setting(
     if isinstance(value, bool) or not isinstance(value, int):
         raise ConfigError(f"{section}.{name} must be an integer")
     return value
-
-
-def github_token(github_config: Dict[str, Any], config_path: Path) -> str:
-    token = github_config.get("token", "")
-    if isinstance(token, str) and token.strip():
-        return token.strip()
-
-    token_file = github_config.get("token_file", "")
-    if not isinstance(token_file, str) or not token_file.strip():
-        return ""
-    token_path = Path(token_file)
-    if not token_path.is_absolute():
-        token_path = config_path.resolve().parent / token_path
-    try:
-        token = token_path.read_text(encoding="utf-8").strip()
-    except OSError as exc:
-        raise ConfigError(f"Cannot read github.token_file: {token_path}: {exc}") from exc
-    if not token:
-        raise ConfigError(f"GitHub token file is empty: {token_path}")
-    return token
 
 
 def main() -> int:
@@ -82,13 +64,18 @@ def main() -> int:
             raise ConfigError("oss_stats must be an object")
 
         organization = require_string(config, "github", "organization")
-        token = github_token(github_config, args.config)
+        token = os.environ.get("GITHUB_TOKEN", "").strip()
         if not token:
-            raise ConfigError("GitHub token is required for per-repository history")
+            raise ConfigError("GitHub token is required: set the GITHUB_TOKEN environment variable")
         timezone_name = str(settings.get("timezone", "Asia/Shanghai"))
         period = resolve_period(
             timezone_name, month=args.month, start=args.start, end=args.end
         )
+        star_history_path = args.config.resolve().parent / str(
+            settings.get("star_history", "star_history.json")
+        )
+        history = load_history(star_history_path)
+        explicit_baseline = load_snapshot(args.star_baseline) if args.star_baseline else None
         client = GitHubClient(
             token=token,
             api_url=str(github_config.get("api_url", "https://api.github.com")),
@@ -113,15 +100,26 @@ def main() -> int:
             ),
             progress=lambda message: print(message, flush=True),
         )
+        baseline = (
+            explicit_baseline if args.star_baseline else
+            previous_month_snapshot(
+                history, organization, report["generated_at"], timezone_name,
+                report["aggregation"]["includes_fork_repositories"],
+            )
+        )
+        snapshot = apply_star_baseline(report, baseline)
+        if args.star_baseline:
+            save_snapshot(star_history_path, baseline)
+        save_snapshot(star_history_path, snapshot)
         top_repositories = integer_setting(
             settings, "oss_stats", "top_repositories", 10
         )
-        message = render_markdown(report, top_repositories)
+        summary_markdown = render_markdown(report, top_repositories)
 
         output = args.output
         if output is None:
             configured_output = str(
-                settings.get("output", "oss_stats/reports/{period}.json")
+                settings.get("output", "reports/{period}.json")
             ).format(period=report["period"]["label"])
             output = args.config.resolve().parent / configured_output
         output.parent.mkdir(parents=True, exist_ok=True)
@@ -133,26 +131,16 @@ def main() -> int:
             xlsx_output = output.with_suffix(".xlsx")
         if xlsx_output is None:
             configured_xlsx_output = str(
-                settings.get("xlsx_output", "oss_stats/reports/{period}.xlsx")
+                settings.get("xlsx_output", "reports/{period}.xlsx")
             ).format(period=report["period"]["label"])
             xlsx_output = args.config.resolve().parent / configured_xlsx_output
         export_xlsx(report, xlsx_output)
-        print(message)
+        print(summary_markdown)
         print(f"\nJSON report: {output}")
         print(f"Excel report: {xlsx_output}")
 
-        if not args.dry_run:
-            webhook = require_string(config, "dingtalk", "webhook")
-            secret = require_string(config, "dingtalk", "secret")
-            send_markdown(
-                webhook,
-                secret,
-                f"{organization} {report['period']['label']} 开源生态统计",
-                message,
-            )
-            print("DingTalk message sent successfully")
         return 0
-    except (ConfigError, DingTalkError, GitHubError, ValueError) as exc:
+    except (ConfigError, GitHubError, ValueError) as exc:
         print(f"Error: {exc}", file=sys.stderr)
         return 1
 

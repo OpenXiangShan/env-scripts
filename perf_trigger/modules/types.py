@@ -1,7 +1,13 @@
+from __future__ import annotations
+
 from dataclasses import dataclass, field
 from pathlib import Path
 import subprocess
 import time
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from .gcpt import GCPT
 
 
 @dataclass
@@ -61,6 +67,8 @@ class PendingTask:
     command: tuple[str, ...] = ()
     stdout_path: Path | None = None
     stderr_path: Path | None = None
+
+    gcpt: GCPT | None = None
 
     @property
     def elapsed(self) -> float:

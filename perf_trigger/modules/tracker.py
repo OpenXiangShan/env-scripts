@@ -16,12 +16,13 @@ class Tracker:
 
     def format_progress(self) -> str:
         if self.with_keys:
-            return " ".join(
-                f"{key}:{value}/{self.total}" for key, value in self.currents.items()
+            return (
+                ",".join(f"{key}:{value}" for key, value in self.currents.items())
+                + f"/{self.total}"
             )
         else:
             return (
-                "/".join(str(value) for value in self.currents.values())
+                ",".join(str(value) for value in self.currents.values())
                 + f"/{self.total}"
             )
 
