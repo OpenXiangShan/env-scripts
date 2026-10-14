@@ -31,7 +31,7 @@ def export_xlsx(report: Dict[str, Any], output: Path) -> Path:
         f"{report['organization']} {report['period']['label']} 开源生态质量月报"
     )
     workbook.properties.subject = "GitHub 开源生态与 GitHub Actions 月度统计"
-    workbook.properties.description = "由 dingtalk_robot.oss_stats 自动生成"
+    workbook.properties.description = "由 oss_stats 自动生成"
     summary_sheet = workbook.active
     summary_sheet.title = "组织汇总"
     _write_summary(summary_sheet, report)
@@ -89,13 +89,27 @@ def _write_summary(sheet: Worksheet, report: Dict[str, Any]) -> None:
         "SummaryScope",
     )
     sheet.cell(row - 2, 2).number_format = PERCENT_FORMAT
+    stars = report["star_growth"]
+    row = _write_summary_table(
+        sheet, row, "Star 净增（上月快照至本次采集）", ["指标", "数值", "口径"],
+        [
+            ["上月快照时间", stars["baseline_at"] or "待建立基线", "总数快照，无需加星时间"],
+            ["本次采集时间", stars["current_at"], "与当期活动的时间范围分别注明"],
+            ["可比仓库", f"{stars['comparable_repositories']}/{stars['aggregate_repositories']}", "仅比较具有基线的同一批仓库"],
+            ["上月 Stars（可比仓库）", stars["baseline_total_comparable"], "同范围累计值"],
+            ["本次 Stars（可比仓库）", stars["current_total_comparable"], "同范围累计值"],
+            ["Star 净增（可比仓库）", stars["comparable_net_change"], "本次总数减去上月总数，可为负数"],
+            ["上月组织 Stars", stars["organization_baseline_total"], "上月保存的组织汇总值"],
+            ["本次组织 Stars", stars["organization_current_total"], "本次组织汇总值"],
+            ["组织 Star 净增", stars["net_change"], "所有汇总仓库具备基线后可用"],
+        ], "SummaryStars",
+    )
     row = _write_summary_table(
         sheet,
         row,
         "月度活跃度",
         ["指标", "数值", "单位/口径"],
         [
-            ["新增 Stars", "N/A", "GitHub 访问限制"],
             ["新增 Forks", vitality["forks_added"], "个"],
             ["默认分支 Commits", vitality["commits"], "次"],
             ["代码新增", vitality["additions"], "行"],
@@ -103,9 +117,9 @@ def _write_summary(sheet: Worksheet, report: Dict[str, Any]) -> None:
             ["代码变更", vitality["lines_changed"], "行"],
             ["新建 Issue", vitality["issues_opened"], "个"],
             ["Issue 评论", vitality["issue_comments"], "次"],
-            ["新建 PR", vitality["prs_opened"], "个"],
+            ["本期创建 PR", vitality["prs_opened"], "按创建时间统计"],
             ["PR 评论", vitality["pr_comments"], "次"],
-            ["合并 PR", collaboration["prs_merged"], "个"],
+            ["本期合并 PR", collaboration["prs_merged"], "按合并时间统计，含跨期创建"],
             ["PR 评审", collaboration["pr_reviews"], "次"],
         ],
         "SummaryVitality",
@@ -148,7 +162,7 @@ def _write_summary(sheet: Worksheet, report: Dict[str, Any]) -> None:
         sheet,
         row,
         "PR 协作质量",
-        ["合并率", "评审参与率", "平均交互", "PR/Issue 关联率"],
+        ["创建 PR 期内合并率", "评审参与率", "平均交互", "PR/Issue 关联率"],
         [[
             collaboration["pr_merge_rate"],
             collaboration["pr_review_participation_rate"],
@@ -255,12 +269,15 @@ def _write_activity_sheet(sheet: Worksheet, report: Dict[str, Any]) -> None:
         "变更行",
         "新建 Issue",
         "Issue 评论",
-        "新建 PR",
+        "本期创建 PR",
         "PR 评论",
-        "合并 PR",
+        "本期合并 PR",
         "活跃贡献者",
         "代码贡献者",
         "非代码贡献者",
+        "代码行统计口径",
+        "上月 Stars",
+        "Star 净增",
     ]
     include_forks = report["aggregation"]["includes_fork_repositories"]
     rows = []
@@ -290,6 +307,13 @@ def _write_activity_sheet(sheet: Worksheet, report: Dict[str, Any]) -> None:
                 repo["developer_base"]["contributors"],
                 repo["developer_base"]["code_contributors"],
                 repo["developer_base"]["non_code_contributors"],
+                (
+                    "统计期开始时尚未创建，代码行记为0"
+                    if vitality.get("changed_lines_status") == "zero_repository_created_in_or_after_period"
+                    else "默认分支提交"
+                ),
+                vitality.get("stars_baseline_total"),
+                vitality["stars_net_change"],
             ]
         )
     _write_data_sheet(sheet, "仓库活跃度", report, headers, rows, "RepositoryActivity")
@@ -304,8 +328,8 @@ def _write_collaboration_sheet(sheet: Worksheet, report: Dict[str, Any]) -> None
         "Issue 首次响应(h)",
         "Issue 处理时长(h)",
         "PR 关闭",
-        "PR 合并",
-        "PR 合并率",
+        "本期合并 PR",
+        "创建 PR 期内合并率",
         "PR 未响应率",
         "PR 首次响应(h)",
         "PR 处理时长(h)",
@@ -508,8 +532,12 @@ def _write_metadata_sheet(sheet: Worksheet, report: Dict[str, Any]) -> None:
         sheet, 4, "报告元数据", ["字段", "值"], rows, "ReportMetadata"
     )
     definitions = [
+        ["Star 净增", "本次采集的 Star 总数减去上个月保存的总数；保留两个快照日期，可为负数"],
         ["默认分支 Commits", "统计期内各仓库默认分支提交数"],
-        ["代码变更", "默认分支 Commit 的 additions + deletions"],
+        ["代码变更", "默认分支 Commit 的 additions + deletions；统计期开始时尚未创建的仓库记为0"],
+        ["本期创建 PR", "createdAt 在统计期内的 PR 数量"],
+        ["本期合并 PR", "mergedAt 在统计期内的 PR 数量，包括以前期间创建的 PR"],
+        ["创建 PR 期内合并率", "本期创建且本期合并的 PR 数 / 本期创建 PR 数"],
         ["首次响应", "统计期内创建的 Issue/PR 到首次非作者互动的时长"],
         ["处理时长", "统计期内创建且关闭的 Issue/PR 从创建到关闭的时长"],
         ["评审参与率", "收到至少一次 Review 的 PR 占比"],

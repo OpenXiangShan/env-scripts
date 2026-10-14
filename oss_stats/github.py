@@ -94,7 +94,7 @@ class GitHubClient:
 
     def graphql(self, query: str, variables: Dict[str, Any]) -> Dict[str, Any]:
         if not self.token:
-            raise GitHubError("GitHub GraphQL requests require github.token or token_file")
+            raise GitHubError("GitHub GraphQL requests require an authentication token")
         request = urllib.request.Request(
             f"{self.api_url}/graphql",
             data=json.dumps({"query": query, "variables": variables}).encode("utf-8"),
