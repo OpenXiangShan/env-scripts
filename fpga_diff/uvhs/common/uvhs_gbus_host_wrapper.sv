@@ -9,11 +9,9 @@
 // exclusive and are distinguished only by DIFFTEST_HOST_GBUS /
 // DIFFTEST_HOST_XDMA; nothing here is CPU-family specific.
 //
-// The GBus C2H stream is parked in on-chip SRAM and drained through the GBS1
-// register window.  H2C converts GeneralBus AXI3 writes into the existing
-// DifftestMemCtrl AXI-stream engine.  The generated dma_core_* slave stays idle
-// in core_def, so the two hostifs remain exclusive owners of their inbound
-// masters.
+// GBD1 consumes the already host-clocked SimTop stream and exposes a read-only
+// bank; guarded H2C and non-bank reads use the physical DDR master. The legacy
+// GBS1 path retains its register window and DifftestMemCtrl stream loader.
 module uvhs_gbus_host_wrapper (
     input  wire        sys_clk_i,
     input  wire        sys_rstn,
@@ -59,6 +57,22 @@ module uvhs_gbus_host_wrapper (
     input  wire [1:0]  difftest_cfg_axilite_rresp,
     input  wire        difftest_cfg_axilite_rvalid,
     output wire        difftest_cfg_axilite_rready
+`ifdef UVHS_GBUS_C2H_DMA
+    ,output wire [13:0] ddr_awid, ddr_arid
+    ,output wire [33:0] ddr_awaddr, ddr_araddr
+    ,output wire [7:0] ddr_awlen, ddr_arlen
+    ,output wire [2:0] ddr_awsize, ddr_arsize, ddr_awprot, ddr_arprot
+    ,output wire [1:0] ddr_awburst, ddr_arburst
+    ,output wire ddr_awlock, ddr_arlock
+    ,output wire [3:0] ddr_awcache, ddr_arcache, ddr_awqos, ddr_arqos, ddr_awregion, ddr_arregion
+    ,output wire ddr_awvalid, ddr_arvalid, ddr_wlast, ddr_wvalid, ddr_bready, ddr_rready
+    ,input wire ddr_awready, ddr_arready, ddr_wready, ddr_bvalid, ddr_rlast, ddr_rvalid
+    ,output wire [255:0] ddr_wdata
+    ,output wire [31:0] ddr_wstrb
+    ,input wire [13:0] ddr_bid, ddr_rid
+    ,input wire [1:0] ddr_bresp, ddr_rresp
+    ,input wire [255:0] ddr_rdata
+`endif
 );
 
   // Host-clock AXI-Lite emitted by the GeneralBD register bridge.  It carries
@@ -126,27 +140,37 @@ module uvhs_gbus_host_wrapper (
   wire gbus_axi_rlast, gbus_axi_rvalid, gbus_axi_rready;
 
   wire gbus_c2h_sready;
+`ifndef UVHS_GBUS_C2H_DMA
   wire gbus_h2c_axis_tvalid;
   wire gbus_h2c_axis_tready;
   wire gbus_h2c_axis_tlast;
   wire [`CONFIG_DIFFTEST_HOST_AXIS_WIDTH-1:0] gbus_h2c_axis_tdata;
   wire [`CONFIG_DIFFTEST_HOST_AXIS_BYTES-1:0] gbus_h2c_axis_tkeep;
-  wire [255:0] gbus_sysbus_to_generalbus;
-  wire [255:0] gbus_sysbus_to_generalbd;
+`endif
 
   assign difftest_to_host_axis_tready_io = gbus_c2h_sready;
   assign gbus_cfg_local_wr_addr = gbus_cfg_wr_addr - 16'h1000;
   assign gbus_cfg_local_rd_addr = gbus_cfg_rd_addr - 16'h1000;
 
+`ifdef UVHS_GBUS_C2H_DMA
+  wire gbus_c2h_cfg_wr_en = gbus_cfg_wr_en && (gbus_cfg_local_wr_addr == 16'h1204);
+  wire gbus_c2h_cfg_rd_en = gbus_cfg_rd_en && (gbus_cfg_local_rd_addr[1:0] == 2'b0) &&
+      (((gbus_cfg_local_rd_addr >= 16'h1200) && (gbus_cfg_local_rd_addr <= 16'h1234)) ||
+       ((gbus_cfg_local_rd_addr >= 16'h2000) && (gbus_cfg_local_rd_addr <= 16'h23fc)));
+`else
   wire gbus_c2h_cfg_wr_en =
       gbus_cfg_wr_en && (gbus_cfg_local_wr_addr >= 16'h1200) && (gbus_cfg_local_wr_addr <= 16'h1208);
   wire gbus_c2h_cfg_rd_en =
       gbus_cfg_rd_en &&
       (((gbus_cfg_local_rd_addr >= 16'h1200) && (gbus_cfg_local_rd_addr <= 16'h1208)) ||
        ((gbus_cfg_local_rd_addr >= 16'h2000) && (gbus_cfg_local_rd_addr <= 16'h2ffc)));
+`endif
   wire gbus_axil_cfg_wr_en = gbus_cfg_wr_en && (gbus_cfg_local_wr_addr <= 16'h0030);
   wire gbus_axil_cfg_rd_en = gbus_cfg_rd_en && (gbus_cfg_local_rd_addr <= 16'h0030);
 
+`ifdef UVHS_GBUS_C2H_DMA
+  `include "uvhs_gbus_dma_path.svh"
+`else
   uvhs_gbus_c2h_fifo #(
       .AXIS_DATA_WIDTH(`CONFIG_DIFFTEST_HOST_AXIS_WIDTH)
   ) U_GBUS_C2H_FIFO (
@@ -161,9 +185,17 @@ module uvhs_gbus_host_wrapper (
     .cfg_rd_addr(gbus_cfg_local_rd_addr), .cfg_rdata(gbus_c2h_cfg_rdata),
     .cfg_rdata_vld(gbus_c2h_cfg_rdata_vld)
   );
+`endif
+
+  wire gbus_config_resetn = rstn_sw4 & sys_rstn;
+  (* ASYNC_REG = "TRUE", SHREG_EXTRACT = "NO" *) reg [2:0] gbus_config_reset_sync;
+  always @(posedge gbus_host_clk or negedge gbus_config_resetn) begin
+    if (!gbus_config_resetn) gbus_config_reset_sync <= 3'b0;
+    else gbus_config_reset_sync <= {gbus_config_reset_sync[1:0], 1'b1};
+  end
 
   uvhs_generalbd_axilite_bridge U_GBUS_CONFIG_BRIDGE (
-    .clk(gbus_host_clk), .rstn(rstn_sw4),
+    .clk(gbus_host_clk), .rstn(gbus_config_reset_sync[2]),
     .gbd_wr_en(gbus_axil_cfg_wr_en), .gbd_wr_addr(gbus_cfg_local_wr_addr),
     .gbd_wdata(gbus_cfg_wdata), .gbd_rd_en(gbus_axil_cfg_rd_en),
     .gbd_rd_addr(gbus_cfg_local_rd_addr), .gbd_rdata(gbus_axil_cfg_rdata),
@@ -194,8 +226,9 @@ module uvhs_gbus_host_wrapper (
     .o_rd_addr    (gbus_cfg_rd_addr),
     .i_rdata      (gbus_cfg_rdata),
     .i_rdata_vld  (gbus_cfg_rdata_vld),
-    .gbd_sysbus_i (gbus_sysbus_to_generalbd),
-    .gbd_sysbus_o (gbus_sysbus_to_generalbus)
+    // UVHS binds each endpoint's system bus through the vendor IP metadata.
+    .gbd_sysbus_i (),
+    .gbd_sysbus_o ()
   );
 
   uvw_general_bus U_GBUS_GENERAL_BUS (
@@ -215,10 +248,11 @@ module uvhs_gbus_host_wrapper (
     .dut_axi_arvalid(gbus_axi_arvalid), .dut_axi_arready(gbus_axi_arready), .dut_axi_rid(gbus_axi_rid),
     .dut_axi_rdata(gbus_axi_rdata), .dut_axi_rresp(gbus_axi_rresp), .dut_axi_rlast(gbus_axi_rlast),
     .dut_axi_rvalid(gbus_axi_rvalid), .dut_axi_rready(gbus_axi_rready),
-    .sysbus_ghbd_o (gbus_sysbus_to_generalbd),
-    .sysbus_ghbd_i (gbus_sysbus_to_generalbus)
+    .sysbus_ghbd_o (),
+    .sysbus_ghbd_i ()
   );
 
+`ifndef UVHS_GBUS_C2H_DMA
   uvhs_gbus_axi_to_axis #(
       .ID_WIDTH(8), .DATA_WIDTH(256)
   ) U_GBUS_H2C_AXIS (
@@ -272,6 +306,13 @@ module uvhs_gbus_host_wrapper (
       .m_tready(difftest_from_host_axis_tready),
       .m_has_data()
   );
+`else
+  assign difftest_from_host_axis_tvalid = 1'b0;
+  assign difftest_from_host_axis_tdata = '0;
+  assign difftest_from_host_axis_tkeep = '0;
+  assign difftest_from_host_axis_tlast = 1'b0;
+  wire _unused_stream = &{1'b0, inter_soc_clk, inter_soc_sync_rstn, difftest_from_host_axis_tready};
+`endif
 
   // GeneralBD AXI-Lite is on the free-running GBus host clock.  The DiffTest
   // config slave is on sys_clk_i, so cross only in the GBus build.
@@ -280,7 +321,7 @@ module uvhs_gbus_host_wrapper (
       .DATA_WIDTH (32)
   ) difftest_cfg_axilite_cdc (
       .s_clk      (gbus_host_clk),
-      .s_resetn   (sys_rstn),
+      .s_resetn   (gbus_config_reset_sync[2]),
       .s_awaddr   (XDMA_AXI_LITE_awaddr),
       .s_awprot   (XDMA_AXI_LITE_awprot),
       .s_awvalid  (XDMA_AXI_LITE_awvalid),

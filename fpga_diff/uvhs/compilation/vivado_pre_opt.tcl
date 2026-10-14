@@ -108,13 +108,18 @@ foreach {fpga_diff_clock fpga_diff_master fpga_diff_gate} {
 
 set fpga_diff_hostif XDMA
 if {[info exists ::env(DIFFTEST_HOSTIF)] && $::env(DIFFTEST_HOSTIF) ne ""} {
-    set fpga_diff_hostif $::env(DIFFTEST_HOSTIF)
+    set fpga_diff_hostif [string toupper [string trim $::env(DIFFTEST_HOSTIF)]]
+}
+if {$fpga_diff_hostif ni {GBUS XDMA}} {
+    error "DIFFTEST_HOSTIF must be one of GBUS/XDMA, got '$fpga_diff_hostif'"
 }
 
 set fpga_diff_async_groups [list]
-set fpga_diff_async_clock_names {TMCLK ddr_ref_clk CPU_CLK_IN jtag_vclk pcie_ep_refclk}
-if {[string toupper $fpga_diff_hostif] eq "GBUS"} {
+set fpga_diff_async_clock_names {TMCLK ddr_ref_clk CPU_CLK_IN jtag_vclk}
+if {$fpga_diff_hostif eq "GBUS"} {
     lappend fpga_diff_async_clock_names UART_CLK_IN
+} else {
+    lappend fpga_diff_async_clock_names pcie_ep_refclk
 }
 foreach fpga_diff_clock $fpga_diff_async_clock_names {
     lappend fpga_diff_async_groups -group \
