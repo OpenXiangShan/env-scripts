@@ -35,10 +35,10 @@ proc fpga_diff_set_async_clock_groups {} {
         lappend groups -group [get_clocks -include_generated_clocks $clock]
     }
     if {$::fpga_diff_hostif eq "XDMA"} {
-        set pcie_clocks [concat \
-            [get_clocks -include_generated_clocks pcie_ep_refclk] \
-            [get_clocks -quiet XDMA_AXI_ACLK]]
-        lappend groups -group [lsort -unique $pcie_clocks]
+    set pcie_clocks [concat \
+        [get_clocks -include_generated_clocks pcie_ep_refclk] \
+        [get_clocks -quiet XDMA_AXI_ACLK]]
+    lappend groups -group [lsort -unique $pcie_clocks]
     }
     set_clock_groups -asynchronous {*}$groups
 }
