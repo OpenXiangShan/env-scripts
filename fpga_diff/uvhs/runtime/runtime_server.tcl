@@ -804,7 +804,21 @@ proc uvhs_initialize_runtime {} {
     uvhs_configure_download_clocks
 
     uvhs_hold_soc_for_download
-    download
+    # Program each DUT FPGA from the loaded database, verifying the image is
+    # present and non-empty first and marking each board explicitly so a
+    # partial download can never look like a complete one.
+    foreach fpga {F0 F1 F2} {
+        set filename [file join $db_path Compile PnR B0 $fpga \
+            [format "MOD_b0_%s.bin" [string tolower $fpga]]]
+        if {![file isfile $filename] || [file size $filename] <= 0} {
+            error "verified DUT bitstream missing: $filename"
+        }
+        puts "BOARD_ONCE_DOWNLOAD_BEGIN $fpga"
+        download -target dut -board B0 -fpga $fpga -file $filename -timeout 120 -tclobj
+        puts "BOARD_ONCE_DOWNLOAD_SUCCESS $fpga"
+        flush stdout
+    }
+    puts "BOARD_ONCE_NEW_DUT_DOWNLOAD_ALL_SUCCESS"
     query -ipinfo
     initialize
     after 1000

@@ -318,14 +318,30 @@ def session_lock(directory):
     return stream
 
 
+def recorded_host_pids(directory):
+    pids = set()
+    for name in ("host.identity.json", "host.children.json"):
+        path = directory / name
+        if not path.exists():
+            continue
+        data = json.loads(path.read_text())
+        for item in (data if isinstance(data, list) else [data]):
+            if isinstance(item, dict) and isinstance(item.get("pid"), int):
+                pids.add(item["pid"])
+    return pids
+
+
 def host_quiescent(directory, token):
     directory = owned(directory, token)
     with session_lock(directory):
         # Seal even a failed attempt, so an exit proof cannot race a later launch.
         atomic(directory / "host-closed.json", json.dumps({"token": token}))
+        recorded = recorded_host_pids(directory)
         deadline = time.monotonic() + 3
+        unreadable_entries = 0
         while True:
             live = []
+            unreadable_entries = 0
             for entry in Path("/proc").iterdir():
                 if not entry.name.isdigit():
                     continue
@@ -337,6 +353,19 @@ def host_quiescent(directory, token):
                             and b"GBUS_WORKER_NAME=host" in identity["env"]):
                         live.append(identity["pid"])
                 except (FileNotFoundError, ProcessLookupError):
+                    continue
+                except PermissionError:
+                    # Same-uid but non-dumpable session helpers (sshd session
+                    # children, (sd-pam), fusermount3) deny /proc metadata
+                    # reads, and every SSH invocation of this scan creates
+                    # them.  Processes launched by this supervisor stay
+                    # dumpable and are recorded, so an unreadable entry is
+                    # skipped and counted; a recorded PID that cannot be
+                    # verified still blocks below.
+                    if int(entry.name) in recorded:
+                        live.append(int(entry.name))
+                    else:
+                        unreadable_entries += 1
                     continue
             if not live:
                 break
@@ -366,7 +395,8 @@ def host_quiescent(directory, token):
                 raise RuntimeError("host socket finalization unconfirmed; runtime preserved")
             state = "finalized"
         proof = {"token": token, "host_directory": str(directory), "state": state,
-                 "sealed": True, "daemon_request_drain": "unproven"}
+                 "sealed": True, "daemon_request_drain": "unproven",
+                 "unreadable_entries_skipped": unreadable_entries}
         atomic(directory / "host-quiescent.json", json.dumps(proof))
         return proof
 
