@@ -801,13 +801,32 @@ class SafetyTests(unittest.TestCase):
             with self.assertRaisesRegex(RuntimeError, "clean exit unconfirmed"):
                 g.host_quiescent(directory, "token")
 
-    def test_host_exit_proof_permission_unknown_blocks_and_seals(self):
+    def test_host_exit_proof_skips_unreadable_session_helpers(self):
+        # Same-uid but non-dumpable session helpers (sshd session children,
+        # (sd-pam), fusermount3) deny /proc metadata reads, and every SSH
+        # invocation of this scan creates them.  They cannot be supervisor
+        # workers (those stay readable and are recorded), so they are skipped
+        # and counted instead of blocking the exit proof forever.
         directory = self.new_owned()
         process = self.base / "12345"
         process.mkdir()
         with patch.object(Path, "iterdir", return_value=iter([process])), \
              patch.object(g, "proc_identity", side_effect=PermissionError("proc access denied")):
-            with self.assertRaises(PermissionError):
+            proof = g.host_quiescent(directory, "token")
+        self.assertEqual(proof["state"], "never_started")
+        self.assertEqual(proof["unreadable_entries_skipped"], 1)
+        self.assertTrue((directory / "host-closed.json").exists())
+        self.assertTrue((directory / "host-quiescent.json").exists())
+
+    def test_host_exit_proof_unreadable_recorded_worker_blocks(self):
+        directory = self.new_owned()
+        process = self.base / "12345"
+        process.mkdir()
+        g.atomic(directory / "host.identity.json",
+                 json.dumps({"pid": 12345, "start": "777", "worker": "host"}))
+        with patch.object(Path, "iterdir", side_effect=lambda: iter([process])), \
+             patch.object(g, "proc_identity", side_effect=PermissionError("proc access denied")):
+            with self.assertRaisesRegex(RuntimeError, "still active"):
                 g.host_quiescent(directory, "token")
         self.assertTrue((directory / "host-closed.json").exists())
         self.assertFalse((directory / "host-quiescent.json").exists())
