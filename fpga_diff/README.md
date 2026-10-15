@@ -2,9 +2,10 @@ Core RTL to FPGA Steps
 ======================
 
 XDMA remains the default DiffTest host interface. For the optional UVHS GBus
-path, see [the SRAM C2H interface and build flow](uvhs/README.md).
-`DIFFTEST_HOSTIF=GBUS` keeps DiffTest output in the GBS1 on-chip SRAM window
-and feeds workload H2C through the existing DifftestMemCtrl AXI-stream engine.
+path, see [the GBD1 C2H DMA interface and build flow](uvhs/README.md).
+`DIFFTEST_HOSTIF=GBUS` drains DiffTest output from frozen banks over the GBD1
+AXI read aperture and feeds workload H2C through the guarded GeneralBus AXI3
+write path.
 The two interfaces are compile-time exclusive: RTL uses
 `` `ifdef DIFFTEST_HOST_GBUS `` / `` `elsif DIFFTEST_HOST_XDMA `` / `` `endif ``.
 `Makefile` maps `DIFFTEST_HOSTIF` to one of those defines

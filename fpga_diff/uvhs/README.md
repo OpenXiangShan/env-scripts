@@ -25,27 +25,35 @@ Host selection is not CPU-specific: the shared core instantiates either the
 XDMA endpoint or, for GBus, `uvhs/common/uvhs_gbus_host_wrapper.sv` as
 `core_def/U_GBUS_HOST`, and the only compile-time switch is
 `` `DIFFTEST_HOST_GBUS `` / `` `elsif DIFFTEST_HOST_XDMA ``. The GBus wrapper
-holds the C2H staging FIFO, the GeneralBD configuration bridge, both protected
-GBus endpoints, the AXI3-to-AXIS H2C converter, and the H2C AXIS CDC, so
+holds the GBD1 C2H DMA engine and read aperture, the guarded H2C / DDR path,
+the GeneralBD configuration bridge and both protected GBus endpoints, so
 `core_def` keeps one DiffTest host instance for every CPU family and the
 generated `SimTop` RTL stays unchanged. The UVHS scripts name the wrapper
 hierarchy in their clock, payload, and partition paths.
 
-GBS1 is a register-drained SRAM window. Backpressure reaches the DiffTest
-sender and pauses the CPU while the host transport clock continues to run.
-The matching fpga-host selects the same GBS1 register-window protocol.
+GBD1 is the C2H transport: the DiffTest stream is captured into 1024-byte
+banks and the host reads them over the AXI aperture while ACK releases each
+bank. Backpressure reaches the DiffTest sender if the bank is not consumed
+while the host transport clock continues to run. The matching fpga-host uses
+the same GBD1 DMA protocol.
 
 GeneralBD local offsets are below; the host adds its config base (`0x1000`).
 
-| Local offset | GBS1 register |
+| Local offset | GBD1 register |
 | --- | --- |
-| `0x1200` | present[31], frame error[30], draining[29], staged words[16:8], filling[7], FIFO data[6] |
-| `0x1204` | control: FILL=1, DRAIN=2 |
-| `0x1208` | ID `0x47425331` |
-| `0x2000..0x23fc` | SRAM data window |
+| `0x1200` | status: present[31], frame error[30], protocol error[29], staged words[16:8], filling[7], data[6], frozen[5], active[4] |
+| `0x1204` | control: FILL=1, ACK=2, clear error=4 |
+| `0x1208` | ID `0x47424431` |
+| `0x120c` | published sequence number |
+| `0x1210` | read aperture base (`0x0ffff000`) |
+| `0x1214` | bank capacity (1024 bytes) |
+| `0x1218..0x1220` | AXI read evidence: AR address, attributes, count |
+| `0x1224..0x1230` | first-control evidence and sticky bad-control word |
+| `0x2000..0x23fc` | frozen bank data window |
 
-AXIS TLAST validates each 768-byte DiffTest range. The host dispatches complete
-96-byte records and preserves any partial record across SRAM windows.
+Each AXIS TLAST validates a 768-byte DiffTest range. The host reads the frozen
+bank through the aperture and compares it with the register-window mirror
+before acknowledging.
 
 ## RTL Input
 
@@ -66,14 +74,11 @@ wrappers in `<work>/rtl/filelist.f`, which the UVHS frontend reads directly.
 
 ## GBus host paths
 
-The GBus C2H path uses the on-chip SRAM register window identified as GBS1.
-GBus H2C converts GeneralBus AXI3 writes into the existing DifftestMemCtrl
-AXI-stream engine; `H2CAXIs2Mem` ignores AXI addresses and writes physical DRAM from
-`0x80000000` using `HOST_IO_H2C_SIZE_MB`. The AXIS payload crosses from the
-free-running host clock to the gated CPU clock in `U_GBUS_H2C_CDC`. DiffTest
-C2H crosses the other way inside `U_GBUS_C2H_FIFO`. No DDR C2H ring,
-GBus-specific physical-DDR path, or 256-to-64 AXI converter is part of this
-flow. Host DMA offsets stay relative to the GeneralBus start address
+The GBus C2H path drains frozen DiffTest banks through the GBD1 AXI read
+aperture; the host reads, verifies AXI evidence and acknowledges each bank.
+GBus H2C goes through the guarded GeneralBus AXI3 write path into the physical
+DDR master (read-only aperture reads are routed to GBD1 and rejected by the
+write guard). Host DMA offsets stay relative to the GeneralBus start address
 (`GBUS_DDR_BASE=0`).
 
 ## Build
