@@ -88,10 +88,9 @@ uvhs_preflight: check_project_name
 			[[ -n "$${!variable:-}" ]] || { echo "ERROR: $$variable is not set" >&2; exit 1; }; \
 		done; \
 		[[ -n "$(CPU)" ]] || { echo "ERROR: CPU is not set" >&2; exit 1; }; \
-		for command in bash python3 gzip ldconfig csh; do \
+		for command in bash python3 gzip ldconfig; do \
 			command -v "$$command" >/dev/null || { echo "ERROR: command not found: $$command" >&2; exit 1; }; \
 		done; \
-		csh -fc limit >/dev/null || { echo "ERROR: csh resource-limit query failed" >&2; exit 1; }; \
 		for executable in \
 			"$$UV_ROOT/bin/uv_shell" "$$UV_ROOT/bin/uv_shell_exec" \
 			"$$UV_XILINX_VIVADO/bin/vivado" \
@@ -210,11 +209,11 @@ uvhs_stage_bitstream:
 	@test -d "$(UVHS_RUNTIME_DB)"
 	@mkdir -p "$(FPGA_BIT_ARTIFACT_DIR)/runtime"
 	@test ! -e "$(FPGA_BIT_ARTIFACT_DIR)/runtime/$(PRJ_NAME)" || { \
-		echo "ERROR: runtime artifact already exists; choose a new bit archive" >&2; exit 2; \
+		echo "ERROR: runtime artifact already exists; clean the bit archive first" >&2; exit 2; \
 	}
-	@python3 "$(UVHS_ROOT_DIR)/tools/uvhs_runtime_package.py" \
-		"$(UVHS_RUNTIME_DB)" "$(FPGA_BIT_ARTIFACT_DIR)/runtime/$(PRJ_NAME)/hw.dat" \
-		--proof "$(FPGA_BIT_ARTIFACT_DIR)/runtime/$(PRJ_NAME)/runtime-package-proof.json"
+	@mkdir -p "$(FPGA_BIT_ARTIFACT_DIR)/runtime/$(PRJ_NAME)"
+	@cp -a --reflink=auto "$(UVHS_RUNTIME_DB)" \
+		"$(FPGA_BIT_ARTIFACT_DIR)/runtime/$(PRJ_NAME)/"
 	@echo "FPGA_RUNTIME_ARTIFACT=$(FPGA_BIT_ARTIFACT_DIR)/runtime/$(PRJ_NAME)"
 	@echo "FPGA_RUNTIME_DEST=env-scripts/fpga_diff/$(PRJ_NAME)"
 

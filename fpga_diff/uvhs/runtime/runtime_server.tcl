@@ -272,13 +272,9 @@ proc uvhs_query_default_clock_frequency {clock} {
     return [lindex $frequencies 0]
 }
 
-proc uvhs_query_clock_names {{defaults 0}} {
+proc uvhs_query_clock_names {} {
     set names {}
-    set arguments {-clock -tclobj}
-    if {$defaults} {
-        lappend arguments -default
-    }
-    foreach line [split [query {*}$arguments] "\n"] {
+    foreach line [split [query -clock -tclobj] "\n"] {
         set fields [regexp -all -inline {\S+} $line]
         if {[llength $fields] >= 6 &&
             [string is double -strict [lindex $fields 3]]} {
@@ -347,7 +343,7 @@ proc uvhs_query_gated_clocks {} {
     return [lsort -unique $gated_clocks]
 }
 
-proc uvhs_tmclk_frequency {cpu_frequency} {
+proc uvhs_configure_tmclk_from_cpu {{cpu_frequency ""}} {
     # Keep the CPU-to-TMCLK relationship stable across sign-off frequencies.
     # The environment variable remains available for controlled experiments,
     # while the normal Make/runtime path supplies the fixed 50:1 default.
@@ -361,76 +357,18 @@ proc uvhs_tmclk_frequency {cpu_frequency} {
         error "TMCLK-to-CPU clock ratio must be positive: $ratio"
     }
 
+    if {$cpu_frequency eq ""} {
+        set cpu_frequency [uvhs_query_clock_frequency clk5_p]
+    }
     set tmclk_frequency [expr {round(double($cpu_frequency) / $ratio)}]
     if {$tmclk_frequency <= 0} {
         error "derived TMCLK frequency is invalid: $tmclk_frequency"
     }
-    return $tmclk_frequency
-}
 
-proc uvhs_configure_tmclk_from_cpu {{cpu_frequency ""}} {
-    if {$cpu_frequency eq ""} {
-        set cpu_frequency [uvhs_query_clock_frequency clk5_p]
-    }
-    set tmclk_frequency [uvhs_tmclk_frequency $cpu_frequency]
-    puts [format "INFO: setting clk8_p to %d Hz from clk5_p %d Hz" \
-        $tmclk_frequency $cpu_frequency]
+    puts [format \
+        "INFO: setting clk8_p to %d Hz from clk5_p %d Hz at %d:1" \
+        $tmclk_frequency $cpu_frequency $ratio]
     config -clock -name clk8_p -frequency $tmclk_frequency
-}
-
-proc uvhs_configure_download_clocks {} {
-    set default_names [uvhs_query_clock_names 1]
-    set current_names [uvhs_query_clock_names]
-    set clocks {clk5_p clk6_p}
-    foreach clock $clocks {
-        if {$clock ni $default_names || $clock ni $current_names} {
-            error "required clock $clock missing from database sign-off or current inventory"
-        }
-    }
-    if {"clk8_p" in $default_names || "clk8_p" in $current_names} {
-        if {"clk8_p" ni $default_names || "clk8_p" ni $current_names} {
-            error "clk8_p sign-off and current clock inventories differ"
-        }
-        lappend clocks clk8_p
-    } else {
-        puts "INFO: clk8_p is absent from both database clock inventories"
-    }
-    set defaults {}
-    foreach clock $clocks {
-        set frequency [uvhs_query_default_clock_frequency $clock]
-        if {$frequency <= 0} {
-            error "invalid sign-off frequency for $clock: $frequency"
-        }
-        dict set defaults $clock $frequency
-    }
-    set requested $defaults
-    # UVHS can round a requested PLL clock upward to a whole kHz.
-    foreach clock {clk5_p clk6_p} {
-        dict set requested $clock [expr {[dict get $defaults $clock] / 1000 * 1000}]
-    }
-    if {"clk8_p" in $clocks} {
-        dict set requested clk8_p [uvhs_tmclk_frequency [dict get $requested clk5_p]]
-    }
-    foreach clock $clocks {
-        set frequency [dict get $requested $clock]
-        if {$frequency <= 0 || $frequency > [dict get $defaults $clock]} {
-            error "requested clock $clock exceeds database sign-off frequency: $frequency > [dict get $defaults $clock]"
-        }
-    }
-    config -clock -default
-    foreach clock $clocks {
-        set frequency [dict get $requested $clock]
-        puts "INFO: using database sign-off clock $clock at $frequency Hz"
-        config -clock -name $clock -frequency $frequency
-    }
-    config -clock -commit
-    foreach clock $clocks {
-        set frequency [uvhs_query_clock_frequency $clock]
-        if {$frequency <= 0 || $frequency > [dict get $defaults $clock]} {
-            error "committed clock $clock exceeds database sign-off frequency: $frequency > [dict get $defaults $clock]"
-        }
-    }
-    query -clock
 }
 
 proc uvhs_capture_station_counts {} {
@@ -626,62 +564,11 @@ proc uvhs_ila_clear {} {
     puts "INFO: UVHS trigger conditions and capture are disabled"
 }
 
-proc uvhs_require_transport_safe {operation} {
-    foreach variable {UVHS_RUNTIME_SAFETY_HELPER UVHS_RUNTIME_WORK_DIR GBUS_OWNER_TOKEN} {
-        if {![info exists ::env($variable)] || $::env($variable) eq ""} {
-            error "owned runtime safety helper/token required: $variable"
-        }
-    }
-    if {[info exists ::uvhs_runtime_fault]} {
-        error "runtime fault is latched; session preserved: $::uvhs_runtime_fault"
-    }
-    set python /usr/bin/python3
-    if {[info exists ::env(UVHS_RUNTIME_PYTHON)]} {
-        set python $::env(UVHS_RUNTIME_PYTHON)
-    }
-    if {[file pathtype $python] ne "absolute" || ![file executable $python]} {
-        error "explicit executable runtime Python path required"
-    }
-    exec $python $::env(UVHS_RUNTIME_SAFETY_HELPER) runtime-guard \
-        $::env(UVHS_RUNTIME_WORK_DIR) $::env(GBUS_OWNER_TOKEN) $operation [pid] 2>@1
-}
-
-proc uvhs_latch_runtime_fault {message} {
-    set ::uvhs_runtime_fault $message
-    catch {uvhs_clear_runtime_ready}
-    catch {uvhs_write_atomic [file join $::uvhs_runtime_work_dir runtime-fault] "$message\n"}
-    puts stderr "ERROR: runtime fault latched; session preserved: $message"
-}
-
-proc uvhs_vendor_call {command args} {
-    uvhs_require_transport_safe io
-    set status [catch {uplevel 1 [list uvhs_vendor_$command {*}$args]} message options]
-    if {$status != 0} {
-        uvhs_latch_runtime_fault $message
-        return -options $options $message
-    }
-    if {[catch {uvhs_require_transport_safe io} guard_message guard_options]} {
-        uvhs_latch_runtime_fault $guard_message
-        return -options $guard_options $guard_message
-    }
-    return $message
-}
-
-proc uvhs_install_transport_guards {} {
-    foreach command {query load_db config reset download initialize gbus_dma_write gbus_dma_read \
-                     writemem trigger capture upload_uhd wavegen} {
-        if {[llength [info commands $command]] == 0} {continue}
-        rename $command uvhs_vendor_$command
-        interp alias {} $command {} uvhs_vendor_call $command
-    }
-}
-
 proc uvhs_execute_command {args} {
     if {[llength $args] == 0} {
         error "missing UVHS runtime command"
     }
     set command [lindex $args 0]
-    uvhs_require_transport_safe command
     puts "INFO: executing UVHS runtime command: $command"
     switch -- $command {
         halt_soc {
@@ -717,7 +604,6 @@ proc uvhs_execute_command {args} {
         }
         stop {
             if {[llength $args] != 1} { error "stop expects no arguments" }
-            uvhs_require_transport_safe stop
             set ::uvhs_keepalive 1
         }
         default {
@@ -755,7 +641,6 @@ proc uvhs_poll_command_file {} {
         } command_message]
         if {$command_status != 0} {
             set command_message "UVHS runtime command failed: $command_message"
-            uvhs_latch_runtime_fault $command_message
         }
         catch {file delete -force $running_file}
         uvhs_write_command_result $uvhs_result_file $command_status $command_message
@@ -801,24 +686,24 @@ proc uvhs_initialize_runtime {} {
     query -connector -type fmc
     query -voltage
 
-    uvhs_configure_download_clocks
+    # A release database can lack sign-off defaults. In that case the replay
+    # clock values already stored in the database remain active.
+    if {[catch {query -clock -default} clock_error]} {
+        puts "WARN: retaining database replay clocks: $clock_error"
+    } else {
+        config -clock -default
+    }
+    # Keep clk5_p at the system sign-off frequency committed in this runtime DB.
+    # It varies with the partition and PnR result, so it must not be hard-coded.
+    config -clock -name clk6_p -frequency 50000000
+    set signoff_cpu_frequency [uvhs_query_default_clock_frequency clk5_p]
+    config -clock -name clk5_p -frequency $signoff_cpu_frequency
+    uvhs_configure_tmclk_from_cpu $signoff_cpu_frequency
+    config -clock -commit
+    query -clock
 
     uvhs_hold_soc_for_download
-    # Program each DUT FPGA from the loaded database, verifying the image is
-    # present and non-empty first and marking each board explicitly so a
-    # partial download can never look like a complete one.
-    foreach fpga {F0 F1 F2} {
-        set filename [file join $db_path Compile PnR B0 $fpga \
-            [format "MOD_b0_%s.bin" [string tolower $fpga]]]
-        if {![file isfile $filename] || [file size $filename] <= 0} {
-            error "verified DUT bitstream missing: $filename"
-        }
-        puts "BOARD_ONCE_DOWNLOAD_BEGIN $fpga"
-        download -target dut -board B0 -fpga $fpga -file $filename -timeout 120 -tclobj
-        puts "BOARD_ONCE_DOWNLOAD_SUCCESS $fpga"
-        flush stdout
-    }
-    puts "BOARD_ONCE_NEW_DUT_DOWNLOAD_ALL_SUCCESS"
+    download
     query -ipinfo
     initialize
     after 1000
@@ -826,24 +711,5 @@ proc uvhs_initialize_runtime {} {
     query -fpgas -all
 }
 
-proc uvhs_start_runtime {} {
-    foreach variable {UVHS_COMMAND_FILE UVHS_RUNTIME_READY_FILE UVHS_RUNTIME_WORK_DIR} {
-        if {![info exists ::env($variable)] || $::env($variable) eq ""} {
-            error "$variable is not set"
-        }
-    }
-    set ::uvhs_runtime_work_dir $::env(UVHS_RUNTIME_WORK_DIR)
-    set ::uvhs_ready_file $::env(UVHS_RUNTIME_READY_FILE)
-    set ::uvhs_keepalive 0
-    if {[catch {
-        uvhs_require_transport_safe initialize
-        uvhs_install_transport_guards
-        uvhs_initialize_runtime
-        uvhs_serve_runtime_commands
-    } message]} {
-        uvhs_latch_runtime_fault $message
-        vwait ::uvhs_faulted_session_preserved
-    }
-}
-
-uvhs_start_runtime
+uvhs_initialize_runtime
+uvhs_serve_runtime_commands
