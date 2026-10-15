@@ -13,6 +13,10 @@ proc pin_name {top port} {
 }
 
 set top [uvhs::env_or_default UVHS_ASSIGN_PIN_TOP fpga_top_debug]
+set hostif [string toupper [string trim [uvhs::env_or_default DIFFTEST_HOSTIF XDMA]]]
+if {$hostif ni {GBUS XDMA}} {
+    error "DIFFTEST_HOSTIF must be one of GBUS/XDMA, got '$hostif'"
+}
 set xdma_link_width [string toupper [string trim [uvhs::env_or_default XDMA_LINK_WIDTH X4]]]
 if {$xdma_link_width ni {X4 X8}} {
     error "XDMA_LINK_WIDTH must be one of X4/X8, got '$xdma_link_width'"
@@ -74,9 +78,9 @@ assign_pin -port [pin_name $top clk8_n] -fpga b0.f2 -pin F36
 assign_pin -port [pin_name $top clk5_p] -fpga b0.f2 -pin AW17
 assign_pin -port [pin_name $top clk5_n] -fpga b0.f2 -pin AY17
 
-# The physical XDMA PCIe ports are declared for every DiffTest build, so their
-# pins are assigned in both host modes.  Only the endpoint instantiation is
-# host-mode dependent: GBus leaves these ports unused.
+# The physical XDMA PCIe ports exist only in the XDMA host mode; GBus
+# synthesis removes them, so their pins are assigned for XDMA only.
+if {$hostif eq "XDMA"} {
 assign_pin -port [pin_name $top pcie_ep_lnk_up] -connector b0.F2_APC16 -index 58
 
 # XDMA endpoint signals. X4 uses the HGC7 lane group from the Hejian official
@@ -97,6 +101,9 @@ for {set i 0} {$i < $xdma_lane_count} {incr i} {
     assign_pin -port [pin_name $top [format {pci_ep_rxn[%d]} $i]] -connector [lindex $xdma_rx_connectors $i] -index [lindex $xdma_rxn_indices $i]
     assign_pin -port [pin_name $top [format {pci_ep_txp[%d]} $i]] -connector [lindex $xdma_tx_connectors $i] -index [lindex $xdma_txp_indices $i]
     assign_pin -port [pin_name $top [format {pci_ep_txn[%d]} $i]] -connector [lindex $xdma_tx_connectors $i] -index [lindex $xdma_txn_indices $i]
+}
+} else {
+puts "INFO: skip physical XDMA PCIe pin assignments for GBus"
 }
 
 # The vendor DDR DCP declares its PDDR4DME binding through UV_HW_IP metadata.

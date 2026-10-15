@@ -5,6 +5,10 @@
 ################################################################################
 
 set fpga_diff_top fpga_top_debug
+set fpga_diff_hostif [string toupper [string trim [uvhs::env_or_default DIFFTEST_HOSTIF XDMA]]]
+if {$fpga_diff_hostif ni {GBUS XDMA}} {
+    error "DIFFTEST_HOSTIF must be one of GBUS/XDMA, got '$fpga_diff_hostif'"
+}
 proc fpga_diff_top_port {name} {
     set scoped_name "${::fpga_diff_top}.${name}"
     if {[llength [get_ports -quiet $scoped_name]] == 1} {
@@ -21,7 +25,7 @@ create_clock -name jtag_vclk -period 83.333 [get_ports [fpga_diff_top_port JTAG_
 # GBus builds do not define XS_XDMA_EP, so this port does not exist. UVHS
 # protects every port a constraint names and aborts elaboration when it is
 # missing, so the clock has to be omitted rather than queried.
-if {[string toupper [uvhs::env_or_default DIFFTEST_HOSTIF XDMA]] eq "XDMA"} {
+if {$fpga_diff_hostif eq "XDMA"} {
     create_clock -name pcie_ep_refclk -period 10 [get_ports [fpga_diff_top_port pcie_ep_gt_ref_clk_p]]
 }
 
@@ -30,9 +34,11 @@ proc fpga_diff_set_async_clock_groups {} {
     foreach clock {TMCLK ddr_ref_clk CPU_CLK_IN UART_CLK_IN jtag_vclk} {
         lappend groups -group [get_clocks -include_generated_clocks $clock]
     }
+    if {$::fpga_diff_hostif eq "XDMA"} {
     set pcie_clocks [concat \
         [get_clocks -include_generated_clocks pcie_ep_refclk] \
         [get_clocks -quiet XDMA_AXI_ACLK]]
     lappend groups -group [lsort -unique $pcie_clocks]
+    }
     set_clock_groups -asynchronous {*}$groups
 }

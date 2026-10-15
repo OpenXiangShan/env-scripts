@@ -226,13 +226,18 @@ proc create_root_design { parentCell } {
    ] $S00_AXI
 
   if {$uvhs_flow} {
+    set uvhs_flash_data_width 64
+    if {[info exists ::env(DIFFTEST_HOSTIF)] &&
+        [string toupper $::env(DIFFTEST_HOSTIF)] eq "GBUS"} {
+      set uvhs_flash_data_width 256
+    }
     set UVHS_FLASH_AXI [ create_bd_intf_port -mode Slave -vlnv xilinx.com:interface:aximm_rtl:1.0 UVHS_FLASH_AXI ]
     set_property -dict [ list \
      CONFIG.ADDR_WIDTH {32} \
      CONFIG.ARUSER_WIDTH {0} \
      CONFIG.AWUSER_WIDTH {0} \
      CONFIG.BUSER_WIDTH {0} \
-     CONFIG.DATA_WIDTH {64} \
+     CONFIG.DATA_WIDTH $uvhs_flash_data_width \
      CONFIG.FREQ_HZ {25000000} \
      CONFIG.HAS_BRESP {1} \
      CONFIG.HAS_BURST {1} \
