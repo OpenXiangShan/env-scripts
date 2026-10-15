@@ -54,7 +54,10 @@ if {$fpga_diff_hostif eq "XDMA"} {
     create_clock -name XDMA_AXI_ACLK -period $xdma_axi_clock_period \
         $xdma_axi_clock_pin
 } else {
-    # DUT-side GBus ports use UART_CLK_IN; UVHS supplies the separate system-bus clocks.
+    # GBus has no XDMA user-clock output.  The fpga-host/GBus protocol and
+    # both protected GBus IPs are driven by the explicit UVHS host clock
+    # UART_CLK_IN (clk6_p/dev_clk_i), not the gated CPU clock and not a clock
+    # inferred from the compatibility shell.
     # Do not create a second primary clock on a black-box input: doing so makes
     # the same host net appear as two unrelated clocks and lets infer_clock
     # rediscover the old pseudo-XDMA clock.
