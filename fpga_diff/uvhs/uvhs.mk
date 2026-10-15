@@ -4,23 +4,22 @@ UVHS_RUNTIME_DIR := $(UVHS_ROOT_DIR)/uvhs/runtime
 
 UVHS_TEMPLATE_DIR ?=
 UVHS_UVW_AXI4_TO_DDR4_SRC ?=
-UVHS_GBUS_C2H_DMA ?= 0
-UVHS_FUNCTIONAL_DDR_REMOTE_LINK ?= $(UVHS_GBUS_C2H_DMA)
-ifneq ($(filter $(UVHS_GBUS_C2H_DMA),0 1),$(UVHS_GBUS_C2H_DMA))
-$(error UVHS_GBUS_C2H_DMA must be 0 or 1)
-endif
+# The GBus host interface always uses the GBD1 C2H DMA path; the legacy
+# register-window transport is no longer built.  The remote functional-DDR
+# link stays a GBus option and defaults to on, matching the validated build.
+UVHS_FUNCTIONAL_DDR_REMOTE_LINK ?= $(if $(filter GBUS,$(DIFFTEST_HOSTIF)),1,0)
 ifneq ($(filter $(UVHS_FUNCTIONAL_DDR_REMOTE_LINK),0 1),$(UVHS_FUNCTIONAL_DDR_REMOTE_LINK))
 $(error UVHS_FUNCTIONAL_DDR_REMOTE_LINK must be 0 or 1)
 endif
-ifeq ($(UVHS_GBUS_C2H_DMA),1)
+ifeq ($(UVHS_FUNCTIONAL_DDR_REMOTE_LINK),1)
 ifneq ($(DIFFTEST_HOSTIF),GBUS)
-$(error UVHS_GBUS_C2H_DMA=1 requires DIFFTEST_HOSTIF=GBUS)
+$(error UVHS_FUNCTIONAL_DDR_REMOTE_LINK=1 requires DIFFTEST_HOSTIF=GBUS)
 endif
 endif
 # KMH is the XiangShan target; keep the larger CPU profile enabled by default.
 UVHS_PROBE_TCL ?= $(if $(filter kmh xiangshan,$(CPU)),$(UVHS_COMPILATION_DIR)/probe_kmh.tcl,$(UVHS_COMPILATION_DIR)/probe_ila.tcl)
 UVHS_PROBE_PATH := $(if $(strip $(UVHS_PROBE_TCL)),$(abspath $(UVHS_PROBE_TCL)),)
-UVHS_DDR_AXI_WIDTH := $(if $(filter 1,$(UVHS_GBUS_C2H_DMA)),256,$(if $(filter nutshell,$(CPU)),64,256))
+UVHS_DDR_AXI_WIDTH := $(if $(filter GBUS,$(DIFFTEST_HOSTIF)),256,$(if $(filter nutshell,$(CPU)),64,256))
 UVHS_WORK_DIR := $(ENV_SCRIPTS_HOME)/$(PRJ_NAME)
 UVHS_FILELIST := $(UVHS_WORK_DIR)/rtl/filelist.f
 
@@ -68,7 +67,6 @@ UVHS_FLOW_ENV = \
 	XDMA_LINK_WIDTH="$(XDMA_LINK_WIDTH)" \
 	DIFFTEST_HOSTIF="$(DIFFTEST_HOSTIF)" \
 	DIFFTEST_HOST_DEFINE="$(DIFFTEST_HOST_DEFINE)" \
-	UVHS_GBUS_C2H_DMA="$(UVHS_GBUS_C2H_DMA)" \
 	UVHS_FUNCTIONAL_DDR_REMOTE_LINK="$(UVHS_FUNCTIONAL_DDR_REMOTE_LINK)" \
 	UVHS_KEEP_FPGAS="$(UVHS_KEEP_FPGAS)" \
 	UVHS_LUT_FILL_RATE="$(UVHS_LUT_FILL_RATE)" \
@@ -133,7 +131,7 @@ uvhs_prepare: uvhs_preflight
 
 uvhs_project: uvhs_prepare
 	DIFFTEST_HOSTIF="$(DIFFTEST_HOSTIF)" DIFFTEST_HOST_DEFINE="$(DIFFTEST_HOST_DEFINE)" \
-	UVHS_GBUS_C2H_DMA="$(UVHS_GBUS_C2H_DMA)" UVHS_FUNCTIONAL_DDR_REMOTE_LINK="$(UVHS_FUNCTIONAL_DDR_REMOTE_LINK)" \
+	UVHS_FUNCTIONAL_DDR_REMOTE_LINK="$(UVHS_FUNCTIONAL_DDR_REMOTE_LINK)" \
 	bash "$(UVHS_ROOT_DIR)/tools/update_core_flist.sh" uvhs \
 		"$(CORE_DIR)" "$(UVHS_WORK_DIR)" "$(CPU)" "$(UVHS_FILELIST)" \
 		-- $(RTL_INCLUDE)

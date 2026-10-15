@@ -1284,7 +1284,7 @@ wire [0:0]    br2cfg_wvalid;
 `endif
   assign sys_rstn_io = sys_rstn & ~io_host_reset;
   assign cpu_rstn_io = cpu_rstn & ~io_host_reset;
-`ifdef UVHS_GBUS_C2H_DMA
+`ifdef DIFFTEST_HOST_GBUS
 `ifdef CPU_NUTSHELL
   wire uvhs_memory_cpu_mode, uvhs_memory_session_resetn;
   uvhs_difftest_memory_control U_GBUS_MEMORY_CONTROL (
@@ -1300,7 +1300,7 @@ wire [0:0]    br2cfg_wvalid;
   assign difftest_clock_gate_enable =
       difftest_clock_enable || ~io_host_diff_enable ||
       ~sys_rstn_io || ~cpu_rstn_io
-`ifdef UVHS_GBUS_C2H_DMA
+`ifdef DIFFTEST_HOST_GBUS
 `ifdef CPU_NUTSHELL
       // The exported memory bus multiplexes reference-clock init and CPU traffic.
       || ~uvhs_memory_cpu_mode
@@ -1355,9 +1355,7 @@ wire [0:0]    br2cfg_wvalid;
 `endif
 
 `ifdef DIFFTEST_HOST_GBUS
-`ifdef UVHS_GBUS_C2H_DMA
   `include "uvhs_gbus_ddr_wires.svh"
-`endif
   // Optional GBus host interface.  The GBus protocol implementation lives in
   // uvhs/common/uvhs_gbus_host_wrapper.sv and is instantiated here so the
   // shared core keeps one DiffTest host instance for every CPU family.  XDMA
@@ -1367,8 +1365,6 @@ wire [0:0]    br2cfg_wvalid;
       .sys_rstn                         (sys_rstn),
       .gbus_host_clk                    (gbus_host_clk),
       .rstn_sw4                         (rstn_sw4),
-      .inter_soc_clk                    (inter_soc_clk),
-      .inter_soc_sync_rstn              (inter_soc_sync_rstn),
       .cpu_rstn_pcie                    (cpu_rstn_pcie),
       .difftest_stream_enable_pcie      (difftest_stream_enable_pcie),
       .difftest_to_host_axis_tvalid_io  (difftest_to_host_axis_tvalid_io),
@@ -1398,7 +1394,6 @@ wire [0:0]    br2cfg_wvalid;
       .difftest_cfg_axilite_rresp       (difftest_cfg_axilite_rresp),
       .difftest_cfg_axilite_rvalid      (difftest_cfg_axilite_rvalid),
       .difftest_cfg_axilite_rready      (difftest_cfg_axilite_rready)
-`ifdef UVHS_GBUS_C2H_DMA
       ,.ddr_awid(gbus_ddr_awid), .ddr_awaddr(gbus_ddr_awaddr), .ddr_awlen(gbus_ddr_awlen), .ddr_awsize(gbus_ddr_awsize)
       ,.ddr_awburst(gbus_ddr_awburst), .ddr_awlock(gbus_ddr_awlock), .ddr_awcache(gbus_ddr_awcache), .ddr_awprot(gbus_ddr_awprot)
       ,.ddr_awqos(gbus_ddr_awqos), .ddr_awregion(gbus_ddr_awregion), .ddr_awvalid(gbus_ddr_awvalid), .ddr_awready(gbus_ddr_awready)
@@ -1408,7 +1403,6 @@ wire [0:0]    br2cfg_wvalid;
       ,.ddr_arburst(gbus_ddr_arburst), .ddr_arlock(gbus_ddr_arlock), .ddr_arcache(gbus_ddr_arcache), .ddr_arprot(gbus_ddr_arprot)
       ,.ddr_arqos(gbus_ddr_arqos), .ddr_arregion(gbus_ddr_arregion), .ddr_arvalid(gbus_ddr_arvalid), .ddr_arready(gbus_ddr_arready)
       ,.ddr_rid(gbus_ddr_rid), .ddr_rdata(gbus_ddr_rdata), .ddr_rresp(gbus_ddr_rresp), .ddr_rlast(gbus_ddr_rlast), .ddr_rvalid(gbus_ddr_rvalid), .ddr_rready(gbus_ddr_rready)
-`endif
   );
 
 `else
@@ -1544,7 +1538,7 @@ mode_ctrl U_MODE_CTRL(
 );
 
 `ifdef UVHS
-`ifdef UVHS_GBUS_C2H_DMA
+`ifdef DIFFTEST_HOST_GBUS
   `include "uvhs_gbus_ddr_path.svh"
 `else
 // The vendor DDR IP uses 34-bit addresses and 14-bit IDs. Keep those narrow

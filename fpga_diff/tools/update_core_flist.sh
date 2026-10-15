@@ -76,12 +76,12 @@ generate_uvhs_filelist() {
   local hostif=${DIFFTEST_HOSTIF:-XDMA}
   [[ $hostif == XDMA || $hostif == GBUS ]] ||
     rtl_flist_fail "DIFFTEST_HOSTIF must be XDMA or GBUS: $hostif"
-  local dma=${UVHS_GBUS_C2H_DMA:-0}
-  local remote_link=${UVHS_FUNCTIONAL_DDR_REMOTE_LINK:-$dma}
-  [[ $dma == 0 || $dma == 1 ]] || rtl_flist_fail "UVHS_GBUS_C2H_DMA must be 0 or 1"
+  local remote_link=${UVHS_FUNCTIONAL_DDR_REMOTE_LINK:-}
+  if [[ -z $remote_link ]]; then
+    [[ $hostif == GBUS ]] && remote_link=1 || remote_link=0
+  fi
   [[ $remote_link == 0 || $remote_link == 1 ]] || rtl_flist_fail "UVHS_FUNCTIONAL_DDR_REMOTE_LINK must be 0 or 1"
-  [[ $dma == 0 || $hostif == GBUS ]] || rtl_flist_fail "DMA requires DIFFTEST_HOSTIF=GBUS"
-  [[ $remote_link == 0 || $dma == 1 ]] || rtl_flist_fail "remote DDR link requires the physical-DDR DMA path"
+  [[ $remote_link == 0 || $hostif == GBUS ]] || rtl_flist_fail "remote DDR link requires DIFFTEST_HOSTIF=GBUS"
 
   core_dir=$(realpath -e -- "$core_dir")
   work_dir=$(realpath -e -- "$work_dir")
@@ -110,8 +110,8 @@ generate_uvhs_filelist() {
       rtl_flist_fail "DIFFTEST_HOST_DEFINE=$host_define does not match DIFFTEST_HOSTIF=$hostif"
     fi
     printf '+define+%s\n' "$host_define"
-    if [[ $dma == 1 ]]; then
-      printf '+define+UVHS_GBUS_C2H_DMA\n+define+CONFIG_USE_XSCORE_AXI\n+define+UVHS_UVW_AXI4_TO_DDR4\n'
+    if [[ $hostif == GBUS ]]; then
+      printf '+define+CONFIG_USE_XSCORE_AXI\n+define+UVHS_UVW_AXI4_TO_DDR4\n'
     fi
     if [[ $remote_link == 1 ]]; then
       printf '+define+UVHS_FUNCTIONAL_DDR_REMOTE_LINK\n'
@@ -173,21 +173,16 @@ generate_uvhs_filelist() {
     required_modules+=(
       uvhs_async_fifo
       uvhs_axilite_cdc_bridge
-      uvhs_axis_async_fifo
-      uvhs_gbus_axi_to_axis
-      uvhs_gbus_c2h_fifo
       uvhs_gbus_host_wrapper
       uvhs_generalbd_axilite_bridge
+      uvhs_gbus_c2h_dma uvhs_gbus_axi_read_router uvhs_gbus_axi_write_guard
+      uvhs_axi3_to_axi4_adapter uvhs_axi_async_bridge uvhs_axi_3master_arbiter uvhs_async_status_sync
     )
-    if [[ $dma == 1 ]]; then
-      required_modules+=(uvhs_gbus_c2h_dma uvhs_gbus_axi_read_router uvhs_gbus_axi_write_guard
-        uvhs_axi3_to_axi4_adapter uvhs_axi_async_bridge uvhs_axi_3master_arbiter uvhs_async_status_sync)
-      if [[ $cpu == nutshell ]]; then
-        required_modules+=(uvhs_axi64_to_axi256 uvhs_difftest_memory_control)
-      fi
-      if [[ $remote_link == 1 ]]; then
-        required_modules+=(uvhs_axi_remote_source uvhs_axi_remote_sink)
-      fi
+    if [[ $cpu == nutshell ]]; then
+      required_modules+=(uvhs_axi64_to_axi256 uvhs_difftest_memory_control)
+    fi
+    if [[ $remote_link == 1 ]]; then
+      required_modules+=(uvhs_axi_remote_source uvhs_axi_remote_sink)
     fi
   fi
   for module_name in "${required_modules[@]}"; do
