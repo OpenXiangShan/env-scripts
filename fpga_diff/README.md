@@ -74,8 +74,10 @@ Clock configuration
   `20.000`.
 - The CPU/SoC core clock is derived from `clk6_p` by a divider in
   `src/rtl/common/fpga_top_debug.sv`. Set `FPGA_CORE_CLK_MHZ=<n>` to choose the
-  running frequency in MHz; it must divide 200 evenly (100, 50, 40, 25, 20,
-  ...). The matching `CORE_CLK` generated clock is created by
+  running frequency in MHz. `n` must divide 200 evenly and be in `[1, 100]`
+  (clk6_p/2 .. clk6_p/200), i.e. 100, 50, 40, 25, 20, 10, 8, 5, 4, 2 or 1.
+  200MHz is not reachable because the clock is produced by a register
+  divider. The matching `CORE_CLK` generated clock is created by
   `vivado/tcl/common/constraints.tcl` from the same value, and the debounce
   counter in `button_debounce.v` is scaled to the same frequency:
 
