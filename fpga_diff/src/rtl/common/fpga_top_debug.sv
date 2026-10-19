@@ -282,6 +282,23 @@ assign        dev_clk_i = cqetmclk_buf;
 assign        dev_clk_i = dbg_clk_buf;
 `endif
 
+// Fixed 50MHz device clock for the UART (the AXI bridge that hosts the 16550),
+// derived from the 200MHz board clock so it does not follow the selectable
+// core clock (FPGA_CORE_CLK_MHZ) nor the debug clock.
+reg  [1:0] uart_clk_cnt = 2'd0;
+reg        uart_clk_r   = 1'b0;
+wire       uart_clk_50m;
+always @(posedge cqetmclk_buf) begin
+  uart_clk_cnt <= uart_clk_cnt + 2'd1;
+  if (uart_clk_cnt == 2'd1)
+    uart_clk_r <= ~uart_clk_r;
+end
+BUFG bufg_uart_clk
+(
+    .I              (uart_clk_r),
+    .O              (uart_clk_50m)
+);
+
 `ifndef UVHS
 vio_0 u_vio(
    .clk        (dbg_clk_buf),
@@ -410,6 +427,7 @@ core_def core_def
   .cpu_rd_qspi_valid    (led2),
   .cpu_wr_ddr_valid     (led0),
   .sys_clk_i            (sys_clk_i),
+  .uart_clk_i           (uart_clk_50m),
   .dev_clk_i            (dev_clk_i),
   .sys_rstn             (sys_rstn_to_core),
   .cpu_rstn             (cpu_rstn_to_core),
