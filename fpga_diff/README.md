@@ -85,6 +85,9 @@ Clock configuration
 
   `FPGA_CORE_CLK_100M=1` is kept as a legacy alias for `FPGA_CORE_CLK_MHZ=100`.
   Without either variable `sys_clk_i` runs directly on the debug clock.
+- The UART (the AXI bridge that hosts the 16550) always runs on a fixed
+  50MHz `clk6_p/4` clock (`bufg_uart_clk`), independent of `FPGA_CORE_CLK_MHZ`
+  and of the debug clock, so the console baud rate stays calibrated at 50MHz.
 
 fpga-host environment
 =====================

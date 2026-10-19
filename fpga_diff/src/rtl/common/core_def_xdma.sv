@@ -21,6 +21,7 @@ module core_def (
       output                                     cpu_wr_ddr_valid,
       input                                      sys_clk_i,
       input                                      dev_clk_i,
+      input                                      uart_clk_i,
       input                                      sys_rstn,
       input                                      cpu_rstn,
       input                                      rstn_sw4,
@@ -123,6 +124,7 @@ assign sd_led_control = 0;
 // }}} Unbind useless output port
 
 wire                       axi_bclk_sync_rstn        ;
+wire                       uart_bclk_sync_rstn       ;
 wire                       ddr_bus_clk               ;
 wire                       ddr_bclk_sync_rstn        ;
 `ifdef  XS_UART
@@ -1439,6 +1441,16 @@ wire [0:0]    br2cfg_wvalid;
   assign cpu_rstn_io = cpu_rstn;
 `endif
 
+RST_SYNC #(
+   .SYNC_STAGES     (3),
+   .PIPELINE_STAGES (1),
+   .INIT            (1'b0)
+) uart_bclk_rstn (
+   .clk     (uart_clk_i),
+   .async_in(sys_rstn),
+   .sync_out(uart_bclk_sync_rstn)
+);
+
 xilnx_crg xilnx_crg(
    .sys_clk                         (sys_clk_i                     ),
    .dev_clk                         (dev_clk_i                     ),
@@ -1894,8 +1906,13 @@ AXI_bridge CFG_AXI_bridge_i
         .UART_ACLK              (uart_sclk),
         .UART_ARESETN           (uart_sclk_sync_rstn),
 `endif
+`ifdef UVHS
         .ACLK                   (sys_clk_i),
         .ARESETN                (axi_bclk_sync_rstn),
+`else
+        .ACLK                   (uart_clk_i),
+        .ARESETN                (uart_bclk_sync_rstn),
+`endif
 
         .S00_AXI_araddr         (cpu2cfg_m2s_araddr),
         .S00_AXI_arburst        (cpu2cfg_m2s_arburst),
