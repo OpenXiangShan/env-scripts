@@ -28,6 +28,9 @@ if {$_core_clk_mhz ne ""} {
   if {200 % $_core_clk_mhz != 0} {
     error "FPGA_CORE_CLK_MHZ must divide the 200MHz board clock evenly, got '$_core_clk_mhz'"
   }
+  if {$_core_clk_mhz < 1 || $_core_clk_mhz > 100} {
+    error "FPGA_CORE_CLK_MHZ must be between 1 and 100 (clk6_p/2 .. clk6_p/200), got '$_core_clk_mhz'"
+  }
   set _core_clk_div [expr {200 / $_core_clk_mhz}]
   lappend defines FPGA_CORE_CLK_MHZ=$_core_clk_mhz
   lappend defines FPGA_CORE_CLK_DIV=$_core_clk_div
