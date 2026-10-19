@@ -237,7 +237,45 @@ IBUFDS_GTE4 refclk2_ibuf (
 `endif
 `endif
 
+
+`ifdef FPGA_CORE_CLK_MHZ
+// clk6_p is the board 200MHz system clock.  FPGA_CORE_CLK_MHZ selects the
+// CPU/SoC frequency and FPGA_CORE_CLK_DIV (= 200/FPGA_CORE_CLK_MHZ) sets the
+// divider; both defines are emitted by vivado/tcl/common/defines.tcl.  The
+// matching generated-clock constraint is created by constraints.tcl
+// (create_generated_clock on bufg_core_clk/O).
+localparam [7:0] CORE_CLK_DIV = `FPGA_CORE_CLK_DIV;
+reg  [7:0]       core_clk_cnt = 8'd0;
+reg              core_clk_r   = 1'b0;
+wire             core_clk_out;
+always @(posedge cqetmclk_buf) begin
+  if (core_clk_cnt == CORE_CLK_DIV - 8'd1)
+    core_clk_cnt <= 8'd0;
+  else
+    core_clk_cnt <= core_clk_cnt + 8'd1;
+  core_clk_r <= (core_clk_cnt < (CORE_CLK_DIV >> 1));
+end
+BUFG bufg_core_clk
+(
+    .I              (core_clk_r),
+    .O              (core_clk_out)
+);
+assign        sys_clk_i = core_clk_out;
+`elsif FPGA_CORE_CLK_100M
+// Legacy knob: clk6_p / 2 = 100MHz (kept for existing scripts).
+reg             core_clk_r = 1'b0;
+wire            core_clk_100m;
+always @(posedge cqetmclk_buf)
+  core_clk_r <= ~core_clk_r;
+BUFG bufg_core_clk
+(
+    .I              (core_clk_r),
+    .O              (core_clk_100m)
+);
+assign        sys_clk_i = core_clk_100m;
+`else
 assign        sys_clk_i = dbg_clk_buf;
+`endif
 `ifdef UVHS
 assign        dev_clk_i = cqetmclk_buf;
 `else
