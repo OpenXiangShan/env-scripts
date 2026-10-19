@@ -64,6 +64,28 @@ case 3: With fpga-host (diff mode)
 ./fpga-host --diff <nemu> -i <workload>.bin
 ```
 
+Clock configuration
+===================
+
+- `CPU_CLK_IN` is `clk6_p` (board 200MHz, 5.000ns), declared in
+  `vivado/constr/common/cpu_clock.xdc`.
+- `DEBUG_CLK_IN` is `clk5_p`. Pick 25MHz (default, `debug_clock_25.xdc`) or
+  50MHz (`debug_clock_50.xdc`) with `TIMING_DEBUG_CLK_PERIOD_NS=40.000` /
+  `20.000`.
+- The CPU/SoC core clock is derived from `clk6_p` by a divider in
+  `src/rtl/common/fpga_top_debug.sv`. Set `FPGA_CORE_CLK_MHZ=<n>` to choose the
+  running frequency in MHz; it must divide 200 evenly (100, 50, 40, 25, 20,
+  ...). The matching `CORE_CLK` generated clock is created by
+  `vivado/tcl/common/constraints.tcl` from the same value, and the debounce
+  counter in `button_debounce.v` is scaled to the same frequency:
+
+  ```shell
+  make bit FPGA_CORE_CLK_MHZ=100 TIMING_DEBUG_CLK_PERIOD_NS=20.000
+  ```
+
+  `FPGA_CORE_CLK_100M=1` is kept as a legacy alias for `FPGA_CORE_CLK_MHZ=100`.
+  Without either variable `sys_clk_i` runs directly on the debug clock.
+
 fpga-host environment
 =====================
 
