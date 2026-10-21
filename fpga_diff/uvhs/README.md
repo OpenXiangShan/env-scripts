@@ -141,22 +141,24 @@ experiments. `UVHS_EXPORT_IP_FORCE=1` regenerates cached Vivado and generalBus
 IP. `uvhs_clean` removes only the selected work directory and refuses to run
 while its runtime session is active.
 
-The default topology keeps the XiangShan CHI/CMN memory path, configuration
-bridge, runtime flash interface, syscfg, and boot ROM with user DDR on B0/F0.
-The physical UV_FMCH_FLASH USB-UART remains on B0/F1, while the core, DiffTest
-endpoint, and XDMA host path stay on B0/F2. The timer source/sink CDC boundary
-also stays with the CPU-side path, while the 65-bit `syscnt` time bus and the
-DiffTest clock-enable signal use explicit direct F2-to-F0 routes. This avoids
-per-bit TDM skew on the time value. The remaining logic is partitioned
-automatically. XiangShan uses these path constraints together with high
-partition effort and the `uv_placer_balance_slrs` PnR strategy.
+`compilation/partition.tcl` cuts the design at the CPU/DDR asynchronous bridge
+`core_def/U_CPU_DDR_CDC`. The complete CPU/SoC hierarchy, its configuration
+path, the DiffTest host endpoint, and the bridge stay on B0/F2; only the user
+DDR controller and its FMC connector stay on B0/F0. The DDR AXI that crosses
+the connector is synchronous to the free-running device clock, so the DDR
+controller keeps running while DiffTest stops the CPU. The physical
+UV_FMCH_FLASH USB-UART remains on B0/F1. XiangShan uses these constraints
+together with high partition effort and the `uv_placer_balance_slrs` PnR
+strategy.
 
 UVHS drives the AXI UART16550 from `clk6_p` at a fixed 50 MHz. The CPU/SoC
 `clk5_p` frequency comes from the system sign-off result committed in the
 selected runtime database, so each partition and PnR result runs at its own
-reported frequency. The GBus DiffTest host interface also uses this
-free-running UART/host clock, independent of CPU clock gating. The fixed UART
-clock matches the 50 MHz clock declared by the XiangShan FPGA device tree.
+reported frequency. The DDR side of `core_def/U_CPU_DDR_CDC` and the DDR
+controller AXI port also use the free-running `clk6_p`, independent of CPU
+clock gating. The GBus DiffTest host interface also uses this free-running
+UART/host clock. The fixed UART clock matches the 50 MHz clock declared by the
+XiangShan FPGA device tree.
 
 `clk8_p` is then derived at a fixed 50:1 CPU-to-TMCLK
 ratio, so a 14 MHz CPU clock uses approximately 280 kHz TMCLK. The optional
@@ -466,7 +468,7 @@ before the UVHS timing worker reads it.
 | `compilation/frontend_run.tcl` | RTL/IP import, elaboration, and uvsyn frontend. |
 | `compilation/backend_run.tcl` | Fill-rate setup, partition, routing, PnR, and database commit. |
 | `compilation/assemble.tcl` | Assembles the FPGA set from the vendor board description. |
-| `compilation/partition.tcl` | Places memory/configuration on B0/F0 and the core/DiffTest/XDMA path on B0/F2. |
+| `compilation/partition.tcl` | Cuts the design at the CPU/DDR async bridge: CPU/SoC, configuration and host path on B0/F2, user DDR controller on B0/F0. |
 | `compilation/assign_pin.tcl` | Physical UART daughter-card, clock, PCIe, JTAG, SD, and control pins. |
 | `compilation/timing.tcl` | External clock and asynchronous-group constraints. |
 | `compilation/vivado_pre_opt.tcl` | XDMA refclock and CDC constraints. |
