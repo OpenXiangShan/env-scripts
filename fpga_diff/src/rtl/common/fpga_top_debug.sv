@@ -244,21 +244,25 @@ IBUFDS_GTE4 refclk2_ibuf (
 // divider; both defines are emitted by vivado/tcl/common/defines.tcl.  The
 // matching generated-clock constraint is created by constraints.tcl
 // (create_generated_clock on bufg_core_clk/O).
+//
+// Use BUFGCE_DIV rather than a fabric toggle flop plus BUFG: sys_clk_i is fed
+// into another BUFGCE inside core_def (DifftestClockGate SOC_CLK_CTRL), and a
+// BUFG -> BUFGCE cascade is not a legal clock path on UltraScale.
+// BUFGCE_DIV supports /1..8, covering 100/50/40/25 MHz (divide 2/4/5/8).
 localparam [7:0] CORE_CLK_DIV = `FPGA_CORE_CLK_DIV;
-reg  [7:0]       core_clk_cnt = 8'd0;
-reg              core_clk_r   = 1'b0;
 wire             core_clk_out;
-always @(posedge cqetmclk_buf) begin
-  if (core_clk_cnt == CORE_CLK_DIV - 8'd1)
-    core_clk_cnt <= 8'd0;
-  else
-    core_clk_cnt <= core_clk_cnt + 8'd1;
-  core_clk_r <= (core_clk_cnt < (CORE_CLK_DIV >> 1));
-end
-BUFG bufg_core_clk
+BUFGCE_DIV #(
+    .BUFGCE_DIVIDE   (CORE_CLK_DIV),
+    .CE_TYPE         ("SYNC"),
+    .IS_CE_INVERTED  (1'b0),
+    .IS_CLR_INVERTED (1'b0),
+    .IS_I_INVERTED   (1'b0)
+) bufg_core_clk
 (
-    .I              (core_clk_r),
-    .O              (core_clk_out)
+    .O               (core_clk_out),
+    .CE              (1'b1),
+    .CLR             (1'b0),
+    .I               (cqetmclk_buf)
 );
 assign        sys_clk_i = core_clk_out;
 `elsif FPGA_CORE_CLK_100M
