@@ -18,7 +18,6 @@
     },
     "gifts": {
       "win_denominator": 5,
-      "tracking_start": "2026-09-20",
       "special_gifts": [
         {
           "id": "mid_autumn",
@@ -29,18 +28,6 @@
           "per_day": 1
         }
       ],
-      "highlight_pity": {
-        "enabled": true,
-        "threshold": 3
-      },
-      "commit_pity": {
-        "enabled": true,
-        "threshold": 50
-      },
-      "weekly_pity": {
-        "enabled": true,
-        "window_days": 7
-      },
       "random_gift": {
         "name": "一盒随机口味哈根达斯（或一罐无糖可乐）"
       }

@@ -32,7 +32,8 @@
   "analysis_window": "24h",
   "highlight_count": null,
   "max_commits": 0,
-  "git_timeout_seconds": 900,
+  "git_timeout_seconds": 120,
+  "git_collection_timeout_seconds": 1200,
   "output": "dingtalk_robot/xiangshan_monitor/reports/{date}-{window}.json",
   "message_output": "dingtalk_robot/xiangshan_monitor/reports/{date}-{window}.md",
   "dingtalk_use_proxy": false,
@@ -43,6 +44,8 @@
     "model": "deepseek-flash",
     "context_window_tokens": 1000000,
     "max_api_calls": 32,
+    "timeout_seconds": 180,
+    "total_timeout_seconds": 300,
     "max_output_tokens": 1800,
     "reasoning_effort": "xhigh",
     "store": false
