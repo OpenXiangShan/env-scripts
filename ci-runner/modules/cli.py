@@ -169,9 +169,9 @@ def parser() -> argparse.ArgumentParser:
     create.add_argument("--token")
     stopping_options(create)
     start = commands.add_parser("start", help="Start stopped runners")
-    start.add_argument("name", type=valid_name)
+    start.add_argument("name", type=valid_name, nargs="?")
     stop = commands.add_parser("stop", help="Wait for idle runners and stop them")
-    stop.add_argument("name", type=valid_name)
+    stop.add_argument("name", type=valid_name, nargs="?")
     stopping_options(stop)
     status = commands.add_parser("status", help="Inspect live local state")
     status.add_argument("name", type=valid_name, nargs="?")
@@ -185,7 +185,7 @@ def parser() -> argparse.ArgumentParser:
     update = commands.add_parser(
         "update", help="Install a local package or the latest stable release"
     )
-    update.add_argument("name", type=valid_name)
+    update.add_argument("name", type=valid_name, nargs="?")
     update.add_argument("--runner-file", type=runner_file)
     update.set_defaults(token=None)
     stopping_options(update)

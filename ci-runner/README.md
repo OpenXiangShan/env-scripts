@@ -30,17 +30,18 @@ python3 manager.py create --count 11 --token '<token>' demo
 ### 启动、状态与停止
 
 ```bash
-python3 manager.py start demo
+python3 manager.py start demo       # omit demo to start all groups on this host
 python3 manager.py status demo
 python3 manager.py status --verbose demo  # 当前任务、耗时及上次执行结果
 python3 manager.py status          # 本机所有组
 python3 manager.py status --json
 python3 manager.py status --verbose --json demo
-python3 manager.py stop --timeout 3600 demo
+python3 manager.py stop --timeout 3600 demo  # omit demo to stop all groups
 python3 manager.py stop --force demo
+python3 manager.py update demo             # omit demo to update all groups
 ```
 
-每组使用一个独立 session，每个 runner 一个 window。status 展示实际 session/pane，可使用 `tmux attach -t <session>` 查看。管理器通过元数据和进程识别实例，不依赖 window 编号、标题或 pane 排列。runner 退出后保留 window 供诊断，stop 会清理已停止的受管理 window。重复 start 不创建重复进程，重复 stop 成功返回。
+每组使用一个独立 session，每个 runner 一个 window。`start` 和 `stop` 省略组名时操作本机所有组，并跳过已经处于目标状态的 runner；`update` 省略组名时更新本机所有组，并跳过已经是目标版本的 runner。status 展示实际 session/pane，可使用 `tmux attach -t <session>` 查看。管理器通过元数据和进程识别实例，不依赖 window 编号、标题或 pane 排列。runner 退出后保留 window 供诊断，stop 会清理已停止的受管理 window。重复 start 不创建重复进程，重复 stop 成功返回。
 
 普通 `status` 只显示每组的活动数/总数和各 runner 状态；已登记但未运行的 runner 也会列出并显示为 `Stopped`。
 

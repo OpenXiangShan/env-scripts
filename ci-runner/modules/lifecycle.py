@@ -145,48 +145,62 @@ class Manager:
             if arguments.command == "import":
                 self.import_group(arguments, groups)
                 return None
-            name = arguments.name
-            group = groups.get(name)
-            if arguments.command == "create":
-                if group:
-                    self.check_existing_arguments(arguments, group)
-                else:
-                    if not arguments.directory or not arguments.url:
-                        raise ManagerError("First create requires --dir and --url")
-                    group = {
-                        "directory": str(arguments.directory),
-                        "url": arguments.url,
-                        "labels": arguments.labels or [],
-                        "proxy_command": arguments.proxy_command or [],
-                        "count": 0,
-                        "package": None,
-                        "instances": [],
-                    }
-            if group is None:
-                if arguments.command == "remove" and arguments.count == 0:
-                    if arguments.dry_run:
-                        print("[DRY RUN] Group is already absent; no changes")
-                    return None
-                raise ManagerError(f"Unknown runner group: {name}")
-            pending = group.get("pending")
-            target = (
-                arguments.count if arguments.command in ("create", "remove") else None
+            names = (
+                sorted(groups)
+                if arguments.command in ("start", "stop", "update")
+                and not arguments.name
+                else [arguments.name]
             )
-            if pending and (
-                pending["kind"] != arguments.command or pending.get("target") != target
-            ):
-                raise ManagerError(
-                    f"Group has unfinished {pending['kind']} operation (target={pending.get('target')}); retry that operation first"
-                )
-            if arguments.dry_run:
-                Preview(self.store, self.packages, self.tmux).run(
-                    arguments, group, groups, self.check_paths, self.registered
-                )
+            if not names:
+                if arguments.dry_run:
+                    print("[DRY RUN] No runner groups found; no changes")
                 return None
-            if arguments.command in ("create", "remove", "update"):
-                self.reconcile(arguments, name, group, groups)
-            else:
-                self.control(arguments, name, group)
+            for name in names:
+                arguments.name = name
+                group = groups.get(name)
+                if arguments.command == "create":
+                    if group:
+                        self.check_existing_arguments(arguments, group)
+                    else:
+                        if not arguments.directory or not arguments.url:
+                            raise ManagerError("First create requires --dir and --url")
+                        group = {
+                            "directory": str(arguments.directory),
+                            "url": arguments.url,
+                            "labels": arguments.labels or [],
+                            "proxy_command": arguments.proxy_command or [],
+                            "count": 0,
+                            "package": None,
+                            "instances": [],
+                        }
+                if group is None:
+                    if arguments.command == "remove" and arguments.count == 0:
+                        if arguments.dry_run:
+                            print("[DRY RUN] Group is already absent; no changes")
+                        continue
+                    raise ManagerError(f"Unknown runner group: {name}")
+                pending = group.get("pending")
+                target = (
+                    arguments.count
+                    if arguments.command in ("create", "remove")
+                    else None
+                )
+                if pending and (
+                    pending["kind"] != arguments.command
+                    or pending.get("target") != target
+                ):
+                    raise ManagerError(
+                        f"Group has unfinished {pending['kind']} operation (target={pending.get('target')}); retry that operation first"
+                    )
+                if arguments.dry_run:
+                    Preview(self.store, self.packages, self.tmux).run(
+                        arguments, group, groups, self.check_paths, self.registered
+                    )
+                    continue
+                if arguments.command in ("create", "remove", "update"):
+                    self.reconcile(arguments, name, group, groups)
+                else:
+                    self.control(arguments, name, group)
         return None
 
     def reconcile(
