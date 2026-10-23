@@ -17,7 +17,6 @@ from .models import (
     Instance,
     Package,
     PackageInfo,
-    StoredInstance,
 )
 from .packages import Packages, digest
 
@@ -31,7 +30,7 @@ class Store:
         self.hostname = hostname or socket.gethostname().split(".")[0]
         self.path = self.root / "state" / f"{self.hostname}.json"
         self.data: HostState = {
-            "schema_version": 3,
+            "schema_version": 4,
             "hostname": self.hostname,
             "packages": {},
             "groups": {},
@@ -41,7 +40,7 @@ class Store:
         """Load group configurations after checking the host state schema."""
         if not self.path.exists():
             self.data = {
-                "schema_version": 3,
+                "schema_version": 4,
                 "hostname": self.hostname,
                 "packages": {},
                 "groups": {},
@@ -50,7 +49,7 @@ class Store:
             self.data = read_json(self.path)
             if not isinstance(self.data, dict) or self.data.get(
                 "schema_version"
-            ) not in (1, 2, 3):
+            ) not in (1, 2, 3, 4):
                 raise ManagerError(f"Unsupported state schema: {self.path}")
             if self.data.get("hostname") != self.hostname or not isinstance(
                 self.data.get("groups"), dict
@@ -62,15 +61,17 @@ class Store:
             for checksum, info in self.data["packages"].items():
                 self.validate_package(checksum, info)
             for name, group in self.data["groups"].items():
-                legacy = cast(dict[str, object], group)
-                group_reference = self.normalize_package(legacy.pop("package", None))
-                if group_reference:
-                    for instance in group["instances"]:
-                        instance.setdefault("package", group_reference)
-                group["instances"] = [
-                    self.resolve_instance(name, group, instance)
-                    for instance in group["instances"]
-                ]
+                if (
+                    not isinstance(group, dict)
+                    or type(group.get("count")) is not int
+                    or group["count"] < 0
+                    or (
+                        self.data["schema_version"] == 4
+                        and ("package" not in group or "instances" in group)
+                    )
+                ):
+                    raise ManagerError(f"Invalid group {name} in {self.path}")
+                group["package"] = self.normalize_package(group.get("package"))
                 operation = group.get("pending")
                 if operation:
                     operation["package"] = self.normalize_package(
@@ -82,7 +83,9 @@ class Store:
                         )
                         if reference:
                             item["package"] = reference
-            self.data["schema_version"] = 3
+                if self.data["schema_version"] < 4:
+                    self.migrate_group(name, group)
+            self.data["schema_version"] = 4
         return self.data["groups"]
 
     def validate_package(self, checksum: str, info: PackageInfo) -> None:
@@ -195,62 +198,154 @@ class Store:
         }
 
     def group_package(self, group: Group) -> Package | None:
-        """Choose the newest reusable archive referenced by a group's instances."""
-        packages = [
-            package
-            for instance in group["instances"]
-            if (package := self.package(instance.get("package"))) is not None
-        ]
-        return max(
-            packages,
-            key=lambda package: tuple(map(int, package["version"].split("."))),
-            default=None,
-        )
+        """Resolve the group's shared package for reuse during installation."""
+        return self.package(group["package"])
 
-    def resolve_instance(
-        self, name: str, group: Group, instance: StoredInstance
-    ) -> Instance:
-        """Derive an instance's identity while preserving completed renames."""
-        count = group["count"]
+    def instances(self, name: str, group: Group) -> list[Instance]:
+        """Derive runner identities and packages from count and operation progress."""
+        instances: dict[int, Instance] = {}
+        for index in range(group["count"]):
+            expected = runner_name(name, self.hostname, index, group["count"])
+            instance: Instance = {
+                "index": index,
+                "name": expected,
+                "path": str(Path(group["directory"]) / expected),
+            }
+            if group["package"]:
+                instance["package"] = group["package"]
+            instances[index] = instance
         operation = group.get("pending")
         if operation:
             for item in operation.get("items", []):
+                if item["stage"] == "done" and item["new_name"] is None:
+                    instances.pop(item["index"], None)
+                    continue
+                instance = {
+                    "index": item["index"],
+                    "name": item["name"],
+                    "path": item["path"],
+                }
+                reference = item.get("package", group["package"])
                 if (
-                    item["index"] == instance["index"]
-                    and item["stage"] == "done"
-                    and item["new_name"] is not None
+                    operation["kind"] in ("create", "update")
+                    and item["stage"] in ("registering", "done")
+                    and operation.get("package")
+                    and "package" not in item
                 ):
-                    count = operation["final_count"]
-                    break
-        expected_name = runner_name(name, self.hostname, instance["index"], count)
-        expected_path = str(Path(group["directory"]) / expected_name)
-        if (
-            instance.get("name", expected_name) != expected_name
-            or instance.get("path", expected_path) != expected_path
-        ):
-            raise ManagerError(
-                f"Stored runner identity does not match derived name/path: {expected_path}"
+                    reference = operation["package"]
+                if reference:
+                    instance["package"] = reference
+                instances[item["index"]] = instance
+        return [instance for _, instance in sorted(instances.items())]
+
+    def migrate_group(self, name: str, group: Group) -> None:
+        """Replace legacy instance records with a shared package and derived indices."""
+        legacy = cast(dict[str, object], group)
+        stored = legacy.pop("instances", None)
+        if not isinstance(stored, list):
+            raise ManagerError(f"Invalid legacy instances for group {name}")
+        operation = group.get("pending")
+        items = (
+            {item["index"]: item for item in operation.get("items", [])}
+            if operation
+            else {}
+        )
+        references: dict[int, str | None] = {}
+        for instance in stored:
+            index = instance["index"]
+            count = group["count"]
+            item = items.get(index)
+            if item and item["stage"] == "done" and item["new_name"]:
+                assert operation is not None
+                count = operation["final_count"]
+            expected = runner_name(name, self.hostname, index, count)
+            path = str(Path(group["directory"]) / expected)
+            if (
+                index in references
+                or instance.get("name", expected) != expected
+                or instance.get("path", path) != path
+            ):
+                raise ManagerError(f"Invalid legacy runner identity: {path}")
+            references[index] = self.normalize_package(
+                instance.get("package", group["package"]), Path(path)
             )
-        result: Instance = {**instance, "name": expected_name, "path": expected_path}
-        reference = self.normalize_package(instance.get("package"), Path(expected_path))
-        if reference:
-            result["package"] = reference
-        else:
-            result.pop("package", None)
-        return result
+        target = operation.get("package") if operation else None
+        baseline = {
+            reference
+            for index, reference in references.items()
+            if reference is not None
+            and not (
+                operation
+                and index in items
+                and (
+                    operation["kind"] == "update"
+                    or operation["kind"] == "create"
+                    and reference == target
+                )
+            )
+        }
+        if not baseline and group["package"]:
+            baseline.add(group["package"])
+        if not baseline and operation and operation["kind"] == "update":
+            baseline = {
+                reference
+                for reference in references.values()
+                if reference and reference != target
+            }
+            if baseline:
+                baseline = {sorted(baseline)[0]}
+        if len(baseline) > 1:
+            raise ManagerError(
+                f"Group {name} has mixed runner packages; unify them before migrating"
+            )
+        group["package"] = next(iter(baseline), target)
+        if (
+            operation
+            and operation.get("phase") == "restoring"
+            and operation["kind"] in ("create", "update")
+        ):
+            group["package"] = target
+        expected_indices = set(range(group["count"]))
+        for index, item in items.items():
+            if item["stage"] == "done":
+                if item["new_name"] is None:
+                    expected_indices.discard(index)
+                else:
+                    expected_indices.add(index)
+        if references.keys() != expected_indices:
+            raise ManagerError(f"Legacy runner indices are not contiguous: {name}")
+        for index, item in items.items():
+            reference = references.get(index)
+            if (
+                reference
+                and "package" not in item
+                and item["stage"] not in ("registering", "done")
+            ):
+                item["package"] = reference
+        if operation and operation["kind"] == "create":
+            for index, reference in references.items():
+                if index >= operation["final_count"] or reference == target:
+                    continue
+                item = items.get(index)
+                if item is None or item["stage"] == "done":
+                    raise ManagerError(
+                        f"Group {name} has mixed runner packages; unify them before migrating"
+                    )
+        for instance in self.instances(name, group):
+            index = instance["index"]
+            item = items.get(index)
+            if (
+                index in references
+                and (item is None or item["stage"] == "done")
+                and references[index] != instance.get("package")
+            ):
+                raise ManagerError(
+                    f"Group {name} has mixed runner packages; unify them before migrating"
+                )
 
     def save(self) -> None:
-        """Atomically save state without redundant instance names or paths."""
-        groups: dict[str, dict[str, object]] = {}
-        for name, group in self.data["groups"].items():
-            instances: list[StoredInstance] = []
-            for instance in group["instances"]:
-                stored: StoredInstance = {"index": instance["index"]}
-                if "package" in instance:
-                    stored["package"] = instance["package"]
-                instances.append(stored)
-            groups[name] = {**group, "instances": instances}
-        atomic_json(self.path, {**self.data, "schema_version": 3, "groups": groups})
+        """Atomically save shared group configuration and operation progress."""
+        atomic_json(self.path, {**self.data, "schema_version": 4})
 
     @contextmanager
     def cache_locked(self, exclusive: bool = False) -> Iterator[None]:

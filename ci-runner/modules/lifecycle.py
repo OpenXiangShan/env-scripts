@@ -1,4 +1,3 @@
-from copy import deepcopy
 from contextlib import nullcontext
 from dataclasses import replace
 from pathlib import Path
@@ -66,9 +65,11 @@ class Manager:
         path = self.owned(name, instance)
         return verify_registration(path, instance["name"], group["url"])
 
-    def reserved_paths(self, group: Group) -> set[Path]:
+    def reserved_paths(self, name: str, group: Group) -> set[Path]:
         """Collect directories reserved by instances and pending changes."""
-        paths = {Path(instance["path"]) for instance in group["instances"]}
+        paths = {
+            Path(instance["path"]) for instance in self.store.instances(name, group)
+        }
         operation = group.get("pending")
         if operation:
             for item in operation.get("items", []):
@@ -85,11 +86,11 @@ class Manager:
             raise ManagerError(
                 "Runner base directory must be canonical and cannot be /"
             )
-        own_paths = {instance["path"] for instance in group["instances"]}
+        own_paths = {instance["path"] for instance in self.store.instances(name, group)}
         other_paths: list[Path] = []
         for other_name, other in groups.items():
             if other_name != name:
-                other_paths.extend(self.reserved_paths(other))
+                other_paths.extend(self.reserved_paths(other_name, other))
         for index in range(target):
             candidate = base / runner_name(name, self.store.hostname, index, target)
             if str(candidate) not in own_paths and (
@@ -105,7 +106,7 @@ class Manager:
                 raise ManagerError(
                     f"Runner directory overlaps another managed group: {candidate}"
                 )
-        for instance in group["instances"]:
+        for instance in self.store.instances(name, group):
             self.registered(name, instance, group)
 
     def check_existing_arguments(self, arguments: Arguments, group: Group) -> None:
@@ -176,7 +177,7 @@ class Manager:
                             "labels": arguments.labels or [],
                             "proxy_command": arguments.proxy_command or [],
                             "count": 0,
-                            "instances": [],
+                            "package": None,
                         }
                 if group is None:
                     if arguments.command == "remove" and arguments.count == 0:
@@ -225,7 +226,7 @@ class Manager:
                 raise ManagerError("remove --count cannot exceed the current count")
             self.check_paths(name, group, target, groups)
             items: list[OperationItem] = []
-            for instance in group["instances"]:
+            for instance in self.store.instances(name, group):
                 expected = (
                     runner_name(name, self.store.hostname, instance["index"], target)
                     if instance["index"] < target
@@ -234,7 +235,9 @@ class Manager:
                 if arguments.command == "update" or expected != instance["name"]:
                     items.append(
                         {
-                            **deepcopy(instance),
+                            "index": instance["index"],
+                            "name": instance["name"],
+                            "path": instance["path"],
                             "old_name": instance["name"],
                             "new_name": expected,
                             "stage": "ready",
@@ -279,13 +282,22 @@ class Manager:
                 else:
                     self.packages.verify(package)
                 if arguments.command == "update":
-                    items = [
-                        item
-                        for item in items
-                        if item.get("package") != package["sha256"]
-                    ]
-                    if not items:
+                    if group["package"] == package["sha256"]:
                         return
+                elif group["count"] and group["package"] != package["sha256"]:
+                    affected_indices = {item["index"] for item in items}
+                    for instance in self.store.instances(name, group):
+                        if instance["index"] not in affected_indices:
+                            items.append(
+                                {
+                                    "index": instance["index"],
+                                    "name": instance["name"],
+                                    "path": instance["path"],
+                                    "old_name": instance["name"],
+                                    "new_name": instance["name"],
+                                    "stage": "ready",
+                                }
+                            )
             resume = []
             for item in items:
                 if (
@@ -347,11 +359,12 @@ class Manager:
             ):
                 self.change_instance(name, group, operation, item, arguments.token)
             group["count"] = operation["final_count"]
-            group["instances"].sort(key=lambda instance: instance["index"])
+            if operation["kind"] in ("create", "update"):
+                group["package"] = operation.get("package")
             operation["phase"] = "restoring"
             self.store.save()
         if operation["phase"] == "restoring":
-            for instance in group["instances"]:
+            for instance in self.store.instances(name, group):
                 if instance["index"] in operation["resume"]:
                     self.registered(name, instance, group)
                     self.tmux.start(name, instance, group["proxy_command"])
@@ -393,7 +406,7 @@ class Manager:
             )
             item["stage"] = "installing"
             self.store.save()
-        if operation["kind"] == "update" and item["stage"] == "ready":
+        if item["old_name"] == item["new_name"] and item["stage"] == "ready":
             self.registered(name, item, group)
             item["stage"] = "installing"
             self.store.save()
@@ -436,11 +449,6 @@ class Manager:
                         child.unlink()
                 (path / ".manager-owner.json").unlink(missing_ok=True)
                 path.rmdir()
-            group["instances"] = [
-                instance
-                for instance in group["instances"]
-                if instance["index"] != item["index"]
-            ]
             item["stage"] = "done"
             self.store.save()
             return
@@ -463,14 +471,19 @@ class Manager:
             item["path"] = str(destination)
             item["name"] = new_name
             path = destination
-            item["stage"] = "registering"
+            item["stage"] = (
+                "installing"
+                if operation["kind"] == "create"
+                and operation.get("package") != group["package"]
+                else "registering"
+            )
             self.store.save()
         if item["stage"] == "installing":
             self.owned(name, item)
             package = self.store.package(operation.get("package"))
             assert package is not None
             self.packages.install(package, path)
-            item["package"] = package["sha256"]
+            item.pop("package", None)
             item["stage"] = "registering"
             self.store.save()
         if item["stage"] == "registering":
@@ -478,25 +491,14 @@ class Manager:
             new_name = item["new_name"]
             assert new_name is not None
             github.register(path, new_name, group, token)
-            instance: Instance = {
-                "index": item["index"],
-                "name": item["name"],
-                "path": item["path"],
-                "package": item["package"],
-            }
-            group["instances"] = [
-                existing
-                for existing in group["instances"]
-                if existing["index"] != item["index"]
-            ]
-            group["instances"].append(instance)
             item["stage"] = "done"
             self.store.save()
             print(f"Configured {item['name']}", flush=True)
 
     def control(self, arguments: Arguments, name: str, group: Group) -> None:
         """Start or stop a group while preserving retry progress."""
-        for instance in group["instances"]:
+        instances = self.store.instances(name, group)
+        for instance in instances:
             self.registered(name, instance, group)
         if not group.get("pending"):
             group["pending"] = {
@@ -506,12 +508,12 @@ class Manager:
             }
             self.store.save()
         if arguments.command == "start":
-            for instance in group["instances"]:
+            for instance in instances:
                 self.tmux.start(name, instance, group["proxy_command"])
         else:
             self.tmux.stop(
                 name,
-                group["instances"],
+                instances,
                 group["pending"],
                 self.store.save,
                 arguments.timeout,
@@ -570,31 +572,32 @@ class Manager:
             )
         if len(urls) != 1:
             raise ManagerError("Imported group contains multiple GitHub URLs")
+        packages = {instance["package"] for instance in instances}
+        if len(packages) != 1:
+            raise ManagerError("Imported runners must all use the same package")
         group: Group = {
             "directory": str(base),
             "url": urls.pop(),
             "labels": arguments.labels or [],
             "proxy_command": arguments.proxy_command or [],
             "count": count,
-            "instances": instances,
+            "package": packages.pop(),
         }
         existing = groups.get(name)
         if existing:
             if existing.get("pending"):
                 raise ManagerError("Cannot import a group with an unfinished operation")
             comparable = ("directory", "url", "labels", "proxy_command", "count")
-            if any(existing.get(field) != group.get(field) for field in comparable) or [
-                item["path"] for item in existing["instances"]
-            ] != [item["path"] for item in instances]:
+            if any(existing.get(field) != group.get(field) for field in comparable):
                 raise ManagerError(
                     "Imported group conflicts with the existing configuration"
                 )
             if arguments.dry_run:
                 print(f"[DRY RUN] {name} is already imported; no changes")
             return
-        self.check_paths(name, {**group, "instances": []}, 0, groups)
-        for other in groups.values():
-            for other_path in self.reserved_paths(other):
+        self.check_paths(name, {**group, "count": 0}, 0, groups)
+        for other_name, other in groups.items():
+            for other_path in self.reserved_paths(other_name, other):
                 if any(
                     Path(item["path"]) == other_path
                     or Path(item["path"]).is_relative_to(other_path)
@@ -631,17 +634,6 @@ class Manager:
             if selected and name != selected:
                 continue
             pending = group.get("pending")
-            instances: dict[int, Instance] = {
-                item["index"]: item for item in group["instances"]
-            }
-            if pending:
-                instances.update(
-                    {
-                        item["index"]: item
-                        for item in pending.get("items", [])
-                        if item["stage"] != "done"
-                    }
-                )
             summary: GroupStatus = {
                 "name": name,
                 "count": group["count"],
@@ -654,10 +646,10 @@ class Manager:
                     "target": pending["target"],
                     "phase": pending.get("phase"),
                 }
-            for index, instance in sorted(instances.items()):
+            for instance in self.store.instances(name, group):
                 package = self.store.data["packages"].get(instance.get("package", ""))
                 row: InstanceStatus = {
-                    "index": index,
+                    "index": instance["index"],
                     "name": instance["name"],
                     "directory": instance["path"],
                     "version": package["version"] if package else "unknown",

@@ -37,16 +37,11 @@ class PackageInfo(TypedDict):
     source: Literal["archive", "imported"]
 
 
-class StoredInstance(TypedDict):
-    """Store runner-specific configuration without derived identity."""
+class Instance(TypedDict):
+    """Describe a runner derived from its group and operation progress."""
 
     index: int
     package: NotRequired[str]
-
-
-class Instance(StoredInstance):
-    """Describe a runner with its derived name and path."""
-
     name: str
     path: str
 
@@ -73,14 +68,14 @@ class Operation(TypedDict):
 
 
 class Group(TypedDict):
-    """Store the configuration and instances of a runner group."""
+    """Store shared configuration for a contiguous group of runners."""
 
     directory: str
     url: str
     labels: list[str]
     proxy_command: list[str]
     count: int
-    instances: list[Instance]
+    package: str | None
     pending: NotRequired[Operation]
 
 

@@ -8,12 +8,11 @@ from .storage import Store
 
 
 def references(groups: Groups) -> set[str]:
-    """Collect package references from instances and unfinished operations."""
+    """Collect package references from groups and unfinished operations."""
     result: set[str] = set()
     for group in groups.values():
-        for instance in group["instances"]:
-            if checksum := instance.get("package"):
-                result.add(checksum)
+        if checksum := group["package"]:
+            result.add(checksum)
         operation = group.get("pending")
         if operation:
             if checksum := operation.get("package"):

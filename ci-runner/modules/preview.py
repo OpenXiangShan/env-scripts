@@ -68,7 +68,7 @@ class Preview:
                 f"Resume unfinished {pending['kind']} at phase {pending.get('phase', 'control')}"
             )
         if arguments.command in ("start", "stop"):
-            for instance in group["instances"]:
+            for instance in self.store.instances(name, group):
                 registered(name, instance, group)
                 if arguments.command == "stop":
                     self.stop(arguments, name, instance)
@@ -93,7 +93,7 @@ class Preview:
         self.show(f"Runner count: {group['count']} -> {target}")
         affected = [
             instance
-            for instance in group["instances"]
+            for instance in self.store.instances(name, group)
             if arguments.command == "update"
             or instance["index"] >= target
             or instance["name"]
@@ -119,18 +119,18 @@ class Preview:
                 self.show(f"Reuse group runner package {package['version']}")
         if arguments.command == "update":
             if package:
-                affected = [
-                    instance
-                    for instance in affected
-                    if instance.get("package") != package["sha256"]
-                ]
-                if not affected:
+                if group["package"] == package["sha256"]:
                     self.show("All runners already use this package; no changes")
                     return
             else:
                 self.show(
-                    "Following updates apply only to runners whose package differs from the selected release"
+                    "Update this group if its package differs from the selected release"
                 )
+        replace_package = arguments.command == "create" and (
+            package is None or package["sha256"] != group["package"]
+        )
+        if replace_package:
+            affected = self.store.instances(name, group)
         resume = []
         for instance in affected:
             if self.stop(arguments, name, instance) and instance["index"] < target:
@@ -138,7 +138,12 @@ class Preview:
         for instance in sorted(
             affected, key=lambda value: (value["index"] < target, -value["index"])
         ):
-            if arguments.command == "update":
+            expected = (
+                runner_name(name, self.store.hostname, instance["index"], target)
+                if instance["index"] < target
+                else None
+            )
+            if arguments.command == "update" or expected == instance["name"]:
                 self.show(
                     f"Update program files for {instance['name']}; preserve credentials, work and logs"
                 )
@@ -156,6 +161,8 @@ class Preview:
                 )
                 destination = Path(group["directory"]) / expected
                 self.show(f"Rename {instance['path']} -> {destination}")
+                if replace_package:
+                    self.show(f"Install the shared group package into {destination}")
                 self.show(
                     f"Register {expected} at {group['url']} using --token <redacted>"
                 )
@@ -217,13 +224,12 @@ class Preview:
         """Describe unfinished directory and registration changes for an item."""
         stage = item["stage"]
         expected = item["new_name"]
+        install_only = arguments.command == "update" or (
+            item["old_name"] is not None and item["old_name"] == expected
+        )
         if stage == "allocate":
             self.show(f"Create owned runner directory {item['path']}")
-        if (
-            stage in ("allocate", "installing")
-            or arguments.command == "update"
-            and stage == "ready"
-        ):
+        if stage in ("allocate", "installing") or install_only and stage == "ready":
             self.show(f"Install selected runner package into {item['path']}")
         elif stage in ("ready", "unregistering"):
             self.show(
@@ -237,9 +243,16 @@ class Preview:
         destination = Path(group["directory"]) / expected
         if (
             stage in ("ready", "unregistering", "unregistered", "moving")
-            and arguments.command != "update"
+            and not install_only
         ):
             self.show(f"Ensure directory renamed {item['path']} -> {destination}")
+            operation = group.get("pending")
+            if (
+                arguments.command == "create"
+                and operation
+                and operation.get("package") != group["package"]
+            ):
+                self.show(f"Install selected runner package into {destination}")
         self.show(
             f"Ensure {expected} is registered at {group['url']}; preserve matching local registration"
         )
