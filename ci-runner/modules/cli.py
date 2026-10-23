@@ -214,7 +214,10 @@ def parser() -> argparse.ArgumentParser:
         help="Override labels from the legacy JSON configuration",
     )
     imported.add_argument("--proxy-command", type=proxy_command)
-    for command in (create, start, stop, status, update, remove, imported):
+    clean = commands.add_parser(
+        "clean", help="Remove packages unreferenced by any state/*.json"
+    )
+    for command in (create, start, stop, status, update, remove, imported, clean):
         command.add_argument(
             "--dry-run",
             action="store_true",

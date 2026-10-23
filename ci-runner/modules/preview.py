@@ -102,7 +102,7 @@ class Preview:
         if not affected and target == group["count"]:
             self.show("Already at the requested count; no changes")
             return
-        package = group["package"]
+        package = self.store.group_package(group)
         if arguments.command in ("create", "update"):
             if (
                 arguments.runner_file
@@ -122,8 +122,7 @@ class Preview:
                 affected = [
                     instance
                     for instance in affected
-                    if "package" not in instance
-                    or instance["package"]["sha256"] != package["sha256"]
+                    if instance.get("package") != package["sha256"]
                 ]
                 if not affected:
                     self.show("All runners already use this package; no changes")
@@ -178,7 +177,7 @@ class Preview:
 
     def resume(self, arguments: Arguments, group: Group, operation: Operation) -> None:
         """Preview the remaining stages recorded by an interrupted operation."""
-        package = operation.get("package")
+        package = self.store.package(operation.get("package"))
         if arguments.runner_file:
             supplied = self.packages.describe(arguments.runner_file)
             if package is None or supplied["sha256"] != package["sha256"]:

@@ -6,6 +6,7 @@ import shutil
 from typing import Any
 
 from . import github
+from .cleanup import Cleaner
 from .common import (
     ManagerError,
     atomic_json,
@@ -124,13 +125,14 @@ class Manager:
                 raise ManagerError(
                     f"Existing group has a different {key}; create cannot modify it"
                 )
-        if arguments.runner_file and group["package"]:
+        current_package = self.store.group_package(group)
+        if arguments.runner_file and current_package:
             package = (
                 self.packages.describe(arguments.runner_file)
                 if arguments.dry_run
                 else self.packages.select(arguments.runner_file)
             )
-            if package["sha256"] != group["package"]["sha256"]:
+            if package["sha256"] != current_package["sha256"]:
                 raise ManagerError(
                     "Use update to change an existing group's runner package"
                 )
@@ -139,6 +141,9 @@ class Manager:
         """Dispatch a validated command while serializing state mutations."""
         if arguments.command == "status":
             return self.status(arguments.name, verbose=arguments.verbose)
+        if arguments.command == "clean":
+            Cleaner(self.root).run(arguments.dry_run)
+            return None
         context = (
             nullcontext(self.store.load()) if arguments.dry_run else self.store.locked()
         )
@@ -171,7 +176,6 @@ class Manager:
                             "labels": arguments.labels or [],
                             "proxy_command": arguments.proxy_command or [],
                             "count": 0,
-                            "package": None,
                             "instances": [],
                         }
                 if group is None:
@@ -258,7 +262,7 @@ class Manager:
                 )
             if not items:
                 return
-            package = group["package"]
+            package = self.store.group_package(group)
             if arguments.command in ("create", "update"):
                 runner_file = arguments.runner_file
                 if arguments.command == "create" and group["count"] and runner_file:
@@ -278,8 +282,7 @@ class Manager:
                     items = [
                         item
                         for item in items
-                        if "package" not in item
-                        or item["package"]["sha256"] != package["sha256"]
+                        if item.get("package") != package["sha256"]
                     ]
                     if not items:
                         return
@@ -301,7 +304,7 @@ class Manager:
                 "phase": "stopping",
                 "resume": resume,
                 "items": items,
-                "package": package,
+                "package": self.store.remember(package) if package else None,
             }
             group["pending"] = operation
             groups[name] = group
@@ -316,14 +319,13 @@ class Manager:
             if arguments.runner_file:
                 supplied = self.packages.select(arguments.runner_file)
                 saved_package = operation.get("package")
-                if (
-                    saved_package is None
-                    or supplied["sha256"] != saved_package["sha256"]
-                ):
+                if saved_package is None or supplied["sha256"] != saved_package:
                     raise ManagerError("Retry must use the same runner package")
             saved_package = operation.get("package")
             if saved_package:
-                self.packages.verify(saved_package)
+                resolved_package = self.store.package(saved_package)
+                if resolved_package:
+                    self.packages.verify(resolved_package)
         if operation["phase"] == "stopping":
             affected = [
                 item for item in operation["items"] if item["old_name"] is not None
@@ -345,8 +347,6 @@ class Manager:
             ):
                 self.change_instance(name, group, operation, item, arguments.token)
             group["count"] = operation["final_count"]
-            if operation["kind"] in ("create", "update"):
-                group["package"] = operation["package"]
             group["instances"].sort(key=lambda instance: instance["index"])
             operation["phase"] = "restoring"
             self.store.save()
@@ -467,10 +467,10 @@ class Manager:
             self.store.save()
         if item["stage"] == "installing":
             self.owned(name, item)
-            package = operation.get("package")
+            package = self.store.package(operation.get("package"))
             assert package is not None
             self.packages.install(package, path)
-            item["package"] = package
+            item["package"] = package["sha256"]
             item["stage"] = "registering"
             self.store.save()
         if item["stage"] == "registering":
@@ -565,7 +565,7 @@ class Manager:
                     "index": index,
                     "name": expected,
                     "path": str(path),
-                    "package": {"version": version, "sha256": None},
+                    "package": self.store.remember_import(version, path),
                 }
             )
         if len(urls) != 1:
@@ -576,7 +576,6 @@ class Manager:
             "labels": arguments.labels or [],
             "proxy_command": arguments.proxy_command or [],
             "count": count,
-            "package": None,
             "instances": instances,
         }
         existing = groups.get(name)
@@ -656,7 +655,7 @@ class Manager:
                     "phase": pending.get("phase"),
                 }
             for index, instance in sorted(instances.items()):
-                package = instance.get("package")
+                package = self.store.data["packages"].get(instance.get("package", ""))
                 row: InstanceStatus = {
                     "index": index,
                     "name": instance["name"],

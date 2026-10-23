@@ -3,7 +3,7 @@ from pathlib import Path
 from typing import Literal, NotRequired, TypedDict
 
 type Command = Literal[
-    "create", "start", "stop", "status", "update", "remove", "import"
+    "create", "start", "stop", "status", "update", "remove", "import", "clean"
 ]
 type RunnerState = Literal["stopped", "idle", "busy", "unknown", "error"]
 type Stage = Literal[
@@ -28,18 +28,20 @@ class Package(TypedDict):
     root: str
 
 
-class ImportedPackage(TypedDict):
-    """Describe the version of an imported runner."""
+class PackageInfo(TypedDict):
+    """Store shared package metadata under its checksum."""
 
+    platform: str
     version: str
-    sha256: None
+    root: str | None
+    source: Literal["archive", "imported"]
 
 
 class StoredInstance(TypedDict):
     """Store runner-specific configuration without derived identity."""
 
     index: int
-    package: NotRequired[Package | ImportedPackage]
+    package: NotRequired[str]
 
 
 class Instance(StoredInstance):
@@ -67,7 +69,7 @@ class Operation(TypedDict):
     phase: NotRequired[Literal["stopping", "changing", "restoring"]]
     resume: NotRequired[list[int]]
     items: NotRequired[list[OperationItem]]
-    package: NotRequired[Package | None]
+    package: NotRequired[str | None]
 
 
 class Group(TypedDict):
@@ -78,7 +80,6 @@ class Group(TypedDict):
     labels: list[str]
     proxy_command: list[str]
     count: int
-    package: Package | None
     instances: list[Instance]
     pending: NotRequired[Operation]
 
@@ -91,6 +92,7 @@ class HostState(TypedDict):
 
     schema_version: int
     hostname: str
+    packages: dict[str, PackageInfo]
     groups: Groups
 
 

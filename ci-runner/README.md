@@ -85,13 +85,24 @@ python3 manager.py create \
   --proxy-command 'proxychains -q' demo
 ```
 
-`--runner-file` 使用匹配本机平台的本地安装包，并纳入入口目录的 `.cache/`。没有该参数时，create 优先选择缓存中的最高稳定版本，无缓存才下载；update 总是查询最新稳定 Release，缓存命中则复用。已有组扩容继续使用该组已选择的安装包；导入组尚未选定安装包时按缓存规则选择。
+`--runner-file` 使用匹配本机平台的本地安装包，并纳入入口目录的 `.cache/`。没有该参数时，create 优先选择缓存中的最高稳定版本，无缓存才下载；update 总是查询最新稳定 Release，缓存命中则复用。已有组扩容复用实例引用的最新可安装包；没有可复用缓存的导入组按缓存规则选择。
 
 下载会校验 GitHub Release 提供的 SHA-256；没有可验证摘要时拒绝自动安装，需自行提供可信本地包。本地包按内容摘要缓存，不代表管理器验证了其发布者身份。解压拒绝路径逃逸和不安全链接。
 
-更新先准备安装包，再停止受影响实例、覆盖程序文件并恢复原运行集合。相同版本且内容相同的重复更新不重启；注册文件、工作目录和日志保留。每实例有独立 `bin`，`externals` 链接到缓存中的版本目录；不要删除仍被实例引用的 `.cache/`。管理器不自动清理旧缓存。新注册 runner 使用 `--disableupdate`，由 manager 统一更新。
+更新先准备安装包，再停止受影响实例、覆盖程序文件并恢复原运行集合。相同版本且内容相同的重复更新不重启；注册文件、工作目录和日志保留。每实例有独立 `bin`，`externals` 链接到缓存中的版本目录。旧缓存可使用 `clean` 清理；新注册 runner 使用 `--disableupdate`，由 manager 统一更新。
 
 `--proxy-command` 是注册、注销和 runner 运行时的命令前缀，会保存在组配置中。下载不使用该参数，也不读取 HTTP 代理环境配置；需要代理下载时自行执行 `proxychains python3 manager.py ...`。前缀按参数列表执行，不支持管道、重定向或 shell 变量展开。
+
+### 清理未引用的安装包
+
+```bash
+python3 manager.py clean --dry-run
+python3 manager.py clean
+```
+
+`clean` 扫描入口目录下所有 `state/*.json`，保留所有主机的实例和未完成操作仍引用的包，清除未引用的顶层 `packages` 条目及 `.cache/` 内容，包括归档、解压目录、遗留下载和临时文件。仅存在于 `packages` 字典中但没有实例或操作引用的条目不算在用。重复清理无额外效果；`--dry-run` 只预览，不写状态或锁文件。
+
+清理持有跨主机共享缓存的独占锁；创建、更新等修改命令持有共享锁，避免清理尚未写入引用的新包。存在无法读取、格式错误或引用缺失的状态文件时，清理会在删除前报错。缓存中的目录符号链接不会被递归跟随。
 
 ### 缩容与清空
 
@@ -137,7 +148,11 @@ python3 manager.py import --dry-run --config xs.json#builder
 
 入口目录的 `state/<短hostname>.json` 按组名保存配置，保证同一状态目录内 `(hostname, name)` 唯一。修改命令通过主机锁串行执行；JSON 原子写入，目录通过所有权标记校验。status 可在修改期间读取操作进度。
 
-每个 instance 只保存 `index` 和安装包信息：名称根据组名、hostname 和当前数量推导，索引仍按最大下标的位宽补零；路径为 `<directory>/<name>`。状态格式为 schema 2，兼容读取 schema 1，并在下次保存时自动转换。未完成操作继续保存新旧名称、路径和阶段，以支持跨位数重命名期间的恢复；status JSON 仍提供推导后的名称和路径。
+状态格式为 schema 3，兼容读取 schema 1、2，并在下次保存时自动转换。顶层 `packages` 以 SHA-256 为键，集中保存 `platform`、`version`、`root` 和来源 `source`。group 不保存 package，instance 的 `package` 和未完成操作中的包信息都只保存 SHA 引用；未被引用的元数据由 `clean` 清理。
+
+每个 instance 只保存 `index` 和 `package`：名称根据组名、hostname 和当前数量推导，索引仍按最大下标的位宽补零；路径为 `<directory>/<name>`。未完成操作继续保存新旧名称、路径和阶段，以支持跨位数重命名期间的恢复；status JSON 仍提供推导后的名称、路径和版本。
+
+导入时若能确认实例对应已有缓存包，则复用该包的 SHA；否则记录为 `source: imported`，以本地 `Runner.Listener` 摘要标识，保留版本和平台，不将其当作可安装的归档包。旧导入记录的本地文件已丢失时，以原导入元数据摘要迁移。
 
 外部操作前记录目标和阶段，逐实例保存进度。命令中断后重新执行相同操作和目标即可恢复，可以调整 `--timeout`、`--force` 或重新提供 token。未完成操作会阻止该组执行其他修改命令。已经完成的远端操作不会自动回滚。
 
