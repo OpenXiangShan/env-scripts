@@ -249,16 +249,12 @@ def elapsed_time(seconds: int | None) -> str:
 
 
 def print_status(result: Status, verbose: bool) -> None:
-    """Render compact runner rows or detailed activity blocks."""
-    if not verbose:
-        print(f"Host: {result['hostname']}")
+    """Render runner status rows or detailed activity blocks."""
+    print(f"Host: {result['hostname']}")
     for group in result["groups"]:
-        if not verbose:
-            print(
-                f"{group['name']}: {group['count']} runners"
-                + (f"; pending {group['pending']}" if group["pending"] else "")
-            )
-        elif group["pending"]:
+        active = sum(instance["state"] != "stopped" for instance in group["instances"])
+        print(f"{group['name']}: {active}/{group['count']} runners")
+        if verbose and group["pending"]:
             print(f"{group['name']}: pending {group['pending']}")
         for instance in group["instances"]:
             if verbose:
@@ -269,20 +265,31 @@ def print_status(result: Status, verbose: bool) -> None:
                     "unknown": "Unknown",
                     "error": "Error",
                 }[instance["state"]]
-                print(f"{instance['name']}: {instance.get('started_at') or '-'}")
-                print(f"  State: {state}")
+                print(f"  {instance['name']}:")
+                print(f"    Version: {instance['version']}")
+                print(f"    Path: {instance['directory']}")
+                print(f"    Tmux: {instance['tmux'] or '-'}")
+                print(f"    Status: {state}")
+                if instance["state"] == "stopped":
+                    continue
+                print(f"    Started: {instance.get('started_at') or '-'}")
                 if instance["state"] == "busy":
-                    print(f"  Task: {instance.get('current_task') or '-'}")
-                    print(f"  Elapsed: {elapsed_time(instance.get('elapsed'))}")
+                    print(f"    Task: {instance.get('current_task') or '-'}")
+                    print(f"    Elapsed: {elapsed_time(instance.get('elapsed'))}")
                 elif instance["state"] == "idle":
-                    print(f"  Last Task: {instance.get('last_task') or '-'}")
-                    print(f"  Result: {instance.get('result') or '-'}")
+                    print(f"    Last Task: {instance.get('last_task') or '-'}")
+                    print(f"    Result: {instance.get('result') or '-'}")
             else:
-                print(
-                    f"  {instance['name']}  {instance['state']}  {instance['version']}  {instance['directory']}  {instance['tmux'] or '-'}"
-                )
+                state = {
+                    "busy": "Running",
+                    "idle": "Idle",
+                    "stopped": "Stopped",
+                    "unknown": "Unknown",
+                    "error": "Error",
+                }[instance["state"]]
+                print(f"  {instance['name']}: {state}")
             if instance.get("detail"):
-                print(f"    {instance.get('detail')}")
+                print(f"      Detail: {instance['detail']}")
 
 
 def main(root: Path, argv: Sequence[str] | None = None) -> int:

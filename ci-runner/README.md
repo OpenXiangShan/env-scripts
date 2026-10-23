@@ -42,17 +42,26 @@ python3 manager.py stop --force demo
 
 每组使用一个独立 session，每个 runner 一个 window。status 展示实际 session/pane，可使用 `tmux attach -t <session>` 查看。管理器通过元数据和进程识别实例，不依赖 window 编号、标题或 pane 排列。runner 退出后保留 window 供诊断，stop 会清理已停止的受管理 window。重复 start 不创建重复进程，重复 stop 成功返回。
 
+普通 `status` 只显示每组的活动数/总数和各 runner 状态；已登记但未运行的 runner 也会列出并显示为 `Stopped`。
+
 `status --verbose`（或 `-v`）从 tmux 捕获的输出解析活动信息，按以下格式显示：
 
 ```text
-demo-host-0: 2026-10-23T10:00:00-07:00
-  State: Running
-  Task: build
-  Elapsed: 00:03:15
-demo-host-1: 2026-10-23T10:00:01-07:00
-  State: Idle
-  Last Task: test
-  Result: Success
+Host: host
+demo: 1/2 runners
+  demo-host-0:
+    Version: 2.333.0
+    Path: /path/to/runners/demo-host-0
+    Tmux: ci-host-demo-12345678 %0
+    Status: Running
+    Started: 2026-10-23T10:00:00-07:00
+    Task: build
+    Elapsed: 00:03:15
+  demo-host-1:
+    Version: 2.333.0
+    Path: /path/to/runners/demo-host-1
+    Tmux: -
+    Status: Stopped
 ```
 
 头部时间取本次启动后首次 `Listening for Jobs` 的时间，使用带时区的本地 ISO 8601 格式；`Elapsed` 从当前任务的 `Running job` 时间计算。`Result` 将 runner 的 Succeeded、Failed、Canceled 分别显示为 Success、Failed、Cancelled。尚无历史任务、时间或输出已滚出 tmux 历史时显示 `-`；停止、异常状态分别显示 Stopped、Error 或 Unknown。JSON 模式额外提供 `started_at`、`current_task`、`elapsed`（秒）、`last_task` 和 `result`，缺失信息使用 `null`。
