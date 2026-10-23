@@ -14,12 +14,15 @@ from .models import Instance, Operation, Pane, Process, RunnerDetails, RunnerSta
 
 
 def processes() -> dict[int, Process]:
-    """Read process ancestry and command lines from procfs."""
+    """Read process ancestry and command lines for the current user."""
     result: dict[int, Process] = {}
+    user_id = os.geteuid()
     for entry in Path("/proc").iterdir():
         if not entry.name.isdigit():
             continue
         try:
+            if entry.stat().st_uid != user_id:
+                continue
             status = (entry / "stat").read_text()
             fields = status[status.rfind(")") + 2 :].split()
             if fields[0] == "Z":
