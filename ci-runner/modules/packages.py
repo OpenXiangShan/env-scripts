@@ -167,8 +167,8 @@ class Packages:
         except tarfile.TarError as error:
             raise ManagerError(f"Invalid runner archive {archive}: {error}") from error
 
-    def unpack(self, archive: Path) -> Package:
-        """Validate and safely extract an archive into the package cache."""
+    def describe(self, archive: Path) -> Package:
+        """Describe a local archive without extracting or caching it."""
         match = PACKAGE_PATTERN.fullmatch(archive.name)
         if not match or match[1] != self.target() or not archive.is_file():
             raise ManagerError(
@@ -178,6 +178,63 @@ class Packages:
         destination = (
             self.cache / "packages" / f"{match[1]}-{match[2]}-{checksum}"
         ).resolve()
+        return {
+            "platform": match[1],
+            "version": match[2],
+            "sha256": checksum,
+            "root": str(destination),
+        }
+
+    def preview(
+        self, runner_file: Path | None = None, latest: bool = False
+    ) -> tuple[Package | None, list[str]]:
+        """Describe package selection without downloads or cache writes."""
+        if runner_file:
+            package = self.describe(runner_file)
+            if Path(package["root"]).exists():
+                self.verify(read_json(Path(package["root"]) / "package.json"))
+                return package, [f"Reuse cached runner package {package['version']}"]
+            return package, [
+                f"Validate, cache and extract {runner_file} -> {package['root']}"
+            ]
+        archives = []
+        for archive in sorted(self.cache.glob("actions-runner-*.tar.gz")):
+            match = PACKAGE_PATTERN.fullmatch(archive.name)
+            if match and match[1] == self.target():
+                archives.append((archive, self.describe(archive)))
+        actions = [
+            f"Validate and cache local archive {archive}"
+            for archive, package in archives
+            if not Path(package["root"]).exists()
+        ]
+        if latest:
+            return None, actions + [
+                f"Query latest stable GitHub release for {self.target()} at execution time",
+                f"Reuse matching cache or download, verify SHA-256 and extract into {self.cache}",
+            ]
+        cached = self.cached()
+        candidates = cached + [package for archive, package in archives]
+        if not candidates:
+            return None, [
+                f"Query latest stable GitHub release for {self.target()} at execution time",
+                f"Download, verify SHA-256 and extract into {self.cache}",
+            ]
+        selected = max(
+            candidates,
+            key=lambda value: (
+                tuple(map(int, value["version"].split("."))),
+                value["sha256"],
+            ),
+        )
+        if Path(selected["root"]).exists():
+            self.verify(selected)
+        return selected, actions + [f"Use cached runner package {selected['version']}"]
+
+    def unpack(self, archive: Path) -> Package:
+        """Validate and safely extract an archive into the package cache."""
+        package = self.describe(archive)
+        checksum = package["sha256"]
+        destination = Path(package["root"])
         if destination.exists():
             return self.verify(read_json(destination / "package.json"))
         destination.parent.mkdir(parents=True, exist_ok=True)
@@ -224,12 +281,6 @@ class Packages:
                     raise ManagerError(f"Package is missing {required}")
             if not (files / "externals").is_dir():
                 raise ManagerError("Package is missing the externals directory")
-            package: Package = {
-                "platform": match[1],
-                "version": match[2],
-                "sha256": checksum,
-                "root": str(destination),
-            }
             atomic_json(staging / "package.json", package)
             os.replace(staging, destination)
         return package

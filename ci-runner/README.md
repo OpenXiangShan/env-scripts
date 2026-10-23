@@ -99,12 +99,27 @@ python3 manager.py remove --count 0 --token '<token>' demo
 
 ```bash
 ./stop_runners_safe.sh --config xs.json#runner
-python3 manager.py import --config xs.json#runner --labels bosc,runner
+python3 manager.py import --config xs.json#runner
+# 可选：覆盖旧 JSON 中的 labels
+python3 manager.py import --config xs.json#builder --labels bosc,open,builder
 # 若旧 runner 使用代理，导入时同时传 --proxy-command 'proxychains -q'
 python3 manager.py start xs-runner
 ```
 
-组名取旧配置的 `basename`，不是 JSON key；上例中的实际名称以 `xs.json` 为准。import 检查目录、名称、注册信息和进程，发现运行进程或信息冲突时拒绝。URL 默认从 `.runner` 读取，缺失时可提供 `--url`。导入不注销、不重命名、不启动，标签必须显式提供。导入后不要再用旧脚本操作该组；旧 runner 的自动更新设置不会被 import 改写。
+组名取旧配置的 `basename`，不是 JSON key；上例中的实际名称以 `xs.json` 为准。import 检查目录、名称、注册信息和进程，发现运行进程或信息冲突时拒绝。URL 默认从 `.runner` 读取，缺失时可提供 `--url`。支持 GitHub runner 生成的带 UTF-8 BOM 的 JSON 文件。导入不注销、不重命名、不启动，标签默认读取旧 JSON 的 `labels`（逗号分隔字符串或字符串列表），缺失时为空；`--labels` 可选，用于覆盖该值。导入后不要再用旧脚本操作该组；旧 runner 的自动更新设置不会被 import 改写。
+
+### 预览操作
+
+```bash
+python3 manager.py create --dry-run --count 11 demo
+python3 manager.py --dry-run remove --count 8 demo
+python3 manager.py update --dry-run demo
+python3 manager.py import --dry-run --config xs.json#builder
+```
+
+所有命令支持 `--dry-run`，放在子命令前后均可。修改命令只读取配置、目录、安装包摘要和 tmux 状态，输出 `[DRY RUN]` 操作清单，不写状态、锁文件或所有权标记，不下载、解压或执行 runner 程序，不发送信号、不更改 tmux 或 GitHub 注册。预览无需 token，提供的 token 不会输出；实际执行注册或移除仍需有效 token。
+
+预览会标明跨位数重命名、注销及重新注册、末尾目录删除、原运行状态恢复，以及未完成操作的剩余阶段。自动更新只预览“查询最新 Release、按需下载”的动作，不联网查询版本；同版本是否需要更新在实际执行时确定。status 本身只读，添加该选项后仍正常显示状态。预览不持有修改锁，实际执行时会重新检查状态和冲突。
 
 ### 持久化与失败恢复
 

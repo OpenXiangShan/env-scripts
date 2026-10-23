@@ -1,4 +1,4 @@
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Literal, NotRequired, TypedDict
 
@@ -173,6 +173,7 @@ class LegacyConfig:
     name: str
     directory: Path
     count: int
+    labels: list[str] = field(default_factory=list)
 
 
 @dataclass
@@ -192,4 +193,5 @@ class Arguments:
     force: bool = False
     json: bool = False
     verbose: bool = False
+    dry_run: bool = False
     config: LegacyConfig | None = None

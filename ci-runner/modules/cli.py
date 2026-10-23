@@ -94,10 +94,22 @@ def legacy_config(value: str) -> LegacyConfig:
         count = legacy.get("count")
         if isinstance(count, bool) or not isinstance(count, (str, int)):
             raise argparse.ArgumentTypeError("Legacy count must be a positive integer")
+        raw_labels = legacy.get("labels", [])
+        if isinstance(raw_labels, str):
+            imported_labels = labels(raw_labels) if raw_labels else []
+        elif isinstance(raw_labels, list) and all(
+            isinstance(item, str) for item in raw_labels
+        ):
+            imported_labels = labels(",".join(raw_labels)) if raw_labels else []
+        else:
+            raise argparse.ArgumentTypeError(
+                "Legacy labels must be a comma-separated string or string list"
+            )
         return LegacyConfig(
             valid_name(legacy["basename"]),
             directory(legacy["directory"]),
             positive(str(count)),
+            imported_labels,
         )
     except (ManagerError, OSError, ValueError) as error:
         raise argparse.ArgumentTypeError(str(error)) from error
@@ -139,6 +151,9 @@ def parser() -> argparse.ArgumentParser:
     """Build the command parser with input validation at each option."""
     result = argparse.ArgumentParser(
         description="Manage GitHub self-hosted runners using tmux, without a manager daemon"
+    )
+    result.add_argument(
+        "--dry-run", action="store_true", help="Preview actions without making changes"
     )
     commands = result.add_subparsers(dest="command", required=True)
     create = commands.add_parser(
@@ -193,8 +208,19 @@ def parser() -> argparse.ArgumentParser:
         "--config", type=legacy_config, required=True, help="Legacy JSON path#key"
     )
     imported.add_argument("--url", type=normalize_url)
-    imported.add_argument("--labels", type=labels, required=True)
+    imported.add_argument(
+        "--labels",
+        type=labels,
+        help="Override labels from the legacy JSON configuration",
+    )
     imported.add_argument("--proxy-command", type=proxy_command)
+    for command in (create, start, stop, status, update, remove, imported):
+        command.add_argument(
+            "--dry-run",
+            action="store_true",
+            default=argparse.SUPPRESS,
+            help="Preview actions without making changes",
+        )
     return result
 
 
@@ -208,6 +234,8 @@ def parse_arguments(argv: Sequence[str] | None = None) -> Arguments:
         arguments.name = arguments.config.name
         arguments.count = arguments.config.count
         arguments.directory = arguments.config.directory
+        if arguments.labels is None:
+            arguments.labels = arguments.config.labels
     return arguments
 
 
@@ -256,6 +284,7 @@ def print_status(result: Status, verbose: bool) -> None:
             if instance.get("detail"):
                 print(f"    {instance.get('detail')}")
 
+
 def main(root: Path, argv: Sequence[str] | None = None) -> int:
     """Parse a command, execute it and render its result or error."""
     arguments = parse_arguments(argv)
@@ -268,7 +297,8 @@ def main(root: Path, argv: Sequence[str] | None = None) -> int:
             else:
                 print_status(result, arguments.verbose)
         else:
-            print(f"{arguments.command}: complete")
+            suffix = "preview complete" if arguments.dry_run else "complete"
+            print(f"{arguments.command}: {suffix}")
         return 0
     except KeyboardInterrupt:
         print(

@@ -1,4 +1,5 @@
 from copy import deepcopy
+from contextlib import nullcontext
 from pathlib import Path
 import shutil
 from typing import Any
@@ -26,6 +27,7 @@ from .models import (
     Status,
 )
 from .packages import Packages
+from .preview import Preview
 from .storage import Store
 from .tmux import Tmux, assert_no_unmanaged_process
 
@@ -122,7 +124,11 @@ class Manager:
                     f"Existing group has a different {key}; create cannot modify it"
                 )
         if arguments.runner_file and group["package"]:
-            package = self.packages.select(arguments.runner_file)
+            package = (
+                self.packages.describe(arguments.runner_file)
+                if arguments.dry_run
+                else self.packages.select(arguments.runner_file)
+            )
             if package["sha256"] != group["package"]["sha256"]:
                 raise ManagerError(
                     "Use update to change an existing group's runner package"
@@ -132,7 +138,10 @@ class Manager:
         """Dispatch a validated command while serializing state mutations."""
         if arguments.command == "status":
             return self.status(arguments.name, verbose=arguments.verbose)
-        with self.store.locked() as groups:
+        context = (
+            nullcontext(self.store.load()) if arguments.dry_run else self.store.locked()
+        )
+        with context as groups:
             if arguments.command == "import":
                 self.import_group(arguments, groups)
                 return None
@@ -155,6 +164,8 @@ class Manager:
                     }
             if group is None:
                 if arguments.command == "remove" and arguments.count == 0:
+                    if arguments.dry_run:
+                        print("[DRY RUN] Group is already absent; no changes")
                     return None
                 raise ManagerError(f"Unknown runner group: {name}")
             pending = group.get("pending")
@@ -167,6 +178,11 @@ class Manager:
                 raise ManagerError(
                     f"Group has unfinished {pending['kind']} operation (target={pending.get('target')}); retry that operation first"
                 )
+            if arguments.dry_run:
+                Preview(self.store, self.packages, self.tmux).run(
+                    arguments, group, groups, self.check_paths, self.registered
+                )
+                return None
             if arguments.command in ("create", "remove", "update"):
                 self.reconcile(arguments, name, group, groups)
             else:
@@ -522,7 +538,11 @@ class Manager:
             version_file = path / "bin" / "Runner.Listener"
             if not version_file.is_file() or not (path / "run.sh").is_file():
                 raise ManagerError(f"Incomplete runner installation: {path}")
-            version = execute([str(version_file), "--version"], cwd=path).stdout.strip()
+            version = (
+                "unresolved"
+                if arguments.dry_run
+                else execute([str(version_file), "--version"], cwd=path).stdout.strip()
+            )
             if not version:
                 raise ManagerError(f"Cannot determine imported runner version: {path}")
             instances.append(
@@ -555,6 +575,8 @@ class Manager:
                 raise ManagerError(
                     "Imported group conflicts with the existing configuration"
                 )
+            if arguments.dry_run:
+                print(f"[DRY RUN] {name} is already imported; no changes")
             return
         self.check_paths(name, {**group, "instances": []}, 0, groups)
         for other in groups.values():
@@ -566,6 +588,16 @@ class Manager:
                     for item in instances
                 ):
                     raise ManagerError("Imported directory overlaps another group")
+        if arguments.dry_run:
+            print(
+                f"[DRY RUN] Import {count} stopped runners as {name}; labels: {','.join(group['labels']) or '(none)'}"
+            )
+            for instance in instances:
+                print(
+                    f"[DRY RUN] Read runner version and write ownership marker: {instance['path']}"
+                )
+            print(f"[DRY RUN] Save group {name} to {self.store.path}")
+            return
         for instance in instances:
             atomic_json(
                 Path(instance["path"]) / ".manager-owner.json",

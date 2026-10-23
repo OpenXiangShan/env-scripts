@@ -34,9 +34,9 @@ def execute(
 
 
 def read_json(path: str | Path) -> Any:
-    """Read JSON and report file or decoding errors."""
+    """Read UTF-8 JSON with an optional BOM and report decoding errors."""
     try:
-        return json.loads(Path(path).read_text())
+        return json.loads(Path(path).read_text(encoding="utf-8-sig"))
     except (OSError, ValueError) as error:
         raise ManagerError(f"Cannot read JSON {path}: {error}") from error
 
