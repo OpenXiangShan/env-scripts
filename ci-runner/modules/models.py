@@ -35,13 +35,18 @@ class ImportedPackage(TypedDict):
     sha256: None
 
 
-class Instance(TypedDict):
-    """Describe a managed runner instance."""
+class StoredInstance(TypedDict):
+    """Store runner-specific configuration without derived identity."""
 
     index: int
+    package: NotRequired[Package | ImportedPackage]
+
+
+class Instance(StoredInstance):
+    """Describe a runner with its derived name and path."""
+
     name: str
     path: str
-    package: NotRequired[Package | ImportedPackage]
 
 
 class OperationItem(Instance):

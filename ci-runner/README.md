@@ -137,6 +137,8 @@ python3 manager.py import --dry-run --config xs.json#builder
 
 入口目录的 `state/<短hostname>.json` 按组名保存配置，保证同一状态目录内 `(hostname, name)` 唯一。修改命令通过主机锁串行执行；JSON 原子写入，目录通过所有权标记校验。status 可在修改期间读取操作进度。
 
+每个 instance 只保存 `index` 和安装包信息：名称根据组名、hostname 和当前数量推导，索引仍按最大下标的位宽补零；路径为 `<directory>/<name>`。状态格式为 schema 2，兼容读取 schema 1，并在下次保存时自动转换。未完成操作继续保存新旧名称、路径和阶段，以支持跨位数重命名期间的恢复；status JSON 仍提供推导后的名称和路径。
+
 外部操作前记录目标和阶段，逐实例保存进度。命令中断后重新执行相同操作和目标即可恢复，可以调整 `--timeout`、`--force` 或重新提供 token。未完成操作会阻止该组执行其他修改命令。已经完成的远端操作不会自动回滚。
 
 如果 GitHub 注册成功但本地注册文件不完整，或注销过程中本地文件仅被部分删除，管理器会保留现场并报错。此时先核对 GitHub runner 列表及本地 `.runner` / `.credentials`，修复身份信息后重试；不要盲目删改状态文件或使用 `--replace` 覆盖未知 runner。state、缓存和运行目录应由同一个可信用户管理，不要在运行中手动改名或替换为符号链接。

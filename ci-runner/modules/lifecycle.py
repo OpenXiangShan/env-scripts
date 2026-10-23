@@ -1,5 +1,6 @@
 from copy import deepcopy
 from contextlib import nullcontext
+from dataclasses import replace
 from pathlib import Path
 import shutil
 from typing import Any
@@ -156,11 +157,11 @@ class Manager:
                     print("[DRY RUN] No runner groups found; no changes")
                 return None
             for name in names:
-                arguments.name = name
+                requested = replace(arguments, name=name)
                 group = groups.get(name)
                 if arguments.command == "create":
                     if group:
-                        self.check_existing_arguments(arguments, group)
+                        self.check_existing_arguments(requested, group)
                     else:
                         if not arguments.directory or not arguments.url:
                             raise ManagerError("First create requires --dir and --url")
@@ -194,13 +195,13 @@ class Manager:
                     )
                 if arguments.dry_run:
                     Preview(self.store, self.packages, self.tmux).run(
-                        arguments, group, groups, self.check_paths, self.registered
+                        requested, group, groups, self.check_paths, self.registered
                     )
                     continue
                 if arguments.command in ("create", "remove", "update"):
-                    self.reconcile(arguments, name, group, groups)
+                    self.reconcile(requested, name, group, groups)
                 else:
-                    self.control(arguments, name, group)
+                    self.control(requested, name, group)
         return None
 
     def reconcile(
