@@ -1,144 +1,46 @@
-# DingTalk robots
+# DingTalk Robots
 
-This directory contains reusable DingTalk custom-robot helpers and concrete robot
-jobs. Python 3.9 or newer and the standard library are sufficient.
+Daily XiangShan updates and reusable DingTalk helpers. Run all commands from the repository root.
 
-## Configuration
+## Setup
 
-`config.json` is the local runtime configuration. It is ignored by Git and should
-remain readable only by its owner. Start from `config.example.json` on a new host.
-
-```json
-{
-  "dingtalk": {
-    "webhook": "https://oapi.dingtalk.com/robot/send?access_token=...",
-    "secret": "SEC..."
-  },
-  "github": {
-    "organization": "OpenXiangShan",
-    "token": "",
-    "token_file": "token",
-    "proxy": ""
-  }
-}
-```
-
-Put the fine-grained PAT in the ignored `token` file and keep `github.token_file` as
-shown. Alternatively, place it directly in `github.token`. The token is only sent in
-the HTTPS `Authorization` header and is never included in reports or logs. Public
-repository read access is sufficient for the daily monitor's GitHub metadata queries.
-
-Set `github.proxy` when GitHub must be reached through a proxy. Leave it empty to use
-the standard process proxy environment or a direct connection. The per-request timeout
-is controlled by `github.timeout_seconds`.
-
-## Reusable DingTalk API
-
-`robot.py` provides `signed_webhook`, `send_message`, `send_text`, and
-`send_markdown`. Credentials are passed by callers after loading `config.json`.
-
-Monthly organization reports are documented in [OSS statistics](../oss_stats/README.md).
-
-## OpenXiangShan daily praise monitor
-
-`xiangshan_monitor/xiangshan_monitor.py` is a three-stage daily job for the OpenXiangShan
-organization. `pull` clones or force-checkouts the remote default branch of the
-repositories listed in
-`dingtalk_robot/xiangshan_monitor/repositories.json` and records commits from a
-rolling window (`24h` by default, or `7d`), including the complete patch for
-every commit. `talk` reads the checked-in `prompt.txt` and uses the explicitly
-configured local API in `config.json` to select standout contributors and write
-a casual DingTalk-ready Chinese message from the patch material. The prompt
-file keeps the final, map, and reduce instructions in separate `[final]`, `[map]`,
-and `[reduce]` sections. `highlight_count` controls how many contributors are
-selected; when it is `null`, the monitor chooses 1 for a window up to 24h, adds
-one for each additional full day, and caps at 3. The final praise reply must
-include a machine-readable highlight block so the lottery can record people,
-not just slot numbers. Each highlight independently wins a random gift when a local hash is divisible
-by `xiangshan_monitor.gifts.win_denominator` in `config.json` (default 5, so
-1/5 odds), using the report date and captured repository HEADs as the seed.
-Pity rules are also read from that `gifts` object. `special_gifts` lists dated
-named gifts and how many copies to award each day in those windows;
-`highlight_pity.threshold` consecutive highlights without a win guarantee a
-gift; `commit_pity.threshold` commits without a win also guarantee a gift; and
-if a rolling `weekly_pity.window_days` window has no successful draw at all,
-that day forces one. Award history is stored in the
-ignored local `xiangshan_monitor/gift_history.json`. Remaining gift counts live in `delivery_history.json` under `gift_inventory` as `remaining` only, and only decrease after a successful release. During a special-gift window the daily copies come from that gift's remaining count, not the random pool; ordinary days draw from `random.remaining`. A second `[award]` prompt asks the model to write the
-public winner announcement from that already-decided result. If the AI API
-returns an error or unusable response, the monitor writes and sends its fixed
-fallback message instead. `push` sends that message as plain text with the normal signed
-DingTalk helper; it never calls an AI API. Monitor credentials are layered as
-`xiangshan_monitor.dingtalk.release` (the current release robot) and
-`xiangshan_monitor.dingtalk.debug` (the legacy MemBlock-compatible robot).
-`debug` is the default; select the release layer with `--dingtalk-layer release`.
-
-The repository data file includes XiangShan, NEMU, difftest, GEM5, xs-env,
-workload-builder, XSAI, XSCache, XiangShan-Dashboard, minjie-playground, ZhuJiang,
-CUTE, YunSuan, CoupledL2, gsim, XSAICache, and Utility. Edit that file to add or
-remove repositories or change the default `analysis_window` to `7d`.
-`max_commits: 0` means every commit in the window is included. The local API
-key and both layered DingTalk credentials belong in the ignored
-`config.json`; all are required and there is no `.codex` or public OpenAI
-fallback. The DeepSeek chat-completions endpoint is always reached directly
-and never reuses `github.proxy` or process proxy environment variables.
-Chat requests enable thinking and omit `max_tokens`, so DeepSeek uses its
-thinking-mode default (64K) instead of truncating the chain of thought.
-The client does not set an HTTP timeout for that call.
-
-Run the complete job once, which is suitable for cron or a systemd timer:
+Requires Python 3.9+ and Git; no third-party Python packages are needed.
 
 ```bash
-python3 dingtalk_robot/xiangshan_monitor/xiangshan_monitor.py
+cp dingtalk_robot/config.example.json dingtalk_robot/config.json
 ```
 
-The installed workday delivery mode resumes from the analysis cutoff of the
-last successful release, stored in the ignored local
-`xiangshan_monitor/delivery_history.json`. A failed day therefore remains in
-the next successful report instead of creating a gap. It reuses the same
-generated message for both robots: debug as soon as generation finishes,
-then release at 18:30.
-It reads `xiangshan_monitor/workdays.json` before doing any repository or AI
-work, so normal weekends and official holidays are skipped while official
-makeup workdays are included. It accepts scheduled starts only from 18:00 up
-to 18:30, so starting the delivery entry point at another time makes no Git,
-GitHub, AI, or DingTalk request. Failed git updates are retried until 18:20;
-any repositories still failing then are left out, and Stars/AI/release continue
-with the data that did arrive. If Stars lookup fails,
-AI is not called, release is skipped, and only debug receives an error. A
-successful release advances the local cutoff and saves all repositories'
-current Stars as the next growth baseline. Calendar years that are not present
-in the JSON fail closed without sending.
+Edit `dingtalk_robot/config.json`:
+
+- `dingtalk`: Webhook and signing secret for the general-purpose robot.
+- `github`: GitHub token (or `token_file`), proxy, and connection settings.
+- `xiangshan_monitor`: AI API endpoint and key, debug/release robots, and gift rules.
+
+Repository lists, schedules, and timeouts are configured in `xiangshan_monitor/repositories.json`; message instructions are in `xiangshan_monitor/prompt.txt`.
+Credentials, reports, and delivery history are stored locally and excluded from Git.
+
+## Daily XiangShan Updates
+
+Summarizes mainline commits and GitHub stars, then generates Chinese messages recognizing contributors. Supports gift draws and limited-time gifts. Use `per_day` to set a daily gift quantity, or `per_person: true` to give one to each featured contributor.
+Binary files and SVG/drawio diagrams retain only their filenames; other files retain their diffs. Long reports are split automatically.
 
 ```bash
-python3 dingtalk_robot/xiangshan_monitor/xiangshan_monitor.py --workday-delivery
+# Workday delivery: start at 18:00, send to debug first, then release at 18:30 (Beijing time)
+python3 -m dingtalk_robot.xiangshan_monitor.xiangshan_monitor --workday-delivery
+
+# Run immediately and send to debug only
+python3 -m dingtalk_robot.xiangshan_monitor.xiangshan_monitor --debug-now
+
+# Check the workday calendar and scheduling window without network access
+python3 -m dingtalk_robot.xiangshan_monitor.xiangshan_monitor --workday-delivery --dry-run
+
+# Collect commits from the last 7 days
+python3 -m dingtalk_robot.xiangshan_monitor.xiangshan_monitor --stage pull --window 7d
 ```
 
-Run the same collection and AI pipeline immediately but send only to debug,
-without advancing the successful-release cutoff or Stars baseline:
+Workday mode uses `workdays.json` and resumes collection from the cutoff of the last successful release. The scheduled start window is 18:00–18:30 Beijing time. If all repositories fail to update, no messages are sent. Missing star data does not block delivery; AI failures are reported to debug only.
+The `pull`, `talk`, and `push` stages can also run separately. See `--help` for all options.
 
-```bash
-python3 dingtalk_robot/xiangshan_monitor/xiangshan_monitor.py --debug-now
-```
+`robot.py` provides reusable `send_text`, `send_markdown`, and signed-message helpers.
 
-Run individual stages or test delivery with the monitor's DingTalk robot:
-
-```bash
-python3 dingtalk_robot/xiangshan_monitor/xiangshan_monitor.py --stage pull --window 7d
-python3 dingtalk_robot/xiangshan_monitor/xiangshan_monitor.py --stage talk --report dingtalk_robot/xiangshan_monitor/reports/2026-09-11-7d.json
-python3 dingtalk_robot/xiangshan_monitor/xiangshan_monitor.py --stage push \
-  --message dingtalk_robot/xiangshan_monitor/reports/2026-09-11-7d.md \
-  --dingtalk-section xiangshan_monitor \
-  --dingtalk-layer release
-```
-
-Use `--dry-run` to suppress DingTalk delivery (including while testing the
-`debug` layer). With `--workday-delivery`, a dry run is a pure schedule/window
-check: it skips Git, GitHub, AI, DingTalk, and waiting. The older single-layer loop remains available through
-`--daemon`; the registered systemd timer is easier to monitor. The first
-successful run establishes the Stars baseline; later successful runs report
-the current total, net change, and per-repository changes. If the
-complete diff for a long window does not fit one context, the default
-`overflow_strategy: map_reduce` splits at commit boundaries, asks the local API
-for compact fact summaries, and makes one final synthesis call. The checked-in
-`ai.max_api_calls` cap prevents unbounded requests; a single oversized commit is
-split by text without dropping its patch content.
+For monthly community reports, see [OSS statistics](../oss_stats/README.md).
