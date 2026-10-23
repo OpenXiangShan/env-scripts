@@ -521,7 +521,7 @@ class Manager:
         self.store.save()
 
     def import_group(self, arguments: Arguments, groups: Groups) -> None:
-        """Adopt validated legacy instances after confirming they are stopped."""
+        """Adopt existing registered instances after confirming they are stopped."""
         name = arguments.name
         count = arguments.count
         base = arguments.directory
@@ -569,7 +569,7 @@ class Manager:
                 }
             )
         if len(urls) != 1:
-            raise ManagerError("Legacy group contains multiple GitHub URLs")
+            raise ManagerError("Imported group contains multiple GitHub URLs")
         group: Group = {
             "directory": str(base),
             "url": urls.pop(),

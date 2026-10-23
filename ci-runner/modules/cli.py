@@ -202,16 +202,31 @@ def parser() -> argparse.ArgumentParser:
     remove.add_argument("--token")
     stopping_options(remove)
     imported = commands.add_parser(
-        "import", help="Import a stopped group from legacy JSON"
+        "import", help="Import a stopped group from legacy JSON or explicit settings"
     )
     imported.add_argument(
-        "--config", type=legacy_config, required=True, help="Legacy JSON path#key"
+        "name", type=valid_name, nargs="?", help="Group name (default: legacy basename)"
+    )
+    imported.add_argument(
+        "--config", type=legacy_config, help="Use legacy JSON path#key as defaults"
+    )
+    imported.add_argument(
+        "--dir",
+        dest="directory",
+        type=directory,
+        help="Base directory containing runners",
+    )
+    imported.add_argument(
+        "--count",
+        type=positive,
+        default=argparse.SUPPRESS,
+        help="Number of existing runners to import",
     )
     imported.add_argument("--url", type=normalize_url)
     imported.add_argument(
         "--labels",
         type=labels,
-        help="Override labels from the legacy JSON configuration",
+        help="Runner labels (default: legacy labels or none)",
     )
     imported.add_argument("--proxy-command", type=proxy_command)
     clean = commands.add_parser(
@@ -228,17 +243,35 @@ def parser() -> argparse.ArgumentParser:
 
 
 def parse_arguments(argv: Sequence[str] | None = None) -> Arguments:
-    """Produce typed arguments and expand validated legacy configuration."""
-    values = vars(parser().parse_args(argv))
+    """Produce typed arguments and validate explicit or legacy import settings."""
+    argument_parser = parser()
+    values = vars(argument_parser.parse_args(argv))
     if values.get("name") is None:
         values.pop("name", None)
     arguments = Arguments(**values)
     if arguments.config is not None:
-        arguments.name = arguments.config.name
-        arguments.count = arguments.config.count
-        arguments.directory = arguments.config.directory
+        if not arguments.name:
+            arguments.name = arguments.config.name
+        if not arguments.count:
+            arguments.count = arguments.config.count
+        if arguments.directory is None:
+            arguments.directory = arguments.config.directory
         if arguments.labels is None:
             arguments.labels = arguments.config.labels
+    if arguments.command == "import":
+        missing = [
+            field
+            for field, value in (
+                ("name", arguments.name),
+                ("--dir", arguments.directory),
+                ("--count", arguments.count),
+            )
+            if not value
+        ]
+        if missing:
+            argument_parser.error(
+                f"import requires {', '.join(missing)} when not supplied by --config"
+            )
     return arguments
 
 

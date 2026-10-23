@@ -129,7 +129,17 @@ python3 manager.py import --config xs.json#builder --labels bosc,open,builder
 python3 manager.py start xs-runner
 ```
 
-组名取旧配置的 `basename`，不是 JSON key；上例中的实际名称以 `xs.json` 为准。import 检查目录、名称、注册信息和进程，发现运行进程或信息冲突时拒绝。URL 默认从 `.runner` 读取，缺失时可提供 `--url`。支持 GitHub runner 生成的带 UTF-8 BOM 的 JSON 文件。导入不注销、不重命名、不启动，标签默认读取旧 JSON 的 `labels`（逗号分隔字符串或字符串列表），缺失时为空；`--labels` 可选，用于覆盖该值。导入后不要再用旧脚本操作该组；旧 runner 的自动更新设置不会被 import 改写。
+没有旧配置文件时，手动提供组名、runner 所在的父目录和数量：
+
+```bash
+python3 manager.py import --dir /path/to/runners --count 4 \
+  --labels label1,label2 --proxy-command 'proxychains -q' demo
+python3 manager.py import --dry-run --dir /path/to/runners --count 4 demo
+```
+
+`--dir` 下应已存在 `<组名>-<短hostname>-<补零索引>` 目录，索引从 0 开始，补零规则与 create 相同。不使用 `--config` 时，组名、`--dir` 和 `--count` 必填；`--labels`、`--url`、`--proxy-command` 可选，labels 默认空列表，URL 默认读取 `.runner`。也可以将 `--config` 作为默认配置，并用显式参数覆盖组名、目录、数量或标签。
+
+使用 `--config` 时，组名默认取旧配置的 `basename`，不是 JSON key；配置示例中的实际名称以 `xs.json` 为准。import 检查目录、名称、注册信息和进程，发现运行进程或信息冲突时拒绝。URL 默认从 `.runner` 读取，缺失时可提供 `--url`。支持 GitHub runner 生成的带 UTF-8 BOM 的 JSON 文件。导入不注销、不重命名、不启动，标签默认读取旧 JSON 的 `labels`（逗号分隔字符串或字符串列表），缺失时为空；`--labels` 可选，用于覆盖该值。导入后不要再用旧脚本操作该组；旧 runner 的自动更新设置不会被 import 改写。
 
 ### 预览操作
 
