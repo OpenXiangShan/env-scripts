@@ -39,8 +39,8 @@ if {$core_clk_mhz ne 0 && $core_clk_mhz ne "0"} {
   if {200 % $core_clk_mhz != 0} {
     error "FPGA_CORE_CLK_MHZ must divide the 200MHz board clock evenly, got '$core_clk_mhz'"
   }
-  if {$core_clk_mhz < 1 || $core_clk_mhz > 100} {
-    error "FPGA_CORE_CLK_MHZ must be between 1 and 100 (clk6_p/2 .. clk6_p/200), got '$core_clk_mhz'"
+  if {$core_clk_mhz < 25 || $core_clk_mhz > 100} {
+    error "FPGA_CORE_CLK_MHZ must be between 25 and 100 (clk6_p/2 .. clk6_p/8, BUFGCE_DIV range), got '$core_clk_mhz'"
   }
   set core_clk_div [expr {200 / $core_clk_mhz}]
   set core_clk_xdc [file join $project_dir core_clock.xdc]
