@@ -1,8 +1,8 @@
 `timescale 1ns/1ps
 
 // Converts the local bus emitted by the UVHS generalBD IP into the existing
-// DiffTest AXI-Lite config BAR.  The local bus has no ready signal; one command
-// is held until the AXI-Lite response completes.
+// DiffTest AXI-Lite config BAR. GeneralBD acknowledges posted writes before
+// AXI completion, but waits for read data before issuing another local read.
 module uvhs_generalbd_axilite_bridge (
     input wire clk,
     input wire rstn,
@@ -37,6 +37,8 @@ module uvhs_generalbd_axilite_bridge (
     reg aw_done, w_done;
     reg [15:0] pending_addr;
     reg [31:0] pending_data;
+    reg read_waiting;
+    reg [15:0] waiting_read_addr;
 
     always @(posedge clk or negedge rstn) begin
         if (!rstn) begin
@@ -47,11 +49,21 @@ module uvhs_generalbd_axilite_bridge (
             pending_data <= 32'b0;
             gbd_rdata <= 32'b0;
             gbd_rdata_vld <= 1'b0;
+            read_waiting <= 1'b0;
+            waiting_read_addr <= 16'b0;
         end else begin
             gbd_rdata_vld <= 1'b0;
+            if (gbd_rd_en && !read_waiting && ((state == S_AW_W) || (state == S_B))) begin
+                read_waiting <= 1'b1;
+                waiting_read_addr <= gbd_rd_addr;
+            end
             case (state)
                 S_IDLE: begin
-                    if (gbd_wr_en) begin
+                    if (read_waiting) begin
+                        pending_addr <= waiting_read_addr;
+                        read_waiting <= 1'b0;
+                        state <= S_AR;
+                    end else if (gbd_wr_en) begin
                         pending_addr <= gbd_wr_addr;
                         pending_data <= gbd_wdata;
                         aw_done <= 1'b0;
