@@ -10,6 +10,8 @@ import statistics
 from typing import Deque, Literal
 
 DEFAULT_LOG_ROOT = Path("/nfs/home/ci-runner/perf-report")
+PROFILE_DIR = Path(__file__).resolve().parent
+DATA_DIR = PROFILE_DIR / "data"
 SortMode = Literal["json", "avgtime", "maxtime"]
 
 NEW_SUCCESS_RE = re.compile(
