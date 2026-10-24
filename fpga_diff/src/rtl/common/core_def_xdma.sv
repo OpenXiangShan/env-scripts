@@ -1507,66 +1507,208 @@ mode_ctrl U_MODE_CTRL(
 `ifdef UVHS
 // The vendor DDR IP uses 34-bit addresses and 14-bit IDs. Keep those narrow
 // adaptations local while preserving the common fpga_diff AXI interface.
+`ifdef CPU_NUTSHELL
+localparam integer UVHS_DDR_DATA_WIDTH = 64;
+`else
+localparam integer UVHS_DDR_DATA_WIDTH = 256;
+`endif
+
+// The DDR controller runs on the free-running device clock, so it keeps
+// servicing the board while DiffTest holds the CPU clock disabled.
+wire uvhs_ddr_transport_clk = dev_clk_i;
+
+wire [33:0] uvhs_cpu_ddr_awaddr;
+wire [33:0] uvhs_cpu_ddr_araddr;
+`ifdef CPU_NUTSHELL
+assign uvhs_cpu_ddr_awaddr = {1'b0, cpu2ddr_m2s_awaddr_mix};
+assign uvhs_cpu_ddr_araddr = {1'b0, cpu2ddr_m2s_araddr_mix};
+`else
+assign uvhs_cpu_ddr_awaddr = cpu2ddr_m2s_awaddr_mix[33:0];
+assign uvhs_cpu_ddr_araddr = cpu2ddr_m2s_araddr_mix[33:0];
+`endif
+wire [13:0] uvhs_cpu_ddr_bid;
+wire [13:0] uvhs_cpu_ddr_rid;
+
+wire [13:0] uvhs_ddr_awid;
+wire [13:0] uvhs_ddr_arid;
 wire [33:0] uvhs_ddr_awaddr;
 wire [33:0] uvhs_ddr_araddr;
+wire [7:0]  uvhs_ddr_awlen;
+wire [7:0]  uvhs_ddr_arlen;
+wire [2:0]  uvhs_ddr_awsize;
+wire [2:0]  uvhs_ddr_arsize;
+wire [1:0]  uvhs_ddr_awburst;
+wire [1:0]  uvhs_ddr_arburst;
+wire        uvhs_ddr_awlock;
+wire        uvhs_ddr_arlock;
+wire [3:0]  uvhs_ddr_awcache;
+wire [3:0]  uvhs_ddr_arcache;
+wire [2:0]  uvhs_ddr_awprot;
+wire [2:0]  uvhs_ddr_arprot;
+wire [3:0]  uvhs_ddr_awqos;
+wire [3:0]  uvhs_ddr_arqos;
+wire [3:0]  uvhs_ddr_awregion;
+wire [3:0]  uvhs_ddr_arregion;
+wire        uvhs_ddr_awvalid;
+wire        uvhs_ddr_arvalid;
+wire        uvhs_ddr_awready;
+wire        uvhs_ddr_arready;
+wire [UVHS_DDR_DATA_WIDTH-1:0] uvhs_ddr_wdata;
+wire [UVHS_DDR_DATA_WIDTH/8-1:0] uvhs_ddr_wstrb;
+wire        uvhs_ddr_wlast;
+wire        uvhs_ddr_wvalid;
+wire        uvhs_ddr_wready;
 wire [13:0] uvhs_ddr_bid;
 wire [13:0] uvhs_ddr_rid;
+wire [1:0]  uvhs_ddr_bresp;
+wire [1:0]  uvhs_ddr_rresp;
+wire        uvhs_ddr_bvalid;
+wire        uvhs_ddr_rvalid;
+wire        uvhs_ddr_rlast;
+wire [UVHS_DDR_DATA_WIDTH-1:0] uvhs_ddr_rdata;
+wire        uvhs_ddr_bready;
+wire        uvhs_ddr_rready;
 wire        uvhs_ddr_user_rst;
 
-`ifdef CPU_NUTSHELL
-assign uvhs_ddr_awaddr = {1'b0, cpu2ddr_m2s_awaddr_mix};
-assign uvhs_ddr_araddr = {1'b0, cpu2ddr_m2s_araddr_mix};
-`else
-assign uvhs_ddr_awaddr = cpu2ddr_m2s_awaddr_mix[33:0];
-assign uvhs_ddr_araddr = cpu2ddr_m2s_araddr_mix[33:0];
-`endif
-assign cpu2ddr_s2m_bid = {4'b0, uvhs_ddr_bid};
-assign cpu2ddr_s2m_rid = {4'b0, uvhs_ddr_rid};
+// Single CPU-to-DDR clock-domain crossing.  The source side runs on the CPU
+// clock, the destination side on the free-running DDR transport clock.
+uvhs_axi_async_bridge #(
+    .ADDR_WIDTH (34),
+    .ID_WIDTH   (14),
+    .DATA_WIDTH (UVHS_DDR_DATA_WIDTH)
+) U_CPU_DDR_CDC (
+    .s_clk    (inter_soc_clk),
+    .s_rstn   (rstn_sw4),
+    .s_awid   (cpu2ddr_m2s_awid_mix[13:0]),
+    .s_awaddr (uvhs_cpu_ddr_awaddr),
+    .s_awlen  (cpu2ddr_m2s_awlen),
+    .s_awsize (cpu2ddr_m2s_awsize),
+    .s_awburst(cpu2ddr_m2s_awburst),
+    .s_awlock (cpu2ddr_m2s_awlock),
+    .s_awcache(cpu2ddr_m2s_awcache),
+    .s_awprot (cpu2ddr_m2s_awprot),
+    .s_awqos  (cpu2ddr_m2s_awqos),
+    .s_awregion(cpu2ddr_m2s_awregion),
+    .s_awvalid(cpu2ddr_m2s_awvalid),
+    .s_awready(cpu2ddr_s2m_awready),
+    .s_wdata  (cpu2ddr_m2s_wdata),
+    .s_wstrb  (cpu2ddr_m2s_wstrb),
+    .s_wlast  (cpu2ddr_m2s_wlast),
+    .s_wvalid (cpu2ddr_m2s_wvalid),
+    .s_wready (cpu2ddr_s2m_wready),
+    .s_bid    (uvhs_cpu_ddr_bid),
+    .s_bresp  (cpu2ddr_s2m_bresp),
+    .s_bvalid (cpu2ddr_s2m_bvalid),
+    .s_bready (cpu2ddr_m2s_bready),
+    .s_arid   (cpu2ddr_m2s_arid_mix[13:0]),
+    .s_araddr (uvhs_cpu_ddr_araddr),
+    .s_arlen  (cpu2ddr_m2s_arlen),
+    .s_arsize (cpu2ddr_m2s_arsize),
+    .s_arburst(cpu2ddr_m2s_arburst),
+    .s_arlock (cpu2ddr_m2s_arlock),
+    .s_arcache(cpu2ddr_m2s_arcache),
+    .s_arprot (cpu2ddr_m2s_arprot),
+    .s_arqos  (cpu2ddr_m2s_arqos),
+    .s_arregion(cpu2ddr_m2s_arregion),
+    .s_arvalid(cpu2ddr_m2s_arvalid),
+    .s_arready(cpu2ddr_s2m_arready),
+    .s_rid    (uvhs_cpu_ddr_rid),
+    .s_rdata  (cpu2ddr_s2m_rdata),
+    .s_rresp  (cpu2ddr_s2m_rresp),
+    .s_rlast  (cpu2ddr_s2m_rlast),
+    .s_rvalid (cpu2ddr_s2m_rvalid),
+    .s_rready (cpu2ddr_m2s_rready),
+
+    .m_clk    (uvhs_ddr_transport_clk),
+    .m_rstn   (rstn_sw4),
+    .m_awid   (uvhs_ddr_awid),
+    .m_awaddr (uvhs_ddr_awaddr),
+    .m_awlen  (uvhs_ddr_awlen),
+    .m_awsize (uvhs_ddr_awsize),
+    .m_awburst(uvhs_ddr_awburst),
+    .m_awlock (uvhs_ddr_awlock),
+    .m_awcache(uvhs_ddr_awcache),
+    .m_awprot (uvhs_ddr_awprot),
+    .m_awqos  (uvhs_ddr_awqos),
+    .m_awregion(uvhs_ddr_awregion),
+    .m_awvalid(uvhs_ddr_awvalid),
+    .m_awready(uvhs_ddr_awready),
+    .m_wdata  (uvhs_ddr_wdata),
+    .m_wstrb  (uvhs_ddr_wstrb),
+    .m_wlast  (uvhs_ddr_wlast),
+    .m_wvalid (uvhs_ddr_wvalid),
+    .m_wready (uvhs_ddr_wready),
+    .m_bid    (uvhs_ddr_bid),
+    .m_bresp  (uvhs_ddr_bresp),
+    .m_bvalid (uvhs_ddr_bvalid),
+    .m_bready (uvhs_ddr_bready),
+    .m_arid   (uvhs_ddr_arid),
+    .m_araddr (uvhs_ddr_araddr),
+    .m_arlen  (uvhs_ddr_arlen),
+    .m_arsize (uvhs_ddr_arsize),
+    .m_arburst(uvhs_ddr_arburst),
+    .m_arlock (uvhs_ddr_arlock),
+    .m_arcache(uvhs_ddr_arcache),
+    .m_arprot (uvhs_ddr_arprot),
+    .m_arqos  (uvhs_ddr_arqos),
+    .m_arregion(uvhs_ddr_arregion),
+    .m_arvalid(uvhs_ddr_arvalid),
+    .m_arready(uvhs_ddr_arready),
+    .m_rid    (uvhs_ddr_rid),
+    .m_rdata  (uvhs_ddr_rdata),
+    .m_rresp  (uvhs_ddr_rresp),
+    .m_rlast  (uvhs_ddr_rlast),
+    .m_rvalid (uvhs_ddr_rvalid),
+    .m_rready (uvhs_ddr_rready)
+);
+
+assign cpu2ddr_s2m_bid = {4'b0, uvhs_cpu_ddr_bid};
+assign cpu2ddr_s2m_rid = {4'b0, uvhs_cpu_ddr_rid};
 assign init_calib_complete = rstn_sw4 & ~uvhs_ddr_user_rst;
 
 uvw_axi4_to_ddr4 U_UVHS_UVW_AXI4_TO_DDR4 (
-    .ddr4ip_dut_axi_aclk       (sys_clk_i),
+    .ddr4ip_dut_axi_aclk       (uvhs_ddr_transport_clk),
     .ddr4ip_dut_axi_aresetn    (rstn_sw4),
     .ddr4ip_dut_axi_awaddr     (uvhs_ddr_awaddr),
-    .ddr4ip_dut_axi_awburst    (cpu2ddr_m2s_awburst),
-    .ddr4ip_dut_axi_awcache    (cpu2ddr_m2s_awcache),
-    .ddr4ip_dut_axi_awid       (cpu2ddr_m2s_awid_mix[13:0]),
-    .ddr4ip_dut_axi_awlen      (cpu2ddr_m2s_awlen),
-    .ddr4ip_dut_axi_awlock     (cpu2ddr_m2s_awlock),
-    .ddr4ip_dut_axi_awprot     (cpu2ddr_m2s_awprot),
-    .ddr4ip_dut_axi_awqos      (cpu2ddr_m2s_awqos),
-    .ddr4ip_dut_axi_awready    (cpu2ddr_s2m_awready),
-    .ddr4ip_dut_axi_awregion   (cpu2ddr_m2s_awregion),
-    .ddr4ip_dut_axi_awsize     (cpu2ddr_m2s_awsize),
-    .ddr4ip_dut_axi_awvalid    (cpu2ddr_m2s_awvalid),
-    .ddr4ip_dut_axi_wdata      (cpu2ddr_m2s_wdata),
-    .ddr4ip_dut_axi_wlast      (cpu2ddr_m2s_wlast),
-    .ddr4ip_dut_axi_wready     (cpu2ddr_s2m_wready),
-    .ddr4ip_dut_axi_wstrb      (cpu2ddr_m2s_wstrb),
-    .ddr4ip_dut_axi_wvalid     (cpu2ddr_m2s_wvalid),
+    .ddr4ip_dut_axi_awburst    (uvhs_ddr_awburst),
+    .ddr4ip_dut_axi_awcache    (uvhs_ddr_awcache),
+    .ddr4ip_dut_axi_awid       (uvhs_ddr_awid),
+    .ddr4ip_dut_axi_awlen      (uvhs_ddr_awlen),
+    .ddr4ip_dut_axi_awlock     (uvhs_ddr_awlock),
+    .ddr4ip_dut_axi_awprot     (uvhs_ddr_awprot),
+    .ddr4ip_dut_axi_awqos      (uvhs_ddr_awqos),
+    .ddr4ip_dut_axi_awready    (uvhs_ddr_awready),
+    .ddr4ip_dut_axi_awregion   (uvhs_ddr_awregion),
+    .ddr4ip_dut_axi_awsize     (uvhs_ddr_awsize),
+    .ddr4ip_dut_axi_awvalid    (uvhs_ddr_awvalid),
+    .ddr4ip_dut_axi_wdata      (uvhs_ddr_wdata),
+    .ddr4ip_dut_axi_wlast      (uvhs_ddr_wlast),
+    .ddr4ip_dut_axi_wready     (uvhs_ddr_wready),
+    .ddr4ip_dut_axi_wstrb      (uvhs_ddr_wstrb),
+    .ddr4ip_dut_axi_wvalid     (uvhs_ddr_wvalid),
     .ddr4ip_dut_axi_bid        (uvhs_ddr_bid),
-    .ddr4ip_dut_axi_bready     (cpu2ddr_m2s_bready),
-    .ddr4ip_dut_axi_bresp      (cpu2ddr_s2m_bresp),
-    .ddr4ip_dut_axi_bvalid     (cpu2ddr_s2m_bvalid),
+    .ddr4ip_dut_axi_bready     (uvhs_ddr_bready),
+    .ddr4ip_dut_axi_bresp      (uvhs_ddr_bresp),
+    .ddr4ip_dut_axi_bvalid     (uvhs_ddr_bvalid),
     .ddr4ip_dut_axi_araddr     (uvhs_ddr_araddr),
-    .ddr4ip_dut_axi_arburst    (cpu2ddr_m2s_arburst),
-    .ddr4ip_dut_axi_arcache    (cpu2ddr_m2s_arcache),
-    .ddr4ip_dut_axi_arid       (cpu2ddr_m2s_arid_mix[13:0]),
-    .ddr4ip_dut_axi_arlen      (cpu2ddr_m2s_arlen),
-    .ddr4ip_dut_axi_arlock     (cpu2ddr_m2s_arlock),
-    .ddr4ip_dut_axi_arprot     (cpu2ddr_m2s_arprot),
-    .ddr4ip_dut_axi_arqos      (cpu2ddr_m2s_arqos),
-    .ddr4ip_dut_axi_arready    (cpu2ddr_s2m_arready),
-    .ddr4ip_dut_axi_arregion   (cpu2ddr_m2s_arregion),
-    .ddr4ip_dut_axi_arsize     (cpu2ddr_m2s_arsize),
-    .ddr4ip_dut_axi_arvalid    (cpu2ddr_m2s_arvalid),
-    .ddr4ip_dut_axi_rdata      (cpu2ddr_s2m_rdata),
+    .ddr4ip_dut_axi_arburst    (uvhs_ddr_arburst),
+    .ddr4ip_dut_axi_arcache    (uvhs_ddr_arcache),
+    .ddr4ip_dut_axi_arid       (uvhs_ddr_arid),
+    .ddr4ip_dut_axi_arlen      (uvhs_ddr_arlen),
+    .ddr4ip_dut_axi_arlock     (uvhs_ddr_arlock),
+    .ddr4ip_dut_axi_arprot     (uvhs_ddr_arprot),
+    .ddr4ip_dut_axi_arqos      (uvhs_ddr_arqos),
+    .ddr4ip_dut_axi_arready    (uvhs_ddr_arready),
+    .ddr4ip_dut_axi_arregion   (uvhs_ddr_arregion),
+    .ddr4ip_dut_axi_arsize     (uvhs_ddr_arsize),
+    .ddr4ip_dut_axi_arvalid    (uvhs_ddr_arvalid),
+    .ddr4ip_dut_axi_rdata      (uvhs_ddr_rdata),
     .ddr4ip_dut_axi_rid        (uvhs_ddr_rid),
-    .ddr4ip_dut_axi_rlast      (cpu2ddr_s2m_rlast),
-    .ddr4ip_dut_axi_rready     (cpu2ddr_m2s_rready),
-    .ddr4ip_dut_axi_rresp      (cpu2ddr_s2m_rresp),
-    .ddr4ip_dut_axi_rvalid     (cpu2ddr_s2m_rvalid),
-    .ddr4ip_dut_axi_aclk_en    (difftest_clock_gate_enable),
+    .ddr4ip_dut_axi_rlast      (uvhs_ddr_rlast),
+    .ddr4ip_dut_axi_rready     (uvhs_ddr_rready),
+    .ddr4ip_dut_axi_rresp      (uvhs_ddr_rresp),
+    .ddr4ip_dut_axi_rvalid     (uvhs_ddr_rvalid),
+    .ddr4ip_dut_axi_aclk_en    (1'b1),
     .ddr4ip_ddr4_user_clk      (),
     .ddr4ip_ddr4_user_rst      (uvhs_ddr_user_rst),
     .sysbus_ghbd_i             (256'b0),
