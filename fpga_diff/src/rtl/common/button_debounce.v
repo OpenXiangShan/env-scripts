@@ -1,4 +1,6 @@
-module button_debounce(
+module button_debounce #(
+     parameter CLK_FREQ_MHZ = 50
+)(
      input            clk,
 	 input            rstn,
      input            button_i,
@@ -31,14 +33,7 @@ end
 assign button_f = ~button_d1 && button_d2;
 assign button_r = button_d1 && ~button_d2;
 
-`ifdef FPGA_CORE_CLK_MHZ
-// 10ms in cycles for the configured core clock (FPGA_CORE_CLK_MHZ from defines.tcl)
-localparam [23:0] DEBOUNCE_10MS = `FPGA_CORE_CLK_MHZ * 10000;
-`else
-localparam [23:0] DEBOUNCE_10MS = 24'h7a120;  // 10ms @ 50MHz
-`endif
-
-(*mark_debug = "true"*) reg  [23:0]   counter;
+(*mark_debug = "true"*) reg  [19:0]   counter;
 always@(posedge clk) begin
    if ((cur_state==FILTER)||(cur_state==FILTER_O))
 	   counter <= counter + 1'b1;
@@ -61,7 +56,7 @@ always@(*) begin
           else
               nxt_state = IDLE;
       FILTER:
-	  if(counter==DEBOUNCE_10MS)   // 10ms
+	  if(counter==CLK_FREQ_MHZ * 10000)   // 10ms
               nxt_state = CHECK_IN;
           else
 	      nxt_state = FILTER;
@@ -76,7 +71,7 @@ always@(*) begin
            else
              nxt_state = STAYLOW;
       FILTER_O:
-	  if(counter==DEBOUNCE_10MS)
+	  if(counter==CLK_FREQ_MHZ * 10000)
 		  nxt_state = CHECK_OUT;
 	  else
 		  nxt_state = FILTER_O;

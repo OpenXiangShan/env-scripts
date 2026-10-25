@@ -67,29 +67,19 @@ case 3: With fpga-host (diff mode)
 Clock configuration
 ===================
 
-- `CPU_CLK_IN` is `clk6_p` (board 200MHz, 5.000ns), declared in
-  `vivado/constr/common/cpu_clock.xdc`.
-- `DEBUG_CLK_IN` is `clk5_p`. Pick 25MHz (default, `debug_clock_25.xdc`) or
-  50MHz (`debug_clock_50.xdc`) with `TIMING_DEBUG_CLK_PERIOD_NS=40.000` /
-  `20.000`.
-- The CPU/SoC core clock is derived from `clk6_p` by a divider in
-  `src/rtl/common/fpga_top_debug.sv`. Set `FPGA_CORE_CLK_MHZ=<n>` to choose the
-  running frequency in MHz. `n` must divide 200 evenly and be in `[1, 100]`
-  (clk6_p/2 .. clk6_p/200), i.e. 100, 50, 40, 25, 20, 10, 8, 5, 4, 2 or 1.
-  200MHz is not reachable because the clock is produced by a register
-  divider. The matching `CORE_CLK` generated clock is created by
-  `vivado/tcl/common/constraints.tcl` from the same value, and the debounce
-  counter in `button_debounce.v` is scaled to the same frequency:
+For Vivado, the CPU clock uses `BUFGCE_DIV` to divide `clk6_p` (200MHz).
+`FPGA_CORE_CLK_MHZ` defaults to 50; supported values are 25, 40, 50 and 100
+(divide by 8, 5, 4 and 2). Other values are rejected during project creation.
+Vivado derives the divided clock constraint from the primitive; `fpga.xdc`
+constrains the board inputs at their actual frequencies.
 
-  ```shell
-  make bit FPGA_CORE_CLK_MHZ=100 TIMING_DEBUG_CLK_PERIOD_NS=20.000
-  ```
+```shell
+make bit FPGA_CORE_CLK_MHZ=100
+```
 
-  `FPGA_CORE_CLK_100M=1` is kept as a legacy alias for `FPGA_CORE_CLK_MHZ=100`.
-  Without either variable `sys_clk_i` runs directly on the debug clock.
-- The UART (the AXI bridge that hosts the 16550) always runs on a fixed
-  50MHz `clk6_p/4` clock (`bufg_uart_clk`), independent of `FPGA_CORE_CLK_MHZ`
-  and of the debug clock, so the console baud rate stays calibrated at 50MHz.
+The UART uses the existing `clk5_p` device clock and synchronized reset,
+fixed at 50MHz regardless of the CPU frequency. UVHS keeps its existing
+clock configuration.
 
 fpga-host environment
 =====================

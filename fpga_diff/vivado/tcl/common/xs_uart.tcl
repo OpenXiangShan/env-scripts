@@ -108,13 +108,13 @@ if { $::argc > 0 } {
   for {set i 0} {$i < $::argc} {incr i} {
     set option [string trim [lindex $::argv $i]]
     switch -regexp -- $option {
-      "^--cpu$"          { incr i; set cpu [lindex $::argv $i] }
-      "^--origin_dir$"   { incr i; set origin_dir [lindex $::argv $i] }
-      "^--project_name$" { incr i; set _xil_proj_name_ [lindex $::argv $i] }
-      "^--project_dir$"  { incr i; set project_dir [lindex $::argv $i] }
-      "^--cpu_files$"    { incr i; set cpu_files_tcl [lindex $::argv $i] }
-      "^--vivado_version$" { incr i; set vivado_version [lindex $::argv $i] }
-      "^--help$"         { print_help "$cpu_candidates" }
+      "^--cpu$"        { incr i; set cpu [lindex $::argv $i] }
+      "--origin_dir"   { incr i; set origin_dir [lindex $::argv $i] }
+      "--project_name" { incr i; set _xil_proj_name_ [lindex $::argv $i] }
+      "--project_dir"  { incr i; set project_dir [lindex $::argv $i] }
+      "--cpu_files"    { incr i; set cpu_files_tcl [lindex $::argv $i] }
+      "--vivado_version" { incr i; set vivado_version [lindex $::argv $i] }
+      "--help"         { print_help "$cpu_candidates" }
       default {
         if { [regexp {^-} $option] } {
           puts "ERROR: Unknown option '$option' specified, please type '$script_file -tclargs --help' for usage info.\n"

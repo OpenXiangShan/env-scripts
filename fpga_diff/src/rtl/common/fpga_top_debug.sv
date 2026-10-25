@@ -9,6 +9,10 @@
 `define XDMA_PCIE_LANES 4
 `endif
 
+`ifndef FPGA_CORE_CLK_DIV
+`define FPGA_CORE_CLK_DIV 4
+`endif
+
 module fpga_top_debug
 (
    input                 clk8_p, // 1MHz clock
@@ -17,7 +21,7 @@ module fpga_top_debug
    input                 clk7_n, 
    input                 clk6_p, // system 200MHz / UVHS UART 50MHz
    input                 clk6_n,
-   input                 clk5_p, // debug 25MHz
+   input                 clk5_p, // debug / UART 50MHz (Vivado)
    input                 clk5_n,
    input                 rstn_sw6,
    input                 rstn_sw5,
@@ -135,7 +139,9 @@ OBUF pcie_rstn_obuf (.O(PERST_N), .I(vio_sw6));
 OBUF pcie2_rstn_obuf (.O(PERST2_N), .I(vio_sw6));
 `endif
 
-button_debounce u_cpu_rstn(
+button_debounce #(
+   .CLK_FREQ_MHZ    (200 / `FPGA_CORE_CLK_DIV)
+) u_cpu_rstn(
    .clk             (sys_clk_i),
    .rstn            (sys_rstn && vio_sw6),
    .button_i        (cpu_setn_buf && vio_sw5),
@@ -200,7 +206,7 @@ BUFG bufg_cqetmclk
 );
 
 wire    dbg_clk;
-IBUFGDS ibufgds_dbgclk_25MHz
+IBUFGDS ibufgds_dbgclk_50MHz
 (
 	.I              (clk5_p),
 	.IB             (clk5_n),
@@ -237,72 +243,25 @@ IBUFDS_GTE4 refclk2_ibuf (
 `endif
 `endif
 
-
-`ifdef FPGA_CORE_CLK_MHZ
-// clk6_p is the board 200MHz system clock.  FPGA_CORE_CLK_MHZ selects the
-// CPU/SoC frequency and FPGA_CORE_CLK_DIV (= 200/FPGA_CORE_CLK_MHZ) sets the
-// divider; both defines are emitted by vivado/tcl/common/defines.tcl.  The
-// matching generated-clock constraint is created by constraints.tcl
-// (create_generated_clock on bufg_core_clk/O).
-//
-// Use BUFGCE_DIV rather than a fabric toggle flop plus BUFG: sys_clk_i is fed
-// into another BUFGCE inside core_def (DifftestClockGate SOC_CLK_CTRL), and a
-// BUFG -> BUFGCE cascade is not a legal clock path on UltraScale.
-// BUFGCE_DIV supports /1..8, covering 100/50/40/25 MHz (divide 2/4/5/8).
-localparam [7:0] CORE_CLK_DIV = `FPGA_CORE_CLK_DIV;
-wire             core_clk_out;
+`ifdef UVHS
+assign        sys_clk_i = dbg_clk_buf;
+`else
+// Divide the 200MHz board clock; Vivado derives its clock constraint.
 BUFGCE_DIV #(
-    .BUFGCE_DIVIDE   (CORE_CLK_DIV),
-    .CE_TYPE         ("SYNC"),
-    .IS_CE_INVERTED  (1'b0),
-    .IS_CLR_INVERTED (1'b0),
-    .IS_I_INVERTED   (1'b0)
+    .BUFGCE_DIVIDE   (`FPGA_CORE_CLK_DIV)
 ) bufg_core_clk
 (
-    .O               (core_clk_out),
-    .CE              (1'b1),
-    .CLR             (1'b0),
-    .I               (cqetmclk_buf)
+    .I              (cqetmclk),
+    .O              (sys_clk_i),
+    .CE             (1'b1),
+    .CLR            (1'b0)
 );
-assign        sys_clk_i = core_clk_out;
-`elsif FPGA_CORE_CLK_100M
-// Legacy knob: clk6_p / 2 = 100MHz (kept for existing scripts).
-reg             core_clk_r = 1'b0;
-wire            core_clk_100m;
-always @(posedge cqetmclk_buf)
-  core_clk_r <= ~core_clk_r;
-BUFG bufg_core_clk
-(
-    .I              (core_clk_r),
-    .O              (core_clk_100m)
-);
-assign        sys_clk_i = core_clk_100m;
-`else
-assign        sys_clk_i = dbg_clk_buf;
 `endif
 `ifdef UVHS
 assign        dev_clk_i = cqetmclk_buf;
 `else
 assign        dev_clk_i = dbg_clk_buf;
 `endif
-
-// Fixed 50MHz device clock for the UART (the AXI bridge that hosts the 16550),
-// derived from the 200MHz board clock so it does not follow the selectable
-// core clock (FPGA_CORE_CLK_MHZ) nor the debug clock.
-wire uart_clk_50m;
-BUFGCE_DIV #(
-    .BUFGCE_DIVIDE   (4),
-    .CE_TYPE         ("SYNC"),
-    .IS_CE_INVERTED  (1'b0),
-    .IS_CLR_INVERTED (1'b0),
-    .IS_I_INVERTED   (1'b0)
-) bufg_uart_clk
-(
-    .O               (uart_clk_50m),
-    .CE              (1'b1),
-    .CLR             (1'b0),
-    .I               (cqetmclk_buf)
-);
 
 `ifndef UVHS
 vio_0 u_vio(
@@ -432,7 +391,6 @@ core_def core_def
   .cpu_rd_qspi_valid    (led2),
   .cpu_wr_ddr_valid     (led0),
   .sys_clk_i            (sys_clk_i),
-  .uart_clk_i           (uart_clk_50m),
   .dev_clk_i            (dev_clk_i),
   .sys_rstn             (sys_rstn_to_core),
   .cpu_rstn             (cpu_rstn_to_core),

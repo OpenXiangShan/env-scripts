@@ -392,11 +392,9 @@ set_property IOSTANDARD LVCMOS18 [get_ports MDC]
 set_property IOSTANDARD LVCMOS18 [get_ports MDIO]
 set_property IOSTANDARD LVCMOS18 [get_ports PHY_RESET_B]
 create_clock -period 400.000 -name mdc_clk [get_ports MDC]
-# CPU_CLK_IN (clk6_p, 5.000ns) is declared in cpu_clock.xdc and DEBUG_CLK_IN
-# (clk5_p) in debug_clock_{25,50}.xdc, which are loaded before this file so
-# that the -include_generated_clocks groups below pick up the optional
-# generated core clock (CORE_CLK).
+create_clock -period 5.000 -name CPU_CLK_IN [get_ports clk6_p]
 create_clock -period 1000.000 -name TMCLK [get_ports clk8_p]
+create_clock -period 20.000 -name DEBUG_CLK_IN [get_ports clk5_p]
 create_clock -period 83.333 -name jtag_vclk [get_ports JTAG_TCK]
 set_clock_groups -asynchronous -group [get_clocks jtag_vclk -include_generated_clocks]
 set_clock_groups -asynchronous -group [get_clocks -include_generated_clocks CPU_CLK_IN] -group [get_clocks -include_generated_clocks TMCLK]
