@@ -70,11 +70,12 @@ Clock configuration
 For Vivado, the CPU clock uses `BUFGCE_DIV` to divide `clk6_p` (200MHz).
 `FPGA_CORE_CLK_MHZ` defaults to 50; supported values are 25, 40, 50 and 100
 (divide by 8, 5, 4 and 2). Other values are rejected during project creation.
+`vivado/vivado.mk` declares and exports this Make variable to Vivado's Tcl.
 Vivado derives the divided clock constraint from the primitive; `fpga.xdc`
 constrains the board inputs at their actual frequencies.
 
 ```shell
-make bit FPGA_CORE_CLK_MHZ=100
+make bitstream CPU=nutshell CORE_DIR=/path/to/release/build FPGA_CORE_CLK_MHZ=100
 ```
 
 The UART uses the existing `clk5_p` device clock and synchronized reset,
