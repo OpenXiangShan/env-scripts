@@ -32,40 +32,67 @@ python3 manager.py create --count 11 --token '<token>' demo
 ```bash
 python3 manager.py start demo       # omit demo to start all groups on this host
 python3 manager.py status demo
-python3 manager.py status --verbose demo  # 当前任务、耗时及上次执行结果
-python3 manager.py status          # 本机所有组
+python3 manager.py status          # 本机各组汇总
+python3 manager.py status -v demo   # 每个 runner 的状态、当前/上次任务
+python3 manager.py status -vv demo  # 每个字段单独一行
+python3 manager.py status -vvv demo # 额外显示非 stopped runner 的最后 5 行 tmux 日志
+python3 manager.py info demo       # 版本、路径、tmux
 python3 manager.py status --json
 python3 manager.py status --verbose --json demo
+python3 manager.py status -vv --remote host-a --remote user@host-b
 python3 manager.py stop --timeout 3600 demo  # omit demo to stop all groups
 python3 manager.py stop --force demo
 python3 manager.py update demo             # omit demo to update all groups
 ```
 
-每组使用一个独立 session，每个 runner 一个 window。`start` 和 `stop` 省略组名时操作本机所有组，并跳过已经处于目标状态的 runner；`update` 省略组名时更新本机所有组，并跳过已经使用目标安装包的组。status 展示实际 session/pane，可使用 `tmux attach -t <session>` 查看。管理器通过元数据和进程识别实例，不依赖 window 编号、标题或 pane 排列。runner 退出后保留 window 供诊断，stop 会清理已停止的受管理 window。重复 start 不创建重复进程，重复 stop 成功返回。
+每组使用一个独立 session，每个 runner 一个 window。`start` 和 `stop` 省略组名时操作本机所有组，并跳过已经处于目标状态的 runner；`update` 省略组名时更新本机所有组，并跳过已经使用目标安装包的组。info 展示实际 session/pane，可使用 `tmux attach -t <session>` 查看。管理器通过元数据和进程识别实例，不依赖 window 编号、标题或 pane 排列。runner 退出后保留 window 供诊断，stop 会清理已停止的受管理 window。重复 start 不创建重复进程，重复 stop 成功返回。
 
-普通 `status` 只显示每组的活动数/总数和各 runner 状态；已登记但未运行的 runner 也会列出并显示为 `Stopped`。
-
-`status --verbose`（或 `-v`）从 tmux 捕获的输出解析活动信息，按以下格式显示：
+普通 `status` 只显示主机组数及各组已启动数量（idle + running），不列出实例：
 
 ```text
-Host: host
-demo: 1/2 runners
-  demo-host-0:
-    Version: 2.333.0
-    Path: /path/to/runners/demo-host-0
-    Tmux: ci-host-demo-12345678 %0
-    Status: Running
-    Started: 2026-10-23T10:00:00-07:00
-    Task: build
-    Elapsed: 00:03:15
-  demo-host-1:
-    Version: 2.333.0
-    Path: /path/to/runners/demo-host-1
-    Tmux: -
-    Status: Stopped
+host: 1 groups
+  demo: 2 started / 4 total
 ```
 
-头部时间取本次启动后首次 `Listening for Jobs` 的时间，使用带时区的本地 ISO 8601 格式；`Elapsed` 从当前任务的 `Running job` 时间计算。`Result` 将 runner 的 Succeeded、Failed、Canceled 分别显示为 Success、Failed、Cancelled。尚无历史任务、时间或输出已滚出 tmux 历史时显示 `-`；停止、异常状态分别显示 Stopped、Error 或 Unknown。JSON 模式额外提供 `started_at`、`current_task`、`elapsed`（秒）、`last_task` 和 `result`，缺失信息使用 `null`。
+`status -v`（或 `--verbose`）显示状态分布和各 runner 的单行任务摘要：
+
+```text
+host: 1 groups
+  demo: 1 stopped, 1 idle, 1 running, 1 failure / 4 total
+    demo-host-0: RUNNING 00:03:15 @ build
+    demo-host-1: IDLE Success @ test
+    demo-host-2: STOPPED
+    demo-host-3: FAILURE Runner exited with status 1
+```
+
+`status -vv` 将任务字段分行显示，`-vvv` 在此基础上增加非 STOPPED runner 的最后 5 行 tmux 日志（忽略窗格末尾空白行）：
+
+```text
+host: 1 groups
+  demo: 1 stopped, 1 idle, 1 running, 1 failure / 4 total
+    demo-host-0: RUNNING
+      Task: build
+      Elapsed: 00:03:15
+    demo-host-1: IDLE
+      Last task: test
+      Result: Success
+    demo-host-2: STOPPED
+    demo-host-3: FAILURE
+      Reason: Runner exited with status 1
+```
+
+`Elapsed` 从当前任务的 `Running job` 时间计算。`Result` 将 Succeeded、Failed、Canceled 分别显示为 Success、Failed、Cancelled；上次任务失败不代表 runner 故障，仍显示 IDLE。无法确定运行状态、检查失败或进程异常退出时显示 FAILURE，并提供原因；无历史任务或日志时显示 `-`。JSON 保留底层 `busy` / `idle` / `stopped` / `unknown` / `error` 状态及未完成操作摘要；`-v` 起包含 `started_at`、`current_task`、`elapsed`（秒）、`last_task`、`result`，`-vvv` 额外包含非 stopped runner 的 `tail`。
+
+安装信息独立通过 `info [组名]` 查看，也支持 `--json`：
+
+```text
+host:
+  demo:
+    demo-host-0: 2.333.0 /path/to/runners/demo-host-0 ci-host-demo-12345678 %0
+    demo-host-1: 2.333.0 /path/to/runners/demo-host-1 -
+```
+
+`status --remote HOST` 通过 SSH 查询指定主机，不同时查询本机；可重复指定多个 `--remote`，并传递组名及 verbosity。远端默认使用与本机相同的 `manager.py` 绝对路径，需要 SSH 非交互认证和相应 Python 环境；路径含空格时会正确转义。单个主机失败不会阻止其他主机查询，但最终返回非零退出码。`--json` 单主机返回对象，多主机返回成功主机的对象列表，错误写入 stderr。
 
 stop、update、remove 和需要重命名的 create 默认等待任务结束，再发送 Ctrl-C，并确认进程退出。`--timeout` 指定本次停止阶段的总等待秒数，不指定则无限等待；超时保留进度。`--force` 允许立即中断任务，10 秒宽限期后强制终止受管理进程。
 

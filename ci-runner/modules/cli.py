@@ -10,7 +10,8 @@ from urllib.parse import urlsplit
 
 from .common import ManagerError, read_json
 from .lifecycle import Manager
-from .models import Arguments, LegacyConfig, Status
+from .models import Arguments, InstanceStatus, LegacyConfig, Status
+from .remote import query_status
 
 
 def positive(value: str) -> int:
@@ -60,6 +61,15 @@ def normalize_url(value: str) -> str:
             "--url must identify an organization, repository or enterprise"
         )
     return value.rstrip("/")
+
+
+def remote_host(value: str) -> str:
+    """Validate an SSH destination without accepting options or shell syntax."""
+    if not re.fullmatch(
+        r"(?:[A-Za-z0-9_][A-Za-z0-9_.-]*@)?[A-Za-z0-9][A-Za-z0-9_.:-]*", value
+    ):
+        raise argparse.ArgumentTypeError("--remote must be a host or user@host")
+    return value
 
 
 def directory(value: str) -> Path:
@@ -173,15 +183,31 @@ def parser() -> argparse.ArgumentParser:
     stop = commands.add_parser("stop", help="Wait for idle runners and stop them")
     stop.add_argument("name", type=valid_name, nargs="?")
     stopping_options(stop)
-    status = commands.add_parser("status", help="Inspect live local state")
+    status = commands.add_parser(
+        "status", help="Inspect local or remote runner activity"
+    )
     status.add_argument("name", type=valid_name, nargs="?")
     status.add_argument("--json", action="store_true")
     status.add_argument(
         "--verbose",
         "-v",
-        action="store_true",
-        help="Show runner start time, running task duration and last task result",
+        action="count",
+        default=0,
+        help="Show runners (-v), task details (-vv), or details and log tails (-vvv)",
     )
+    status.add_argument(
+        "--remote",
+        type=remote_host,
+        action="append",
+        default=[],
+        metavar="HOST",
+        help="Query HOST over SSH instead of this host (repeatable)",
+    )
+    info = commands.add_parser(
+        "info", help="Show runner versions, paths and tmux panes"
+    )
+    info.add_argument("name", type=valid_name, nargs="?")
+    info.add_argument("--json", action="store_true")
     update = commands.add_parser(
         "update", help="Install a local package or the latest stable release"
     )
@@ -232,7 +258,7 @@ def parser() -> argparse.ArgumentParser:
     clean = commands.add_parser(
         "clean", help="Remove packages unreferenced by any state/*.json"
     )
-    for command in (create, start, stop, status, update, remove, imported, clean):
+    for command in (create, start, stop, status, info, update, remove, imported, clean):
         command.add_argument(
             "--dry-run",
             action="store_true",
@@ -249,6 +275,7 @@ def parse_arguments(argv: Sequence[str] | None = None) -> Arguments:
     if values.get("name") is None:
         values.pop("name", None)
     arguments = Arguments(**values)
+    arguments.remote = list(dict.fromkeys(arguments.remote))
     if arguments.config is not None:
         if not arguments.name:
             arguments.name = arguments.config.name
@@ -284,59 +311,114 @@ def elapsed_time(seconds: int | None) -> str:
     return f"{hours:02}:{minutes:02}:{seconds:02}"
 
 
-def print_status(result: Status, verbose: bool) -> None:
-    """Render runner status rows or detailed activity blocks."""
-    print(f"Host: {result['hostname']}")
+def status_label(instance: InstanceStatus) -> str:
+    """Map observed states into the four public status categories."""
+    return {
+        "busy": "RUNNING",
+        "idle": "IDLE",
+        "stopped": "STOPPED",
+        "unknown": "FAILURE",
+        "error": "FAILURE",
+    }[instance["state"]]
+
+
+def print_instance(instance: InstanceStatus, verbose: int) -> None:
+    """Render one runner with compact activity or expanded details."""
+    state = status_label(instance)
+    fields: list[tuple[str, str]] = []
+    if state == "RUNNING":
+        task = instance.get("current_task") or "-"
+        elapsed = elapsed_time(instance.get("elapsed"))
+        compact = f"{elapsed} @ {task}"
+        fields = [("Task", task), ("Elapsed", elapsed)]
+    elif state == "IDLE":
+        task = instance.get("last_task") or "-"
+        result = instance.get("result") or "-"
+        compact = f"{result} @ {task}"
+        fields = [("Last task", task), ("Result", result)]
+    elif state == "FAILURE":
+        compact = instance.get("detail") or "Cannot determine runner state"
+        fields = [("Reason", compact)]
+    else:
+        compact = ""
+    suffix = f" {' '.join(compact.splitlines())}" if verbose == 1 and compact else ""
+    print(f"    {instance['name']}: {state}{suffix}")
+    if verbose >= 2:
+        for label, value in fields:
+            lines = value.splitlines() or ["-"]
+            print(f"      {label}: {lines[0]}")
+            for line in lines[1:]:
+                print(f"        {line}")
+    if verbose >= 3 and state != "STOPPED":
+        lines = instance.get("tail", "").splitlines() or ["-"]
+        print(f"      Tail: {lines[0]}")
+        for line in lines[1:]:
+            print(f"        {line}")
+
+
+def print_status(result: Status, verbose: int) -> None:
+    """Render group summaries and progressively detailed runner activity."""
+    print(f"{result['hostname']}: {len(result['groups'])} groups")
     for group in result["groups"]:
-        active = sum(instance["state"] != "stopped" for instance in group["instances"])
-        print(f"{group['name']}: {active}/{group['count']} runners")
-        if verbose and group["pending"]:
-            print(f"{group['name']}: pending {group['pending']}")
+        states = [status_label(instance) for instance in group["instances"]]
+        if verbose:
+            summary = (
+                f"{states.count('STOPPED')} stopped, {states.count('IDLE')} idle, "
+                f"{states.count('RUNNING')} running, {states.count('FAILURE')} failure"
+            )
+        else:
+            summary = f"{states.count('IDLE') + states.count('RUNNING')} started"
+        print(f"  {group['name']}: {summary} / {group['count']} total")
+        if verbose:
+            for instance in group["instances"]:
+                print_instance(instance, verbose)
+
+
+def print_info(result: Status) -> None:
+    """Render runner installation versions, directories and tmux locations."""
+    print(f"{result['hostname']}:")
+    for group in result["groups"]:
+        print(f"  {group['name']}:")
         for instance in group["instances"]:
-            if verbose:
-                state = {
-                    "busy": "Running",
-                    "idle": "Idle",
-                    "stopped": "Stopped",
-                    "unknown": "Unknown",
-                    "error": "Error",
-                }[instance["state"]]
-                print(f"  {instance['name']}:")
-                print(f"    Version: {instance['version']}")
-                print(f"    Path: {instance['directory']}")
-                print(f"    Tmux: {instance['tmux'] or '-'}")
-                print(f"    Status: {state}")
-                if instance["state"] == "stopped":
-                    continue
-                print(f"    Started: {instance.get('started_at') or '-'}")
-                if instance["state"] == "busy":
-                    print(f"    Task: {instance.get('current_task') or '-'}")
-                    print(f"    Elapsed: {elapsed_time(instance.get('elapsed'))}")
-                elif instance["state"] == "idle":
-                    print(f"    Last Task: {instance.get('last_task') or '-'}")
-                    print(f"    Result: {instance.get('result') or '-'}")
-            else:
-                state = {
-                    "busy": "Running",
-                    "idle": "Idle",
-                    "stopped": "Stopped",
-                    "unknown": "Unknown",
-                    "error": "Error",
-                }[instance["state"]]
-                print(f"  {instance['name']}: {state}")
-            if instance.get("detail"):
-                print(f"      Detail: {instance['detail']}")
+            print(
+                f"    {instance['name']}: {instance['version']} "
+                f"{instance['directory']} {instance['tmux'] or '-'}"
+            )
+
+
+def print_remote_status(root: Path, arguments: Arguments) -> int:
+    """Query each requested SSH host and report independent failures."""
+    results: list[Status] = []
+    failed = False
+    for host in arguments.remote:
+        try:
+            result = query_status(root, host, arguments.name, arguments.verbose)
+        except (ManagerError, OSError, ValueError, KeyError, TypeError) as error:
+            print(f"Error: {host}: {error}", file=sys.stderr)
+            failed = True
+            continue
+        results.append(result)
+        if not arguments.json:
+            print_status(result, arguments.verbose)
+    if arguments.json:
+        output = results[0] if len(arguments.remote) == 1 and results else results
+        print(json.dumps(output, indent=2, ensure_ascii=False))
+    return int(failed)
 
 
 def main(root: Path, argv: Sequence[str] | None = None) -> int:
     """Parse a command, execute it and render its result or error."""
     arguments = parse_arguments(argv)
     try:
+        if arguments.command == "status" and arguments.remote:
+            return print_remote_status(root, arguments)
         result = Manager(root).run(arguments)
-        if arguments.command == "status":
+        if arguments.command in ("status", "info"):
             assert result is not None
             if arguments.json:
                 print(json.dumps(result, indent=2, ensure_ascii=False))
+            elif arguments.command == "info":
+                print_info(result)
             else:
                 print_status(result, arguments.verbose)
         else:

@@ -140,7 +140,7 @@ class Manager:
 
     def run(self, arguments: Arguments) -> Status | None:
         """Dispatch a validated command while serializing state mutations."""
-        if arguments.command == "status":
+        if arguments.command in ("status", "info"):
             return self.status(arguments.name, verbose=arguments.verbose)
         if arguments.command == "clean":
             Cleaner(self.root).run(arguments.dry_run)
@@ -624,7 +624,7 @@ class Manager:
         self.store.save()
         print(f"Imported {count} runners as {name}")
 
-    def status(self, selected: str | None = None, verbose: bool = False) -> Status:
+    def status(self, selected: str | None = None, verbose: int = 0) -> Status:
         """Collect live status and pending-operation summaries for this host."""
         groups = self.store.load()
         if selected and selected not in groups:
@@ -656,6 +656,7 @@ class Manager:
                     "tmux": None,
                     "state": "unknown",
                 }
+                pane = None
                 if verbose:
                     row["current_task"] = None
                     row["started_at"] = None
@@ -667,6 +668,9 @@ class Manager:
                     row["state"], pane = self.tmux.state(name, instance)
                     if pane:
                         row["tmux"] = f"{pane['session']} {pane['id']}"
+                    if failure := self.tmux.failure(pane):
+                        row["state"] = "error"
+                        row["detail"] = failure
                     if verbose:
                         details = self.tmux.details(pane, row["state"])
                         row["current_task"] = details["current_task"]
@@ -674,11 +678,24 @@ class Manager:
                         row["elapsed"] = details["elapsed"]
                         row["last_task"] = details["last_task"]
                         row["result"] = details["result"]
-                        if details["state"] != "unknown":
+                        if row["state"] == "unknown" and details["state"] != "unknown":
                             row["state"] = details["state"]
                 except ManagerError as error:
                     row["state"] = "error"
                     row["detail"] = str(error)
+                if row["state"] == "unknown":
+                    row["detail"] = "Cannot determine runner state from tmux output"
+                if verbose >= 3 and row["state"] != "stopped":
+                    try:
+                        if pane is None:
+                            pane = self.tmux.pane(
+                                name, instance["index"], Path(instance["path"])
+                            )
+                            if pane:
+                                row["tmux"] = f"{pane['session']} {pane['id']}"
+                        row["tail"] = self.tmux.tail(pane)
+                    except ManagerError as error:
+                        row["tail"] = f"Unavailable: {error}"
                 summary["instances"].append(row)
             result["groups"].append(summary)
         return result

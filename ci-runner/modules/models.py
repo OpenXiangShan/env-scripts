@@ -3,7 +3,7 @@ from pathlib import Path
 from typing import Literal, NotRequired, TypedDict
 
 type Command = Literal[
-    "create", "start", "stop", "status", "update", "remove", "import", "clean"
+    "create", "start", "stop", "status", "info", "update", "remove", "import", "clean"
 ]
 type RunnerState = Literal["stopped", "idle", "busy", "unknown", "error"]
 type Stage = Literal[
@@ -150,6 +150,7 @@ class InstanceStatus(TypedDict):
     elapsed: NotRequired[int | None]
     last_task: NotRequired[str | None]
     result: NotRequired[str | None]
+    tail: NotRequired[str]
 
 
 class GroupStatus(TypedDict):
@@ -194,6 +195,7 @@ class Arguments:
     timeout: int | None = None
     force: bool = False
     json: bool = False
-    verbose: bool = False
+    verbose: int = 0
+    remote: list[str] = field(default_factory=list)
     dry_run: bool = False
     config: LegacyConfig | None = None

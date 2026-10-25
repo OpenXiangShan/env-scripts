@@ -278,6 +278,33 @@ class Tmux:
         output = self.call("capture-pane", "-pJ", "-S", "-", "-t", pane["id"]).stdout
         return parse_runner_output(output)
 
+    def tail(self, pane: Pane | None) -> str:
+        """Capture the last five log lines without trailing empty pane rows."""
+        if pane is None:
+            return ""
+        output = self.call("capture-pane", "-pJ", "-S", "-", "-t", pane["id"]).stdout
+        if pane["dead"]:
+            output = re.sub(r"(?:^|\n)Pane is dead \([^\n]*\)\s*$", "", output)
+        return "\n".join(output.rstrip().splitlines()[-5:])
+
+    def failure(self, pane: Pane | None) -> str | None:
+        """Describe an abnormal tmux process exit without changing lifecycle state."""
+        if pane is None or not pane["dead"]:
+            return None
+        result = self.call(
+            "display-message",
+            "-p",
+            "-t",
+            pane["id"],
+            "#{pane_dead_status}\t#{pane_dead_signal}",
+        ).stdout.rstrip("\r\n")
+        status, _, signal = result.partition("\t")
+        if signal:
+            return f"Runner terminated by signal {signal}"
+        if status and status != "0":
+            return f"Runner exited with status {status}"
+        return None
+
     def stop(
         self,
         name: str,
