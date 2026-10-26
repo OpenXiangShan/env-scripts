@@ -109,7 +109,7 @@ generate_uvhs_filelist() {
     printf '+define+DDR4\n+define+SRAM_SYN\n+define+DATA_VERSION=0\n'
     if [[ $cpu == nutshell ]]; then
       printf '+define+CPU_NUTSHELL\n'
-      printf '+define+CPU_64BIT\n'
+      printf '+define+CPU_AXI_DATA_WIDTH=64\n+define+CPU_AXI_ADDR_WIDTH=33\n'
     fi
     if [[ $cpu == kmh ]] &&
       grep -Eq '^[[:space:]]*(input|output)[[:space:]].*dma_awready' "$core_rtl_dir/SimTop.sv"; then

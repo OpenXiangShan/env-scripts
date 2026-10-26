@@ -294,10 +294,21 @@ if {[string equal $cpu "boom"]} {
     fpga_append_unique defines "CPU_BOOM"
     puts "INFO: CPU_BOOM define enabled"
 }
+# Board AXI datapath width.  This is independent of the CPU XLEN: every CPU
+# selected here is RV64, but NutShell/BOOM use a 64-bit SOC AXI while the
+# XiangShan family uses 256 bits.  The BD (jtag_ddr_subsys) and the RTL read
+# the same values, so the width has a single source of truth.
+set cpu_axi_data_width 256
+set cpu_axi_addr_width 40
 if {[string equal $cpu "nutshell"] || [string equal $cpu "boom"]} {
-    fpga_append_unique defines "CPU_64BIT"
-    puts "INFO: CPU_64BIT define enabled"
+    set cpu_axi_data_width 64
+    set cpu_axi_addr_width 33
 }
+set ::cpu_axi_data_width $cpu_axi_data_width
+set ::cpu_axi_addr_width $cpu_axi_addr_width
+fpga_append_unique defines "CPU_AXI_DATA_WIDTH=$cpu_axi_data_width"
+fpga_append_unique defines "CPU_AXI_ADDR_WIDTH=$cpu_axi_addr_width"
+puts "INFO: CPU_AXI_DATA_WIDTH=$cpu_axi_data_width CPU_AXI_ADDR_WIDTH=$cpu_axi_addr_width
 set_property -name "verilog_define" -value "$defines" -objects $obj
 source "$tcl_dir/common/global_includes.tcl"
 
