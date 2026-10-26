@@ -1,0 +1,60 @@
+  wire [13:0] gbus_ddr_awid, gbus_ddr_arid, gbus_ddr_bid, gbus_ddr_rid;
+  wire [33:0] gbus_ddr_awaddr, gbus_ddr_araddr;
+  wire [7:0] gbus_ddr_awlen, gbus_ddr_arlen;
+  wire [2:0] gbus_ddr_awsize, gbus_ddr_arsize, gbus_ddr_awprot, gbus_ddr_arprot;
+  wire [1:0] gbus_ddr_awburst, gbus_ddr_arburst, gbus_ddr_bresp, gbus_ddr_rresp;
+  wire gbus_ddr_awlock, gbus_ddr_arlock;
+  wire [3:0] gbus_ddr_awcache, gbus_ddr_arcache, gbus_ddr_awqos, gbus_ddr_arqos, gbus_ddr_awregion, gbus_ddr_arregion;
+  wire gbus_ddr_awvalid, gbus_ddr_awready, gbus_ddr_wlast, gbus_ddr_wvalid, gbus_ddr_wready, gbus_ddr_bvalid, gbus_ddr_bready;
+  wire gbus_ddr_arvalid, gbus_ddr_arready, gbus_ddr_rlast, gbus_ddr_rvalid, gbus_ddr_rready;
+  wire [255:0] gbus_ddr_wdata, gbus_ddr_rdata;
+  wire [31:0] gbus_ddr_wstrb;
+
+  wire [13:0] cpu_ddr_soc_awid, cpu_ddr_soc_arid, cpu_ddr_soc_bid, cpu_ddr_soc_rid;
+  wire [33:0] cpu_ddr_soc_awaddr, cpu_ddr_soc_araddr;
+  wire [7:0] cpu_ddr_soc_awlen, cpu_ddr_soc_arlen;
+  wire [2:0] cpu_ddr_soc_awsize, cpu_ddr_soc_arsize, cpu_ddr_soc_awprot, cpu_ddr_soc_arprot;
+  wire [1:0] cpu_ddr_soc_awburst, cpu_ddr_soc_arburst, cpu_ddr_soc_bresp, cpu_ddr_soc_rresp;
+  wire cpu_ddr_soc_awlock, cpu_ddr_soc_arlock;
+  wire [3:0] cpu_ddr_soc_awcache, cpu_ddr_soc_arcache, cpu_ddr_soc_awqos, cpu_ddr_soc_arqos, cpu_ddr_soc_awregion, cpu_ddr_soc_arregion;
+  wire cpu_ddr_soc_awvalid, cpu_ddr_soc_awready, cpu_ddr_soc_wlast, cpu_ddr_soc_wvalid, cpu_ddr_soc_wready, cpu_ddr_soc_bvalid, cpu_ddr_soc_bready;
+  wire cpu_ddr_soc_arvalid, cpu_ddr_soc_arready, cpu_ddr_soc_rlast, cpu_ddr_soc_rvalid, cpu_ddr_soc_rready;
+  wire [255:0] cpu_ddr_soc_wdata, cpu_ddr_soc_rdata;
+  wire [31:0] cpu_ddr_soc_wstrb;
+
+  wire [13:0] cpu_ddr_awid, cpu_ddr_arid, cpu_ddr_bid, cpu_ddr_rid;
+  wire [33:0] cpu_ddr_awaddr, cpu_ddr_araddr;
+  wire [7:0] cpu_ddr_awlen, cpu_ddr_arlen;
+  wire [2:0] cpu_ddr_awsize, cpu_ddr_arsize, cpu_ddr_awprot, cpu_ddr_arprot;
+  wire [1:0] cpu_ddr_awburst, cpu_ddr_arburst, cpu_ddr_bresp, cpu_ddr_rresp;
+  wire cpu_ddr_awlock, cpu_ddr_arlock;
+  wire [3:0] cpu_ddr_awcache, cpu_ddr_arcache, cpu_ddr_awqos, cpu_ddr_arqos, cpu_ddr_awregion, cpu_ddr_arregion;
+  wire cpu_ddr_awvalid, cpu_ddr_awready, cpu_ddr_wlast, cpu_ddr_wvalid, cpu_ddr_wready, cpu_ddr_bvalid, cpu_ddr_bready;
+  wire cpu_ddr_arvalid, cpu_ddr_arready, cpu_ddr_rlast, cpu_ddr_rvalid, cpu_ddr_rready;
+  wire [255:0] cpu_ddr_wdata, cpu_ddr_rdata;
+  wire [31:0] cpu_ddr_wstrb;
+
+  wire [13:0] gbus_merged_awid, gbus_merged_arid, gbus_merged_bid, gbus_merged_rid;
+  wire [33:0] gbus_merged_awaddr, gbus_merged_araddr;
+  wire [7:0] gbus_merged_awlen, gbus_merged_arlen;
+  wire [2:0] gbus_merged_awsize, gbus_merged_arsize, gbus_merged_awprot, gbus_merged_arprot;
+  wire [1:0] gbus_merged_awburst, gbus_merged_arburst, gbus_merged_bresp, gbus_merged_rresp;
+  wire gbus_merged_awlock, gbus_merged_arlock;
+  wire [3:0] gbus_merged_awcache, gbus_merged_arcache, gbus_merged_awqos, gbus_merged_arqos, gbus_merged_awregion, gbus_merged_arregion;
+  wire gbus_merged_awvalid, gbus_merged_awready, gbus_merged_wlast, gbus_merged_wvalid, gbus_merged_wready, gbus_merged_bvalid, gbus_merged_bready;
+  wire gbus_merged_arvalid, gbus_merged_arready, gbus_merged_rlast, gbus_merged_rvalid, gbus_merged_rready;
+  wire [255:0] gbus_merged_wdata, gbus_merged_rdata;
+  wire [31:0] gbus_merged_wstrb;
+
+  wire [13:0] uvhs_ddr_awid, uvhs_ddr_arid, uvhs_ddr_bid, uvhs_ddr_rid;
+  wire [33:0] uvhs_ddr_awaddr, uvhs_ddr_araddr;
+  wire [7:0] uvhs_ddr_awlen, uvhs_ddr_arlen;
+  wire [2:0] uvhs_ddr_awsize, uvhs_ddr_arsize, uvhs_ddr_awprot, uvhs_ddr_arprot;
+  wire [1:0] uvhs_ddr_awburst, uvhs_ddr_arburst, uvhs_ddr_bresp, uvhs_ddr_rresp;
+  wire uvhs_ddr_awlock, uvhs_ddr_arlock;
+  wire [3:0] uvhs_ddr_awcache, uvhs_ddr_arcache, uvhs_ddr_awqos, uvhs_ddr_arqos, uvhs_ddr_awregion, uvhs_ddr_arregion;
+  wire uvhs_ddr_awvalid, uvhs_ddr_awready, uvhs_ddr_wlast, uvhs_ddr_wvalid, uvhs_ddr_wready, uvhs_ddr_bvalid, uvhs_ddr_bready;
+  wire uvhs_ddr_arvalid, uvhs_ddr_arready, uvhs_ddr_rlast, uvhs_ddr_rvalid, uvhs_ddr_rready;
+  wire [255:0] uvhs_ddr_wdata, uvhs_ddr_rdata;
+  wire [31:0] uvhs_ddr_wstrb;
+

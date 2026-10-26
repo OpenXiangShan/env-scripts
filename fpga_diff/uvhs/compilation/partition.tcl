@@ -13,6 +13,15 @@ if {[llength $uvhs_ddr_cell] != 1} {
 # daughter card.
 set uvhs_f0_cells $uvhs_ddr_cell
 set uvhs_hostif [string toupper [uvhs::env_or_default DIFFTEST_HOSTIF XDMA]]
+set uvhs_functional_ddr_remote_link \
+    [uvhs::env_or_default UVHS_FUNCTIONAL_DDR_REMOTE_LINK \
+        [expr {$uvhs_hostif eq "GBUS" ? 1 : 0}]]
+if {$uvhs_functional_ddr_remote_link ni {0 1}} {
+    error "GBus remote-link setting must be 0 or 1"
+}
+if {$uvhs_functional_ddr_remote_link eq "1" && $uvhs_hostif ne "GBUS"} {
+    error "functional DDR remote link requires DIFFTEST_HOSTIF=GBUS"
+}
 # The LLC wrapper name depends on the XiangShan configuration: external-LLC
 # builds instantiate chi_extllc_opt, while the default OpenLLC build uses
 # chi_openllc_opt. Keep the variable root separate from the shared memory path
@@ -81,17 +90,24 @@ set uvhs_host_path_names {
 if {$uvhs_hostif eq "XDMA"} {
     lappend uvhs_host_path_names core_def/xdma_ep_i
 } elseif {$uvhs_hostif eq "GBUS"} {
-    # Keep the protected GBus endpoints, AXI-stream H2C converter, C2H SRAM
-    # staging FIFO, and host-to-CPU AXIS CDC together with the CPU host path
-    # on F2.  GBus occupies DifftestMemCtrl's existing stream engine, so the
-    # converter and CDC stay on F2 with memCtrl.
     set uvhs_gbus_host_path_names {\
         core_def/U_GBUS_HOST/U_GBUS_CONFIG_BRIDGE \
+        core_def/U_GBUS_HOST/difftest_cfg_axilite_cdc \
         core_def/U_GBUS_HOST/U_GBUS_GENERALBD \
         core_def/U_GBUS_HOST/U_GBUS_GENERAL_BUS \
-        core_def/U_GBUS_HOST/U_GBUS_H2C_AXIS \
-        core_def/U_GBUS_HOST/U_GBUS_H2C_CDC \
-        core_def/U_GBUS_HOST/U_GBUS_C2H_FIFO}
+        core_def/U_GBUS_HOST/U_GBUS_C2H_DMA \
+        core_def/U_GBUS_HOST/U_GBUS_C2H_READ_ROUTER \
+        core_def/U_GBUS_HOST/U_GBUS_WRITE_GUARD \
+        core_def/U_GBUS_CPU_DDR_CDC \
+        core_def/U_GBUS_DDR_ARBITER}
+    if {$uvhs_functional_ddr_remote_link eq "1"} {
+        lappend uvhs_gbus_host_path_names core_def/u_uvhs_gbus_func_ddr_remote_source
+        set uvhs_remote_sink_cells [get_cells -quiet {core_def/u_uvhs_gbus_func_ddr_remote_sink}]
+        if {[llength $uvhs_remote_sink_cells] != 1} {
+            error "expected one functional DDR remote sink"
+        }
+        set uvhs_f0_cells [concat $uvhs_f0_cells $uvhs_remote_sink_cells]
+    }
     set uvhs_host_path_names \
         [concat $uvhs_host_path_names $uvhs_gbus_host_path_names]
 } else {
@@ -222,7 +238,33 @@ if {[llength $uvhs_xiangshan_cell] == 1} {
 } elseif {[llength $uvhs_xiangshan_cell]} {
     error "expected at most one XiangShan top cell, got [llength $uvhs_xiangshan_cell]"
 } else {
-    puts "INFO: skip XiangShan partition constraints for this CPU"
+    if {$uvhs_hostif eq "GBUS"} {
+        set uvhs_nutshell_cell [get_cells -quiet {core_def/U_CPU_TOP/u_SimTop}]
+        if {[llength $uvhs_nutshell_cell] != 1} {
+            error "expected one NutShell SimTop for the GBus partition"
+        }
+        set uvhs_nutshell_f2_names [concat $uvhs_gbus_host_path_names {
+            core_def/U_CPU_TOP
+            core_def/u_uvhs_axi64_to_axi256
+            core_def/U_GBUS_MEMORY_CONTROL
+            core_def/CFG_AXI_bridge_i
+            core_def/U_UVHS_FLASH_GBUS
+            core_def/U_SYS_CFG
+            core_def/u_rom
+        }]
+        set uvhs_nutshell_f2_cells {}
+        foreach name $uvhs_nutshell_f2_names {
+            set matches [get_cells -quiet $name]
+            if {[llength $matches] != 1} {
+                error "missing required NutShell GBus F2 cell: $name"
+            }
+            lappend uvhs_nutshell_f2_cells [lindex $matches 0]
+        }
+        create_fpga -name b0.f2 -cells $uvhs_nutshell_f2_cells
+        puts "INFO: NutShell, bank and DDR transport on b0.f2; compact DDR sink on b0.f0"
+    } else {
+        puts "INFO: skip XiangShan partition constraints for this CPU"
+    }
 }
 create_fpga -name b0.f0 -cells $uvhs_f0_cells
 set uvhs_ddr_connector b0.F0_FMC0
@@ -274,7 +316,8 @@ unset -nocomplain uvhs_ddr_cell uvhs_ddr_connector \
     uvhs_host_path_names uvhs_host_path_cells \
     uvhs_gbus_host_path_names uvhs_gbus_host_path_name \
     uvhs_gbus_host_path_cell uvhs_missing_gbus_host_cells \
-    uvhs_hostif \
+    uvhs_hostif uvhs_functional_ddr_remote_link \
+    uvhs_remote_sink_cells uvhs_nutshell_cell uvhs_nutshell_f2_names uvhs_nutshell_f2_cells \
     uvhs_nocmisc_path uvhs_nocmisc_prefix uvhs_nocmisc_f0_anchors \
     uvhs_nocmisc_f2_children uvhs_nocmisc_direct_cells \
     uvhs_nocmisc_direct_names uvhs_nocmisc_f0_cells uvhs_nocmisc_f0_names \
