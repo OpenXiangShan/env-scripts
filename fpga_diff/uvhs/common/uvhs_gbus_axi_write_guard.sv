@@ -47,7 +47,8 @@ module uvhs_gbus_axi_write_guard (
   input wire d_bvalid,
   output wire d_bready
 );
-  localparam [32:0] APERTURE = 33'h0_0ffff000;
+  // Host writes must stay below the 256 KiB C2H frame FIFO in port 0.
+  localparam [32:0] APERTURE = 33'h0_0ffc0000;
   localparam [32:0] PORT_END = 33'h0_10000000;
 
   reg active, reject_q, aw_sent, data_done, data_error;

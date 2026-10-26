@@ -60,7 +60,9 @@ module uvhs_gbus_axi_read_router (
   reg busy;
   reg local_q;
 
-  wire aperture_hit = (s_araddr >= 32'h0fff_f000) &&
+  // The C2H frame FIFO owns the top 256 KiB of port 0.  Everything below it is
+  // forwarded to the DDR adapter unchanged.
+  wire aperture_hit = (s_araddr >= 32'h0ffc_0000) &&
                        (s_araddr <= 32'h0fff_ffff);
   wire ar_fire = s_arvalid && s_arready;
 

@@ -141,11 +141,14 @@ module uvhs_gbus_host_wrapper (
   assign gbus_cfg_local_wr_addr = gbus_cfg_wr_addr - 16'h1000;
   assign gbus_cfg_local_rd_addr = gbus_cfg_rd_addr - 16'h1000;
 
-  // GBD1 status/control/evidence window plus the frozen bank data window.
-  wire gbus_c2h_cfg_wr_en = gbus_cfg_wr_en && (gbus_cfg_local_wr_addr == 16'h1204);
+  // GBD1 status/control/evidence window, the streaming counters, and the
+  // first-frame mirror the host uses to cross-check its DMA payload.
+  wire gbus_c2h_cfg_wr_en = gbus_cfg_wr_en &&
+      ((gbus_cfg_local_wr_addr == 16'h1204) || (gbus_cfg_local_wr_addr == 16'h1238) ||
+       (gbus_cfg_local_wr_addr == 16'h123c));
   wire gbus_c2h_cfg_rd_en = gbus_cfg_rd_en && (gbus_cfg_local_rd_addr[1:0] == 2'b0) &&
-      (((gbus_cfg_local_rd_addr >= 16'h1200) && (gbus_cfg_local_rd_addr <= 16'h1234)) ||
-       ((gbus_cfg_local_rd_addr >= 16'h2000) && (gbus_cfg_local_rd_addr <= 16'h23fc)));
+      (((gbus_cfg_local_rd_addr >= 16'h1200) && (gbus_cfg_local_rd_addr <= 16'h1244)) ||
+       ((gbus_cfg_local_rd_addr >= 16'h2000) && (gbus_cfg_local_rd_addr <= 16'h22fc)));
   wire gbus_axil_cfg_wr_en = gbus_cfg_wr_en && (gbus_cfg_local_wr_addr <= 16'h0030);
   wire gbus_axil_cfg_rd_en = gbus_cfg_rd_en && (gbus_cfg_local_rd_addr <= 16'h0030);
 
