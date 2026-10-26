@@ -19,7 +19,7 @@ module core_def (
       output                                     init_calib_complete,
       output                                     cpu_rd_qspi_valid,
       output                                     cpu_wr_ddr_valid,
-      input                                      sys_clk_i,
+      input                                      sys_clk_in,
       input                                      dev_clk_i,
       input                                      sys_rstn,
       input                                      cpu_rstn,
@@ -104,6 +104,19 @@ module core_def (
       //input           [53-1:0]                   pad_c                        ,
       input                                      dft_crg_rst_n
 );
+
+wire sys_clk_i;
+`ifdef UVHS
+assign sys_clk_i = sys_clk_in;
+`elsif NO_DIFF
+assign sys_clk_i = sys_clk_in;
+`else
+// Match the ungated branch to the CPU's clock-gate buffer.
+BUFG bufg_ref_clk (
+    .I (sys_clk_in),
+    .O (sys_clk_i)
+);
+`endif
 
 // Unbind useless output port {{{
 assign cpu_rd_qspi_valid = 0;
@@ -1407,7 +1420,7 @@ wire [0:0]    br2cfg_wvalid;
 `endif
 
   DifftestClockGate SOC_CLK_CTRL(
-      .CK  (sys_clk_i),
+      .CK  (sys_clk_in),
       .E   (difftest_clock_gate_enable),
       .Q   (inter_soc_clk)
   );

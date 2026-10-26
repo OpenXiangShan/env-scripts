@@ -390,7 +390,7 @@ core_def core_def
   .init_calib_complete  (led3),
   .cpu_rd_qspi_valid    (led2),
   .cpu_wr_ddr_valid     (led0),
-  .sys_clk_i            (sys_clk_i),
+  .sys_clk_in           (sys_clk_i),
   .dev_clk_i            (dev_clk_i),
   .sys_rstn             (sys_rstn_to_core),
   .cpu_rstn             (cpu_rstn_to_core),

@@ -73,6 +73,8 @@ For Vivado, the CPU clock uses `BUFGCE_DIV` to divide `clk6_p` (200MHz).
 `vivado/vivado.mk` declares and exports this Make variable to Vivado's Tcl.
 Vivado derives the divided clock constraint from the primitive; `fpga.xdc`
 constrains the board inputs at their actual frequencies.
+With DiffTest enabled, the divided clock feeds a BUFG for the always-running
+reference/peripheral branch and the existing BUFGCE for the gated CPU branch.
 
 ```shell
 make bitstream CPU=nutshell CORE_DIR=/path/to/release/build FPGA_CORE_CLK_MHZ=100
