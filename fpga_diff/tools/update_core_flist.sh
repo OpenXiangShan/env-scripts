@@ -104,6 +104,7 @@ generate_uvhs_filelist() {
       rtl_flist_fail "DIFFTEST_HOST_DEFINE=$host_define does not match DIFFTEST_HOSTIF=$hostif"
     fi
     printf '+define+%s\n' "$host_define"
+    tclsh "$script_dir/cpu_axi_defines.tcl" "$cpu"
     printf '+define+DDR4_16G_X8\n+define+DQ64\n+define+DDR4_2400\n'
     printf '+define+DQ=64\n+define+MICRON_DDR\n+define+DDR4_16Gbx8\n'
     printf '+define+DDR4\n+define+SRAM_SYN\n+define+DATA_VERSION=0\n'

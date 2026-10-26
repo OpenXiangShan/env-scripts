@@ -19,7 +19,7 @@
 # Check file required for this script exists
 
 set cpu "kmh"
-set cpu_candidates [list "kmh" "nanhu" "dualcore" "nutshell"]
+set cpu_candidates [list "kmh" "nanhu" "dualcore" "nutshell" "boom"]
 set cpu_files_tcl ""
 set project_dir ""
 set vivado_version ""
@@ -290,6 +290,13 @@ lappend defines "CONFIG_RANK_WIDTH=$ddr_rank_width"
 lappend defines "DDR_AXI_ADDR_WIDTH=$::ddr_axi_addr_width"
 puts "INFO: DDR_RANK_WIDTH=$ddr_rank_width; DDR_AXI_ADDR_WIDTH=$::ddr_axi_addr_width; DDR4_MEMORY_PART=$::ddr_memory_part"
 
+if {[string equal $cpu "boom"]} {
+    fpga_append_unique defines "CPU_BOOM"
+    puts "INFO: CPU_BOOM define enabled"
+}
+source "$shared_tcl_dir/common/cpu_axi.tcl"
+lappend defines {*}$cpu_axi_defines
+puts "INFO: CPU_AXI_DATA_WIDTH=$cpu_axi_data_width CPU_AXI_ADDR_WIDTH=$cpu_axi_addr_width"
 set_property -name "verilog_define" -value "$defines" -objects $obj
 source "$tcl_dir/common/global_includes.tcl"
 

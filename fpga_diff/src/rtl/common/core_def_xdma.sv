@@ -485,12 +485,9 @@ wire                                           data_x2x_bridge_s2m_rlast      ;
 wire                                           data_x2x_bridge_s2m_rvalid     ;
 wire            [39:0]                         data_x2x_bridge_m2s_awaddr     ;
 wire            [39:0]                         data_x2x_bridge_m2s_araddr     ;
+// CPU-side AXI widths come from the shared Tcl build configuration.
 (*mark_debug = "true"*) wire           [17:0]                       cpu2ddr_m2s_awid_mix           ;
-`ifdef CPU_NUTSHELL
-(*mark_debug = "true"*) wire           [32:0]                      cpu2ddr_m2s_awaddr_mix         ;
-`else
-(*mark_debug = "true"*) wire           [39:0]                      cpu2ddr_m2s_awaddr_mix         ;
-`endif
+(*mark_debug = "true"*) wire    [`CPU_AXI_ADDR_WIDTH-1:0]            cpu2ddr_m2s_awaddr_mix         ;
 (*mark_debug = "true"*) wire           [7:0]                       cpu2ddr_m2s_awlen              ;
 (*mark_debug = "true"*) wire           [2:0]                       cpu2ddr_m2s_awsize             ;
 (*mark_debug = "true"*) wire           [1:0]                       cpu2ddr_m2s_awburst            ;
@@ -498,19 +495,10 @@ wire           [3:0]                       cpu2ddr_m2s_awcache            ;
 wire           [2:0]                       cpu2ddr_m2s_awprot             ;
 wire           [3:0]                       cpu2ddr_m2s_awqos              ;
 wire           [3:0]                       cpu2ddr_m2s_awregion           ;
-`ifdef CPU_NUTSHELL
-(*mark_debug = "true"*) wire           [63:0]                      cpu2ddr_m2s_wdata              ;
-(*mark_debug = "true"*) wire           [7:0]                       cpu2ddr_m2s_wstrb              ;
-`else
-(*mark_debug = "true"*) wire           [255:0]                     cpu2ddr_m2s_wdata              ;
-(*mark_debug = "true"*) wire           [31:0]                      cpu2ddr_m2s_wstrb              ;
-`endif
+(*mark_debug = "true"*) wire    [`CPU_AXI_DATA_WIDTH-1:0]            cpu2ddr_m2s_wdata              ;
+(*mark_debug = "true"*) wire    [`CPU_AXI_DATA_WIDTH/8-1:0]          cpu2ddr_m2s_wstrb              ;
 (*mark_debug = "true"*) wire           [17:0]                       cpu2ddr_m2s_arid_mix           ;
-`ifdef CPU_NUTSHELL
-(*mark_debug = "true"*) wire           [32:0]                      cpu2ddr_m2s_araddr_mix         ;
-`else
-(*mark_debug = "true"*) wire           [39:0]                      cpu2ddr_m2s_araddr_mix         ;
-`endif
+(*mark_debug = "true"*) wire    [`CPU_AXI_ADDR_WIDTH-1:0]            cpu2ddr_m2s_araddr_mix         ;
 (*mark_debug = "true"*) wire           [7:0]                       cpu2ddr_m2s_arlen              ;
 (*mark_debug = "true"*) wire           [2:0]                       cpu2ddr_m2s_arsize             ;
 (*mark_debug = "true"*) wire           [1:0]                       cpu2ddr_m2s_arburst            ;
@@ -521,11 +509,7 @@ wire           [3:0]                       cpu2ddr_m2s_arregion           ;
 (*mark_debug = "true"*) wire           [17:0]                      cpu2ddr_s2m_bid                ;
 (*mark_debug = "true"*) wire           [1:0]                       cpu2ddr_s2m_bresp              ;
 (*mark_debug = "true"*) wire           [17:0]                      cpu2ddr_s2m_rid                ;
-`ifdef CPU_NUTSHELL
-(*mark_debug = "true"*) wire           [63:0]                      cpu2ddr_s2m_rdata              ;
-`else
-(*mark_debug = "true"*) wire           [255:0]                     cpu2ddr_s2m_rdata              ;
-`endif
+(*mark_debug = "true"*) wire    [`CPU_AXI_DATA_WIDTH-1:0]            cpu2ddr_s2m_rdata              ;
 (*mark_debug = "true"*) wire           [1:0]                       cpu2ddr_s2m_rresp              ;
 wire                                           ddr_core_clk                   ;
 wire                                           sys_ddr_rst_n                  ;
@@ -1513,13 +1497,12 @@ wire [13:0] uvhs_ddr_bid;
 wire [13:0] uvhs_ddr_rid;
 wire        uvhs_ddr_user_rst;
 
-`ifdef CPU_NUTSHELL
-assign uvhs_ddr_awaddr = {1'b0, cpu2ddr_m2s_awaddr_mix};
-assign uvhs_ddr_araddr = {1'b0, cpu2ddr_m2s_araddr_mix};
-`else
-assign uvhs_ddr_awaddr = cpu2ddr_m2s_awaddr_mix[33:0];
-assign uvhs_ddr_araddr = cpu2ddr_m2s_araddr_mix[33:0];
-`endif
+// The UVHS DDR port is 34-bit: zero-extend the 33-bit CPU address or truncate
+// the 40-bit one through a common 40-bit view.
+wire [39:0] cpu2ddr_m2s_awaddr_ext = cpu2ddr_m2s_awaddr_mix;
+wire [39:0] cpu2ddr_m2s_araddr_ext = cpu2ddr_m2s_araddr_mix;
+assign uvhs_ddr_awaddr = cpu2ddr_m2s_awaddr_ext[33:0];
+assign uvhs_ddr_araddr = cpu2ddr_m2s_araddr_ext[33:0];
 assign cpu2ddr_s2m_bid = {4'b0, uvhs_ddr_bid};
 assign cpu2ddr_s2m_rid = {4'b0, uvhs_ddr_rid};
 assign init_calib_complete = rstn_sw4 & ~uvhs_ddr_user_rst;
