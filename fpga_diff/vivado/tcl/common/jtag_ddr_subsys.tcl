@@ -197,7 +197,12 @@ proc create_root_design { parentCell } {
    CONFIG.FREQ_HZ {80000000} \
    ] $OSC_SYS_CLK
 
-   if { $::cpu == "nutshell" } {
+   # The BOOM wrapper (and the CPU_64BIT path in core_def_xdma) exposes a
+   # 64-bit SOC_M_AXI.  The jtag_ddr_subsys BD must use the same width; a
+   # 64-bit master connected to a 256-bit slave only commits the low 64 bits
+   # of each 32-byte DDR beat, which is exactly the H2C "first 8 bytes only"
+   # symptom.  NutShell already uses 64; XiangShan keeps 256.
+   if { $::cpu == "nutshell" || $::cpu == "boom" } {
       set SOC_M_AXI_DATA_WIDTH 64
    } else {
       set SOC_M_AXI_DATA_WIDTH 256

@@ -124,7 +124,7 @@ module jtag_ddr_subsys_wrapper
   output [1:0]SOC_M_AXI_bresp;
   output SOC_M_AXI_bvalid;
 
-`ifdef CPU_NUTSHELL
+`ifdef CPU_64BIT
   output [63:0]SOC_M_AXI_rdata;
 `else
   output [255:0]SOC_M_AXI_rdata;
@@ -136,7 +136,7 @@ module jtag_ddr_subsys_wrapper
   output [1:0]SOC_M_AXI_rresp;
   output SOC_M_AXI_rvalid;
 
-`ifdef CPU_NUTSHELL
+`ifdef CPU_64BIT
   input [63:0]SOC_M_AXI_wdata;
   input [7:0]SOC_M_AXI_wstrb;
 `else
@@ -196,7 +196,7 @@ module jtag_ddr_subsys_wrapper
   wire SOC_M_AXI_bready;
   wire [1:0]SOC_M_AXI_bresp;
   wire SOC_M_AXI_bvalid;
-`ifdef CPU_NUTSHELL
+`ifdef CPU_64BIT
   wire [63:0]SOC_M_AXI_rdata;
 `else
   wire [255:0]SOC_M_AXI_rdata;
@@ -206,7 +206,7 @@ module jtag_ddr_subsys_wrapper
   wire SOC_M_AXI_rready;
   wire [1:0]SOC_M_AXI_rresp;
   wire SOC_M_AXI_rvalid;
-`ifdef CPU_NUTSHELL
+`ifdef CPU_64BIT
   wire [63:0]SOC_M_AXI_wdata;
   wire [7:0]SOC_M_AXI_wstrb;
 `else

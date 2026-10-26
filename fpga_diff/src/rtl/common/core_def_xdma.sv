@@ -486,7 +486,7 @@ wire                                           data_x2x_bridge_s2m_rvalid     ;
 wire            [39:0]                         data_x2x_bridge_m2s_awaddr     ;
 wire            [39:0]                         data_x2x_bridge_m2s_araddr     ;
 (*mark_debug = "true"*) wire           [17:0]                       cpu2ddr_m2s_awid_mix           ;
-`ifdef CPU_NUTSHELL
+`ifdef CPU_64BIT
 (*mark_debug = "true"*) wire           [32:0]                      cpu2ddr_m2s_awaddr_mix         ;
 `else
 (*mark_debug = "true"*) wire           [39:0]                      cpu2ddr_m2s_awaddr_mix         ;
@@ -498,7 +498,7 @@ wire           [3:0]                       cpu2ddr_m2s_awcache            ;
 wire           [2:0]                       cpu2ddr_m2s_awprot             ;
 wire           [3:0]                       cpu2ddr_m2s_awqos              ;
 wire           [3:0]                       cpu2ddr_m2s_awregion           ;
-`ifdef CPU_NUTSHELL
+`ifdef CPU_64BIT
 (*mark_debug = "true"*) wire           [63:0]                      cpu2ddr_m2s_wdata              ;
 (*mark_debug = "true"*) wire           [7:0]                       cpu2ddr_m2s_wstrb              ;
 `else
@@ -506,7 +506,7 @@ wire           [3:0]                       cpu2ddr_m2s_awregion           ;
 (*mark_debug = "true"*) wire           [31:0]                      cpu2ddr_m2s_wstrb              ;
 `endif
 (*mark_debug = "true"*) wire           [17:0]                       cpu2ddr_m2s_arid_mix           ;
-`ifdef CPU_NUTSHELL
+`ifdef CPU_64BIT
 (*mark_debug = "true"*) wire           [32:0]                      cpu2ddr_m2s_araddr_mix         ;
 `else
 (*mark_debug = "true"*) wire           [39:0]                      cpu2ddr_m2s_araddr_mix         ;
@@ -521,7 +521,7 @@ wire           [3:0]                       cpu2ddr_m2s_arregion           ;
 (*mark_debug = "true"*) wire           [17:0]                      cpu2ddr_s2m_bid                ;
 (*mark_debug = "true"*) wire           [1:0]                       cpu2ddr_s2m_bresp              ;
 (*mark_debug = "true"*) wire           [17:0]                      cpu2ddr_s2m_rid                ;
-`ifdef CPU_NUTSHELL
+`ifdef CPU_64BIT
 (*mark_debug = "true"*) wire           [63:0]                      cpu2ddr_s2m_rdata              ;
 `else
 (*mark_debug = "true"*) wire           [255:0]                     cpu2ddr_s2m_rdata              ;
@@ -1513,7 +1513,7 @@ wire [13:0] uvhs_ddr_bid;
 wire [13:0] uvhs_ddr_rid;
 wire        uvhs_ddr_user_rst;
 
-`ifdef CPU_NUTSHELL
+`ifdef CPU_64BIT
 assign uvhs_ddr_awaddr = {1'b0, cpu2ddr_m2s_awaddr_mix};
 assign uvhs_ddr_araddr = {1'b0, cpu2ddr_m2s_araddr_mix};
 `else
