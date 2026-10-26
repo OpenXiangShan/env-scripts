@@ -31,29 +31,35 @@ the GeneralBD configuration bridge and both protected GBus endpoints, so
 generated `SimTop` RTL stays unchanged. The UVHS scripts name the wrapper
 hierarchy in their clock, payload, and partition paths.
 
-GBD1 is the C2H transport: the DiffTest stream is captured into 1024-byte
-banks and the host reads them over the AXI aperture while ACK releases each
-bank. Backpressure reaches the DiffTest sender if the bank is not consumed
-while the host transport clock continues to run. The matching fpga-host uses
-the same GBD1 DMA protocol.
+GBD1 is the C2H transport: the DiffTest stream is appended frame by frame to a
+261120-byte ring, and the host reads a whole batch of frames with one DMA call
+over the AXI aperture and releases it with a single CONSUME write. Only CONSUME
+moves the read pointer, so the producer never overwrites unread data and a slow
+DMA call costs throughput but never correctness. Backpressure reaches the
+DiffTest sender once the ring is full, while the host transport clock continues
+to run. The matching fpga-host uses the same GBD1 streaming protocol.
 
 GeneralBD local offsets are below; the host adds its config base (`0x1000`).
 
 | Local offset | GBD1 register |
 | --- | --- |
-| `0x1200` | status: present[31], frame error[30], protocol error[29], staged words[16:8], filling[7], data[6], frozen[5], active[4] |
-| `0x1204` | control: FILL=1, ACK=2, clear error=4 |
+| `0x1200` | status: present[31], frame error[30], protocol error[29], capturing[7], data[6], available[5], active[4] |
+| `0x1204` | control: ENABLE=1, ACK=2 (release one frame), clear error=4, DISABLE=8 |
 | `0x1208` | ID `0x47424431` |
-| `0x120c` | published sequence number |
-| `0x1210` | read aperture base (`0x0ffff000`) |
-| `0x1214` | bank capacity (1024 bytes) |
+| `0x120c` | frames captured since stream reset |
+| `0x1210` | read aperture base (`0x0ffc0000`) |
+| `0x1214` | ring size (261120 bytes, 340 frames) |
 | `0x1218..0x1220` | AXI read evidence: AR address, attributes, count |
 | `0x1224..0x1230` | first-control evidence and sticky bad-control word |
-| `0x2000..0x23fc` | frozen bank data window |
+| `0x1238` | feature: present[0], streaming[2] |
+| `0x123c` | complete frames available to the host; write CONSUME frame count |
+| `0x1240` | read pointer (byte offset into the ring) |
+| `0x1244` | write pointer (byte offset into the ring) |
+| `0x2000..0x22fc` | config mirror of the oldest unread frame |
 
-Each AXIS TLAST validates a 768-byte DiffTest range. The host reads the frozen
-bank through the aperture and compares it with the register-window mirror
-before acknowledging.
+Each AXIS TLAST validates a 768-byte DiffTest range; a malformed frame is
+dropped and raises the sticky frame error bit instead of being published. The
+host compares its first batch against the config mirror before consuming.
 
 ## RTL Input
 
