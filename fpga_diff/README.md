@@ -87,8 +87,8 @@ clock configuration.
 In Vivado, the divider feeds sibling global buffers: a preserved BUFG
 supplies the always-running reference, peripheral and top-level reset
 logic, while the DiffTest BUFGCE gates only the CPU. NO_DIFF keeps the
-reference BUFG and uses its clock directly. The core_def `sys_clk_in`
-port carries the divider output for the gate; `sys_clk_i` carries the
+reference BUFG and uses its clock directly. The core_def `cpu_clk_src_i`
+port carries the divider output for the gate; `ref_clk_i` carries the
 buffered reference clock, including the optional XDMA ILA clock.
 
 fpga-host environment
