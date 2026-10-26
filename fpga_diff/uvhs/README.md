@@ -50,12 +50,16 @@ GeneralBD local offsets are below; the host adds its config base (`0x1000`).
 | `0x1210` | read aperture base (`0x0ffc0000`) |
 | `0x1214` | ring size (261120 bytes, 340 frames) |
 | `0x1218..0x1220` | AXI read evidence: AR address, attributes, count |
-| `0x1224..0x1230` | first-control evidence and sticky bad-control word |
+| `0x1224..0x1228` | control evidence: write count, last control value |
+| `0x122c..0x1234` | first rejected control: data, state+valid, ordinal |
 | `0x1238` | feature: present[0], streaming[2] |
 | `0x123c` | complete frames available to the host; write CONSUME frame count |
 | `0x1240` | read pointer (byte offset into the ring) |
 | `0x1244` | write pointer (byte offset into the ring) |
 | `0x2000..0x22fc` | config mirror of the oldest unread frame |
+
+The mirror covers the first 768 bytes of the oldest unread frame, which is
+what the host compares against its first DMA batch.
 
 Each AXIS TLAST validates a 768-byte DiffTest range; a malformed frame is
 dropped and raises the sticky frame error bit instead of being published. The
