@@ -104,12 +104,16 @@ generate_uvhs_filelist() {
       rtl_flist_fail "DIFFTEST_HOST_DEFINE=$host_define does not match DIFFTEST_HOSTIF=$hostif"
     fi
     printf '+define+%s\n' "$host_define"
+    tclsh /dev/stdin "$cpu" "$fpga_diff_dir/src/tcl/common/cpu_axi.tcl" <<'TCL'
+set cpu [lindex $argv 0]
+source [lindex $argv 1]
+foreach define $cpu_axi_defines { puts "+define+$define" }
+TCL
     printf '+define+DDR4_16G_X8\n+define+DQ64\n+define+DDR4_2400\n'
     printf '+define+DQ=64\n+define+MICRON_DDR\n+define+DDR4_16Gbx8\n'
     printf '+define+DDR4\n+define+SRAM_SYN\n+define+DATA_VERSION=0\n'
     if [[ $cpu == nutshell ]]; then
       printf '+define+CPU_NUTSHELL\n'
-      printf '+define+CPU_AXI_DATA_WIDTH=64\n+define+CPU_AXI_ADDR_WIDTH=33\n'
     fi
     if [[ $cpu == kmh ]] &&
       grep -Eq '^[[:space:]]*(input|output)[[:space:]].*dma_awready' "$core_rtl_dir/SimTop.sv"; then

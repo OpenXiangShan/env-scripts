@@ -485,19 +485,9 @@ wire                                           data_x2x_bridge_s2m_rlast      ;
 wire                                           data_x2x_bridge_s2m_rvalid     ;
 wire            [39:0]                         data_x2x_bridge_m2s_awaddr     ;
 wire            [39:0]                         data_x2x_bridge_m2s_araddr     ;
-// Board AXI datapath width, set by the build flow (xs_uart.tcl /
-// update_core_flist.sh).  It is independent of the CPU XLEN: NutShell and BOOM
-// use a 64-bit SOC AXI, the XiangShan family uses 256 bits.  The defaults keep
-// standalone compiles on the 256-bit path.
-`ifndef CPU_AXI_DATA_WIDTH
-`define CPU_AXI_DATA_WIDTH 256
-`endif
-`ifndef CPU_AXI_ADDR_WIDTH
-`define CPU_AXI_ADDR_WIDTH 40
-`endif
-
+// CPU-side AXI widths come from the shared Tcl build configuration.
 (*mark_debug = "true"*) wire           [17:0]                       cpu2ddr_m2s_awid_mix           ;
-(*mark_debug = "true"*) wire    [CPU_AXI_ADDR_WIDTH-1:0]            cpu2ddr_m2s_awaddr_mix         ;
+(*mark_debug = "true"*) wire    [`CPU_AXI_ADDR_WIDTH-1:0]            cpu2ddr_m2s_awaddr_mix         ;
 (*mark_debug = "true"*) wire           [7:0]                       cpu2ddr_m2s_awlen              ;
 (*mark_debug = "true"*) wire           [2:0]                       cpu2ddr_m2s_awsize             ;
 (*mark_debug = "true"*) wire           [1:0]                       cpu2ddr_m2s_awburst            ;
@@ -505,10 +495,10 @@ wire           [3:0]                       cpu2ddr_m2s_awcache            ;
 wire           [2:0]                       cpu2ddr_m2s_awprot             ;
 wire           [3:0]                       cpu2ddr_m2s_awqos              ;
 wire           [3:0]                       cpu2ddr_m2s_awregion           ;
-(*mark_debug = "true"*) wire    [CPU_AXI_DATA_WIDTH-1:0]            cpu2ddr_m2s_wdata              ;
-(*mark_debug = "true"*) wire    [CPU_AXI_DATA_WIDTH/8-1:0]          cpu2ddr_m2s_wstrb              ;
+(*mark_debug = "true"*) wire    [`CPU_AXI_DATA_WIDTH-1:0]            cpu2ddr_m2s_wdata              ;
+(*mark_debug = "true"*) wire    [`CPU_AXI_DATA_WIDTH/8-1:0]          cpu2ddr_m2s_wstrb              ;
 (*mark_debug = "true"*) wire           [17:0]                       cpu2ddr_m2s_arid_mix           ;
-(*mark_debug = "true"*) wire    [CPU_AXI_ADDR_WIDTH-1:0]            cpu2ddr_m2s_araddr_mix         ;
+(*mark_debug = "true"*) wire    [`CPU_AXI_ADDR_WIDTH-1:0]            cpu2ddr_m2s_araddr_mix         ;
 (*mark_debug = "true"*) wire           [7:0]                       cpu2ddr_m2s_arlen              ;
 (*mark_debug = "true"*) wire           [2:0]                       cpu2ddr_m2s_arsize             ;
 (*mark_debug = "true"*) wire           [1:0]                       cpu2ddr_m2s_arburst            ;
@@ -519,7 +509,7 @@ wire           [3:0]                       cpu2ddr_m2s_arregion           ;
 (*mark_debug = "true"*) wire           [17:0]                      cpu2ddr_s2m_bid                ;
 (*mark_debug = "true"*) wire           [1:0]                       cpu2ddr_s2m_bresp              ;
 (*mark_debug = "true"*) wire           [17:0]                      cpu2ddr_s2m_rid                ;
-(*mark_debug = "true"*) wire    [CPU_AXI_DATA_WIDTH-1:0]            cpu2ddr_s2m_rdata              ;
+(*mark_debug = "true"*) wire    [`CPU_AXI_DATA_WIDTH-1:0]            cpu2ddr_s2m_rdata              ;
 (*mark_debug = "true"*) wire           [1:0]                       cpu2ddr_s2m_rresp              ;
 wire                                           ddr_core_clk                   ;
 wire                                           sys_ddr_rst_n                  ;
