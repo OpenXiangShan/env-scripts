@@ -2,7 +2,7 @@ module ddr_wrapper (
     input  logic         aresetn_0,
     input  logic         aclk_0,
 
-    input  logic [15:0]  awid_0,
+    input  logic [17:0]  awid_0,
     input  logic [35:0]  awaddr_0,
     input  logic [7:0]   awlen_0,
     input  logic [2:0]   awsize_0,
@@ -27,13 +27,13 @@ module ddr_wrapper (
     output logic         wready_0,
     input  logic [7:0]   wuser_0,
 
-    output logic [15:0]  bid_0,
+    output logic [17:0]  bid_0,
     output logic [1:0]   bresp_0,
     output logic [7:0]   buser_0,
     output logic         bvalid_0,
     input  logic         bready_0,
 
-    input  logic [15:0]  arid_0,
+    input  logic [17:0]  arid_0,
     input  logic [35:0]  araddr_0,
     input  logic [7:0]   arlen_0,
     input  logic [2:0]   arsize_0,
@@ -51,7 +51,7 @@ module ddr_wrapper (
     input  logic         arurgent_0,
     input  logic         arautopre_0,
 
-    output logic [15:0]  rid_0,
+    output logic [17:0]  rid_0,
     output logic [255:0] rdata_0,
     output logic [1:0]   rresp_0,
     output logic [7:0]   ruser_0,
@@ -62,8 +62,7 @@ module ddr_wrapper (
     output logic         training_over
 );
     localparam int AXI_ADDRW = 36;
-    localparam int AXI_IDW = 16;
-    localparam int AXI_YUQUAN_IDW = 14;
+    localparam int AXI_IDW = 18;
     localparam int AXI_USERW = 8;
     localparam int AXI_CHANNEL_ADDR_BIT = 6;
     localparam int AXI_ASYNC_FIFO_DEPTH = 256;
@@ -932,7 +931,7 @@ module yuquan_mc_channel #(
     input  logic         clk,
     input  logic         resetn,
 
-    input  logic [15:0]  awid,
+    input  logic [17:0]  awid,
     input  logic [35:0]  awaddr,
     input  logic [7:0]   awlen,
     input  logic [2:0]   awsize,
@@ -949,13 +948,13 @@ module yuquan_mc_channel #(
     input  logic         wvalid,
     output logic         wready,
 
-    output logic [15:0]  bid,
+    output logic [17:0]  bid,
     output logic [1:0]   bresp,
     output logic [7:0]   buser,
     output logic         bvalid,
     input  logic         bready,
 
-    input  logic [15:0]  arid,
+    input  logic [17:0]  arid,
     input  logic [35:0]  araddr,
     input  logic [7:0]   arlen,
     input  logic [2:0]   arsize,
@@ -965,7 +964,7 @@ module yuquan_mc_channel #(
     input  logic         arvalid,
     output logic         arready,
 
-    output logic [15:0]  rid,
+    output logic [17:0]  rid,
     output logic [7:0]   ruser,
     output logic [255:0] rdata,
     output logic [1:0]   rresp,
@@ -1028,9 +1027,9 @@ module yuquan_mc_channel #(
         DFI_CMD_UNKNOWN
     } dfi_cmd_kind_t;
 
-    logic [13:0] by_bid;
+    logic [17:0] by_bid;
     logic by_buser;
-    logic [13:0] by_rid;
+    logic [17:0] by_rid;
     logic by_ruser;
 
     logic [DFI_ADDR_BITS-1:0] dfi_address_0;
@@ -1086,9 +1085,9 @@ module yuquan_mc_channel #(
     logic [(DFI_FREQ_RATIO*DFI_BG_BITS)-1:0] dfi_bg_bus;
     logic [(DFI_FREQ_RATIO*DFI_ADDR_BITS)-1:0] dfi_address_bus;
 
-    assign bid = {2'b00, by_bid};
+    assign bid = by_bid;
     assign buser = {7'b0, by_buser};
-    assign rid = {2'b00, by_rid};
+    assign rid = by_rid;
     assign ruser = {7'b0, by_ruser};
 
     assign dfi_dpi_wrdata = dfi_wdata;
@@ -1344,7 +1343,7 @@ module yuquan_mc_channel #(
     BY_mc_top u_mc_top (
         .io_clk(clk),
         .io_rst(!resetn),
-        .io_awio_awid(awid[13:0]),
+        .io_awio_awid(awid),
         .io_awio_awaddr(awaddr),
         .io_awio_awlen(awlen),
         .io_awio_awsize(awsize),
@@ -1364,7 +1363,7 @@ module yuquan_mc_channel #(
         .io_bio_buser(by_buser),
         .io_bio_bvalid(bvalid),
         .io_bio_bready(bready),
-        .io_ario_arid(arid[13:0]),
+        .io_ario_arid(arid),
         .io_ario_araddr(araddr),
         .io_ario_arlen(arlen),
         .io_ario_arsize(arsize),
