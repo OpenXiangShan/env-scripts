@@ -111,8 +111,8 @@ assign sys_clk_i = sys_clk_in;
 `elsif NO_DIFF
 assign sys_clk_i = sys_clk_in;
 `else
-// Match the ungated branch to the CPU's clock-gate buffer.
-BUFG bufg_ref_clk (
+// Keep this branch beside the CPU gate through clock-buffer optimization.
+(* DONT_TOUCH = "true" *) BUFG bufg_ref_clk (
     .I (sys_clk_in),
     .O (sys_clk_i)
 );
