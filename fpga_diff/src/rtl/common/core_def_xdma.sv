@@ -19,7 +19,8 @@ module core_def (
       output                                     init_calib_complete,
       output                                     cpu_rd_qspi_valid,
       output                                     cpu_wr_ddr_valid,
-      input                                      sys_clk_in,
+      input                                      sys_clk_in, // Divider output for the CPU gate.
+      input                                      sys_clk_i,  // Buffered reference and peripheral clock.
       input                                      dev_clk_i,
       input                                      sys_rstn,
       input                                      cpu_rstn,
@@ -104,19 +105,6 @@ module core_def (
       //input           [53-1:0]                   pad_c                        ,
       input                                      dft_crg_rst_n
 );
-
-wire sys_clk_i;
-`ifdef UVHS
-assign sys_clk_i = sys_clk_in;
-`elsif NO_DIFF
-assign sys_clk_i = sys_clk_in;
-`else
-// Keep this branch beside the CPU gate through clock-buffer optimization.
-(* DONT_TOUCH = "true" *) BUFG bufg_ref_clk (
-    .I (sys_clk_in),
-    .O (sys_clk_i)
-);
-`endif
 
 // Unbind useless output port {{{
 assign cpu_rd_qspi_valid = 0;

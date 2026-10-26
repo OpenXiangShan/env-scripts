@@ -84,6 +84,13 @@ The UART uses the existing `clk5_p` device clock and synchronized reset,
 fixed at 50MHz regardless of the CPU frequency. UVHS keeps its existing
 clock configuration.
 
+In Vivado, the divider feeds sibling global buffers: a preserved BUFG
+supplies the always-running reference, peripheral and top-level reset
+logic, while the DiffTest BUFGCE gates only the CPU. NO_DIFF keeps the
+reference BUFG and uses its clock directly. The core_def `sys_clk_in`
+port carries the divider output for the gate; `sys_clk_i` carries the
+buffered reference clock, including the optional XDMA ILA clock.
+
 fpga-host environment
 =====================
 

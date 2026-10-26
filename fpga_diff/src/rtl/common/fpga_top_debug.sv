@@ -117,7 +117,7 @@ wire vio_sw5;
 wire vio_sw4;
 wire sys_rstn;
 wire cpu_setn_buf;
-wire sys_clk_i, dev_clk_i;
+wire sys_clk_in, sys_clk_i, dev_clk_i;
 wire sys_rstn_to_core;
 wire cpu_rstn_to_core;
 wire ddr_rstn_to_core;
@@ -244,7 +244,8 @@ IBUFDS_GTE4 refclk2_ibuf (
 `endif
 
 `ifdef UVHS
-assign        sys_clk_i = dbg_clk_buf;
+assign        sys_clk_in = dbg_clk_buf;
+assign        sys_clk_i = sys_clk_in;
 `else
 // Divide the 200MHz board clock; Vivado derives its clock constraint.
 BUFGCE_DIV #(
@@ -252,9 +253,15 @@ BUFGCE_DIV #(
 ) bufg_core_clk
 (
     .I              (cqetmclk),
-    .O              (sys_clk_i),
+    .O              (sys_clk_in),
     .CE             (1'b1),
     .CLR            (1'b0)
+);
+
+// Buffer every always-running consumer beside the CPU backpressure gate.
+(* DONT_TOUCH = "true" *) BUFG bufg_ref_clk (
+    .I              (sys_clk_in),
+    .O              (sys_clk_i)
 );
 `endif
 `ifdef UVHS
@@ -390,7 +397,8 @@ core_def core_def
   .init_calib_complete  (led3),
   .cpu_rd_qspi_valid    (led2),
   .cpu_wr_ddr_valid     (led0),
-  .sys_clk_in           (sys_clk_i),
+  .sys_clk_in           (sys_clk_in),
+  .sys_clk_i            (sys_clk_i),
   .dev_clk_i            (dev_clk_i),
   .sys_rstn             (sys_rstn_to_core),
   .cpu_rstn             (cpu_rstn_to_core),
