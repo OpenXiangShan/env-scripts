@@ -43,9 +43,9 @@ override PRJ_NAME := fpga_$(FPGA_BACKEND)_$(CPU)$(if $(strip $(SUFFIX)),-$(strip
 export PRJ_NAME
 FPGA_DISPATCH_TARGETS := project bitstream stage_bitstream write_bitstream halt_soc \
 	write_ddr write_flash reset_cpu runtime_status runtime_stop \
-	ila_arm ila_upload ila_clear host_env
+	ila_arm ila_upload ila_clear
 
-.PHONY: $(FPGA_DISPATCH_TARGETS) check_project_name pcie_remove pcie_rescan
+.PHONY: $(FPGA_DISPATCH_TARGETS) host_env check_project_name pcie_remove pcie_rescan
 
 check_project_name:
 	@case "$$PRJ_NAME" in \
@@ -61,6 +61,21 @@ $(FPGA_DISPATCH_TARGETS): check_project_name
 		exit 2; \
 	}
 	+@$(MAKE) --no-print-directory $(FPGA_BACKEND)_$@
+
+# The relay endpoint is independent of the UART/programming runtime host.
+host_env: check_project_name
+	@test -n "$(filter $(FPGA_BACKEND),$(SUPPORTED_FPGA_BACKENDS))" || { \
+		echo "ERROR: FPGA_BACKEND must be one of: $(SUPPORTED_FPGA_BACKENDS)" >&2; \
+		exit 2; \
+	}
+	@XDMA_RELAY_BOARD="$(XDMA_RELAY_BOARD)" \
+		XDMA_RELAY_DAEMON="$(XDMA_RELAY_DAEMON)" \
+		XDMA_RELAY_LISTEN="$(XDMA_RELAY_LISTEN)" \
+		XDMA_RELAY_PORT="$(XDMA_RELAY_PORT)" \
+		XDMA_RELAY_ZSTD="$(or $(XDMA_RELAY_ZSTD),0)" \
+		DIFFTEST_HOSTIF="$(DIFFTEST_HOSTIF)" \
+		bash "$(CURDIR)/tools/xdma_relay_env.sh" \
+		$(MAKE) --no-print-directory "$(FPGA_BACKEND)_host_env"
 
 pcie_remove:
 	bash "$(CURDIR)/tools/pcie-remove.sh"
