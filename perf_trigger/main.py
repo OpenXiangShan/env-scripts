@@ -62,7 +62,7 @@ SERVER_POOL = [
 ]
 
 HEARTBEAT_INTERVAL = 60
-PROFILE_DIR = Path(__file__).parent / "profile"
+PROFILE_DIR = Path(__file__).parent / "profile" / "data"
 
 RETRY_LIMIT = 3
 
