@@ -38,7 +38,7 @@ if (( $# )); then backend_env=$("$@"); eval "$backend_env"; fi
 backend_cleanup=${FPGA_HOST_CLEANUP_CMD-:}
 session=$(mktemp -d "${TMPDIR:-/tmp}/fpga-xdma-relay.XXXXXXXX")
 chmod 700 "$session"
-script=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)/xdma_relay_env.sh
+script=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)/host_env.sh
 cleanup() {
   bash "$script" --cleanup "$session"
   eval "$backend_cleanup"
