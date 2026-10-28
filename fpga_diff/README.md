@@ -103,4 +103,4 @@ inputs, build stages, runtime commands, and the XDMA host refresh required for
 each runtime download.
 
 For optional remote XDMA sessions, use the separate relay_host_env target.
-See [the relay feature](relay/README.md) for setup and cleanup.
+See [the relay feature](tools/relay/README.md) for setup and cleanup.

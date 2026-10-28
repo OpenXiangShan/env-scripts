@@ -42,7 +42,7 @@ are in XDMA_RELAY_LOG until cleanup; copy the log before cleanup if needed.
 The existing host_env target never starts a relay, even when relay variables
 are set. Select this feature explicitly through relay_host_env or the script.
 
-The standalone relay/host_env.sh entrypoint accepts the same variables
+The standalone tools/relay/host_env.sh entrypoint accepts the same variables
 and prints sourceable settings without ILA/UART setup. Use it when a caller
 already manages the runtime. Existing hardware reset and workload-loading
 ordering still applies; this helper does not program or reset the FPGA.
@@ -52,14 +52,14 @@ host (replace the illustrative address and executable path):
     eval "$(XDMA_RELAY_BOARD=fpga \
       XDMA_RELAY_DAEMON=/opt/difftest/fpga-xdma-relay \
       XDMA_RELAY_LISTEN=192.0.2.10 XDMA_RELAY_PORT=55273 \
-      bash relay/host_env.sh)"
+      bash tools/relay/host_env.sh)"
     trap "${FPGA_HOST_CLEANUP_CMD:-:}" EXIT
     /path/to/fpga-host ...
 
 ## Integration boundary
 
 `relay.mk`, `host_env.sh` and this document contain the complete relay feature.
-The main FPGA Makefile only includes `relay.mk`. The `relay_host_env` target
+The main FPGA Makefile only includes `tools/relay/relay.mk`. The `relay_host_env` target
 wraps the existing backend-neutral `host_env` target and composes its cleanup
 hook. Vivado/UVHS targets and their UART, ILA and DDR setup do not depend on
 relay. `XDMA_RELAY_BOARD` is required for the explicit relay target.

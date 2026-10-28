@@ -16,7 +16,6 @@ if [[ ${1-} == --cleanup ]]; then
 fi
 board=${XDMA_RELAY_BOARD-}
 if [[ -z $board ]]; then
-  if (( $# )); then exec "$@"; fi
   echo 'ERROR: XDMA_RELAY_BOARD is required' >&2
   exit 2
 fi

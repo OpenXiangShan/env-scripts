@@ -2,9 +2,6 @@ XDMA_RELAY_DIR := $(abspath $(dir $(lastword $(MAKEFILE_LIST))))
 
 .PHONY: relay_host_env
 relay_host_env:
-	@test -n "$(XDMA_RELAY_BOARD)" || { \
-		echo "ERROR: XDMA_RELAY_BOARD is required for relay_host_env" >&2; exit 2; \
-	}
 	@XDMA_RELAY_BOARD="$(XDMA_RELAY_BOARD)" \
 		XDMA_RELAY_DAEMON="$(XDMA_RELAY_DAEMON)" \
 		XDMA_RELAY_LISTEN="$(XDMA_RELAY_LISTEN)" \
