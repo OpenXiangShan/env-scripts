@@ -101,3 +101,6 @@ make uvhs CPU=<design> CORE_DIR=/path/to/release/build SUFFIX=<tag>
 See [`uvhs/README.md`](uvhs/README.md) for the board-template and vendor-DDR
 inputs, build stages, runtime commands, and the XDMA host refresh required for
 each runtime download.
+
+For optional remote XDMA sessions, use the separate relay_host_env target.
+See [the relay feature](tools/relay/README.md) for setup and cleanup.
