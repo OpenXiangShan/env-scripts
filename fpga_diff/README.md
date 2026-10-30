@@ -67,47 +67,27 @@ case 3: With fpga-host (diff mode)
 Clock configuration
 ===================
 
-For Vivado, the CPU clock uses `BUFGCE_DIV` to divide `clk6_p` (200MHz).
-`FPGA_CORE_CLK_MHZ` selects the physical frequency: 25, 40, 50 or 100MHz
-(divide by 8, 5, 4 or 2). Other values are rejected during project creation.
-`TIMING_CORE_CLK_MHZ` independently selects the CPU/reference timing frequency
-from the same values. Defaults depend on the CPU target:
+Vivado accepts 25, 40, 50 or 100MHz for both parameters:
 
-| CPU | Physical clock | Timing target |
-|-----|----------------|---------------|
-| `nutshell`, `boom` | 100MHz | Follows `FPGA_CORE_CLK_MHZ` (100MHz by default) |
-| XiangShan (`kmh`, `nanhu`, `dualcore`) | 50MHz | 25MHz |
+| Parameter | Controls |
+|-----------|----------|
+| `FPGA_CORE_CLK_MHZ` | Physical CPU frequency |
+| `TIMING_CORE_CLK_MHZ` | CPU/reference timing target |
 
-BOOM selection requires the BOOM target support from its separate integration.
-Explicit Make values override these defaults; blank values use the defaults.
-`vivado/vivado.mk` declares and exports both Make variables to Vivado's Tcl.
-When they match, Vivado derives the divided clock constraint from the primitive.
-An override changes only the generated timing clock, preserving the divider's
-duty cycle. The board input remains constrained at 200MHz and UART at 50MHz.
-With DiffTest enabled, the divided clock feeds a BUFG for the always-running
-reference/peripheral branch and the existing BUFGCE for the gated CPU branch.
+| CPU | Physical default | Timing default |
+|-----|------------------|----------------|
+| `nutshell`, `boom` | 100MHz | Follows `FPGA_CORE_CLK_MHZ` |
+| `kmh`, `nanhu`, `dualcore` | 50MHz | 25MHz |
+
+Explicit values override the defaults; empty values use the defaults.
+UART remains at 50MHz. Recreate the project after changing either parameter.
 
 ```shell
-make bitstream CPU=nutshell CORE_DIR=/path/to/release/build FPGA_CORE_CLK_MHZ=100
-
-# Physically run at 100MHz; analyze CPU/reference timing at 50MHz.
 make bitstream CPU=nutshell CORE_DIR=/path/to/release/build \
   FPGA_CORE_CLK_MHZ=100 TIMING_CORE_CLK_MHZ=50
 ```
 
-Passing a slower timing target does not establish timing closure at the
-physical frequency. Recreate the project when changing either variable.
-
-The UART uses the existing `clk5_p` device clock and synchronized reset,
-fixed at 50MHz regardless of the CPU frequency. UVHS keeps its existing
-clock configuration.
-
-In Vivado, the divider feeds sibling global buffers: a preserved BUFG
-supplies the always-running reference, peripheral and top-level reset
-logic, while the DiffTest BUFGCE gates only the CPU. NO_DIFF keeps the
-reference BUFG and uses its clock directly. The core_def `cpu_clk_src_i`
-port carries the divider output for the gate; `ref_clk_i` carries the
-buffered reference clock, including the optional XDMA ILA clock.
+A slower timing target does not establish closure at the physical frequency.
 
 fpga-host environment
 =====================
