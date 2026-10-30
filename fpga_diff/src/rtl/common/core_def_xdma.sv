@@ -19,7 +19,8 @@ module core_def (
       output                                     init_calib_complete,
       output                                     cpu_rd_qspi_valid,
       output                                     cpu_wr_ddr_valid,
-      input                                      sys_clk_i,
+      input                                      cpu_clk_src_i, // Divider output for the CPU gate.
+      input                                      ref_clk_i,     // Buffered reference and peripheral clock.
       input                                      dev_clk_i,
       input                                      sys_rstn,
       input                                      cpu_rstn,
@@ -1029,7 +1030,7 @@ wire        uvhs_flash_axi_rvalid;
 wire        uvhs_flash_axi_rready;
 
 uvw_general_bus U_UVHS_FLASH_GBUS (
-    .dut_axi_aclk      (sys_clk_i),
+    .dut_axi_aclk      (ref_clk_i),
     .dut_axi_aclk_en   (1'b1),
     .dut_axi_aresetn   (axi_bclk_sync_rstn),
     .dut_axi_awid      (uvhs_flash_axi_awid),
@@ -1080,7 +1081,7 @@ uvw_general_bus U_UVHS_FLASH_GBUS (
 blk_mem_gen_0 u_rom (
   .rsta_busy      (rsta_busy          ),
   .rstb_busy      (rstb_busy          ),
-  .s_aclk         (sys_clk_i          ),
+  .s_aclk         (ref_clk_i          ),
   .s_aresetn      (axi_bclk_sync_rstn ),
   .s_axi_awaddr   (rom_axi_awaddr     ),
   .s_axi_awlen    (rom_axi_awlen      ),
@@ -1319,7 +1320,7 @@ wire [0:0]    br2cfg_wvalid;
   // shared core keeps one DiffTest host instance for every CPU family.  XDMA
   // and GBus stay compile-time exclusive owners of their inbound masters.
   uvhs_gbus_host_wrapper U_GBUS_HOST (
-      .sys_clk_i                        (sys_clk_i),
+      .sys_clk_i                        (ref_clk_i),
       .sys_rstn                         (sys_rstn),
       .gbus_host_clk                    (gbus_host_clk),
       .rstn_sw4                         (rstn_sw4),
@@ -1361,7 +1362,7 @@ wire [0:0]    br2cfg_wvalid;
   wire [2:0] xdma_axil_arprot;
   wire _unused_xdma_axil_prot = &{1'b0, xdma_axil_awprot, xdma_axil_arprot};
   xdma_ep xdma_ep_i(
-    .cpu_clk              (sys_clk_i),
+    .cpu_clk              (ref_clk_i),
     .cpu_rstn             (sys_rstn),
     .S00_AXIS_0_tdata     (difftest_to_host_axis_tdata),
     .S00_AXIS_0_tkeep     (difftest_to_host_axis_tkeep),
@@ -1407,7 +1408,7 @@ wire [0:0]    br2cfg_wvalid;
 `endif
 
   DifftestClockGate SOC_CLK_CTRL(
-      .CK  (sys_clk_i),
+      .CK  (cpu_clk_src_i),
       .E   (difftest_clock_gate_enable),
       .Q   (inter_soc_clk)
   );
@@ -1433,14 +1434,14 @@ wire [0:0]    br2cfg_wvalid;
   wire sys_rstn_io;
   wire cpu_rstn_io;
 
-  assign inter_soc_clk = sys_clk_i;
+  assign inter_soc_clk = ref_clk_i;
   assign inter_rtc_clk = tmclk;
   assign sys_rstn_io = sys_rstn;
   assign cpu_rstn_io = cpu_rstn;
 `endif
 
 xilnx_crg xilnx_crg(
-   .sys_clk                         (sys_clk_i                     ),
+   .sys_clk                         (ref_clk_i                     ),
    .dev_clk                         (dev_clk_i                     ),
    .tmclk                           (tmclk                         ),
    .cqetmclk                        (cqetmclk                      ),
@@ -1508,7 +1509,7 @@ assign cpu2ddr_s2m_rid = {4'b0, uvhs_ddr_rid};
 assign init_calib_complete = rstn_sw4 & ~uvhs_ddr_user_rst;
 
 uvw_axi4_to_ddr4 U_UVHS_UVW_AXI4_TO_DDR4 (
-    .ddr4ip_dut_axi_aclk       (sys_clk_i),
+    .ddr4ip_dut_axi_aclk       (ref_clk_i),
     .ddr4ip_dut_axi_aresetn    (rstn_sw4),
     .ddr4ip_dut_axi_awaddr     (uvhs_ddr_awaddr),
     .ddr4ip_dut_axi_awburst    (cpu2ddr_m2s_awburst),
@@ -1687,7 +1688,7 @@ SimTop_wrapper U_CPU_TOP(
     .difftest_from_host_axis_tkeep   (difftest_from_host_axis_tkeep),
     .difftest_from_host_axis_tlast   (difftest_from_host_axis_tlast),
     .difftest_clock_enable           (difftest_clock_enable),
-    .difftest_ref_clock              (sys_clk_i),
+    .difftest_ref_clock              (ref_clk_i),
     .difftest_ref_reset              (~sys_rstn),
     .difftest_hostCtrl_reset         (io_host_reset),
     .difftest_hostCtrl_diffEnable    (io_host_diff_enable),
@@ -1891,10 +1892,10 @@ AXI_bridge CFG_AXI_bridge_i
        (.SYS_INTER_CLK          (inter_soc_clk),
 `ifdef UVHS
         .SYS_INTER_ARESETN      (inter_soc_sync_rstn),
+`endif
         .UART_ACLK              (uart_sclk),
         .UART_ARESETN           (uart_sclk_sync_rstn),
-`endif
-        .ACLK                   (sys_clk_i),
+        .ACLK                   (ref_clk_i),
         .ARESETN                (axi_bclk_sync_rstn),
 
         .S00_AXI_araddr         (cpu2cfg_m2s_araddr),

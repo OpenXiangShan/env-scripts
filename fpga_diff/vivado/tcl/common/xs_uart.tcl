@@ -19,7 +19,7 @@
 # Check file required for this script exists
 
 set cpu "kmh"
-set cpu_candidates [list "kmh" "nanhu" "dualcore" "nutshell" "boom"]
+set cpu_candidates [list "kmh" "nanhu" "nutshell" "boom"]
 set cpu_files_tcl ""
 set project_dir ""
 set vivado_version ""
@@ -108,7 +108,7 @@ if { $::argc > 0 } {
   for {set i 0} {$i < $::argc} {incr i} {
     set option [string trim [lindex $::argv $i]]
     switch -regexp -- $option {
-      "--cpu"          { incr i; set cpu [lindex $::argv $i] }
+      "^--cpu$"        { incr i; set cpu [lindex $::argv $i] }
       "--origin_dir"   { incr i; set origin_dir [lindex $::argv $i] }
       "--project_name" { incr i; set _xil_proj_name_ [lindex $::argv $i] }
       "--project_dir"  { incr i; set project_dir [lindex $::argv $i] }

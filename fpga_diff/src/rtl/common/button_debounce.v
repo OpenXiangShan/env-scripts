@@ -1,4 +1,6 @@
-module button_debounce(
+module button_debounce #(
+     parameter CLK_FREQ_MHZ = 50
+)(
      input            clk,
 	 input            rstn,
      input            button_i,
@@ -54,7 +56,7 @@ always@(*) begin
           else
               nxt_state = IDLE;
       FILTER:
-	  if(counter==20'h7a120)   // 10ms 50MHz
+	  if(counter==CLK_FREQ_MHZ * 10000)   // 10ms
               nxt_state = CHECK_IN;
           else
 	      nxt_state = FILTER;
@@ -69,7 +71,7 @@ always@(*) begin
            else
              nxt_state = STAYLOW;
       FILTER_O:
-	  if(counter==20'h7a120)
+	  if(counter==CLK_FREQ_MHZ * 10000)
 		  nxt_state = CHECK_OUT;
 	  else
 		  nxt_state = FILTER_O;
