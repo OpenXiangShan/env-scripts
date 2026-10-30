@@ -23,13 +23,13 @@ fi
   echo 'ERROR: XDMA relay requires DIFFTEST_HOSTIF=XDMA' >&2; exit 2;
 }
 listen=${XDMA_RELAY_LISTEN-}
-port=${XDMA_RELAY_PORT-}
-daemon=${XDMA_RELAY_DAEMON-}
-[[ -n $listen && $port =~ ^[0-9]+$ && $port -ge 1 && $port -le 65535 && $daemon == /* ]] || {
-  echo 'ERROR: set XDMA_RELAY_LISTEN, XDMA_RELAY_PORT (1..65535), and an absolute XDMA_RELAY_DAEMON' >&2
+port=${XDMA_RELAY_PORT:-55273}
+daemon=${XDMA_RELAY_DAEMON:-fpga-xdma-relay}
+[[ $port =~ ^[0-9]+$ && $port -ge 1 && $port -le 65535 ]] || {
+  echo 'ERROR: XDMA_RELAY_PORT must be 1..65535' >&2
   exit 2
 }
-[[ ${XDMA_RELAY_ZSTD-0} == 0 || ${XDMA_RELAY_ZSTD-0} == 1 ]] || {
+[[ ${XDMA_RELAY_ZSTD:-1} == 0 || ${XDMA_RELAY_ZSTD:-1} == 1 ]] || {
   echo 'ERROR: XDMA_RELAY_ZSTD must be 0 or 1' >&2; exit 2;
 }
 backend_env=
@@ -72,7 +72,15 @@ trap 'exit 1' HUP INT TERM
 read -r token
 printf '%s\n' "$token" > "$session/token"
 unset token
-[[ -x $1 ]] || { echo 'ERROR: relay daemon is not executable' >&2; exit 2; }
+daemon=$(command -v -- "$1") && [[ -x $daemon ]] || {
+  echo 'ERROR: relay daemon is not executable or not in PATH' >&2; exit 2;
+}
+connect=$2
+if [[ -z $connect ]]; then
+  connect=${SSH_CONNECTION-}
+  connect=${connect%% *}
+fi
+[[ -n $connect ]] || { echo 'ERROR: set XDMA_RELAY_LISTEN for the board connection' >&2; exit 2; }
 command -v fuser >/dev/null || { echo 'ERROR: fuser is required on the XDMA board host' >&2; exit 2; }
 for device in /dev/xdma0_user /dev/xdma0_h2c_* /dev/xdma0_c2h_*; do
   [[ -e $device ]] || continue
@@ -80,10 +88,11 @@ for device in /dev/xdma0_user /dev/xdma0_h2c_* /dev/xdma0_c2h_*; do
     echo "ERROR: XDMA device is already in use: $device" >&2; exit 2
   fi
 done
-args=(--connect "$2" --port "$3" --token-file "$session/token")
+args=(--connect "$connect" --port "$3" --token-file "$session/token")
 [[ $4 == 0 ]] || args+=(--zstd)
-"$1" "${args[@]}" &
+"$daemon" "${args[@]}" &
 pid=$!
+printf 'LISTEN=%s\n' "$connect"
 printf 'READY\n'
 # A failed daemon releases its session even if the compute host never starts.
 while kill -0 "$pid" 2>/dev/null; do
@@ -94,7 +103,7 @@ done
 REMOTE
 )
 printf -v remote_command 'bash -c %q -- %q %q %q %q' \
-  "$remote_script" "$daemon" "$listen" "$port" "${XDMA_RELAY_ZSTD-0}"
+  "$remote_script" "$daemon" "$listen" "$port" "${XDMA_RELAY_ZSTD:-1}"
 # Keep stdin open until cleanup writes stop; never detach the daemon.
 exec 3<> "$session/control"
 cat "$session/token" >&3
@@ -123,6 +132,9 @@ if ! grep -qx READY "$session/daemon.log"; then
   echo 'ERROR: timed out starting XDMA relay over SSH' >&2
   kill "$ssh_pid" 2>/dev/null || true
   exit 1
+fi
+if [[ -z $listen ]]; then
+  listen=$(sed -n 's/^LISTEN=//p' "$session/daemon.log")
 fi
 printf '%s\n' "$backend_env"
 printf 'export XDMA_RELAY_LISTEN=%q\n' "$listen"
