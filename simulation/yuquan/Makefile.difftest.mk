@@ -1,11 +1,11 @@
 # YuQuan memory-controller backend for difftest.
 
 YUQUAN_ADAPTER_HOME ?= $(abspath $(DESIGN_DIR)/env-scripts/simulation/yuquan)
+YUQUAN_RTL_DIR ?= $(abspath $(DESIGN_DIR)/scripts/yuquan/rtl)
 ifeq ($(WITH_EXTERNAL_MEMORY_BACKEND),1)
-ifeq ($(wildcard $(YUQUAN_ADAPTER_HOME)/rtl/ddr_wrapper_yuquan.sv),)
-$(error YUQUAN_ADAPTER_HOME is invalid: $(YUQUAN_ADAPTER_HOME))
+ifeq ($(wildcard $(YUQUAN_RTL_DIR)/ddr_wrapper_yuquan.sv),)
+$(error YUQUAN_RTL_DIR is invalid: $(YUQUAN_RTL_DIR))
 endif
-YUQUAN_RTL_DIR = $(YUQUAN_ADAPTER_HOME)/rtl
 YUQUAN_HOME ?= $(abspath $(DESIGN_DIR)/YuQuan)
 YUQUAN_BUILD_DIR = $(YUQUAN_HOME)/build
 YUQUAN_VSRC = $(shell find $(YUQUAN_BUILD_DIR) \( -name "*.v" -o -name "*.sv" \) 2> /dev/null)
