@@ -6,11 +6,13 @@ Build the companion daemon with make fpga-xdma-relay in DiffTest (no generated
 CPU profile required), and install it on the board host. The compute executable
 must also include the matching relay implementation.
 
-Use the separate `relay_host_env` target on the compute host with these settings:
+Use the separate `relay_host_env` target on the compute host. Only
+`XDMA_RELAY_BOARD` is required; the other settings have these defaults and can
+be overridden through environment variables:
 
     XDMA_RELAY_BOARD=<xdma-board-ssh-alias>
-    XDMA_RELAY_DAEMON=/absolute/board/path/fpga-xdma-relay
-    XDMA_RELAY_LISTEN=<compute-ipv4-address>
+    XDMA_RELAY_DAEMON=fpga-xdma-relay
+    XDMA_RELAY_LISTEN=  # derive the compute IPv4 address from SSH
     XDMA_RELAY_PORT=55273
     XDMA_RELAY_ZSTD=1
 
@@ -21,11 +23,14 @@ optional UART; these endpoints may be the same machine but are independent.
 Use BIND_UART=0 if UART is already captured separately. Both Vivado and UVHS
 relay_host_env support the relay; DIFFTEST_HOSTIF must be XDMA.
 
-XDMA_RELAY_LISTEN must be an IPv4 address reachable from the board host.
+By default both hosts use the compute IPv4 address reported by the board's
+`SSH_CONNECTION`. Set `XDMA_RELAY_LISTEN` to a reachable compute IPv4 address
+when using a jump host.
 XDMA_RELAY_PORT is the compute-side listening port. Board-to-compute TCP carries
-the data, while SSH starts and supervises the daemon. XDMA_RELAY_DAEMON is an
-absolute executable path on the board host. XDMA_RELAY_ZSTD=1 enables optional
-C2H compression; its default is raw. SSH uses noninteractive authentication.
+the data, while SSH starts and supervises the daemon. XDMA_RELAY_DAEMON is found
+in the board host's PATH, or accepts an explicit executable path.
+C2H compression is enabled by default; set XDMA_RELAY_ZSTD=0 for raw data.
+SSH uses noninteractive authentication.
 
 Startup checks existing XDMA device users with board-side fuser. Coordinate
 board ownership externally as usual; this check is not a hardware lock.
