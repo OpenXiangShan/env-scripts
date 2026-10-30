@@ -68,17 +68,35 @@ Clock configuration
 ===================
 
 For Vivado, the CPU clock uses `BUFGCE_DIV` to divide `clk6_p` (200MHz).
-`FPGA_CORE_CLK_MHZ` defaults to 50; supported values are 25, 40, 50 and 100
-(divide by 8, 5, 4 and 2). Other values are rejected during project creation.
-`vivado/vivado.mk` declares and exports this Make variable to Vivado's Tcl.
-Vivado derives the divided clock constraint from the primitive; `fpga.xdc`
-constrains the board inputs at their actual frequencies.
+`FPGA_CORE_CLK_MHZ` selects the physical frequency: 25, 40, 50 or 100MHz
+(divide by 8, 5, 4 or 2). Other values are rejected during project creation.
+`TIMING_CORE_CLK_MHZ` independently selects the CPU/reference timing frequency
+from the same values. Defaults depend on the CPU target:
+
+| CPU | Physical clock | Timing target |
+|-----|----------------|---------------|
+| `nutshell`, `boom` | 100MHz | Follows `FPGA_CORE_CLK_MHZ` (100MHz by default) |
+| XiangShan (`kmh`, `nanhu`, `dualcore`) | 50MHz | 25MHz |
+
+BOOM selection requires the BOOM target support from its separate integration.
+Explicit Make values override these defaults; blank values use the defaults.
+`vivado/vivado.mk` declares and exports both Make variables to Vivado's Tcl.
+When they match, Vivado derives the divided clock constraint from the primitive.
+An override changes only the generated timing clock, preserving the divider's
+duty cycle. The board input remains constrained at 200MHz and UART at 50MHz.
 With DiffTest enabled, the divided clock feeds a BUFG for the always-running
 reference/peripheral branch and the existing BUFGCE for the gated CPU branch.
 
 ```shell
 make bitstream CPU=nutshell CORE_DIR=/path/to/release/build FPGA_CORE_CLK_MHZ=100
+
+# Physically run at 100MHz; analyze CPU/reference timing at 50MHz.
+make bitstream CPU=nutshell CORE_DIR=/path/to/release/build \
+  FPGA_CORE_CLK_MHZ=100 TIMING_CORE_CLK_MHZ=50
 ```
+
+Passing a slower timing target does not establish timing closure at the
+physical frequency. Recreate the project when changing either variable.
 
 The UART uses the existing `clk5_p` device clock and synchronized reset,
 fixed at 50MHz regardless of the CPU frequency. UVHS keeps its existing
