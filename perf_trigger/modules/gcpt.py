@@ -113,7 +113,7 @@ class GCPT:
             return self.__state
 
         self.__state = GCPT.State.RUNNING
-        with self.stdout_path.open("r", encoding="utf-8") as stdout:
+        with self.stdout_path.open("r", encoding="utf-8", errors="replace") as stdout:
             for line in stdout:
                 if "ABORT at pc" in line or "FATAL:" in line or "Error:" in line:
                     self.__state = GCPT.State.ABORTED
@@ -128,7 +128,7 @@ class GCPT:
         if self.__state != GCPT.State.RUNNING:
             return self.__state
 
-        with self.stderr_path.open("r", encoding="utf-8") as stderr:
+        with self.stderr_path.open("r", encoding="utf-8", errors="replace") as stderr:
             for line in stderr:
                 if "Assertion" in line and "failed" in line:
                     self.__state = GCPT.State.ABORTED
@@ -149,7 +149,7 @@ class GCPT:
             r"\[PERF\s*\]\[time=\s*\d+\] (([a-zA-Z0-9_]+\.)+[a-zA-Z0-9_@]+): ((\w| |\')+),\s+-?(\d+)$"
         )
 
-        with self.stderr_path.open("r", encoding="utf-8") as f:
+        with self.stderr_path.open("r", encoding="utf-8", errors="replace") as f:
             for line in f:
                 m = pattern.match(line)
                 if not m:
@@ -176,7 +176,7 @@ class GCPT:
         return data["clock_cycle"] / data["commitInstr"]
 
     def get_dramsim3_config(self) -> str:
-        with self.stdout_path.open("r", encoding="utf-8") as f:
+        with self.stdout_path.open("r", encoding="utf-8", errors="replace") as f:
             for line in f:
                 if "DRAMSIM3 config:" in line:
                     return line.split("DRAMSIM3 config:")[1].strip()
