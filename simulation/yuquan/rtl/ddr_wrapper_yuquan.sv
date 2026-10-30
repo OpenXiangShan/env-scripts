@@ -329,7 +329,7 @@ module ddr_wrapper (
             5'd0:  apb_init_cmd = apb_init_write(12'h000, 32'h1082_2516);
             5'd1:  apb_init_cmd = apb_init_write(12'h004, 32'h0408_040c);
             5'd2:  apb_init_cmd = apb_init_write(12'h008, 32'h0a18_0c34);
-            5'd3:  apb_init_cmd = apb_init_write(12'h014, 32'h0800_020a);
+            5'd3:  apb_init_cmd = apb_init_write(12'h014, 32'h0400_0105);
             5'd4:  apb_init_cmd = apb_init_write(12'h028, 32'h0014_1008);
             5'd5:  apb_init_cmd = apb_init_write(12'h01c, 32'h0000_0001);
             5'd6:  apb_init_cmd = apb_init_write(12'h010, 32'h0001_5e80);
