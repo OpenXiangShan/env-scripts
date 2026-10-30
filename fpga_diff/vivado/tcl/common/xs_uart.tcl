@@ -19,7 +19,7 @@
 # Check file required for this script exists
 
 set cpu "kmh"
-set cpu_candidates [list "kmh" "nanhu" "dualcore" "nutshell" "boom"]
+set cpu_candidates [list "kmh" "nanhu" "nutshell" "boom"]
 set cpu_files_tcl ""
 set project_dir ""
 set vivado_version ""

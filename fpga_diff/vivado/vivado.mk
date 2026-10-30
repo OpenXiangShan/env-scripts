@@ -6,13 +6,12 @@ PRJ_DIR ?= $(ENV_SCRIPTS_HOME)/$(PRJ_NAME)
 PRJ ?= $(PRJ_DIR)/$(PRJ_NAME).xpr
 CPU_FILES_TCL ?= $(PRJ_DIR)/cpu_files.tcl
 
-# CPU:physical MHz:timing MHz; omitted timing follows the physical frequency.
+# CPU:physical MHz:timing MHz.
 CORE_CLK_DEFAULTS := \
 	kmh:50:25 \
 	nanhu:50:25 \
-	dualcore:50:25 \
-	nutshell:100 \
-	boom:100
+	nutshell:100:100 \
+	boom:100:100
 CORE_CLK_DEFAULT = $(subst :, ,$(or $(filter $(CPU):%,$(CORE_CLK_DEFAULTS)),$(firstword $(CORE_CLK_DEFAULTS))))
 
 # Host-trigger ILA capture is opt-in. Keep the trigger mark_debug net in RTL,
@@ -57,7 +56,7 @@ update_core_flist:
 
 vivado: check_vivado_version
 	FPGA_CORE_CLK_MHZ="$(or $(strip $(FPGA_CORE_CLK_MHZ)),$(word 2,$(CORE_CLK_DEFAULT)))" \
-	TIMING_CORE_CLK_MHZ="$(or $(strip $(TIMING_CORE_CLK_MHZ)),$(word 3,$(CORE_CLK_DEFAULT)),$(strip $(FPGA_CORE_CLK_MHZ)),$(word 2,$(CORE_CLK_DEFAULT)))" \
+	TIMING_CORE_CLK_MHZ="$(or $(strip $(TIMING_CORE_CLK_MHZ)),$(word 3,$(CORE_CLK_DEFAULT)))" \
 	vivado -mode batch -source "$(VIVADO_TCL_DIR)/common/xs_uart.tcl" \
 		-tclargs --origin_dir "$(VIVADO_ROOT_DIR)" --cpu $(CPU) \
 		--project_name $(PRJ_NAME) --project_dir "$(PRJ_DIR)" \
