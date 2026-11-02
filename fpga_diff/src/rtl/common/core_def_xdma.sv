@@ -1290,14 +1290,14 @@ wire [0:0]    br2cfg_wvalid;
   assign cpu_rstn_io = cpu_rstn & ~io_host_reset;
 `ifdef DIFFTEST_HOST_GBUS
 `ifdef CPU_NUTSHELL
-  wire uvhs_memory_cpu_mode, uvhs_memory_session_resetn;
+  wire uvhs_memory_cpu_mode;
   uvhs_difftest_memory_control U_GBUS_MEMORY_CONTROL (
       .clk(sys_clk_i), .rstn(rstn_sw4 & sys_rstn),
       .awaddr(difftest_cfg_axilite_awaddr),
       .awvalid(difftest_cfg_axilite_awvalid), .awready(difftest_cfg_axilite_awready),
       .wdata(difftest_cfg_axilite_wdata), .wstrb(difftest_cfg_axilite_wstrb),
       .wvalid(difftest_cfg_axilite_wvalid), .wready(difftest_cfg_axilite_wready),
-      .cpu_mode(uvhs_memory_cpu_mode), .session_resetn(uvhs_memory_session_resetn)
+      .cpu_mode(uvhs_memory_cpu_mode)
   );
 `endif
 `endif

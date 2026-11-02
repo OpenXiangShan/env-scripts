@@ -11,11 +11,15 @@ assign init_calib_complete = rstn_sw4 & ~uvhs_ddr_user_rst_synced;
 `ifdef CPU_NUTSHELL
 // Vendor AXI Data Width Converter, exported as a UVHS checkpoint from
 // src/tcl/common/gbus_ddr_dwc.tcl.  Its master interface carries no ID
-// ports, so the CPU reaches the DDR as a single in-order master and the
-// converter reset follows the DiffTest session reset.
+// ports, so the CPU reaches the DDR as a single in-order master.
+//
+// Reset is fabric-only on purpose: a DiffTest session reset must abandon the
+// producer, never a DDR transaction already issued, so the converter drains
+// whatever burst is in flight.  The CPU is held off by the memory-mode clock
+// gate for the same window.
 gbus_ddr_dwc u_gbus_ddr_dwc (
     .s_axi_aclk     (inter_soc_clk),
-    .s_axi_aresetn  (rstn_sw4 & uvhs_memory_session_resetn),
+    .s_axi_aresetn  (rstn_sw4),
     .s_axi_awid     (cpu2ddr_m2s_awid_mix[13:0]),
     .s_axi_awaddr   ({1'b0, cpu2ddr_m2s_awaddr_mix}),
     .s_axi_awlen    (cpu2ddr_m2s_awlen),
