@@ -13,10 +13,7 @@ proc pin_name {top port} {
 }
 
 set top [uvhs::env_or_default UVHS_ASSIGN_PIN_TOP fpga_top_debug]
-set hostif [string toupper [string trim [uvhs::env_or_default DIFFTEST_HOSTIF XDMA]]]
-if {$hostif ni {GBUS XDMA}} {
-    error "DIFFTEST_HOSTIF must be one of GBUS/XDMA, got '$hostif'"
-}
+set hostif [string toupper [uvhs::env_or_default DIFFTEST_HOSTIF XDMA]]
 set xdma_link_width [string toupper [string trim [uvhs::env_or_default XDMA_LINK_WIDTH X4]]]
 if {$xdma_link_width ni {X4 X8}} {
     error "XDMA_LINK_WIDTH must be one of X4/X8, got '$xdma_link_width'"
