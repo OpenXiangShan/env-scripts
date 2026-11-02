@@ -245,7 +245,7 @@ if {[llength $uvhs_xiangshan_cell] == 1} {
         }
         set uvhs_nutshell_f2_names [concat $uvhs_gbus_host_path_names {
             core_def/U_CPU_TOP
-            core_def/u_uvhs_axi64_to_axi256
+            core_def/u_gbus_ddr_dwc
             core_def/U_GBUS_MEMORY_CONTROL
             core_def/CFG_AXI_bridge_i
             core_def/U_UVHS_FLASH_GBUS
