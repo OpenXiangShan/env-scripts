@@ -9,9 +9,10 @@
 // exclusive and are distinguished only by DIFFTEST_HOST_GBUS /
 // DIFFTEST_HOST_XDMA; nothing here is CPU-family specific.
 //
-// The GBD1 engine consumes the already host-clocked SimTop stream and exposes a
-// read-only frozen bank behind a guarded AXI aperture; H2C and non-bank reads
-// use the physical DDR master.  The register-window (GBS1) transport is gone.
+// The GBD1 engine consumes the already host-clocked SimTop stream and appends
+// complete 768-byte frames to a streaming ring behind a guarded AXI aperture;
+// H2C and non-ring reads use the physical DDR master.  The legacy
+// register-window (GBS1) and frozen-bank transports are gone.
 module uvhs_gbus_host_wrapper (
     input  wire        sys_clk_i,
     input  wire        sys_rstn,
