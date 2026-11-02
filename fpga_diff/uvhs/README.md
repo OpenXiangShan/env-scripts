@@ -32,12 +32,18 @@ generated `SimTop` RTL stays unchanged. The UVHS scripts name the wrapper
 hierarchy in their clock, payload, and partition paths.
 
 GBD1 is the C2H transport: the DiffTest stream is appended frame by frame to a
-261120-byte ring, and the host reads a whole batch of frames with one DMA call
-over the AXI aperture and releases it with a single CONSUME write. Only CONSUME
-moves the read pointer, so the producer never overwrites unread data and a slow
-DMA call costs throughput but never correctness. Backpressure reaches the
-DiffTest sender once the ring is full, while the host transport clock continues
-to run. The matching fpga-host uses the same GBD1 streaming protocol.
+786432-byte (1024-frame) ring, and the host reads a whole batch of frames with
+one DMA call over the AXI aperture and releases it with a single CONSUME write.
+Only CONSUME moves the read pointer, so the producer never overwrites unread
+data and a slow DMA call costs throughput but never correctness.
+
+Ring depth is the CPU-stall budget, not a bandwidth target: backpressure reaches
+the DiffTest sender as soon as the ring is full, so the ring is sized to absorb
+host jitter instead of being trimmed to the average rate. The host drains at
+half-ring occupancy, which leaves the other half as headroom while the batch is
+in flight, and reads status, frame count and both ring pointers from one
+contiguous snapshot (`0x1248..0x1254`) so a batch costs three runtime round
+trips instead of five. The matching fpga-host uses the same GBD1 protocol.
 
 GeneralBD local offsets are below; the host adds its config base (`0x1000`).
 
@@ -47,8 +53,8 @@ GeneralBD local offsets are below; the host adds its config base (`0x1000`).
 | `0x1204` | control: ENABLE=1, ACK=2 (release one frame), clear error=4, DISABLE=8 |
 | `0x1208` | ID `0x47424431` |
 | `0x120c` | frames captured since stream reset |
-| `0x1210` | read aperture base (`0x0ffc0000`) |
-| `0x1214` | ring size (261120 bytes, 340 frames) |
+| `0x1210` | read aperture base (`0x0ff40000`) |
+| `0x1214` | ring size (786432 bytes, 1024 frames) |
 | `0x1218..0x1220` | AXI read evidence: AR address, attributes, count |
 | `0x1224..0x1228` | control evidence: write count, last control value |
 | `0x122c..0x1234` | first rejected control: data, state+valid, ordinal |
@@ -56,6 +62,7 @@ GeneralBD local offsets are below; the host adds its config base (`0x1000`).
 | `0x123c` | complete frames available to the host; write CONSUME frame count |
 | `0x1240` | read pointer (byte offset into the ring) |
 | `0x1244` | write pointer (byte offset into the ring) |
+| `0x1248..0x1254` | contiguous snapshot: status, available frames, read pointer, write pointer |
 | `0x2000..0x22fc` | config mirror of the oldest unread frame |
 
 The mirror covers the first 768 bytes of the oldest unread frame, which is
