@@ -5,6 +5,14 @@ import random
 import sys
 import time
 
+MEMORY_RESERVED_ABS = 20 * 1024 * 1024 * 1024
+MEMORY_RESERVED_RATIO = 0.1
+
+def check_memory():
+    memory = psutil.virtual_memory()
+    reserved = max(memory.total * MEMORY_RESERVED_RATIO, MEMORY_RESERVED_ABS)
+    return memory.available > reserved
+
 def get_numa_count():
     node_dir = pathlib.Path("/sys/devices/system/node/")
     return len(list(node_dir.glob("node*")))
@@ -34,6 +42,9 @@ def get_bound_cores():
     return cores
 
 def detect(n):
+    if not check_memory(): # fail-fast if no enough memory
+        return (False, 0, 0, 0, 0)
+
     numa_count = get_numa_count()
     phy_cores = get_physical_cores() # invariant, get once
     num_core = len(phy_cores)
