@@ -18,9 +18,12 @@
 // the sticky frame_error bit.
 module uvhs_gbus_c2h_dma #(
     parameter integer AXIS_DATA_WIDTH = 256,
-    // 340 frames = 261120 bytes = 255 KiB: the largest multiple of 768 that
-    // fits below 0x0fffffff when the aperture starts at 0x0ffc0000.
-    parameter integer FRAMES = 340
+    // 1024 frames = 786432 bytes = 768 KiB.  The ring is sized for headroom,
+    // not for average bandwidth: producer backpressure is what stalls the CPU
+    // DiffTest stream, so the deeper the ring, the longer a host jitter spike
+    // can be absorbed before s_tready drops.  At 50 MHz / 32 B per beat this
+    // holds 4.8 ms of full-rate production.
+    parameter integer FRAMES = 1024
 ) (
     input wire clk,
     input wire rstn,
@@ -58,7 +61,9 @@ module uvhs_gbus_c2h_dma #(
     output wire s_rvalid,
     input wire s_rready
 );
-  localparam [31:0] APERTURE = 32'h0ffc_0000;
+  // 1024 frames x 768 B = 0xc0000, ending exactly at the 0x1000_0000 top of
+  // port 0.  The host learns both base and size from 0x1210/0x1214.
+  localparam [31:0] APERTURE = 32'h0ff4_0000;
   localparam [31:0] ID_MAGIC = 32'h4742_4431;  // "GBD1"
 
   localparam integer FRAME_BEATS = 24;
@@ -102,7 +107,7 @@ module uvhs_gbus_c2h_dma #(
 
   reg [AXIS_DATA_WIDTH-1:0] stage_mem [0:RING_BEATS-1];
   wire [RING_AW+3:0] wr_prod = wr_phys * BEATS_PER_FRAME;
-  wire [RING_AW-1:0] wr_index = wr_prod[RING_AW-1:0] + {7'b0, wr_beat};
+  wire [RING_AW-1:0] wr_index = wr_prod[RING_AW-1:0] + {{(RING_AW-6){1'b0}}, wr_beat};
 
   always @(posedge clk) begin
     if (take_beat)
@@ -360,6 +365,13 @@ module uvhs_gbus_c2h_dma #(
       16'h123c: cfg_rdata <= available;
       16'h1240: cfg_rdata <= rd_byte;
       16'h1244: cfg_rdata <= wr_byte;
+      // Contiguous snapshot: one grouped config read returns status, frame
+      // count and both ring pointers, so the host drain needs a single runtime
+      // round trip per batch instead of one read per field.
+      16'h1248: cfg_rdata <= status_word;
+      16'h124c: cfg_rdata <= available;
+      16'h1250: cfg_rdata <= rd_byte;
+      16'h1254: cfg_rdata <= wr_byte;
       default: cfg_rdata <= 0;
     endcase
   end
