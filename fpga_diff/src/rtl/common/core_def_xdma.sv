@@ -1005,11 +1005,6 @@ wire [1 : 0]                rom_axi_rresp    ;
 (*mark_debug = "true"*) wire                        rom_axi_rready   ;
 
 `ifdef UVHS
-`ifdef DIFFTEST_HOST_GBUS
-localparam integer UVHS_FLASH_AXI_WIDTH = 256;
-`else
-localparam integer UVHS_FLASH_AXI_WIDTH = 64;
-`endif
 wire [7:0]  uvhs_flash_axi_awid;
 wire [31:0] uvhs_flash_axi_awaddr;
 wire [3:0]  uvhs_flash_axi_awlen;
@@ -1022,8 +1017,13 @@ wire [3:0]  uvhs_flash_axi_awqos;
 wire        uvhs_flash_axi_awvalid;
 wire        uvhs_flash_axi_awready;
 wire [7:0]  uvhs_flash_axi_wid;
-wire [UVHS_FLASH_AXI_WIDTH-1:0] uvhs_flash_axi_wdata;
-wire [UVHS_FLASH_AXI_WIDTH/8-1:0] uvhs_flash_axi_wstrb;
+`ifdef DIFFTEST_HOST_GBUS
+wire [255:0] uvhs_flash_axi_wdata;
+wire [31:0]  uvhs_flash_axi_wstrb;
+`else
+wire [63:0] uvhs_flash_axi_wdata;
+wire [7:0]  uvhs_flash_axi_wstrb;
+`endif
 wire        uvhs_flash_axi_wlast;
 wire        uvhs_flash_axi_wvalid;
 wire        uvhs_flash_axi_wready;
@@ -1043,7 +1043,11 @@ wire [3:0]  uvhs_flash_axi_arqos;
 wire        uvhs_flash_axi_arvalid;
 wire        uvhs_flash_axi_arready;
 wire [7:0]  uvhs_flash_axi_rid;
-wire [UVHS_FLASH_AXI_WIDTH-1:0] uvhs_flash_axi_rdata;
+`ifdef DIFFTEST_HOST_GBUS
+wire [255:0] uvhs_flash_axi_rdata;
+`else
+wire [63:0] uvhs_flash_axi_rdata;
+`endif
 wire [1:0]  uvhs_flash_axi_rresp;
 wire        uvhs_flash_axi_rlast;
 wire        uvhs_flash_axi_rvalid;
@@ -1297,16 +1301,20 @@ wire [0:0]    br2cfg_wvalid;
   );
 `endif
 `endif
-  assign difftest_clock_gate_enable =
-      difftest_clock_enable || ~io_host_diff_enable ||
-      ~sys_rstn_io || ~cpu_rstn_io
 `ifdef DIFFTEST_HOST_GBUS
 `ifdef CPU_NUTSHELL
-      // The exported memory bus multiplexes reference-clock init and CPU traffic.
-      || ~uvhs_memory_cpu_mode
+  // The exported memory bus multiplexes reference-clock init and CPU traffic,
+  // so the CPU clock stays gated while the host owns the DDR.
+  wire difftest_host_ddr_hold = ~uvhs_memory_cpu_mode;
+`else
+  wire difftest_host_ddr_hold = 1'b0;
 `endif
+`else
+  wire difftest_host_ddr_hold = 1'b0;
 `endif
-      ;
+  assign difftest_clock_gate_enable =
+      difftest_clock_enable || ~io_host_diff_enable ||
+      ~sys_rstn_io || ~cpu_rstn_io || difftest_host_ddr_hold;
 
   RST_SYNC #(
       .SYNC_STAGES(3),
@@ -1393,16 +1401,46 @@ wire [0:0]    br2cfg_wvalid;
       .difftest_cfg_axilite_rdata       (difftest_cfg_axilite_rdata),
       .difftest_cfg_axilite_rresp       (difftest_cfg_axilite_rresp),
       .difftest_cfg_axilite_rvalid      (difftest_cfg_axilite_rvalid),
-      .difftest_cfg_axilite_rready      (difftest_cfg_axilite_rready)
-      ,.ddr_awid(gbus_ddr_awid), .ddr_awaddr(gbus_ddr_awaddr), .ddr_awlen(gbus_ddr_awlen), .ddr_awsize(gbus_ddr_awsize)
-      ,.ddr_awburst(gbus_ddr_awburst), .ddr_awlock(gbus_ddr_awlock), .ddr_awcache(gbus_ddr_awcache), .ddr_awprot(gbus_ddr_awprot)
-      ,.ddr_awqos(gbus_ddr_awqos), .ddr_awregion(gbus_ddr_awregion), .ddr_awvalid(gbus_ddr_awvalid), .ddr_awready(gbus_ddr_awready)
-      ,.ddr_wdata(gbus_ddr_wdata), .ddr_wstrb(gbus_ddr_wstrb), .ddr_wlast(gbus_ddr_wlast), .ddr_wvalid(gbus_ddr_wvalid), .ddr_wready(gbus_ddr_wready)
-      ,.ddr_bid(gbus_ddr_bid), .ddr_bresp(gbus_ddr_bresp), .ddr_bvalid(gbus_ddr_bvalid), .ddr_bready(gbus_ddr_bready)
-      ,.ddr_arid(gbus_ddr_arid), .ddr_araddr(gbus_ddr_araddr), .ddr_arlen(gbus_ddr_arlen), .ddr_arsize(gbus_ddr_arsize)
-      ,.ddr_arburst(gbus_ddr_arburst), .ddr_arlock(gbus_ddr_arlock), .ddr_arcache(gbus_ddr_arcache), .ddr_arprot(gbus_ddr_arprot)
-      ,.ddr_arqos(gbus_ddr_arqos), .ddr_arregion(gbus_ddr_arregion), .ddr_arvalid(gbus_ddr_arvalid), .ddr_arready(gbus_ddr_arready)
-      ,.ddr_rid(gbus_ddr_rid), .ddr_rdata(gbus_ddr_rdata), .ddr_rresp(gbus_ddr_rresp), .ddr_rlast(gbus_ddr_rlast), .ddr_rvalid(gbus_ddr_rvalid), .ddr_rready(gbus_ddr_rready)
+      .difftest_cfg_axilite_rready      (difftest_cfg_axilite_rready),
+      .ddr_awid                         (gbus_ddr_awid),
+      .ddr_awaddr                       (gbus_ddr_awaddr),
+      .ddr_awlen                        (gbus_ddr_awlen),
+      .ddr_awsize                       (gbus_ddr_awsize),
+      .ddr_awburst                      (gbus_ddr_awburst),
+      .ddr_awlock                       (gbus_ddr_awlock),
+      .ddr_awcache                      (gbus_ddr_awcache),
+      .ddr_awprot                       (gbus_ddr_awprot),
+      .ddr_awqos                        (gbus_ddr_awqos),
+      .ddr_awregion                     (gbus_ddr_awregion),
+      .ddr_awvalid                      (gbus_ddr_awvalid),
+      .ddr_awready                      (gbus_ddr_awready),
+      .ddr_wdata                        (gbus_ddr_wdata),
+      .ddr_wstrb                        (gbus_ddr_wstrb),
+      .ddr_wlast                        (gbus_ddr_wlast),
+      .ddr_wvalid                       (gbus_ddr_wvalid),
+      .ddr_wready                       (gbus_ddr_wready),
+      .ddr_bid                          (gbus_ddr_bid),
+      .ddr_bresp                        (gbus_ddr_bresp),
+      .ddr_bvalid                       (gbus_ddr_bvalid),
+      .ddr_bready                       (gbus_ddr_bready),
+      .ddr_arid                         (gbus_ddr_arid),
+      .ddr_araddr                       (gbus_ddr_araddr),
+      .ddr_arlen                        (gbus_ddr_arlen),
+      .ddr_arsize                       (gbus_ddr_arsize),
+      .ddr_arburst                      (gbus_ddr_arburst),
+      .ddr_arlock                       (gbus_ddr_arlock),
+      .ddr_arcache                      (gbus_ddr_arcache),
+      .ddr_arprot                       (gbus_ddr_arprot),
+      .ddr_arqos                        (gbus_ddr_arqos),
+      .ddr_arregion                     (gbus_ddr_arregion),
+      .ddr_arvalid                      (gbus_ddr_arvalid),
+      .ddr_arready                      (gbus_ddr_arready),
+      .ddr_rid                          (gbus_ddr_rid),
+      .ddr_rdata                        (gbus_ddr_rdata),
+      .ddr_rresp                        (gbus_ddr_rresp),
+      .ddr_rlast                        (gbus_ddr_rlast),
+      .ddr_rvalid                       (gbus_ddr_rvalid),
+      .ddr_rready                       (gbus_ddr_rready)
   );
 
 `else
