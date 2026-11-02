@@ -84,11 +84,13 @@ wrappers in `<work>/rtl/filelist.f`, which the UVHS frontend reads directly.
 
 ## GBus host paths
 
-The GBus C2H path drains frozen DiffTest banks through the GBD1 AXI read
-aperture; the host reads, verifies AXI evidence and acknowledges each bank.
+The GBus C2H path drains the GBD1 streaming frame FIFO through the AXI read
+aperture: the RTL appends complete 768-byte DiffTest frames to a ring, and the
+host copies a whole batch per DMA read and releases it with one CONSUME write.
+The legacy register-window and frozen-bank protocols are no longer supported.
 GBus H2C goes through the guarded GeneralBus AXI3 write path into the physical
-DDR master (read-only aperture reads are routed to GBD1 and rejected by the
-write guard). Host DMA offsets stay relative to the GeneralBus start address
+DDR master (ring reads are routed to GBD1 and rejected by the write guard).
+Host DMA offsets stay relative to the GeneralBus start address
 (`GBUS_DDR_BASE=0`).
 
 ## Build

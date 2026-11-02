@@ -4,9 +4,9 @@ UVHS_RUNTIME_DIR := $(UVHS_ROOT_DIR)/uvhs/runtime
 
 UVHS_TEMPLATE_DIR ?=
 UVHS_UVW_AXI4_TO_DDR4_SRC ?=
-# The GBus host interface always uses the GBD1 C2H DMA path; the legacy
-# register-window transport is no longer built.  The remote functional-DDR
-# link stays a GBus option and defaults to on, matching the validated build.
+# The GBus host interface uses only the GBD1 streaming C2H path; the legacy
+# register-window and frozen-bank transports are no longer built.  The remote
+# functional-DDR link stays a GBus option and defaults to on.
 UVHS_FUNCTIONAL_DDR_REMOTE_LINK ?= $(if $(filter GBUS,$(DIFFTEST_HOSTIF)),1,0)
 ifneq ($(filter $(UVHS_FUNCTIONAL_DDR_REMOTE_LINK),0 1),$(UVHS_FUNCTIONAL_DDR_REMOTE_LINK))
 $(error UVHS_FUNCTIONAL_DDR_REMOTE_LINK must be 0 or 1)
