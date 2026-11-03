@@ -5,9 +5,15 @@ UVHS_RUNTIME_DIR := $(UVHS_ROOT_DIR)/uvhs/runtime
 UVHS_TEMPLATE_DIR ?=
 UVHS_UVW_AXI4_TO_DDR4_SRC ?=
 # The GBus host interface uses only the GBD1 streaming C2H path; the legacy
-# register-window and frozen-bank transports are no longer built.  The remote
-# functional-DDR link stays a GBus option and defaults to on.
-UVHS_FUNCTIONAL_DDR_REMOTE_LINK ?= $(if $(filter GBUS,$(DIFFTEST_HOSTIF)),1,0)
+# register-window and frozen-bank transports are no longer built.
+#
+# The remote functional-DDR link defaults to off: it exists to carry the DDR
+# master to another FPGA, but fpga-host drives port-0 DMA on the same FPGA as
+# the config window (GBUS_FPGA == GBUS_DMA_FPGA), so the link is unused in the
+# supported topology while its 320-bit TDM packet assembly is the worst setup
+# path in the GBus clock domain.  Enable it explicitly for a multi-FPGA DDR
+# topology.
+UVHS_FUNCTIONAL_DDR_REMOTE_LINK ?= 0
 ifneq ($(filter $(UVHS_FUNCTIONAL_DDR_REMOTE_LINK),0 1),$(UVHS_FUNCTIONAL_DDR_REMOTE_LINK))
 $(error UVHS_FUNCTIONAL_DDR_REMOTE_LINK must be 0 or 1)
 endif

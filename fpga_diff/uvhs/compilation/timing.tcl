@@ -27,7 +27,13 @@ if {[string toupper [uvhs::env_or_default DIFFTEST_HOSTIF XDMA]] eq "XDMA"} {
 
 proc fpga_diff_set_async_clock_groups {} {
     set groups [list]
-    foreach clock {TMCLK ddr_ref_clk CPU_CLK_IN UART_CLK_IN jtag_vclk} {
+    set clocks {TMCLK ddr_ref_clk CPU_CLK_IN UART_CLK_IN jtag_vclk}
+    if {[string toupper [uvhs::env_or_default DIFFTEST_HOSTIF XDMA]] eq "GBUS"} {
+        # The Clock Wizard is a blackbox, so its output is an independent
+        # root clock rather than a generated one under UART_CLK_IN.
+        lappend clocks GBUS_HOST_CLK
+    }
+    foreach clock $clocks {
         lappend groups -group [get_clocks -include_generated_clocks $clock]
     }
     if {[string toupper [uvhs::env_or_default DIFFTEST_HOSTIF XDMA]] eq "XDMA"} {

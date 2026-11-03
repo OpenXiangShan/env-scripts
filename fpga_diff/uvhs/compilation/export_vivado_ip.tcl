@@ -371,6 +371,9 @@ if {$hostif eq "XDMA"} {
     lappend exports [list xci gbus_ddr_dwc \
         [file join $tcl_dir gbus_ddr_dwc.tcl] \
         [file join $out_dir rtl soc gbus_ddr_dwc.dcp]]
+    lappend exports [list xci gbus_clk_wiz \
+        [file join $tcl_dir gbus_clk_wiz.tcl] \
+        [file join $out_dir rtl soc gbus_clk_wiz.dcp]]
     puts "INFO: skip xdma_ep export for DiffTest host interface $hostif"
 }
 
