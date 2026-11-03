@@ -1279,11 +1279,35 @@ wire [0:0]    br2cfg_wvalid;
 
   wire difftest_pcie_clock;
 `ifdef DIFFTEST_HOST_GBUS
-  // GBus has no XDMA user-clock output.  The DiffTest host-side protocol and
-  // the UVHS GeneralBD/GENERALBUS endpoints are synchronous to the always-on
-  // GBus host/user interface clock: use the real always-running UVHS host
-  // clock (dev_clk_i/clk6_p), not the gated CPU clock or infer_clock output.
-  wire gbus_host_clk = dev_clk_i;
+  // GBus host/user interface clock.
+  //
+  // This domain carries the whole GBus fabric (GeneralBD, generalBus, the
+  // GBD1 C2H engine and the guarded H2C/DDR path) plus the SimTop DiffTest
+  // stream, so it must be free-running: the C2H path has to keep draining
+  // finite TLAST frames after the CPU stops.
+  //
+  // It must not be dev_clk_i.  dev_clk_i is the UART/peripheral clock and also
+  // feeds xilnx_crg; putting the GBus fabric on it left the UART clock tree
+  // with almost no setup margin and made host throughput a function of the
+  // UART divider.  Sharing sys_clk_i with the CPU is equally wrong: the
+  // generalBus read data path then becomes the CPU clock's critical path.
+  //
+  // Use a separate Clock Wizard instance instead.  The wizard is imported as a
+  // blackbox checkpoint (see uvhs/compilation/prepare_ip.sh), which lets the
+  // backend put an explicit create_clock on clk_out1.  A bare MMCME4_ADV
+  // primitive cannot be used: UVHS does not resolve the MMCM feedback divider
+  // and infers every MMCM output as divide-by-1 (TCK-121).
+  //
+  // 50 MHz in (clk6_p, the always-on board clock), 100 MHz out.
+  wire gbus_host_clk;
+
+  gbus_clk_wiz u_gbus_clk_wiz (
+      .clk_in1  (dev_clk_i),
+      .resetn   (rstn_sw4),
+      .clk_out1 (gbus_host_clk),
+      .locked   ()
+  );
+
   assign difftest_pcie_clock = gbus_host_clk;
 `endif
   assign sys_rstn_io = sys_rstn & ~io_host_reset;

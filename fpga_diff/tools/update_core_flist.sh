@@ -179,7 +179,7 @@ generate_uvhs_filelist() {
       uvhs_axi3_to_axi4_adapter uvhs_axi_async_bridge uvhs_axi_3master_arbiter uvhs_async_status_sync
     )
     if [[ $cpu == nutshell ]]; then
-      required_modules+=(uvhs_difftest_memory_control)
+      required_modules+=(uvhs_difftest_memory_control gbus_clk_wiz)
     fi
     if [[ $remote_link == 1 ]]; then
       required_modules+=(uvhs_axi_remote_source uvhs_axi_remote_sink)
