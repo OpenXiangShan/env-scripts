@@ -1,8 +1,8 @@
 ################################################################################
 # Pin assignment for fpga_diff on the U2.2 VU19P platform.
 #
-# CPU, PCIe, and low-speed debug I/O use b0.f2. UART0 uses the USB-UART on the
-# flash daughter card at b0.F1_FMC0. The user-DDR controller uses b0.f0.
+# CPU, PCIe, low-speed debug I/O and the user-DDR controller use b0.f2. UART0
+# uses the USB-UART on the flash daughter card at b0.F1_FMC0.
 ################################################################################
 
 proc pin_name {top port} {
@@ -37,8 +37,10 @@ proc apc16_pin {port slot} {
 # rstn_sw* are exported as UVHS global resets and must not also be assign_pin'd.
 apc16_pin led0 3
 apc16_pin led2 4
-# led3 is driven by the user-DDR calibration status on F0.
-assign_pin -port [pin_name $top led3] -connector b0.F0_FMC1 -index 311
+# led3 reports the DDR-ready status of the FPGA that owns the DDR controller,
+# which for the NutShell GBus topology is b0.f2, so it stays on the F2 APC16
+# connector instead of the F0 daughter card.
+apc16_pin led3 5
 
 # UV_FMCH_FLASH drives USB_UART_RX at FMC[270] and receives USB_UART_TX at
 # FMC[311], so the FPGA RX/TX directions map to 270/311 respectively.

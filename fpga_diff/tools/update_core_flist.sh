@@ -176,7 +176,7 @@ generate_uvhs_filelist() {
       uvhs_gbus_host_wrapper
       uvhs_generalbd_axilite_bridge
       uvhs_gbus_c2h_dma uvhs_gbus_axi_read_router uvhs_gbus_axi_write_guard
-      uvhs_axi3_to_axi4_adapter uvhs_axi_async_bridge uvhs_axi_3master_arbiter uvhs_async_status_sync
+      uvhs_axi3_to_axi4_adapter uvhs_axi_async_bridge uvhs_axi_3master_arbiter
     )
     if [[ $cpu == nutshell ]]; then
       required_modules+=(uvhs_difftest_memory_control gbus_clk_wiz)

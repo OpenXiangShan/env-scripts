@@ -13,6 +13,17 @@ if {[llength $uvhs_ddr_cell] != 1} {
 # daughter card.
 set uvhs_f0_cells $uvhs_ddr_cell
 set uvhs_hostif [string toupper [uvhs::env_or_default DIFFTEST_HOSTIF XDMA]]
+# NutShell GBUS puts the user DDR on b0.f2 next to the CPU, so b0.f0 must not
+# claim the DDR cell here; the NutShell branch below adds it to b0.f2 instead.
+set uvhs_ddr_on_f2 0
+if {$uvhs_hostif eq "GBUS"} {
+    set uvhs_cpu_is_nutshell [get_cells -quiet {core_def/U_CPU_TOP/u_SimTop}]
+    if {[llength $uvhs_cpu_is_nutshell] == 1} {
+        set uvhs_f0_cells {}
+        set uvhs_ddr_on_f2 1
+    }
+}
+unset -nocomplain uvhs_cpu_is_nutshell
 set uvhs_functional_ddr_remote_link \
     [uvhs::env_or_default UVHS_FUNCTIONAL_DDR_REMOTE_LINK \
         [expr {$uvhs_hostif eq "GBUS" ? 1 : 0}]]
@@ -246,6 +257,7 @@ if {[llength $uvhs_xiangshan_cell] == 1} {
         set uvhs_nutshell_f2_names [concat $uvhs_gbus_host_path_names {
             core_def/U_CPU_TOP
             core_def/u_gbus_ddr_dwc
+            core_def/U_UVHS_UVW_AXI4_TO_DDR4
             core_def/U_GBUS_MEMORY_CONTROL
             core_def/CFG_AXI_bridge_i
             core_def/U_UVHS_FLASH_GBUS
@@ -261,13 +273,23 @@ if {[llength $uvhs_xiangshan_cell] == 1} {
             lappend uvhs_nutshell_f2_cells [lindex $matches 0]
         }
         create_fpga -name b0.f2 -cells $uvhs_nutshell_f2_cells
-        puts "INFO: NutShell, bank and DDR transport on b0.f2; compact DDR sink on b0.f0"
+        puts "INFO: NutShell core, user DDR and GBus host all on b0.f2"
     } else {
         puts "INFO: skip XiangShan partition constraints for this CPU"
     }
 }
-create_fpga -name b0.f0 -cells $uvhs_f0_cells
-set uvhs_ddr_connector b0.F0_FMC0
+# An FPGA may stay plugged with no DUT cells (b0.f1 carries only the flash
+# daughter card), so only claim b0.f0 when something actually lives there.
+if {[llength $uvhs_f0_cells] > 0} {
+    create_fpga -name b0.f0 -cells $uvhs_f0_cells
+} else {
+    puts "INFO: no DUT cells on b0.f0; leaving it empty"
+}
+# b0.F2_FMC3 carries the DDR daughter card that UVHS otherwise reserves for UHD
+# waveform capture.  A build without a probe group leaves that card free, so
+# the NutShell GBus DDR binds to it; every other topology keeps the DDR card on
+# b0.F0_FMC0 with the XiangShan memory path.
+set uvhs_ddr_connector [expr {$uvhs_ddr_on_f2 ? "b0.F2_FMC3" : "b0.F0_FMC0"}]
 set_property -name connector -value $uvhs_ddr_connector \
     -objects $uvhs_ddr_cell
 set uvhs_bound_ddr_connector \
@@ -309,7 +331,7 @@ if {[llength $uvhs_xiangshan_cell] == 1} {
         puts "INFO: constrain syscnt time bus to direct b0.f2-b0.f0 route"
     }
 }
-unset -nocomplain uvhs_ddr_cell uvhs_ddr_connector \
+unset -nocomplain uvhs_ddr_cell uvhs_ddr_connector uvhs_ddr_on_f2 \
     uvhs_bound_ddr_connector uvhs_f0_cells uvhs_memory_root_names \
     uvhs_memory_root_cells uvhs_memory_path_names uvhs_memory_path_cells \
     uvhs_config_path_names uvhs_config_path_cells \

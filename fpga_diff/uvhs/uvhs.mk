@@ -23,7 +23,17 @@ $(error UVHS_FUNCTIONAL_DDR_REMOTE_LINK=1 requires DIFFTEST_HOSTIF=GBUS)
 endif
 endif
 # KMH is the XiangShan target; keep the larger CPU profile enabled by default.
+#
+# The NutShell GBus topology places the user DDR in b0.F2_FMC3, the daughter-card
+# slot UVHS reserves for UHD waveform capture.  Binding a probe_net/trigger_net
+# group makes the backend instantiate uvw_uhd_top there and reject the user DDR,
+# so that build defaults to no probe group.  Set UVHS_PROBE_TCL explicitly to
+# trade the DDR back for UHD capture.
+ifeq ($(CPU)-$(DIFFTEST_HOSTIF),nutshell-GBUS)
+UVHS_PROBE_TCL ?=
+else
 UVHS_PROBE_TCL ?= $(if $(filter kmh xiangshan,$(CPU)),$(UVHS_COMPILATION_DIR)/probe_kmh.tcl,$(UVHS_COMPILATION_DIR)/probe_ila.tcl)
+endif
 UVHS_PROBE_PATH := $(if $(strip $(UVHS_PROBE_TCL)),$(abspath $(UVHS_PROBE_TCL)),)
 UVHS_DDR_AXI_WIDTH := $(if $(filter GBUS,$(DIFFTEST_HOSTIF)),256,$(if $(filter nutshell,$(CPU)),64,256))
 UVHS_WORK_DIR := $(ENV_SCRIPTS_HOME)/$(PRJ_NAME)

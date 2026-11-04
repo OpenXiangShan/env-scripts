@@ -211,3 +211,21 @@ last_bit=$((ddr_width - 1))
 grep -Eq "input[[:space:]]+\[$last_bit:0\][[:space:]]*ddr4ip_dut_axi_wdata" "$ddr_stub"
 grep -Eq "output[[:space:]]+\[$last_bit:0\][[:space:]]*ddr4ip_dut_axi_rdata" "$ddr_stub"
 echo "INFO: verified UVHS DDR DCP AXI data width: $ddr_width"
+
+# The vendor prePlace script sizes the DDR pblock from the daughter-card pins
+# alone.  When the DDR shares an FPGA with the system-bus Aurora fabric the two
+# exclusive pblocks overlap, so append the repository carve step that keeps them
+# apart.  See ddr_pblock_carve.tcl for the full explanation.
+ddr_pblock=$work_dir/script/uvw_axi4_to_ddr4_pblock.tcl
+carve_src=$script_dir/ddr_pblock_carve.tcl
+require_file "$carve_src"
+carve_marker="DDR and system-bus pblocks do not both exist"
+if ! grep -qF "$carve_marker" "$ddr_pblock"; then
+  printf '\n' >>"$ddr_pblock"
+  cat "$carve_src" >>"$ddr_pblock"
+fi
+grep -qF "$carve_marker" "$ddr_pblock" || {
+  echo "ERROR: failed to append the DDR pblock carve step to $ddr_pblock" >&2
+  exit 1
+}
+echo "INFO: DDR prePlace script carries the pblock carve step"
