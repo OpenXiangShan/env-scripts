@@ -458,6 +458,18 @@ for UHD. The DUT DDR controller is constrained to B0/F0, which owns the separate
 daughter card and B0/F2 for CPU/XDMA. This avoids sharing an UHD card with the
 DUT DDR controller.
 
+The NutShell GBus build is the exception. It gives the F2 DDR card to the user
+DDR instead of UHD and builds without a probe group, because the DDR has to sit
+next to the CPU: with the DDR on another FPGA the CPU's own DRAM path crosses
+the F2-F0 TDM link, and that single crossing capped the GBus host clock at
+14.7 MHz. Co-locating DDR, CPU and GBus fabric on B0/F2 realises the full
+100 MHz `GBUS_HOST_CLK` and keeps the TDM link out of the DiffTest path. Two
+consequences follow. `uvhs.mk` defaults `UVHS_PROBE_TCL` to empty for
+`CPU=nutshell DIFFTEST_HOSTIF=GBUS`; pass it explicitly to trade the DDR back
+for UHD capture. And the vendor DDR pblock overlaps the system-bus Aurora
+pblock on B0/F2, so `prepare_ip.sh` appends `ddr_pblock_carve.tcl` to the DDR
+prePlace script to keep the two exclusive regions apart.
+
 ## Compatibility Boundary
 
 The retained compatibility code is limited to observed tool behavior:

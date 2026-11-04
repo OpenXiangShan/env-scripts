@@ -2,11 +2,12 @@ wire uvhs_ddr_transport_clk = gbus_host_clk;
 wire uvhs_ddr_user_clk, uvhs_ddr_user_rst;
 wire [79:0] uvhs_func_ddr_req_data, uvhs_func_ddr_rsp_data;
 wire uvhs_func_ddr_req_valid, uvhs_func_ddr_req_ready, uvhs_func_ddr_rsp_valid, uvhs_func_ddr_rsp_ready;
-wire uvhs_ddr_user_rst_synced;
-uvhs_async_status_sync #(.INIT(1'b1)) u_uvhs_ddr_user_rst_sync (
-  .clk(sys_clk_i), .rstn(rstn_sw4), .async_in(uvhs_ddr_user_rst), .sync_out(uvhs_ddr_user_rst_synced)
-);
-assign init_calib_complete = rstn_sw4 & ~uvhs_ddr_user_rst_synced;
+// init_calib_complete only drives the DDR-ready LED in the GBus build: the
+// jtag_ddr_subsys consumer belongs to the XDMA netlist and is not present
+// here.  Sampling the DDR IP's own reset (an internal mmcm_clkout0 output) in
+// the CPU clock domain would create a CDC that UVHS cannot group, so report
+// the fabric reset instead and leave the IP's user clock/reset unused.
+assign init_calib_complete = rstn_sw4;
 
 `ifdef CPU_NUTSHELL
 // Vendor AXI Data Width Converter, exported as a UVHS checkpoint from
