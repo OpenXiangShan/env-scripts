@@ -343,6 +343,17 @@ proc uvhs_query_gated_clocks {} {
     return [lsort -unique $gated_clocks]
 }
 
+proc uvhs_clock_present {name} {
+    # A runtime database only lists clocks that survived synthesis.  A
+    # topology without any TMCLK load (for example the NutShell GBus build,
+    # whose timer sits inside SimTop) drops clk8_p entirely, and configuring a
+    # clock that is not in the database fails the whole download.
+    if {[catch {set clock_text [query -clock]} error]} {
+        return 0
+    }
+    return [regexp -line "\\m${name}\\M" $clock_text]
+}
+
 proc uvhs_configure_tmclk_from_cpu {{cpu_frequency ""}} {
     # Keep the CPU-to-TMCLK relationship stable across sign-off frequencies.
     # The environment variable remains available for controlled experiments,
@@ -365,6 +376,10 @@ proc uvhs_configure_tmclk_from_cpu {{cpu_frequency ""}} {
         error "derived TMCLK frequency is invalid: $tmclk_frequency"
     }
 
+    if {![uvhs_clock_present clk8_p]} {
+        puts "INFO: runtime database has no clk8_p; skipping the TMCLK configuration"
+        return
+    }
     puts [format \
         "INFO: setting clk8_p to %d Hz from clk5_p %d Hz at %d:1" \
         $tmclk_frequency $cpu_frequency $ratio]

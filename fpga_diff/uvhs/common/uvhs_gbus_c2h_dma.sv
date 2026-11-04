@@ -16,6 +16,8 @@
 // Frames are validated on the way in (24 beats, all byte enables, TLAST on the
 // last beat).  A malformed frame is dropped instead of published and raises
 // the sticky frame_error bit.
+`include "uvhs_gbus_c2h_window.svh"
+
 module uvhs_gbus_c2h_dma #(
     parameter integer AXIS_DATA_WIDTH = 256,
     // 1024 frames = 786432 bytes = 768 KiB.  The ring is sized for headroom,
@@ -61,13 +63,14 @@ module uvhs_gbus_c2h_dma #(
     output wire s_rvalid,
     input wire s_rready
 );
-  // 1024 frames x 768 B = 0xc0000, ending exactly at the 0x1000_0000 top of
-  // port 0.  The host learns both base and size from 0x1210/0x1214.
-  localparam [31:0] APERTURE = 32'h0ff4_0000;
+  // Ring geometry comes from uvhs_gbus_c2h_window.svh so the read router and
+  // the write guard cannot disagree with it.  The host learns both base and
+  // size from 0x1210/0x1214.
+  localparam [31:0] APERTURE = `UVHS_C2H_APERTURE;
   localparam [31:0] ID_MAGIC = 32'h4742_4431;  // "GBD1"
 
-  localparam integer FRAME_BEATS = 24;
-  localparam integer BEAT_BYTES = 32;
+  localparam integer FRAME_BEATS = `UVHS_C2H_FRAME_BEATS;
+  localparam integer BEAT_BYTES = `UVHS_C2H_BEAT_BYTES;
   localparam integer FRAME_BYTES = FRAME_BEATS * BEAT_BYTES;  // 768
   localparam integer RING_BYTES = FRAMES * FRAME_BYTES;
   localparam integer RING_BEATS = FRAMES * FRAME_BEATS;
