@@ -3,6 +3,8 @@
 // One-outstanding AXI3 read router. Requests in the local 4 KiB aperture are
 // sent to c_ (the local SRAM endpoint); all other requests are sent to d_
 // (the DDR adapter). Writes are outside this block.
+`include "uvhs_gbus_c2h_window.svh"
+
 module uvhs_gbus_axi_read_router (
   input  wire        clk,
   input  wire        rstn,
@@ -60,10 +62,10 @@ module uvhs_gbus_axi_read_router (
   reg busy;
   reg local_q;
 
-  // The C2H frame FIFO owns the top 256 KiB of port 0.  Everything below it is
-  // forwarded to the DDR adapter unchanged.
-  wire aperture_hit = (s_araddr >= 32'h0ffc_0000) &&
-                       (s_araddr <= 32'h0fff_ffff);
+  // The C2H frame FIFO owns the top of port 0 (see uvhs_gbus_c2h_window.svh).
+  // Everything below it is forwarded to the DDR adapter unchanged.
+  wire aperture_hit = (s_araddr >= `UVHS_C2H_APERTURE) &&
+                       (s_araddr <= `UVHS_C2H_WINDOW_LAST);
   wire ar_fire = s_arvalid && s_arready;
 
   assign s_arready = rstn && !busy && (aperture_hit ? c_arready : d_arready);

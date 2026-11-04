@@ -143,6 +143,7 @@ generate_uvhs_filelist() {
       find "$fpga_diff_dir/uvhs/common" -type f \
         \( -name '*.v' -o -name '*.sv' -o -name '*.vh' -o -name '*.svh' \) \
         ! -name 'uvhs_gbus_dma_path.svh' ! -name 'uvhs_gbus_ddr_path.svh' ! -name 'uvhs_gbus_ddr_wires.svh' \
+        ! -name 'uvhs_gbus_c2h_window.svh' \
         -print | LC_ALL=C sort
     fi
     if [[ -d $work_dir/rtl/stubs ]]; then

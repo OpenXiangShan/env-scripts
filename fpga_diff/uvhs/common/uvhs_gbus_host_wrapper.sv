@@ -13,6 +13,8 @@
 // complete 768-byte frames to a streaming ring behind a guarded AXI aperture;
 // H2C and non-ring reads use the physical DDR master.  The legacy
 // register-window (GBS1) and frozen-bank transports are gone.
+`include "uvhs_gbus_c2h_window.svh"
+
 module uvhs_gbus_host_wrapper (
     input  wire        sys_clk_i,
     input  wire        sys_rstn,
@@ -148,7 +150,8 @@ module uvhs_gbus_host_wrapper (
       ((gbus_cfg_local_wr_addr == 16'h1204) || (gbus_cfg_local_wr_addr == 16'h1238) ||
        (gbus_cfg_local_wr_addr == 16'h123c));
   wire gbus_c2h_cfg_rd_en = gbus_cfg_rd_en && (gbus_cfg_local_rd_addr[1:0] == 2'b0) &&
-      (((gbus_cfg_local_rd_addr >= 16'h1200) && (gbus_cfg_local_rd_addr <= 16'h1244)) ||
+      (((gbus_cfg_local_rd_addr >= `UVHS_C2H_CFG_FIRST) &&
+        (gbus_cfg_local_rd_addr <= `UVHS_C2H_CFG_LAST)) ||
        ((gbus_cfg_local_rd_addr >= 16'h2000) && (gbus_cfg_local_rd_addr <= 16'h22fc)));
   wire gbus_axil_cfg_wr_en = gbus_cfg_wr_en && (gbus_cfg_local_wr_addr <= 16'h0030);
   wire gbus_axil_cfg_rd_en = gbus_cfg_rd_en && (gbus_cfg_local_rd_addr <= 16'h0030);
