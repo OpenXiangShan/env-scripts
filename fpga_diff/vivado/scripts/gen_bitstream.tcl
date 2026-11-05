@@ -1,5 +1,5 @@
 ########################################################################
-# open .xpr from -tclargs then launch and wait on impl_1
+# open .xpr from -tclargs then launch and wait on impl_2
 ########################################################################
 
 proc ensure_open_project {} {
@@ -25,14 +25,14 @@ proc ensure_open_project {} {
 
 ensure_open_project
 
-set impl_runs [get_runs impl_1]
+set impl_runs [get_runs impl_2]
 if {[llength $impl_runs] == 0} {
-	puts "ERROR: Run impl_1 not found in project. Please ensure runs are created."
+	puts "ERROR: Run impl_2 not found in project. Please ensure runs are created."
 	exit 1
 }
 set impl_run [lindex $impl_runs 0]
 set status [get_property STATUS $impl_run]
-puts "INFO: impl_1 status: $status"
+puts "INFO: impl_2 status: $status"
 
 set requested_jobs ""
 if {[info exists ::argv] && [llength $::argv] > 2} {
@@ -58,11 +58,11 @@ if {![string match "write_bitstream Complete*" $status]} {
 		set jobs $requested_jobs
 	}
 	if {$jobs < 1} { set jobs 1 }
-	puts "INFO: Launching impl_1 to write_bitstream with -jobs $jobs (system threads: $sys_threads)"
-	launch_runs impl_1 -to_step write_bitstream -jobs $jobs
+	puts "INFO: Launching impl_2 to write_bitstream with -jobs $jobs (system threads: $sys_threads)"
+	launch_runs impl_2 -to_step write_bitstream -jobs $jobs
 	wait_on_run $impl_run
 } else {
-	puts "INFO: impl_1 already complete."
+	puts "INFO: impl_2 already complete."
 }
 
 puts "INFO: Bitstream generation flow finished."

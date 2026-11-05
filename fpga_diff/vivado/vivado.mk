@@ -39,7 +39,7 @@ synth:
 	vivado -mode batch -source "$(VIVADO_SCRIPT_DIR)/gen_synth.tcl" -tclargs $(PRJ)
 
 vivado_bitstream: vivado_project
-	vivado -mode batch -source "$(VIVADO_SCRIPT_DIR)/gen_bitstream.tcl" -tclargs $(PRJ) impl_1 $(VIVADO_JOBS)
+	vivado -mode batch -source "$(VIVADO_SCRIPT_DIR)/gen_bitstream.tcl" -tclargs $(PRJ) impl_2 $(VIVADO_JOBS)
 
 vivado_stage_bitstream:
 	@test -n "$(FPGA_BIT_ARTIFACT_DIR)" && test "$(FPGA_BIT_ARTIFACT_DIR)" != "/" || { \
@@ -71,11 +71,11 @@ check_version:
 vivado_write_bitstream:
 	@test -n "$(FPGA_BIT_HOME)" || { echo "ERROR: please set FPGA_BIT_HOME=..." >&2; exit 2; }
 ifneq ($(NO_DIFF),1)
-	sh "$(VIVADO_ROOT_DIR)/tools/pcie-remove.sh"
+	bash "$(VIVADO_ROOT_DIR)/tools/pcie-remove.sh"
 endif
 	vivado -mode tcl -source "$(VIVADO_SCRIPT_DIR)/write_bitstream.tcl" -tclargs $(FPGA_BIT_HOME)
 ifneq ($(NO_DIFF),1)
-	sh "$(VIVADO_ROOT_DIR)/tools/pcie-rescan.sh"
+	bash "$(VIVADO_ROOT_DIR)/tools/pcie-rescan.sh"
 endif
 	vivado -mode tcl -source "$(VIVADO_SCRIPT_DIR)/reset_ddr.tcl" \
 		-tclargs $(FPGA_BIT_HOME)/fpga_top_debug.ltx
@@ -119,10 +119,10 @@ vivado_ila_clear:
 		-tclargs clear "$(FPGA_BIT_HOME)/fpga_top_debug.ltx"
 
 get_impl_log:
-	cat $(PRJ_DIR)/$(PRJ_NAME).runs/impl_1/runme.log
+	cat $(PRJ_DIR)/$(PRJ_NAME).runs/impl_2/runme.log
 
 get_synth_log:
-	cat $(PRJ_DIR)/$(PRJ_NAME).runs/synth_1/runme.log
+	cat $(PRJ_DIR)/$(PRJ_NAME).runs/synth_2/runme.log
 
 vivado_project: check_project_name
 	$(MAKE) update_core_flist CORE_DIR="$(CORE_DIR)" RTL_INCLUDE="$(RTL_INCLUDE)"

@@ -372,9 +372,6 @@ set_property -name "steps.synth_design.args.directive" -value "AlternateRoutabil
 set_property -name "steps.synth_design.args.gated_clock_conversion" -value "auto" -objects $obj
 set_property -name "steps.synth_design.args.bufg" -value "52" -objects $obj
 
-# set the current synth run
-current_run -synthesis [get_runs synth_1]
-
 # Create 'synth_2' run (if not found)
 if {[string equal [get_runs -quiet synth_2] ""]} {
     create_run -name synth_2 -part xcvu19p-fsva3824-2-e -flow {Vivado Synthesis 2020} -strategy "Flow_PerfOptimized_high" -report_strategy {No Reports} -constrset constrs_1
@@ -385,6 +382,9 @@ if {[string equal [get_runs -quiet synth_2] ""]} {
 set obj [get_runs synth_2]
 set_property -name "part" -value "xcvu19p-fsva3824-2-e" -objects $obj
 set_property -name "strategy" -value "Flow_PerfOptimized_high" -objects $obj
+
+# set the current synth run
+current_run -synthesis [get_runs synth_2]
 
 # Create 'impl_1' run (if not found)
 if {[string equal [get_runs -quiet impl_1] ""]} {
@@ -416,6 +416,6 @@ set_property -name "steps.write_bitstream.args.readback_file" -value "0" -object
 set_property -name "steps.write_bitstream.args.verbose" -value "0" -objects $obj
 
 # set the current impl run
-current_run -implementation [get_runs impl_1]
+current_run -implementation [get_runs impl_2]
 
 puts "INFO: Project created:${_xil_proj_name_}"

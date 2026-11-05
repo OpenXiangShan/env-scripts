@@ -1,5 +1,5 @@
 ########################################################################
-# Run synthesis only: open project from -tclargs and launch/wait on synth_1
+# Run synthesis only: open project from -tclargs and launch/wait on synth_2
 ########################################################################
 
 proc ensure_open_project {} {
@@ -25,16 +25,16 @@ proc ensure_open_project {} {
 
 ensure_open_project
 
-# Make sure synth_1 run exists
-set synth_runs [get_runs synth_1]
+# Make sure synth_2 run exists
+set synth_runs [get_runs synth_2]
 if {[llength $synth_runs] == 0} {
-    puts "ERROR: Run synth_1 not found in project. Please generate the project/runs first (e.g. make vivado ...)."
+    puts "ERROR: Run synth_2 not found in project. Please generate the project/runs first (e.g. make vivado ...)."
     exit 1
 }
 
 set synth_run [lindex $synth_runs 0]
 set status [get_property STATUS $synth_run]
-puts "INFO: synth_1 status: $status"
+puts "INFO: synth_2 status: $status"
 
 # Launch synthesis if not complete, then block until finished
 if {![string match "synth_design Complete*" $status]} {
@@ -46,11 +46,11 @@ if {![string match "synth_design Complete*" $status]} {
     }
     set jobs [expr {int(ceil($sys_threads/2.0))}]
     if {$jobs < 1} { set jobs 1 }
-    puts "INFO: Launching synth_1 with -jobs $jobs (system threads: $sys_threads)"
-    launch_runs synth_1 -jobs $jobs
+    puts "INFO: Launching synth_2 with -jobs $jobs (system threads: $sys_threads)"
+    launch_runs synth_2 -jobs $jobs
     wait_on_run $synth_run
 } else {
-    puts "INFO: synth_1 already complete."
+    puts "INFO: synth_2 already complete."
 }
 
 puts "INFO: Synthesis flow finished."

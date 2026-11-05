@@ -167,32 +167,32 @@ if {[info exists ::env(HIER_MAX_DEPTH)]} {
   set HIER_MAX_DEPTH 7
 }
 set reported_run ""
-if {[llength [get_runs impl_1]]} {
-  # Try to report impl_1; open_run may fail if the run was never launched
-  if {[catch { report_for_run impl_1 $fh $HIER_MAX_DEPTH } err]} {
-    puts $fh "WARNING: reporting impl_1 failed: $err"
-    if {[llength [get_runs synth_1]]} {
-      if {[catch { report_for_run synth_1 $fh $HIER_MAX_DEPTH } err2]} {
-        puts $fh "ERROR: reporting synth_1 failed: $err2"
+if {[llength [get_runs impl_2]]} {
+  # Try to report impl_2; open_run may fail if the run was never launched
+  if {[catch { report_for_run impl_2 $fh $HIER_MAX_DEPTH } err]} {
+    puts $fh "WARNING: reporting impl_2 failed: $err"
+    if {[llength [get_runs synth_2]]} {
+      if {[catch { report_for_run synth_2 $fh $HIER_MAX_DEPTH } err2]} {
+        puts $fh "ERROR: reporting synth_2 failed: $err2"
       } else {
-        set reported_run synth_1
+        set reported_run synth_2
       }
     } else {
       section $fh "NO RUNS FOUND"
-      puts $fh "Run impl_1 could not be used and synth_1 not found."
+      puts $fh "Run impl_2 could not be used and synth_2 not found."
     }
   } else {
-    set reported_run impl_1
+    set reported_run impl_2
   }
-} elseif {[llength [get_runs synth_1]]} {
-  if {[catch { report_for_run synth_1 $fh $HIER_MAX_DEPTH } err]} {
-    puts $fh "ERROR: reporting synth_1 failed: $err"
+} elseif {[llength [get_runs synth_2]]} {
+  if {[catch { report_for_run synth_2 $fh $HIER_MAX_DEPTH } err]} {
+    puts $fh "ERROR: reporting synth_2 failed: $err"
   } else {
-    set reported_run synth_1
+    set reported_run synth_2
   }
 } else {
   section $fh "NO RUNS FOUND"
-  puts $fh "Run impl_1 and synth_1 not found."
+  puts $fh "Run impl_2 and synth_2 not found."
 }
 
 ## Output the summary of the sequence of events after all the reports have been completed.

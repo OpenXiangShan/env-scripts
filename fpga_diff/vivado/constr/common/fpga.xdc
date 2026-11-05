@@ -421,3 +421,9 @@ set_property PULLUP true [get_ports MDIO]
 ####################################################################################
 # Constraints from file : 'jtag_ddr_subsys_s01_data_fifo_0_clocks.xdc'
 ####################################################################################
+
+# Use DSPs only for FReducePE mantissa multiplication.
+set_property USE_DSP yes [get_nets -hierarchical -quiet -filter {
+    NAME =~ */FReducePE*/pipe0/io_out_Product0_* ||
+    NAME =~ */FReducePE*/pipe0/io_out_Product1_*
+}]
