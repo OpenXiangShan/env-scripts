@@ -733,6 +733,11 @@ def main():
         action="store_true",
         help="Run emu with --dump-db and store simulator.db in each checkpoint result directory",
     )
+    parser.add_argument(
+        "--dump-select-db",
+        type=str,
+        help="Record only the space-separated ChiselDB table names; implies database dumping",
+    )
 
     # report configs
     parser.add_argument(
@@ -901,6 +906,7 @@ def main():
                     threads=args.threads,
                     cst_file=cst_file,
                     dump_db=args.dump_db,
+                    dump_select_db=args.dump_select_db,
                     dry_run=args.dry_run,
                     max_cycles=args.max_cycles,
                 ),

@@ -364,12 +364,13 @@ class Server:
                     else []
                 )
                 + (
-                    [
-                        "--dump-db",
-                        "--db-path",
-                        shlex.quote(str(gcpt.db_path)),
-                    ]
-                    if emu_config.dump_db
+                    (
+                        ["--dump-select-db", shlex.quote(emu_config.dump_select_db)]
+                        if emu_config.dump_select_db
+                        else ["--dump-db"]
+                    )
+                    + ["--db-path", shlex.quote(str(gcpt.db_path))]
+                    if emu_config.dump_db or emu_config.dump_select_db
                     else []
                 )
             )

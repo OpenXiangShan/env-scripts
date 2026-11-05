@@ -20,6 +20,7 @@ class EmuConfig:
     with_numactl: bool = True
     cst_file: Path | None = None
     dump_db: bool = False
+    dump_select_db: str | None = None
     dry_run: bool = False
     max_cycles: int | None = None
 
