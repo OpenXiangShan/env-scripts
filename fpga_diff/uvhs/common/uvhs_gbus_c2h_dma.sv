@@ -108,7 +108,14 @@ module uvhs_gbus_c2h_dma #(
   wire frame_done = take_beat && capture_last && frame_good;
   wire frame_drop = take_beat && (!frame_good | (s_tlast != capture_last));
 
-  reg [AXIS_DATA_WIDTH-1:0] stage_mem [0:RING_BEATS-1];
+  // 6 Mbit at 256 bits wide.  Forced to UltraRAM: as block RAM this ring is
+  // about 190 RAMB36, and the FPGA that carries it also carries the CPU, the
+  // DDR controller and the GBus fabric, where those tiles are the scarce
+  // resource.  UltraRAM costs 24 URAM288 for the same depth and the FPGA has
+  // 320 of them with 16 in use.  The array has no reset and no initial value,
+  // and the producer can never write the frame the consumer is reading, so the
+  // same-address read/write behaviour the two styles differ in never occurs.
+  (* ram_style = "ultra" *) reg [AXIS_DATA_WIDTH-1:0] stage_mem [0:RING_BEATS-1];
   wire [RING_AW+3:0] wr_prod = wr_phys * BEATS_PER_FRAME;
   wire [RING_AW-1:0] wr_index = wr_prod[RING_AW-1:0] + {{(RING_AW-6){1'b0}}, wr_beat};
 
