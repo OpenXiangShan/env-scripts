@@ -37,10 +37,19 @@ proc apc16_pin {port slot} {
 # rstn_sw* are exported as UVHS global resets and must not also be assign_pin'd.
 apc16_pin led0 3
 apc16_pin led2 4
-# led3 reports the DDR-ready status of the FPGA that owns the DDR controller,
-# which for the NutShell GBus topology is b0.f2, so it stays on the F2 APC16
-# connector instead of the F0 daughter card.
-apc16_pin led3 5
+# led3 reports the DDR controller's ready status, so it has to sit on the FPGA
+# that owns the DDR.  Every non-GBUS topology keeps the DDR on b0.f0; GBUS
+# co-locates it with the CPU on b0.f2, and only then does led3 move.
+set uvhs_ddr_on_f2 0
+if {$hostif eq "GBUS"} {
+    set uvhs_ddr_on_f2 1
+}
+if {$uvhs_ddr_on_f2} {
+    apc16_pin led3 5
+} else {
+    assign_pin -port [pin_name $top led3] -connector b0.F0_FMC1 -index 311
+}
+unset -nocomplain uvhs_ddr_on_f2
 
 # UV_FMCH_FLASH drives USB_UART_RX at FMC[270] and receives USB_UART_TX at
 # FMC[311], so the FPGA RX/TX directions map to 270/311 respectively.

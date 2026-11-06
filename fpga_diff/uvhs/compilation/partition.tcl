@@ -238,7 +238,21 @@ if {[llength $uvhs_xiangshan_cell] == 1} {
         $uvhs_nocmisc_f2_cells]
     set uvhs_f0_cells [concat $uvhs_f0_cells $uvhs_memory_path_cells \
         $uvhs_config_path_cells]
-    if {$uvhs_hostif ne "GBUS" || [llength $uvhs_host_path_cells]} {
+    if {$uvhs_hostif eq "GBUS"} {
+        # GBus drives the CPU's own DDR bus, so the DDR has to sit on the same
+        # FPGA as the GBus host.  With the DDR on b0.f0 the memory bus crosses
+        # the F0-F2 TDM link and UVHS relaxes every clock that touches it
+        # (measured on this build: CPU 40 -> 125.7 ns, UART 20 -> 63.7 ns),
+        # which also breaks IP whose configuration assumes the nominal input
+        # rate.  Keep the whole design on b0.f2 instead.
+        set uvhs_gbus_f2_cells [get_cells -quiet [concat \
+            $uvhs_gbus_host_path_names $uvhs_host_path_cells \
+            $uvhs_f0_cells]]
+        create_fpga -name b0.f2 -cells $uvhs_gbus_f2_cells
+        set uvhs_f0_cells {}
+        set uvhs_ddr_on_f2 1
+        puts "INFO: XiangShan core, user DDR and GBus host all on b0.f2"
+    } elseif {[llength $uvhs_host_path_cells]} {
         create_fpga -name b0.f2 -cells $uvhs_host_path_cells
     }
     puts "INFO: selected XiangShan LLC path: $uvhs_memory_root_cells"
