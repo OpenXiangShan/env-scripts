@@ -122,8 +122,8 @@ wire sys_rstn_to_core;
 wire cpu_rstn_to_core;
 wire ddr_rstn_to_core;
 wire pcie_rstn;
-(*mark_debug = "true"*) wire cpu_setn_rflag;
-(*mark_debug = "true"*) reg  cpu_rstn;
+wire cpu_setn_rflag;
+reg  cpu_rstn;
 
 `ifdef UVHS
 assign sys_rstn = rstn_sw6;

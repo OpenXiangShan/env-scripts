@@ -102,8 +102,8 @@ wire sys_rstn;
 wire cpu_setn_buf;
 wire ui_clk, sys_clk_i, dev_clk_i;
 wire pcie_rstn;
-(*mark_debug = "true"*) wire cpu_setn_rflag;
-(*mark_debug = "true"*) reg  cpu_rstn;
+wire cpu_setn_rflag;
+reg  cpu_rstn;
 
 IBUF sys_rstn_ibuf (.O(sys_rstn), .I(rstn_sw6));
 IBUF cpu_rstn_ibuf (.O(cpu_setn_buf), .I(rstn_sw5));

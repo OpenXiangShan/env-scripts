@@ -17,9 +17,9 @@ parameter        CHECK_OUT    =    3'b100;
 parameter        DONE         =    3'b101;
 
 
-(*mark_debug = "true"*) reg         [2:0]       cur_state, nxt_state;
-(*mark_debug = "true"*) reg                     button_d1, button_d2;
-(*mark_debug = "true"*) wire                    button_f, button_r;
+reg         [2:0]       cur_state, nxt_state;
+reg                     button_d1, button_d2;
+wire                    button_f, button_r;
 always@(posedge clk) begin
 	if (!rstn) begin
 	   button_d1 <= 1'b1;
@@ -33,7 +33,7 @@ end
 assign button_f = ~button_d1 && button_d2;
 assign button_r = button_d1 && ~button_d2;
 
-(*mark_debug = "true"*) reg  [19:0]   counter;
+reg  [19:0]   counter;
 always@(posedge clk) begin
    if ((cur_state==FILTER)||(cur_state==FILTER_O))
 	   counter <= counter + 1'b1;

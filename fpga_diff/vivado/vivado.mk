@@ -14,11 +14,11 @@ CORE_CLK_DEFAULTS := \
 	boom:100:100
 CORE_CLK_DEFAULT = $(subst :, ,$(or $(filter $(CPU):%,$(CORE_CLK_DEFAULTS)),$(firstword $(CORE_CLK_DEFAULTS))))
 
-# Host-trigger ILA capture is opt-in. Keep the trigger mark_debug net in RTL,
-# but avoid instantiating the ILA core by default to reduce routing pressure.
+# Host-trigger ILA capture is opt-in; avoid instantiating the ILA core
+# by default to reduce routing pressure.
 ENABLE_ILA ?= 0
 ILA_DEPTH ?= 16384
-DDR_RANK_WIDTH ?= 2
+DDR_RANK_WIDTH ?= 1
 export FPGA_CORE_CLK_MHZ TIMING_CORE_CLK_MHZ ENABLE_ILA ILA_DEPTH DDR_RANK_WIDTH
 
 ILA_OUT ?= $(ENV_SCRIPTS_HOME)/ila-dump

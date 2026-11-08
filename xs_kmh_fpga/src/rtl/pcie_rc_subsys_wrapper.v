@@ -228,8 +228,8 @@ module pcie_rc_subsys_wrapper # (
 
    
 // Interrupt related 
-(*mark_debug = "true"*)   wire        [4:0]     cfg_msg_received_type;
-(*mark_debug = "true"*)   wire                  cfg_msg_received; 
+  wire        [4:0]     cfg_msg_received_type;
+  wire                  cfg_msg_received;
 
 // Core Top Level Wrapper
  pcie4c_uscale_plus_0  pcie4c_uscale_plus_0_i (
