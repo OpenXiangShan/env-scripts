@@ -11,7 +11,7 @@ assign init_calib_complete = rstn_sw4;
 
 `ifdef CPU_NUTSHELL
 // Vendor AXI Data Width Converter, exported as a UVHS checkpoint from
-// src/tcl/common/gbus_ddr_dwc.tcl.  Its master interface carries no ID
+// uvhs/ip/gbus/gbus_ddr_dwc.tcl.  Its master interface carries no ID
 // ports, so the CPU reaches the DDR as a single in-order master.
 //
 // Reset is fabric-only on purpose: a DiffTest session reset must abandon the

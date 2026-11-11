@@ -1,8 +1,10 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-[[ $# == 7 ]] || {
-  echo "Usage: $0 ORIGIN_DIR WORK_DIR CORE_DIR JOBS FORCE DDR_SOURCE DDR_WIDTH" >&2
+# CPU is optional so a caller that predates it still gets a complete export for
+# every layout that needs no CPU-specific IP.
+[[ $# == 7 || $# == 8 ]] || {
+  echo "Usage: $0 ORIGIN_DIR WORK_DIR CORE_DIR JOBS FORCE DDR_SOURCE DDR_WIDTH [CPU]" >&2
   exit 64
 }
 : "${UV_ROOT:?UV_ROOT is not set}"
@@ -15,6 +17,10 @@ jobs=$4
 force=$5
 ddr_source=$6
 ddr_width=$7
+# CPU selects which GBus IP has to exist: only NutShell instantiates the 64- to
+# 256-bit AXI converter.  Empty means "unknown", which exports only the pieces
+# every layout needs.
+cpu=${8:-}
 script_dir=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)
 
 require_file() {
@@ -166,6 +172,7 @@ vivado_args=(
   --origin_dir "$origin_dir" --out_dir "$work_dir"
   --core_dir "$core_dir" --jobs "$jobs"
   --hostif "${DIFFTEST_HOSTIF:-XDMA}"
+  --cpu "$cpu"
 )
 [[ $force != 1 ]] || vivado_args+=(--force)
 export VIVADO_HOME=$UV_XILINX_VIVADO XILINX_VIVADO=$UV_XILINX_VIVADO

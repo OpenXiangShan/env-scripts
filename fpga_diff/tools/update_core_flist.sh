@@ -76,10 +76,10 @@ generate_uvhs_filelist() {
   local hostif=${DIFFTEST_HOSTIF:-XDMA}
   [[ $hostif == XDMA || $hostif == GBUS ]] ||
     rtl_flist_fail "DIFFTEST_HOSTIF must be XDMA or GBUS: $hostif"
-  # Default this off, like UVHS_FUNCTIONAL_DDR_REMOTE_LINK in uvhs.mk and the
-  # partition script.  The dedicated F2->F0 DDR link is an opt-in experiment;
-  # a plain GBus build uses the CPU DDR path that the netlist always contains.
-  local remote_link=${UVHS_FUNCTIONAL_DDR_REMOTE_LINK:-0}
+  local remote_link=${UVHS_FUNCTIONAL_DDR_REMOTE_LINK:-}
+  if [[ -z $remote_link ]]; then
+    [[ $hostif == GBUS ]] && remote_link=1 || remote_link=0
+  fi
   [[ $remote_link == 0 || $remote_link == 1 ]] || rtl_flist_fail "UVHS_FUNCTIONAL_DDR_REMOTE_LINK must be 0 or 1"
   [[ $remote_link == 0 || $hostif == GBUS ]] || rtl_flist_fail "remote DDR link requires DIFFTEST_HOSTIF=GBUS"
 
