@@ -9,12 +9,16 @@ if {[llength $uvhs_ddr_cell] != 1} {
 }
 
 # Keep the XiangShan memory and configuration paths with the user DDR. Keep the
-# core and DiffTest host path with XDMA. UART pins remain on the physical F1
-# daughter card.
+# core and the DiffTest host path together on b0.f2, whichever host interface
+# is selected: GBus takes the place of xdma_ep_i rather than moving any CPU or
+# memory cell, so the XiangShan partition is identical for XDMA and GBUS and
+# only the host cells differ.  UART pins remain on the physical F1 daughter
+# card.
 set uvhs_f0_cells $uvhs_ddr_cell
 set uvhs_hostif [string toupper [uvhs::env_or_default DIFFTEST_HOSTIF XDMA]]
-# NutShell GBUS puts the user DDR on b0.f2 next to the CPU, so b0.f0 must not
-# claim the DDR cell here; the NutShell branch below adds it to b0.f2 instead.
+# The one exception is NutShell under GBUS: its DDR has to sit next to the CPU,
+# so b0.f0 must not claim the DDR cell here and the NutShell branch below adds
+# it to b0.f2 instead.  XiangShan never takes this path.
 set uvhs_ddr_on_f2 0
 if {$uvhs_hostif eq "GBUS"} {
     set uvhs_cpu_is_nutshell [get_cells -quiet {core_def/U_CPU_TOP/u_SimTop}]
@@ -24,9 +28,12 @@ if {$uvhs_hostif eq "GBUS"} {
     }
 }
 unset -nocomplain uvhs_cpu_is_nutshell
+# Opt-in, and off by default to match UVHS_FUNCTIONAL_DDR_REMOTE_LINK in
+# uvhs.mk and the `ifdef that guards the RTL.  Turning it on without the define
+# fails the sink lookup below rather than silently partitioning a link the
+# netlist does not contain.
 set uvhs_functional_ddr_remote_link \
-    [uvhs::env_or_default UVHS_FUNCTIONAL_DDR_REMOTE_LINK \
-        [expr {$uvhs_hostif eq "GBUS" ? 1 : 0}]]
+    [uvhs::env_or_default UVHS_FUNCTIONAL_DDR_REMOTE_LINK 0]
 if {$uvhs_functional_ddr_remote_link ni {0 1}} {
     error "GBus remote-link setting must be 0 or 1"
 }

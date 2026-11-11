@@ -35,7 +35,10 @@ GBD1 is the C2H transport: the DiffTest stream is appended frame by frame to a
 786432-byte (1024-frame) ring, and the host reads a whole batch of frames with
 one DMA call over the AXI aperture and releases it with a single CONSUME write.
 Only CONSUME moves the read pointer, so the producer never overwrites unread
-data and a slow DMA call costs throughput but never correctness.
+data and a slow DMA call costs throughput but never correctness. The ring is
+declared `ram_style = "ultra"`, so the 768 KiB stage costs no block RAM on the
+FPGA that also carries the CPU's L3: 24 URAM288 hold the whole ring, which is
+what leaves the B0/F2 block RAM budget to the cache and the host bridges.
 
 Ring depth is the CPU-stall budget, not a bandwidth target: backpressure reaches
 the DiffTest sender as soon as the ring is full, so the ring is sized to absorb
@@ -168,12 +171,15 @@ while its runtime session is active.
 The default topology keeps the XiangShan CHI/CMN memory path, configuration
 bridge, runtime flash interface, syscfg, and boot ROM with user DDR on B0/F0.
 The physical UV_FMCH_FLASH USB-UART remains on B0/F1, while the core, DiffTest
-endpoint, and XDMA host path stay on B0/F2. The timer source/sink CDC boundary
-also stays with the CPU-side path, while the 65-bit `syscnt` time bus and the
-DiffTest clock-enable signal use explicit direct F2-to-F0 routes. This avoids
-per-bit TDM skew on the time value. The remaining logic is partitioned
-automatically. XiangShan uses these path constraints together with high
-partition effort and the `uv_placer_balance_slrs` PnR strategy.
+endpoint, and the selected host path stay on B0/F2. GBus replaces `xdma_ep_i`
+in that group instead of moving any CPU or memory cell, so `DIFFTEST_HOSTIF`
+chooses the host cells and leaves every other partition position unchanged.
+The timer source/sink CDC boundary also stays with the CPU-side path, while
+the 65-bit `syscnt` time bus and the DiffTest clock-enable signal use explicit
+direct F2-to-F0 routes. This avoids per-bit TDM skew on the time value. The
+remaining logic is partitioned automatically. XiangShan uses these path
+constraints together with high partition effort and the
+`uv_placer_balance_slrs` PnR strategy.
 
 UVHS drives the AXI UART16550 from `clk6_p` at a fixed 50 MHz. The CPU/SoC
 `clk5_p` frequency comes from the system sign-off result committed in the
