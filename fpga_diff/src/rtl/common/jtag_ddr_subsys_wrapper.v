@@ -124,11 +124,7 @@ module jtag_ddr_subsys_wrapper
   output [1:0]SOC_M_AXI_bresp;
   output SOC_M_AXI_bvalid;
 
-`ifdef CPU_NUTSHELL
-  output [63:0]SOC_M_AXI_rdata;
-`else
-  output [255:0]SOC_M_AXI_rdata;
-`endif // CPU_NUTSHELL
+  output [`CPU_AXI_DATA_WIDTH-1:0]SOC_M_AXI_rdata;
 
   output [17:0]SOC_M_AXI_rid;
   output SOC_M_AXI_rlast;
@@ -136,13 +132,8 @@ module jtag_ddr_subsys_wrapper
   output [1:0]SOC_M_AXI_rresp;
   output SOC_M_AXI_rvalid;
 
-`ifdef CPU_NUTSHELL
-  input [63:0]SOC_M_AXI_wdata;
-  input [7:0]SOC_M_AXI_wstrb;
-`else
-  input [255:0]SOC_M_AXI_wdata;
-  input [31:0]SOC_M_AXI_wstrb;
-`endif // CPU_NUTSHELL
+  input [`CPU_AXI_DATA_WIDTH-1:0]SOC_M_AXI_wdata;
+  input [`CPU_AXI_DATA_WIDTH/8-1:0]SOC_M_AXI_wstrb;
 
   input SOC_M_AXI_wlast;
   output SOC_M_AXI_wready;
@@ -196,23 +187,14 @@ module jtag_ddr_subsys_wrapper
   wire SOC_M_AXI_bready;
   wire [1:0]SOC_M_AXI_bresp;
   wire SOC_M_AXI_bvalid;
-`ifdef CPU_NUTSHELL
-  wire [63:0]SOC_M_AXI_rdata;
-`else
-  wire [255:0]SOC_M_AXI_rdata;
-`endif // CPU_NUTSHELL
+  wire [`CPU_AXI_DATA_WIDTH-1:0]SOC_M_AXI_rdata;
   wire [17:0]SOC_M_AXI_rid;
   wire SOC_M_AXI_rlast;
   wire SOC_M_AXI_rready;
   wire [1:0]SOC_M_AXI_rresp;
   wire SOC_M_AXI_rvalid;
-`ifdef CPU_NUTSHELL
-  wire [63:0]SOC_M_AXI_wdata;
-  wire [7:0]SOC_M_AXI_wstrb;
-`else
-  wire [255:0]SOC_M_AXI_wdata;
-  wire [31:0]SOC_M_AXI_wstrb;
-`endif // CPU_NUTSHELL
+  wire [`CPU_AXI_DATA_WIDTH-1:0]SOC_M_AXI_wdata;
+  wire [`CPU_AXI_DATA_WIDTH/8-1:0]SOC_M_AXI_wstrb;
   wire SOC_M_AXI_wlast;
   wire SOC_M_AXI_wready;
   wire SOC_M_AXI_wvalid;

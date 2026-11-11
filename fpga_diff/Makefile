@@ -70,3 +70,4 @@ pcie_rescan:
 
 include vivado/vivado.mk
 include uvhs/uvhs.mk
+include tools/relay/relay.mk

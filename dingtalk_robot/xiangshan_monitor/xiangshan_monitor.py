@@ -1,17 +1,9 @@
-"""Daily OpenXiangShan progress and DingTalk praise robot.
-
-The checked-in files under ``xiangshan_monitor/`` describe repositories, prompt
-wording, scheduling, and context limits. The ignored ``dingtalk_robot/config.json``
-contains DingTalk credentials and the private local AI endpoint/key.
-
-``pull`` is Git-only, ``talk`` uses the configured local API, and ``push`` is
-DingTalk-only. Long reports use an explicit map-reduce strategy: independent
-commit chunks are summarized first, then one final call writes the message.
-"""
+"""Collect OpenXiangShan progress, generate praise, and deliver it to DingTalk."""
 
 from __future__ import annotations
 
 import argparse
+import ast
 import hashlib
 import json
 import math
@@ -51,7 +43,10 @@ DEFAULT_ANALYSIS_WINDOW = "24h"
 DEFAULT_CLONE_DIR = "dingtalk_robot/xiangshan_monitor/repos"
 DEFAULT_REPORT_PATH = "dingtalk_robot/xiangshan_monitor/reports/{date}-{window}.json"
 DEFAULT_MESSAGE_PATH = "dingtalk_robot/xiangshan_monitor/reports/{date}-{window}.md"
-DEFAULT_GIT_TIMEOUT = 900.0
+DEFAULT_GIT_TIMEOUT = 120.0
+DEFAULT_GIT_COLLECTION_TIMEOUT = 1200.0
+DEFAULT_API_TIMEOUT = 180.0
+DEFAULT_AI_TOTAL_TIMEOUT = 300.0
 DEFAULT_CONTEXT_WINDOW_TOKENS = 120000
 DEFAULT_MAX_OUTPUT_TOKENS = 1800
 DEFAULT_MAX_API_CALLS = 1
@@ -60,32 +55,9 @@ DEFAULT_DINGTALK_LAYER = "debug"
 DEFAULT_HIGHLIGHT_COUNT = 1
 RANDOM_GIFT_DENOMINATOR = 5
 RANDOM_GIFT_LABEL = "一盒随机口味哈根达斯（或一罐无糖可乐）"
-GIFT_TRACKING_START = date(2026, 9, 20)
 MID_AUTUMN_GIFT_START = date(2026, 9, 20)
 MID_AUTUMN_GIFT_END = date(2026, 9, 24)
-HIGHLIGHT_PITY_THRESHOLD = 3
-COMMIT_PITY_THRESHOLD = 50
-WEEKLY_PITY_WINDOW_DAYS = 7
 GIFT_KIND_RANDOM = "random"
-GIFT_KIND_MID_AUTUMN = "mid_autumn"
-GIFT_KIND_HIGHLIGHT_PITY = "highlight_pity"
-GIFT_KIND_COMMIT_PITY = "commit_pity"
-GIFT_KIND_WEEKLY_PITY = "weekly_pity"
-GIFT_PITY_KINDS = frozenset({GIFT_KIND_MID_AUTUMN, GIFT_KIND_HIGHLIGHT_PITY, GIFT_KIND_COMMIT_PITY, GIFT_KIND_WEEKLY_PITY})
-GIFT_KIND_LABELS = {
-    GIFT_KIND_RANDOM: RANDOM_GIFT_LABEL,
-    GIFT_KIND_MID_AUTUMN: "中秋礼物",
-    GIFT_KIND_HIGHLIGHT_PITY: "保底礼包",
-    GIFT_KIND_COMMIT_PITY: "保底礼包",
-    GIFT_KIND_WEEKLY_PITY: "保底礼包",
-}
-GIFT_REASON_TEXT = {
-    GIFT_KIND_RANDOM: "随机抽中",
-    GIFT_KIND_MID_AUTUMN: "中秋活动，今日保底一份",
-    GIFT_KIND_HIGHLIGHT_PITY: "连续3次表扬未中奖保底",
-    GIFT_KIND_COMMIT_PITY: "连续50个commit未中奖保底",
-    GIFT_KIND_WEEKLY_PITY: "过去一周无人中奖，今日保底一份",
-}
 DEFAULT_ANALYSIS_START_TIME = "18:00"
 DEFAULT_PULL_RETRY_UNTIL = "18:20"
 DEFAULT_PULL_RETRY_INTERVAL = 20.0
@@ -101,6 +73,10 @@ _HIGHLIGHT_BLOCK = re.compile(
 )
 _HIGHLIGHT_LINE = re.compile(r"^\s*(\d+)\.\s*(.+?)\s*$")
 _NAME_EMAIL = re.compile(r"^(?P<name>.+?)\s*<\s*(?P<email>[^>]+)\s*>$")
+_DIFF_SUFFIX_BLACKLIST = frozenset({
+    # Text diagram formats can embed megabytes of encoded image data.
+    ".svg", ".drawio",
+})
 
 
 class XiangShanMonitorError(RuntimeError):
@@ -334,8 +310,41 @@ def collect_repository_commits(path: Path, ref: str, window: AnalysisWindow, org
         args.append(f"-n{max_commits}")
     commits = parse_git_log(git_runner(args, cwd=path), organization, repository)
     for commit in commits:
-        commit["diff"] = git_runner(["show", "--format=", "--patch", "--binary", "--find-renames", "--no-ext-diff", "--no-color", commit["sha"]], cwd=path)
+        patch = git_runner(["show", "--format=", "--patch", "--find-renames", "--no-ext-diff", "--no-color", "--src-prefix=a/", "--dst-prefix=b/", commit["sha"]], cwd=path)
+        commit["diff"] = filter_diff(patch)
     return commits
+
+
+def _diff_path(value: str) -> str:
+    value = value.split("\t", 1)[0].strip()
+    if value.startswith('"'):
+        try:
+            value = ast.literal_eval(value)
+        except (SyntaxError, ValueError):
+            return ""
+    return value[2:] if value.startswith(("a/", "b/")) else value
+
+
+def filter_diff(patch: str) -> str:
+    """Omit binary and diagram patches; names remain in the commit's files list."""
+    kept: List[str] = []
+    for section in re.split(r"(?=^diff --git )", patch, flags=re.MULTILINE):
+        if not section.startswith("diff --git "):
+            continue
+        header_text = re.split(r"^@@", section, maxsplit=1, flags=re.MULTILINE)[0]
+        paths = re.findall(r"^(?:---|\+\+\+) (.+)$", header_text, flags=re.MULTILINE)
+        paths = [_diff_path(path) for path in paths if path != "/dev/null"]
+        if not paths:
+            paths = re.findall(r"^(?:rename|copy) (?:from|to) (.+)$", header_text, flags=re.MULTILINE)
+        if not paths:
+            header = re.match(r'^diff --git ("(?:\\.|[^"])*"|a/.*?) ("(?:\\.|[^"])*"|b/.*)$', section.split("\n", 1)[0])
+            paths = [_diff_path(path) for path in header.groups()] if header else []
+        if any(Path(path).suffix.lower() in _DIFF_SUFFIX_BLACKLIST for path in paths):
+            continue
+        if re.search(r"^(?:GIT binary patch|Binary files .* differ)$", header_text, flags=re.MULTILINE):
+            continue
+        kept.append(section)
+    return "".join(kept)
 
 
 def _pr_counts(repositories: Iterable[Mapping[str, Any]]) -> Dict[str, int]:
@@ -455,7 +464,6 @@ def resolve_highlight_count(data: Mapping[str, Any], report: Mapping[str, Any], 
 def default_gift_settings() -> Dict[str, Any]:
     return {
         "win_denominator": RANDOM_GIFT_DENOMINATOR,
-        "tracking_start": GIFT_TRACKING_START,
         "special_gifts": [
             {
                 "id": "mid_autumn",
@@ -466,9 +474,6 @@ def default_gift_settings() -> Dict[str, Any]:
             }
         ],
         "random_gift": {"name": RANDOM_GIFT_LABEL},
-        "highlight_pity": {"enabled": True, "threshold": HIGHLIGHT_PITY_THRESHOLD},
-        "commit_pity": {"enabled": True, "threshold": COMMIT_PITY_THRESHOLD},
-        "weekly_pity": {"enabled": True, "window_days": WEEKLY_PITY_WINDOW_DAYS},
     }
 
 
@@ -536,12 +541,14 @@ def _parse_special_gifts(raw: Any) -> List[Dict[str, Any]]:
             raise ConfigError(f"{prefix}.name is required")
         enabled = True if "enabled" not in item else _parse_bool(item.get("enabled"), f"{prefix}.enabled")
         per_day = 1 if "per_day" not in item else _parse_positive_int(item.get("per_day"), f"{prefix}.per_day")
+        per_person = False if "per_person" not in item else _parse_bool(item.get("per_person"), f"{prefix}.per_person")
         gifts.append({
             "id": ident,
             "name": name,
             "enabled": enabled,
             "windows": _parse_special_windows(item, prefix),
             "per_day": per_day,
+            "per_person": per_person,
         })
     return gifts
 
@@ -553,23 +560,8 @@ def _special_gift_active(gift: Mapping[str, Any], report_day: date) -> bool:
     return any(start <= report_day <= end for start, end in windows)
 
 
-def _merge_gift_rule(raw: Any, dest: Dict[str, Any], prefix: str, *, date_keys: Sequence[str] = (), int_keys: Sequence[str] = ()) -> None:
-    if raw is None:
-        return
-    if not isinstance(raw, Mapping):
-        raise ConfigError(f"{prefix} must be an object")
-    if "enabled" in raw:
-        dest["enabled"] = _parse_bool(raw.get("enabled"), f"{prefix}.enabled")
-    for key in date_keys:
-        if key in raw:
-            dest[key] = _parse_config_date(raw.get(key), f"{prefix}.{key}")
-    for key in int_keys:
-        if key in raw:
-            dest[key] = _parse_positive_int(raw.get(key), f"{prefix}.{key}")
-
-
 def gift_settings(config: Optional[Mapping[str, Any]] = None) -> Dict[str, Any]:
-    """Load lottery odds and pity rules from config.json, with code defaults."""
+    """Load lottery odds and gift settings from config.json, with code defaults."""
     settings = default_gift_settings()
     if not isinstance(config, Mapping):
         return settings
@@ -581,8 +573,6 @@ def gift_settings(config: Optional[Mapping[str, Any]] = None) -> Dict[str, Any]:
         raise ConfigError("xiangshan_monitor.gifts must be an object")
     if "win_denominator" in raw:
         settings["win_denominator"] = _parse_positive_int(raw.get("win_denominator"), "xiangshan_monitor.gifts.win_denominator")
-    if "tracking_start" in raw:
-        settings["tracking_start"] = _parse_config_date(raw.get("tracking_start"), "xiangshan_monitor.gifts.tracking_start")
     if "special_gifts" in raw:
         settings["special_gifts"] = _parse_special_gifts(raw.get("special_gifts"))
     random_gift = raw.get("random_gift")
@@ -593,34 +583,19 @@ def gift_settings(config: Optional[Mapping[str, Any]] = None) -> Dict[str, Any]:
         if not name:
             raise ConfigError("xiangshan_monitor.gifts.random_gift.name is required")
         settings["random_gift"] = {"name": name}
-    _merge_gift_rule(raw.get("highlight_pity"), settings["highlight_pity"], "xiangshan_monitor.gifts.highlight_pity", int_keys=("threshold",))
-    _merge_gift_rule(raw.get("commit_pity"), settings["commit_pity"], "xiangshan_monitor.gifts.commit_pity", int_keys=("threshold",))
-    _merge_gift_rule(raw.get("weekly_pity"), settings["weekly_pity"], "xiangshan_monitor.gifts.weekly_pity", int_keys=("window_days",))
     return settings
 
 
 def _gift_reason_text(settings: Mapping[str, Any]) -> Dict[str, str]:
-    highlight_n = int(settings["highlight_pity"]["threshold"])
-    commit_n = int(settings["commit_pity"]["threshold"])
-    weekly_n = int(settings["weekly_pity"]["window_days"])
-    reasons = {
-        GIFT_KIND_RANDOM: GIFT_REASON_TEXT[GIFT_KIND_RANDOM],
-        GIFT_KIND_HIGHLIGHT_PITY: f"连续{highlight_n}次表扬未中奖保底",
-        GIFT_KIND_COMMIT_PITY: f"连续{commit_n}个commit未中奖保底",
-        GIFT_KIND_WEEKLY_PITY: f"过去{weekly_n}天无人中奖，今日保底一份",
-    }
+    reasons = {GIFT_KIND_RANDOM: "中奖"}
     for gift in settings.get("special_gifts") or []:
-        reasons[str(gift["id"])] = f"{gift['name']}，今日保底{gift['per_day']}份"
+        quantity = "今日每位表扬伙伴一份" if gift.get("per_person") else f"今日{gift['per_day']}份"
+        reasons[str(gift["id"])] = f"{gift['name']}，{quantity}"
     return reasons
 
 
 def _gift_labels(settings: Mapping[str, Any]) -> Dict[str, str]:
-    labels = dict(GIFT_KIND_LABELS)
-    random_name = str((settings.get("random_gift") or {}).get("name") or RANDOM_GIFT_LABEL)
-    labels[GIFT_KIND_RANDOM] = random_name
-    labels[GIFT_KIND_HIGHLIGHT_PITY] = random_name
-    labels[GIFT_KIND_COMMIT_PITY] = random_name
-    labels[GIFT_KIND_WEEKLY_PITY] = random_name
+    labels = {GIFT_KIND_RANDOM: str((settings.get("random_gift") or {}).get("name") or RANDOM_GIFT_LABEL)}
     for gift in settings.get("special_gifts") or []:
         labels[str(gift["id"])] = str(gift["name"])
     return labels
@@ -630,10 +605,7 @@ def _award_inventory_key(award: Mapping[str, Any]) -> str:
     special_id = str(award.get("special_id") or "").strip()
     if special_id:
         return special_id
-    kind = str(award.get("kind") or "")
-    if kind in {GIFT_KIND_RANDOM, GIFT_KIND_HIGHLIGHT_PITY, GIFT_KIND_COMMIT_PITY, GIFT_KIND_WEEKLY_PITY}:
-        return GIFT_KIND_RANDOM
-    return kind or GIFT_KIND_RANDOM
+    return str(award.get("kind") or GIFT_KIND_RANDOM)
 
 
 def resolve_gift_inventory(settings: Mapping[str, Any], delivery_history: Optional[Mapping[str, Any]] = None) -> Dict[str, Optional[int]]:
@@ -758,7 +730,7 @@ def append_random_gift_result(message: str, winning_slots: Sequence[int]) -> str
 def _stable_index(report: Mapping[str, Any], salt: str, count: int) -> int:
     if count <= 0:
         raise ValueError("stable pick requires a positive candidate count")
-    seed = f"xiangshan-gift-pity-v1\n{_report_date(report).isoformat()}\n{_repository_head_snapshot(report)}\n{salt}"
+    seed = f"xiangshan-special-gift-v1\n{_report_date(report).isoformat()}\n{_repository_head_snapshot(report)}\n{salt}"
     value = int.from_bytes(hashlib.sha256(seed.encode("utf-8")).digest(), "big")
     return value % count
 
@@ -912,23 +884,9 @@ def extract_highlights(text: str, report: Mapping[str, Any], highlight_count: in
     return praise, people
 
 
-def empty_gift_history(timezone_name: str, tracking_start: Optional[date] = None) -> Dict[str, Any]:
-    start = tracking_start or GIFT_TRACKING_START
-    if not isinstance(start, date) or isinstance(start, datetime):
-        start = _parse_config_date(start, "tracking_start")
-    return {
-        "version": 1,
-        "timezone": timezone_name,
-        "tracking_start": start.isoformat(),
-        "people": {},
-        "counted_shas": [],
-        "days": [],
-    }
-
-
-def load_gift_history(path: Path, timezone_name: str, tracking_start: Optional[date] = None) -> Dict[str, Any]:
+def load_gift_history(path: Path, timezone_name: str) -> Dict[str, Any]:
     if not path.exists():
-        return empty_gift_history(timezone_name, tracking_start)
+        return {"version": 1, "timezone": timezone_name, "days": []}
     try:
         history = json.loads(path.read_text(encoding="utf-8"))
     except (OSError, json.JSONDecodeError) as exc:
@@ -937,10 +895,6 @@ def load_gift_history(path: Path, timezone_name: str, tracking_start: Optional[d
         raise ConfigError(f"Unsupported gift history format: {path}")
     if history.get("timezone") != timezone_name:
         raise ConfigError(f"Gift history timezone does not match {timezone_name}: {path}")
-    if not isinstance(history.get("people"), dict):
-        raise ConfigError(f"Gift history people must be an object: {path}")
-    if not isinstance(history.get("counted_shas"), list):
-        raise ConfigError(f"Gift history counted_shas must be a list: {path}")
     if not isinstance(history.get("days"), list):
         raise ConfigError(f"Gift history days must be a list: {path}")
     return history
@@ -953,113 +907,9 @@ def write_gift_history(history: Mapping[str, Any], path: Path) -> None:
     temporary.replace(path)
 
 
-def _commit_day(commit: Mapping[str, Any]) -> Optional[date]:
-    raw = str(commit.get("authored_at") or "").strip()
-    if not raw:
-        return None
-    try:
-        parsed = datetime.fromisoformat(raw)
-    except ValueError:
-        return None
-    if parsed.tzinfo is not None:
-        parsed = parsed.astimezone(_timezone(DEFAULT_TIMEZONE))
-    return parsed.date()
-
-
-def collect_new_gift_commits(report: Mapping[str, Any], history: Mapping[str, Any]) -> List[Dict[str, str]]:
-    counted = {str(item) for item in history.get("counted_shas", []) if isinstance(item, str)}
-    try:
-        tracking = date.fromisoformat(str(history.get("tracking_start") or GIFT_TRACKING_START.isoformat()))
-    except ValueError:
-        tracking = GIFT_TRACKING_START
-    found: List[Dict[str, str]] = []
-    for repo_name, commit in iter_report_commits(report):
-        sha = str(commit.get("sha") or "").strip().lower()
-        if not sha:
-            continue
-        token = f"{repo_name}:{sha}"
-        if token in counted:
-            continue
-        identity = _author_identity(commit.get("author"), commit.get("email"))
-        if identity is None:
-            continue
-        when = _commit_day(commit)
-        if when is None or when < tracking:
-            continue
-        found.append({"token": token, "key": identity["key"], "name": identity["name"], "email": identity["email"]})
-        counted.add(token)
-    return found
-
-
-def _stats_map(history: Mapping[str, Any]) -> Dict[str, Dict[str, Any]]:
-    people = history.get("people")
-    if not isinstance(people, dict):
-        return {}
-    stats: Dict[str, Dict[str, Any]] = {}
-    for key, raw in people.items():
-        if not isinstance(raw, Mapping):
-            continue
-        stats[str(key)] = {
-            "name": str(raw.get("name") or ""),
-            "email": str(raw.get("email") or ""),
-            "highlights_since_gift": int(raw.get("highlights_since_gift") or 0),
-            "wins": int(raw.get("wins") or 0),
-            "commits_since_gift": int(raw.get("commits_since_gift") or 0),
-            "total_commits": int(raw.get("total_commits") or 0),
-            "last_gift_date": raw.get("last_gift_date"),
-        }
-    return stats
-
-
-def _touch_stats(stats: Dict[str, Dict[str, Any]], identity: Mapping[str, Any]) -> Dict[str, Any]:
-    key = str(identity.get("key") or "")
-    current = stats.get(key)
-    if current is None:
-        current = {
-            "name": str(identity.get("name") or ""),
-            "email": str(identity.get("email") or ""),
-            "highlights_since_gift": 0,
-            "wins": 0,
-            "commits_since_gift": 0,
-            "total_commits": 0,
-            "last_gift_date": None,
-        }
-        stats[key] = current
-        return current
-    if identity.get("name"):
-        current["name"] = str(identity["name"])
-    if identity.get("email"):
-        current["email"] = str(identity["email"])
-    return current
-
-
-def _day_has_win(item: Mapping[str, Any]) -> bool:
-    awards = item.get("awards")
-    return isinstance(awards, list) and any(isinstance(award, Mapping) and award.get("key") for award in awards)
-
-
-def _window_has_win(history: Mapping[str, Any], start: date, end: date) -> bool:
-    if end < start:
-        return False
-    days = history.get("days")
-    if not isinstance(days, list):
-        return False
-    for item in days:
-        if not isinstance(item, Mapping) or not _day_has_win(item):
-            continue
-        try:
-            day = date.fromisoformat(str(item.get("date") or "").strip())
-        except ValueError:
-            continue
-        if start <= day <= end:
-            return True
-    return False
-
-
 def resolve_gift_awards(
     report: Mapping[str, Any],
     highlights: Sequence[Mapping[str, Any]],
-    history: Mapping[str, Any],
     highlight_count: int,
     settings: Optional[Mapping[str, Any]] = None,
     inventory: Optional[Mapping[str, Optional[int]]] = None,
@@ -1077,13 +927,6 @@ def resolve_gift_awards(
         identity["slot"] = int(item.get("slot") or index)
         snapshot_highlights.append(identity)
 
-    stats = _stats_map(history)
-    new_commits = collect_new_gift_commits(report, history)
-    for commit in new_commits:
-        current = _touch_stats(stats, commit)
-        current["commits_since_gift"] += 1
-        current["total_commits"] += 1
-
     awards: List[Dict[str, Any]] = []
     awarded_keys: set[str] = set()
 
@@ -1095,14 +938,13 @@ def resolve_gift_awards(
         if not _take_stock(stock, inventory_key):
             return False
         awarded_keys.add(key)
-        person = stats.get(key, {})
         awards.append({
             "key": key,
-            "name": str(identity.get("name") or person.get("name") or key),
-            "email": str(identity.get("email") or person.get("email") or ""),
+            "name": str(identity.get("name") or key),
+            "email": str(identity.get("email") or ""),
             "kind": kind,
             "reason": extra.get("reason") or reasons.get(kind, reasons[GIFT_KIND_RANDOM]),
-            "label": extra.get("label") or labels.get(kind, GIFT_KIND_LABELS.get(kind, "礼包")),
+            "label": extra.get("label") or labels.get(kind, "礼包"),
             "slot": slot if slot is not None else identity.get("slot"),
         })
         for key_name, value in extra.items():
@@ -1122,10 +964,9 @@ def resolve_gift_awards(
     slot_people = {int(item["slot"]): item for item in snapshot_highlights if item.get("slot") is not None}
     random_slots = random_gift_slots(report, highlight_count, gifts)
     active_special = [gift for gift in gifts.get("special_gifts") or [] if _special_gift_active(gift, report_day)]
-    pity = False
     if active_special:
         for gift in active_special:
-            needed = int(gift["per_day"])
+            needed = len(snapshot_highlights) if gift.get("per_person") else int(gift["per_day"])
             available = stock.get(str(gift["id"]))
             if available is not None:
                 needed = min(needed, max(0, int(available)))
@@ -1139,97 +980,33 @@ def resolve_gift_awards(
                     continue
                 if add_award(person, str(gift["id"]), slot, **extra):
                     have += 1
-                    pity = True
             while have < needed:
                 person = pick_candidate(f"special:{gift['id']}:{have}", awarded_keys)
                 if person is None or not add_award(person, str(gift["id"]), person.get("slot"), **extra):
                     break
                 have += 1
-                pity = True
     else:
         for slot in random_slots:
             person = slot_people.get(slot)
             if person is not None:
                 add_award(person, GIFT_KIND_RANDOM, slot)
 
-    highlight_pity = gifts["highlight_pity"]
-    if highlight_pity["enabled"] and not active_special:
-        threshold = int(highlight_pity["threshold"])
-        for person in snapshot_highlights:
-            current = _touch_stats(stats, person)
-            if person["key"] not in awarded_keys and int(current["highlights_since_gift"]) + 1 >= threshold:
-                if add_award(person, GIFT_KIND_HIGHLIGHT_PITY, person.get("slot")):
-                    pity = True
-
-    commit_pity = gifts["commit_pity"]
-    if commit_pity["enabled"] and not active_special:
-        threshold = int(commit_pity["threshold"])
-        for key, current in stats.items():
-            if key not in awarded_keys and int(current["commits_since_gift"]) >= threshold:
-                if add_award({"key": key, "name": current["name"], "email": current["email"]}, GIFT_KIND_COMMIT_PITY):
-                    pity = True
-
-    weekly_pity = gifts["weekly_pity"]
-    if weekly_pity["enabled"] and not active_special:
-        window_start = report_day - timedelta(days=int(weekly_pity["window_days"]) - 1)
-        if not awards and not _window_has_win(history, window_start, report_day - timedelta(days=1)):
-            person = pick_candidate("weekly-pity")
-            if person is not None and add_award(person, GIFT_KIND_WEEKLY_PITY, person.get("slot")):
-                pity = True
-
     return {
         "date": report_day.isoformat(),
-        "pity": pity,
         "highlights": snapshot_highlights,
         "awards": awards,
-        "new_commits": new_commits,
         "inventory": dict(stock),
     }
 
 
-def apply_gift_result(history: Dict[str, Any], result: Mapping[str, Any], report: Mapping[str, Any]) -> bool:
+def apply_gift_result(history: Dict[str, Any], result: Mapping[str, Any]) -> bool:
     result_date = str(result.get("date") or "").strip()
     days = history.setdefault("days", [])
     if any(isinstance(item, Mapping) and item.get("date") == result_date for item in days):
         return False
-    counted = history.setdefault("counted_shas", [])
-    counted_set = {str(item) for item in counted if isinstance(item, str)}
-    stats = _stats_map(history)
-    commits = result.get("new_commits")
-    if not isinstance(commits, list):
-        commits = collect_new_gift_commits(report, history)
-    for commit in commits:
-        if not isinstance(commit, Mapping) or not commit.get("key"):
-            continue
-        current = _touch_stats(stats, commit)
-        current["commits_since_gift"] += 1
-        current["total_commits"] += 1
-        token = str(commit.get("token") or "")
-        if token and token not in counted_set:
-            counted.append(token)
-            counted_set.add(token)
-    for item in result.get("highlights") or []:
-        if not isinstance(item, Mapping):
-            continue
-        identity = _author_identity(item.get("name"), item.get("email"))
-        if identity is None:
-            continue
-        current = _touch_stats(stats, identity)
-        current["highlights_since_gift"] += 1
-    for award in result.get("awards") or []:
-        if not isinstance(award, Mapping) or not award.get("key"):
-            continue
-        current = _touch_stats(stats, award)
-        current["wins"] += 1
-        current["highlights_since_gift"] = 0
-        current["commits_since_gift"] = 0
-        current["last_gift_date"] = result_date
-        current["last_gift_kind"] = award.get("kind")
-    history["people"] = stats
     compact_fields = ("key", "name", "email", "kind", "label", "reason", "slot", "special_id")
     days.append({
         "date": result_date,
-        "pity": bool(result.get("pity")),
         "highlights": [
             {"key": item.get("key"), "name": item.get("name"), "email": item.get("email"), "slot": item.get("slot")}
             for item in result.get("highlights") or []
@@ -1249,14 +1026,13 @@ def persist_gift_result(
     root_dir: Union[Path, str],
     timezone_name: str,
     result: Mapping[str, Any],
-    report: Mapping[str, Any],
     config: Optional[Mapping[str, Any]] = None,
 ) -> None:
     root = Path(root_dir).resolve()
     settings = gift_settings(config)
     path = _configured_path(data, "gift_history", DEFAULT_GIFT_HISTORY, root)
-    history = load_gift_history(path, timezone_name, tracking_start=settings["tracking_start"])
-    applied = apply_gift_result(history, result, report)
+    history = load_gift_history(path, timezone_name)
+    applied = apply_gift_result(history, result)
     write_gift_history(history, path)
     if not applied:
         return
@@ -1289,13 +1065,13 @@ def format_gift_fallback(result: Mapping[str, Any]) -> str:
         if not isinstance(award, Mapping):
             continue
         kind = str(award.get("kind") or "")
-        label = str(award.get("label") or GIFT_KIND_LABELS.get(kind, "礼包"))
+        label = str(award.get("label") or (RANDOM_GIFT_LABEL if kind == GIFT_KIND_RANDOM else "礼包"))
         name = str(award.get("name") or "未具名伙伴")
         reason = str(award.get("reason") or "").strip()
-        if kind == GIFT_KIND_RANDOM or not reason:
-            lines.append(f"{label}：{name}")
-        else:
-            lines.append(f"{label}：{name}（{reason}）")
+        line = f"{label}：{name}"
+        if award.get("special_id") and reason:
+            line += f"（{reason}）"
+        lines.append(line)
     return "\n".join(lines)
 
 
@@ -1314,14 +1090,16 @@ def format_award_source(result: Mapping[str, Any]) -> str:
     if not awards:
         lines.append("（无人中奖）")
     for award in awards:
-        lines.append(f"- {award.get('name')}：{award.get('label')}（{award.get('reason')}）")
+        line = f"- {award.get('name')}：{award.get('label')}"
+        if award.get("special_id") and award.get("reason"):
+            line += f"（{award['reason']}）"
+        lines.append(line)
     return "\n".join(lines)
 
 
 def _public_gift_result(result: Mapping[str, Any]) -> Dict[str, Any]:
     return {
         "date": result.get("date"),
-        "pity": bool(result.get("pity")),
         "highlights": result.get("highlights") or [],
         "awards": result.get("awards") or [],
         "inventory": result.get("inventory") or {},
@@ -1332,7 +1110,6 @@ def _compose_talk_message(
     report: Mapping[str, Any],
     raw_ai_text: str,
     selected_highlights: int,
-    history: Mapping[str, Any],
     api: Mapping[str, Any],
     opener: Any,
     data: Mapping[str, Any],
@@ -1342,7 +1119,7 @@ def _compose_talk_message(
     inventory: Optional[Mapping[str, Optional[int]]] = None,
 ) -> Tuple[str, Dict[str, Any]]:
     praise, highlights = extract_highlights(raw_ai_text, report, selected_highlights)
-    result = resolve_gift_awards(report, highlights, history, selected_highlights, settings, inventory)
+    result = resolve_gift_awards(report, highlights, selected_highlights, settings, inventory)
     if not result["awards"]:
         return praise, result
     award_text = ""
@@ -1389,7 +1166,7 @@ def _git_attempt_timeout(base_timeout: float, retry_until: Optional[datetime]) -
     remaining = (retry_until - datetime.now(retry_until.tzinfo)).total_seconds()
     if remaining <= 0:
         return None
-    return max(1.0, min(float(base_timeout), remaining))
+    return min(float(base_timeout), remaining)
 
 
 def _refresh_repository_item(
@@ -1402,15 +1179,25 @@ def _refresh_repository_item(
     max_commits: Optional[int],
     git_runner: Callable[..., str],
     timeout: float,
+    deadline: Optional[datetime] = None,
 ) -> None:
     item["status"] = "error"
     item["head_sha"] = None
     item["commits"] = []
+
+    def bounded_git(args: Sequence[str], cwd: Optional[Path] = None, timeout: float = timeout) -> str:
+        command_timeout = _git_attempt_timeout(timeout, deadline)
+        if command_timeout is None:
+            raise XiangShanMonitorError("Git collection deadline reached")
+        return git_runner(args, cwd=cwd, timeout=command_timeout)
+
     try:
-        path, branch = clone_or_pull(spec, organization, clone_root, git_runner, float(timeout))
+        if _git_attempt_timeout(timeout, deadline) is None:
+            raise XiangShanMonitorError("Git collection deadline reached")
+        path, branch = clone_or_pull(spec, organization, clone_root, bounded_git, float(timeout))
         item["path"], item["branch"] = _relative_path(path, root), branch
-        item["head_sha"] = git_runner(["rev-parse", "HEAD"], cwd=path).strip()
-        item["commits"] = collect_repository_commits(path, "HEAD", window, organization, spec.name, max_commits, git_runner)
+        item["head_sha"] = bounded_git(["rev-parse", "HEAD"], cwd=path).strip()
+        item["commits"] = collect_repository_commits(path, "HEAD", window, organization, spec.name, max_commits, bounded_git)
         item["status"] = "updated"
         item.pop("error", None)
     except (OSError, XiangShanMonitorError, ValueError) as exc:
@@ -1442,6 +1229,12 @@ def pull_data(
     timeout = data.get("git_timeout_seconds", DEFAULT_GIT_TIMEOUT)
     if isinstance(timeout, bool) or not isinstance(timeout, (int, float)) or timeout <= 0:
         raise ConfigError("repositories.json.git_timeout_seconds must be positive")
+    collection_timeout = data.get("git_collection_timeout_seconds", DEFAULT_GIT_COLLECTION_TIMEOUT)
+    if isinstance(collection_timeout, bool) or not isinstance(collection_timeout, (int, float)) or collection_timeout <= 0:
+        raise ConfigError("repositories.json.git_collection_timeout_seconds must be positive")
+    deadline = datetime.now(timezone.utc) + timedelta(seconds=collection_timeout)
+    if retry_until is not None:
+        deadline = min(deadline, retry_until)
     specs = repository_specs(data)
     repositories: List[Dict[str, Any]] = []
     pending: List[Tuple[RepositorySpec, Dict[str, Any]]] = []
@@ -1449,28 +1242,28 @@ def pull_data(
         item = _empty_repository_item(spec, organization, clone_root, root)
         repositories.append(item)
         pending.append((spec, item))
-        _refresh_repository_item(item, spec, organization, clone_root, root, window, max_commits, git_runner, float(timeout))
+        _refresh_repository_item(item, spec, organization, clone_root, root, window, max_commits, git_runner, float(timeout), deadline)
 
     def failed_pairs() -> List[Tuple[RepositorySpec, Dict[str, Any]]]:
         return [(spec, item) for spec, item in pending if item.get("status") != "updated"]
 
     while retry_until is not None and failed_pairs():
-        now_ts = datetime.now(retry_until.tzinfo)
-        if now_ts >= retry_until:
+        now_ts = datetime.now(deadline.tzinfo)
+        if now_ts >= deadline:
             break
         remaining = failed_pairs()
         for spec, item in remaining:
-            attempt_timeout = _git_attempt_timeout(float(timeout), retry_until)
+            attempt_timeout = _git_attempt_timeout(float(timeout), deadline)
             if attempt_timeout is None:
                 break
             print(f"Retrying git update for {spec.name}", file=sys.stderr)
-            _refresh_repository_item(item, spec, organization, clone_root, root, window, max_commits, git_runner, attempt_timeout)
+            _refresh_repository_item(item, spec, organization, clone_root, root, window, max_commits, git_runner, attempt_timeout, deadline)
         if not failed_pairs():
             break
-        now_ts = datetime.now(retry_until.tzinfo)
-        if now_ts >= retry_until:
+        now_ts = datetime.now(deadline.tzinfo)
+        if now_ts >= deadline:
             break
-        sleeper(min(float(DEFAULT_PULL_RETRY_INTERVAL), (retry_until - now_ts).total_seconds()))
+        sleeper(min(float(DEFAULT_PULL_RETRY_INTERVAL), (deadline - now_ts).total_seconds()))
 
     totals = {"repositories": len(repositories), "updated_repositories": sum(item["status"] == "updated" for item in repositories), "repositories_with_errors": sum(item["status"] == "error" for item in repositories), "commits": sum(len(item["commits"]) for item in repositories)}
     totals.update(_pr_counts(repositories))
@@ -1483,8 +1276,9 @@ def _commit_text(repository: str, commit: Mapping[str, Any]) -> str:
         lines.append(f"正文：{commit['body']}")
     if commit.get("files"):
         lines.append("文件：" + ", ".join(str(item) for item in commit["files"]))
-    if commit.get("diff"):
-        lines.extend(["完整改动：", "```diff", str(commit["diff"]).rstrip(), "```"])
+    diff = filter_diff(str(commit.get("diff") or ""))
+    if diff:
+        lines.extend(["文件改动（已过滤图片及二进制内容）：", "```diff", diff.rstrip(), "```"])
     return "\n".join(lines)
 
 
@@ -1560,7 +1354,8 @@ def local_api_settings(config: Mapping[str, Any], data: Mapping[str, Any]) -> Di
     context_tokens = ai.get("context_window_tokens", DEFAULT_CONTEXT_WINDOW_TOKENS)
     max_output = ai.get("max_output_tokens", DEFAULT_MAX_OUTPUT_TOKENS)
     map_output = ai.get("map_max_output_tokens", min(max_output, 800))
-    timeout = ai.get("timeout_seconds")
+    timeout = ai.get("timeout_seconds", DEFAULT_API_TIMEOUT)
+    total_timeout = ai.get("total_timeout_seconds", DEFAULT_AI_TOTAL_TIMEOUT)
     max_api_calls = ai.get("max_api_calls", DEFAULT_MAX_API_CALLS)
     reasoning_effort = ai.get("reasoning_effort", DEFAULT_REASONING_EFFORT)
     store = ai.get("store", False)
@@ -1568,11 +1363,11 @@ def local_api_settings(config: Mapping[str, Any], data: Mapping[str, Any]) -> Di
     if any(isinstance(value, bool) or not isinstance(value, int) or value <= 0 for value in (context_tokens, max_output, map_output, max_api_calls)):
         raise ConfigError("repositories.json.ai token/call limits must be positive integers")
     if timeout is None:
-        parsed_timeout = None
-    elif isinstance(timeout, bool) or not isinstance(timeout, (int, float)) or timeout <= 0:
-        raise ConfigError("repositories.json.ai.timeout_seconds must be a positive number when set")
-    else:
-        parsed_timeout = float(timeout)
+        timeout = DEFAULT_API_TIMEOUT
+    if isinstance(timeout, bool) or not isinstance(timeout, (int, float)) or timeout <= 0:
+        raise ConfigError("repositories.json.ai.timeout_seconds must be positive")
+    if isinstance(total_timeout, bool) or not isinstance(total_timeout, (int, float)) or total_timeout <= 0:
+        raise ConfigError("repositories.json.ai.total_timeout_seconds must be positive")
     if reasoning_effort is not None and (not isinstance(reasoning_effort, str) or not reasoning_effort.strip()):
         raise ConfigError("repositories.json.ai.reasoning_effort must be a non-empty string when set")
     if not isinstance(store, bool):
@@ -1590,7 +1385,7 @@ def local_api_settings(config: Mapping[str, Any], data: Mapping[str, Any]) -> Di
         endpoint = base if base.endswith("/chat/completions") else f"{base}/chat/completions"
     else:
         raise ConfigError("repositories.json.ai.wire_api must be responses or chat_completions")
-    return {"api_key": api_key, "endpoint": endpoint, "model": model.strip(), "wire_api": wire, "context_window_tokens": context_tokens, "max_output_tokens": max_output, "map_max_output_tokens": map_output, "timeout": parsed_timeout, "max_api_calls": max_api_calls, "reasoning_effort": reasoning_effort.strip() if reasoning_effort else None, "store": store, "proxy": "", "http_headers": {key.strip(): value for key, value in http_headers.items()}}
+    return {"api_key": api_key, "endpoint": endpoint, "model": model.strip(), "wire_api": wire, "context_window_tokens": context_tokens, "max_output_tokens": max_output, "map_max_output_tokens": map_output, "timeout": float(timeout), "total_timeout": float(total_timeout), "max_api_calls": max_api_calls, "reasoning_effort": reasoning_effort.strip() if reasoning_effort else None, "store": store, "proxy": "", "http_headers": {key.strip(): value for key, value in http_headers.items()}}
 
 
 def _prompt_path(data: Mapping[str, Any], root_dir: Union[Path, str]) -> Path:
@@ -1601,7 +1396,7 @@ def _prompt_path(data: Mapping[str, Any], root_dir: Union[Path, str]) -> Path:
     return path if path.is_absolute() else Path(root_dir).resolve() / path
 
 
-def _prompt_text(data: Mapping[str, Any], root_dir: Union[Path, str], source: str, section: str = "final") -> str:
+def _prompt_text(data: Mapping[str, Any], root_dir: Union[Path, str], source: str, section: str = "final", stars: Any = None) -> str:
     path = _prompt_path(data, root_dir)
     try:
         content = path.read_text(encoding="utf-8")
@@ -1609,7 +1404,6 @@ def _prompt_text(data: Mapping[str, Any], root_dir: Union[Path, str], source: st
         raise XiangShanMonitorError(f"Cannot read prompt file {path}: {exc}") from exc
     if not content.strip():
         raise XiangShanMonitorError(f"Prompt file is empty: {path}")
-    # Keep both the final-writing and map-stage instructions in one readable file.
     marker = f"[{section}]"
     if marker in content:
         template = content.split(marker, 1)[1]
@@ -1622,6 +1416,13 @@ def _prompt_text(data: Mapping[str, Any], root_dir: Union[Path, str], source: st
         raise XiangShanMonitorError(f"Prompt file has no [{section}] section: {path}")
     if not template.strip():
         raise XiangShanMonitorError(f"Prompt section is empty: [{section}] in {path}")
+    stars_instruction = ""
+    if isinstance(stars, Mapping) and isinstance(stars.get("total"), int):
+        stars_instruction = "准确写出汇总中提供的当前 Stars，并自然融入概述。"
+        growth = stars.get("growth")
+        if isinstance(growth, Mapping) and growth.get("available") is True and isinstance(growth.get("net_change"), int):
+            stars_instruction += "同时写出提供的 Stars 净变化，不要自行推算增长。"
+    template = template.replace("{stars_instruction}", stars_instruction)
     return template.replace("{source}", source) if "{source}" in template else f"{template.rstrip()}\n\n{source}"
 
 
@@ -1745,8 +1546,15 @@ def _call_local_api(prompt: str, api: Mapping[str, Any], opener: Any, max_output
     }
     headers.update(api.get("http_headers", {}))
     request = urllib.request.Request(api["endpoint"], data=json.dumps(payload, ensure_ascii=False).encode("utf-8"), headers=headers, method="POST")
+    request_timeout = api.get("timeout") or DEFAULT_API_TIMEOUT
+    deadline = api.get("deadline")
+    if deadline is not None:
+        remaining = deadline - time.monotonic()
+        if remaining <= 0:
+            raise LocalAPIError("AI generation deadline reached")
+        request_timeout = min(request_timeout, remaining)
     try:
-        with opener.open(request, timeout=api.get("timeout")) as response:
+        with opener.open(request, timeout=request_timeout) as response:
             result = json.loads(response.read().decode("utf-8"))
     except urllib.error.HTTPError as exc:
         raise LocalAPIError(f"Local AI API HTTP error {exc.code}: {exc.read().decode('utf-8', errors='replace')}") from exc
@@ -1756,6 +1564,8 @@ def _call_local_api(prompt: str, api: Mapping[str, Any], opener: Any, max_output
         raise LocalAPIError("Local AI API returned invalid JSON") from exc
     if not isinstance(result, dict):
         raise LocalAPIError("Local AI API returned an unexpected JSON value")
+    if deadline is not None and time.monotonic() >= deadline:
+        raise LocalAPIError("AI generation deadline reached")
     text = _response_text(result)
     if not text:
         raise LocalAPIError(_empty_api_text_error(result))
@@ -1835,18 +1645,14 @@ def _split_text(text: str, budget_tokens: int) -> List[str]:
     return parts
 
 
-def talk(report: Mapping[str, Any], config: Mapping[str, Any], repository_data: Optional[Mapping[str, Any]] = None, *, root_dir: Union[Path, str] = ".", highlight_count: Optional[int] = None, opener: Optional[Any] = None, gift_history: Optional[Mapping[str, Any]] = None) -> Tuple[str, Dict[str, Any]]:
+def talk(report: Mapping[str, Any], config: Mapping[str, Any], repository_data: Optional[Mapping[str, Any]] = None, *, root_dir: Union[Path, str] = ".", highlight_count: Optional[int] = None, opener: Optional[Any] = None) -> Tuple[str, Dict[str, Any]]:
     data = repository_data or load_repository_data()
     api = local_api_settings(config, data)
+    api["deadline"] = time.monotonic() + api["total_timeout"]
     selected_highlights = resolve_highlight_count(data, report, highlight_count)
     timezone_name = str(report.get("timezone") or data.get("timezone") or DEFAULT_TIMEZONE)
     gifts = gift_settings(config)
     root = Path(root_dir).resolve()
-    history = gift_history if gift_history is not None else load_gift_history(
-        _configured_path(data, "gift_history", DEFAULT_GIFT_HISTORY, root),
-        timezone_name,
-        tracking_start=gifts["tracking_start"],
-    )
     delivery = load_delivery_history(_configured_path(data, "delivery_history", DEFAULT_DELIVERY_HISTORY, root), timezone_name)
     inventory = resolve_gift_inventory(gifts, delivery)
     roster_text = format_author_roster(report_author_roster(report))
@@ -1859,10 +1665,10 @@ def talk(report: Mapping[str, Any], config: Mapping[str, Any], repository_data: 
     if opener is None:
         # DeepSeek is reachable directly; never inherit http(s)_proxy from the environment.
         opener = urllib.request.build_opener(urllib.request.ProxyHandler({}))
-    direct_prompt = _prompt_text(data, root_dir, source).replace("{highlight_count}", str(selected_highlights))
+    direct_prompt = _prompt_text(data, root_dir, source, stars=report.get("stars")).replace("{highlight_count}", str(selected_highlights))
     if estimate_tokens(direct_prompt) + api["max_output_tokens"] <= api["context_window_tokens"]:
         raw = _call_local_api(direct_prompt, api, opener)
-        return _compose_talk_message(report, raw, selected_highlights, history, api, opener, data, root_dir, 1, gifts, inventory)
+        return _compose_talk_message(report, raw, selected_highlights, api, opener, data, root_dir, 1, gifts, inventory)
     strategy = str(data.get("overflow_strategy", "map_reduce")).lower()
     if strategy != "map_reduce":
         raise XiangShanMonitorError(
@@ -1900,14 +1706,14 @@ def talk(report: Mapping[str, Any], config: Mapping[str, Any], repository_data: 
             _work_summary(report),
             *[f"分块摘要 {i}:\n{summary}" for i, summary in enumerate(summaries, 1)],
         ])
-        final_prompt = _prompt_text(data, root_dir, final_source).replace("{highlight_count}", str(selected_highlights))
+        final_prompt = _prompt_text(data, root_dir, final_source, stars=report.get("stars")).replace("{highlight_count}", str(selected_highlights))
         if estimate_tokens(final_prompt) + api["max_output_tokens"] <= api["context_window_tokens"]:
             if calls_used >= int(api["max_api_calls"]):
                 raise XiangShanMonitorError(
                     f"完整报告需要至少 {calls_used + 1} 次 API，超过 max_api_calls={api['max_api_calls']}；请缩短窗口或提高上限"
                 )
             raw = _call_local_api(final_prompt, api, opener)
-            return _compose_talk_message(report, raw, selected_highlights, history, api, opener, data, root_dir, calls_used + 1, gifts, inventory)
+            return _compose_talk_message(report, raw, selected_highlights, api, opener, data, root_dir, calls_used + 1, gifts, inventory)
         if len(summaries) == 1:
             raise XiangShanMonitorError("摘要仍超过 context 上限，请提高 context_window_tokens")
         if calls_used + 1 >= int(api["max_api_calls"]):
@@ -2140,6 +1946,14 @@ def _pull_failures(report: Mapping[str, Any]) -> List[Dict[str, str]]:
     return failures
 
 
+def _all_repositories_failed(report: Mapping[str, Any]) -> bool:
+    repositories = report.get("repositories", [])
+    return bool(repositories) and all(
+        isinstance(item, Mapping) and (item.get("status") == "error" or item.get("error"))
+        for item in repositories
+    )
+
+
 def _github_metadata_settings(config: Mapping[str, Any], config_path: Path) -> Dict[str, Any]:
     github = config.get("github")
     if not isinstance(github, Mapping):
@@ -2291,14 +2105,6 @@ def star_report(snapshot: Mapping[str, Any], baseline: Any) -> Dict[str, Any]:
     return result
 
 
-def _metadata_failure_message(error: Exception) -> str:
-    return (
-        "呜呜呜，今天仓库代码已经拉取完成，但 Stars 数据获取失败，数据还不完整。"
-        "这次不会调用 AI，也不会发送 release，下一次会从本次尚未完成的时间起点继续汇总。"
-        f"原因：{error}"
-    )
-
-
 def _wait_until_today(schedule: str, timezone_name: str, day: date, sleep: Callable[[float], None] = time.sleep) -> None:
     hour, minute = _parse_schedule(schedule)
     tz = _timezone(timezone_name)
@@ -2378,7 +2184,7 @@ def run_workday_delivery(
         data,
         root_dir=root,
         analysis_window=window,
-        retry_until=_scheduled_datetime(today, _pull_retry_until_time(data), timezone_name),
+        retry_until=None if debug_now else _scheduled_datetime(today, _pull_retry_until_time(data), timezone_name),
     )
     write_report(report, report_file)
     totals = report.get("totals", {})
@@ -2401,8 +2207,18 @@ def run_workday_delivery(
     }
     attempts = history["attempts"]
     attempts.append(attempt)
+    if history.get("next_window_start") is None:
+        history["next_window_start"] = window.start.isoformat()
 
     failures = _pull_failures(report)
+    if _all_repositories_failed(report):
+        attempt["pull_status"] = "failed"
+        attempt["pull_failures"] = failures
+        attempt["debug_status"] = "skipped_incomplete_pull"
+        attempt["release_status"] = "skipped_incomplete_pull"
+        write_delivery_history(history, history_path)
+        print("All Git updates failed; AI and DingTalk delivery skipped", file=sys.stderr)
+        return
     if failures:
         attempt["pull_status"] = "partial"
         attempt["pull_failures"] = failures
@@ -2412,6 +2228,7 @@ def run_workday_delivery(
             file=sys.stderr,
         )
 
+    snapshot = None
     try:
         snapshot = collect_star_snapshot(config, data, config_file, datetime.now(tz))
         attempt["stars_status"] = "success"
@@ -2420,35 +2237,13 @@ def run_workday_delivery(
     except GitHubMetadataError as exc:
         attempt["stars_status"] = "failed"
         attempt["stars_error"] = str(exc)
-        attempt["release_status"] = "skipped_incomplete_stars"
-        if history.get("next_window_start") is None:
-            history["next_window_start"] = window.start.isoformat()
-        write_delivery_history(history, history_path)
-        warning = _metadata_failure_message(exc)
-        if not debug_now and debug_time is not None:
-            _wait_until_today(debug_time, timezone_name, today)
-        try:
-            push(warning, config, section="xiangshan_monitor", layer="debug", use_proxy=bool(data.get("dingtalk_use_proxy", False)))
-            attempt["debug_status"] = "sent"
-            attempt["debug_sent_at"] = datetime.now(tz).isoformat()
-            print(f"DingTalk debug Stars-failure message sent at {datetime.now(tz).isoformat(timespec='seconds')}")
-        except (ConfigError, DingTalkError, OSError, ValueError) as debug_exc:
-            attempt["debug_status"] = "failed"
-            attempt["debug_error"] = str(debug_exc)
-            write_delivery_history(history, history_path)
-            raise XiangShanMonitorError(f"debug: {debug_exc}") from debug_exc
-        write_delivery_history(history, history_path)
-        print("Release skipped because Stars data is incomplete; AI was not called")
-        return
+        snapshot = None
+        report.pop("stars", None)
+        print(f"Stars lookup failed: {exc}; continuing without Stars", file=sys.stderr)
 
     gift_result: Dict[str, Any] = {}
     try:
-        gift_history = load_gift_history(
-            _configured_path(data, "gift_history", DEFAULT_GIFT_HISTORY, root),
-            timezone_name,
-            tracking_start=gift_settings(config)["tracking_start"],
-        )
-        message, gift_result = talk(report, config, data, root_dir=root, highlight_count=highlight_count, gift_history=gift_history)
+        message, gift_result = talk(report, config, data, root_dir=root, highlight_count=highlight_count)
         attempt["ai_status"] = "success"
         attempt["gifts"] = _public_gift_result(gift_result)
         valid_ai_result = True
@@ -2465,9 +2260,13 @@ def run_workday_delivery(
 
     use_proxy = bool(data.get("dingtalk_use_proxy", False))
     errors: List[str] = []
-    deliveries = (("debug", debug_time),) if debug_now else (("debug", debug_time), ("release", release_time))
+    deliveries = [("debug", debug_time)]
     if debug_now:
         attempt["release_status"] = "skipped_debug_only"
+    elif not valid_ai_result:
+        attempt["release_status"] = "skipped_api_failure"
+    else:
+        deliveries.append(("release", release_time))
     for layer, schedule in deliveries:
         if not debug_now and schedule:
             _wait_until_today(schedule, timezone_name, today)
@@ -2476,12 +2275,13 @@ def run_workday_delivery(
             attempt[f"{layer}_status"] = "sent" if valid_ai_result else "sent_api_fallback"
             attempt[f"{layer}_sent_at"] = datetime.now(tz).isoformat()
             print(f"DingTalk {layer} message sent successfully at {datetime.now(tz).isoformat(timespec='seconds')}")
-            if layer == "release" and valid_ai_result:
+            if layer == "release":
                 history["next_window_start"] = window.end.isoformat()
                 history["last_successful_release"] = attempt[f"{layer}_sent_at"]
-                history["last_successful_stars"] = snapshot
+                if snapshot is not None:
+                    history["last_successful_stars"] = snapshot
                 if gift_result.get("date"):
-                    persist_gift_result(data, root, timezone_name, gift_result, report, config)
+                    persist_gift_result(data, root, timezone_name, gift_result, config)
         except (ConfigError, DingTalkError, OSError, ValueError) as exc:
             errors.append(f"{layer}: {exc}")
             attempt[f"{layer}_status"] = "failed"
@@ -2515,6 +2315,9 @@ def run_once(config: Mapping[str, Any], *, repository_data: Optional[Mapping[str
         report = read_report(report_file)
     if stage in {"all", "talk"}:
         assert report is not None
+        if _all_repositories_failed(report):
+            print("All Git updates failed; AI and DingTalk delivery skipped", file=sys.stderr)
+            return report, None
         try:
             message, gift_result = talk(report, config, data, root_dir=root, highlight_count=highlight_count, opener=opener)
         except LocalAPIError as exc:
@@ -2527,10 +2330,11 @@ def run_once(config: Mapping[str, Any], *, repository_data: Optional[Mapping[str
         message = _load_message(message_file)
     if stage in {"all", "push"} and not dry_run:
         assert message is not None
-        push(message, config, section=dingtalk_section, layer=dingtalk_layer, use_proxy=bool(data.get("dingtalk_use_proxy", False)))
+        layer = "debug" if message.strip() == API_FAILURE_MESSAGE else dingtalk_layer
+        push(message, config, section=dingtalk_section, layer=layer, use_proxy=bool(data.get("dingtalk_use_proxy", False)))
         print("DingTalk message sent successfully")
         if stage == "all" and report is not None and gift_result.get("date"):
-            persist_gift_result(data, root, str(report.get("timezone") or data.get("timezone") or DEFAULT_TIMEZONE), gift_result, report, config)
+            persist_gift_result(data, root, str(report.get("timezone") or data.get("timezone") or DEFAULT_TIMEZONE), gift_result, config)
     return report, message
 
 

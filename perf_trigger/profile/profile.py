@@ -10,6 +10,9 @@ import statistics
 from typing import Deque, Literal
 
 DEFAULT_LOG_ROOT = Path("/nfs/home/ci-runner/perf-report")
+PROFILE_DIR = Path(__file__).resolve().parent
+DATA_DIR = PROFILE_DIR / "data"
+CURRENT_DIR = PROFILE_DIR / "current"
 SortMode = Literal["json", "avgtime", "maxtime"]
 
 NEW_SUCCESS_RE = re.compile(
@@ -119,6 +122,61 @@ def update_profile(profile_path: Path, log_files: list[Path]) -> tuple[int, int]
         json.dump(profile, profile_file, indent=2, ensure_ascii=False)
 
     return len(runtimes), sum(len(samples) for samples in runtimes.values())
+
+
+def create_profile(checkpoint_path: Path, profile_path: Path) -> None:
+    """Create a zeroed runtime profile from a checkpoint description."""
+    with checkpoint_path.open("r", encoding="utf-8") as checkpoint_file:
+        data = json.load(checkpoint_file)
+
+    for benchmark, checkpoint in data.items():
+        data[benchmark] = {point: 0 for point in checkpoint["points"]}
+
+    profile_path.parent.mkdir(parents=True, exist_ok=True)
+    with profile_path.open("w", encoding="utf-8") as profile_file:
+        json.dump(data, profile_file, indent=2, ensure_ascii=False)
+
+
+def current_profiles() -> list[Path]:
+    """Return the profiles indexed by the ``current`` directory."""
+    if not CURRENT_DIR.is_dir():
+        return []
+    return sorted(path for path in CURRENT_DIR.iterdir() if path.is_file())
+
+
+def set_current_profile(profile_path: Path, name: str) -> Path | None:
+    """Index a profile from ``current`` under ``name``.
+
+    Return the link path when it was created, or ``None`` when an existing
+    link was kept after the user declined to replace it.
+    """
+    if not name:
+        raise ValueError("current profile name must not be empty")
+    if not name.endswith(".json"):
+        name += ".json"
+    if Path(name).name != name or name in {".", ".."}:
+        raise ValueError(
+            f"current profile name must be a single path component: {name}"
+        )
+
+    current_path = CURRENT_DIR / name
+    if current_path.exists() or current_path.is_symlink():
+        try:
+            answer = input(
+                f"{current_path} already exists; overwrite it? [y/N] "
+            )
+        except EOFError:
+            answer = ""
+        if answer.strip().lower() not in {"y", "yes"}:
+            print(f"Kept existing current entry {current_path}")
+            return None
+        if current_path.is_dir() and not current_path.is_symlink():
+            raise IsADirectoryError(f"cannot replace directory: {current_path}")
+        current_path.unlink()
+
+    CURRENT_DIR.mkdir(parents=True, exist_ok=True)
+    current_path.symlink_to(Path("..") / "data" / profile_path.name)
+    return current_path
 
 
 def get_profile_runtimes(profile: dict) -> dict[str, list[float]]:
@@ -346,8 +404,7 @@ def main():
     parser.add_argument(
         "--profile",
         type=Path,
-        required=True,
-        help=f"Profile JSON to update or show",
+        help="Profile JSON to update or show (defaults to current profiles for --update)",
     )
     parser.add_argument(
         "--create-from",
@@ -355,33 +412,44 @@ def main():
         default=None,
         help="Create profile from checkpoint json file",
     )
+    parser.add_argument(
+        "--set-current",
+        metavar="NAME",
+        help="Index a created profile in current/ under NAME",
+    )
 
     args = parser.parse_args()
 
     if not args.update and not args.show and not args.create_from:
         parser.print_help()
         return
-    if not args.profile.is_file():
-        raise FileNotFoundError(f"profile does not exist: {args.profile}")
+    if args.set_current and not args.create_from:
+        parser.error("--set-current requires --create-from")
 
+    profile_paths: list[Path] = []
     if args.create_from:
         if not args.create_from.is_file():
             raise FileNotFoundError(
                 f"checkpoint json does not exist: {args.create_from}"
             )
-        with args.create_from.open("r", encoding="utf-8") as f:
-            data = json.load(f)
-
         profile_name = args.create_from.parent.parent.name
-        args.profile = args.profile.parent / f"{profile_name}.json"
+        profile_path = DATA_DIR / f"{profile_name}.json"
+        create_profile(args.create_from, profile_path)
+        profile_paths.append(profile_path)
+        print(f"Created profile {profile_path} from {args.create_from}")
+        if args.set_current:
+            current_path = set_current_profile(profile_path, args.set_current)
+            if current_path is not None:
+                print(f"Indexed profile as {current_path}")
+    elif args.profile is not None:
+        profile_paths.append(args.profile)
 
-        for benchmark, d in data.items():
-            data[benchmark] = {p: 0 for p in d["points"].keys()}
+    if args.show and not profile_paths:
+        parser.error("--show requires --profile")
 
-        with args.profile.open("w", encoding="utf-8") as f:
-            json.dump(data, f, indent=2, ensure_ascii=False)
-
-        print(f"Created profile {args.profile} from {args.create_from}")
+    for profile_path in profile_paths:
+        if not profile_path.is_file():
+            raise FileNotFoundError(f"profile does not exist: {profile_path}")
 
     if args.update:
         if not args.log_root.is_dir():
@@ -396,14 +464,23 @@ def main():
                 "profile was not changed."
             )
         else:
-            updated, samples = update_profile(args.profile, files)
-            print(
-                f"Updated {updated} checkpoints from {samples} runtime samples "
-                f"in {len(files)} runner logs."
-            )
+            if not profile_paths:
+                profile_paths = current_profiles()
+                if not profile_paths:
+                    print(
+                        f"No profiles found under {CURRENT_DIR}; "
+                        "profile was not changed."
+                    )
+
+            for profile_path in profile_paths:
+                updated, samples = update_profile(profile_path, files)
+                print(
+                    f"Updated {updated} checkpoints from {samples} runtime samples "
+                    f"in {len(files)} runner logs for {profile_path}."
+                )
 
     if args.show:
-        show_profile(args.profile, detail=args.detail, sort=args.sort)
+        show_profile(profile_paths[0], detail=args.detail, sort=args.sort)
 
 
 if __name__ == "__main__":

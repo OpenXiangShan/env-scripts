@@ -110,6 +110,9 @@ generate_uvhs_filelist() {
       rtl_flist_fail "DIFFTEST_HOST_DEFINE=$host_define does not match DIFFTEST_HOSTIF=$hostif"
     fi
     printf '+define+%s\n' "$host_define"
+    # cpu_axi_defines.tcl emits CPU_AXI_DATA_WIDTH/ADDR_WIDTH; the GBus block
+    # below emits the host-side defines.  They are disjoint, so keep both.
+    tclsh "$script_dir/cpu_axi_defines.tcl" "$cpu"
     if [[ $hostif == GBUS ]]; then
       printf '+define+CONFIG_USE_XSCORE_AXI\n+define+UVHS_UVW_AXI4_TO_DDR4\n'
     fi

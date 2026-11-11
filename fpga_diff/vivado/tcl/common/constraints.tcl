@@ -1,4 +1,19 @@
+set core_clock_xdc [file normalize ${proj_dir}/core_clock.xdc]
+set core_clock_fd [open $core_clock_xdc w]
+puts $core_clock_fd {create_clock -period 5.000 -name CPU_CLK_IN [get_ports clk6_p]}
+if {$timing_core_clk_mhz != $core_clk_mhz} {
+  set core_clk_div [expr {200 / $core_clk_mhz}]
+  set core_period [expr {1000.0 / $timing_core_clk_mhz}]
+  # Scale the period without changing the physical divider's duty cycle.
+  set core_high_time [expr {$core_period * ($core_clk_div / 2) / $core_clk_div}]
+  puts $core_clock_fd [format {create_generated_clock -name CORE_CLK -source [get_ports clk6_p] -edges {1 2 3} -edge_shift {0 %.9f %.9f} [get_pins bufg_core_clk/O]} \
+    [expr {$core_high_time - 2.5}] [expr {$core_period - 5.0}]]
+}
+close $core_clock_fd
+
+# Define the CPU clock family before fpga.xdc and xdma.xdc group it.
 set constr_files [list \
+  $core_clock_xdc \
   [file normalize ${constr_dir}/ddr.xdc] \
   [file normalize ${constr_dir}/fpga.xdc] \
   [file normalize ${constr_dir}/debug.xdc] \

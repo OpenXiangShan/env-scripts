@@ -65,6 +65,31 @@ case 3: With fpga-host (diff mode)
 ./fpga-host --diff <nemu> -i <workload>.bin
 ```
 
+Clock configuration
+===================
+
+Vivado accepts 25, 40, 50 or 100MHz for both parameters:
+
+| Parameter | Controls |
+|-----------|----------|
+| `FPGA_CORE_CLK_MHZ` | Physical CPU frequency |
+| `TIMING_CORE_CLK_MHZ` | CPU/reference timing target |
+
+| CPU | Physical default | Timing default |
+|-----|------------------|----------------|
+| `nutshell`, `boom` | 100MHz | 100MHz |
+| `kmh`, `nanhu` | 50MHz | 25MHz |
+
+Explicit values override the defaults; empty values use the defaults.
+UART remains at 50MHz. Recreate the project after changing either parameter.
+
+```shell
+make bitstream CPU=kmh CORE_DIR=/path/to/release/build \
+  FPGA_CORE_CLK_MHZ=50 TIMING_CORE_CLK_MHZ=25
+```
+
+A slower timing target does not establish closure at the physical frequency.
+
 fpga-host environment
 =====================
 
@@ -102,3 +127,6 @@ make uvhs CPU=<design> CORE_DIR=/path/to/release/build SUFFIX=<tag>
 See [`uvhs/README.md`](uvhs/README.md) for the board-template and vendor-DDR
 inputs, build stages, runtime commands, and the XDMA host refresh required for
 each runtime download.
+
+For optional remote XDMA sessions, use the separate relay_host_env target.
+See [the relay feature](tools/relay/README.md) for setup and cleanup.
