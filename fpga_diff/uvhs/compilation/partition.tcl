@@ -28,12 +28,9 @@ if {$uvhs_hostif eq "GBUS"} {
     }
 }
 unset -nocomplain uvhs_cpu_is_nutshell
-# Opt-in, and off by default to match UVHS_FUNCTIONAL_DDR_REMOTE_LINK in
-# uvhs.mk and the `ifdef that guards the RTL.  Turning it on without the define
-# fails the sink lookup below rather than silently partitioning a link the
-# netlist does not contain.
 set uvhs_functional_ddr_remote_link \
-    [uvhs::env_or_default UVHS_FUNCTIONAL_DDR_REMOTE_LINK 0]
+    [uvhs::env_or_default UVHS_FUNCTIONAL_DDR_REMOTE_LINK \
+        [expr {$uvhs_hostif eq "GBUS" ? 1 : 0}]]
 if {$uvhs_functional_ddr_remote_link ni {0 1}} {
     error "GBus remote-link setting must be 0 or 1"
 }

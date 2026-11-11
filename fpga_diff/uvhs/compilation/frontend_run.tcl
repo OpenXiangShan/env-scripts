@@ -135,7 +135,12 @@ if {[string toupper [uvhs::env_or_default DIFFTEST_HOSTIF XDMA]] eq "XDMA"} {
     # metadata.
     uvhs::import_blackbox generalBD ./rtl/soc/generalBD.dcp \
         -clock_enable_pairs {i_clk i_clk_en 1} -generalbd
-    uvhs::import_blackbox gbus_ddr_dwc ./rtl/soc/gbus_ddr_dwc.dcp
+    # Only NutShell instantiates the 64- to 256-bit AXI converter, so only that
+    # build exports the checkpoint.  Keep the two gates identical: importing a
+    # blackbox the netlist does not use, or missing one it does, both fail here.
+    if {[string tolower [uvhs::env_or_default UVHS_CPU ""]] eq "nutshell"} {
+        uvhs::import_blackbox gbus_ddr_dwc ./rtl/soc/gbus_ddr_dwc.dcp
+    }
     uvhs::import_blackbox gbus_clk_wiz ./rtl/soc/gbus_clk_wiz.dcp
     puts "INFO: skip xdma_ep blackbox import for DiffTest host interface [uvhs::env_or_default DIFFTEST_HOSTIF XDMA]"
 }

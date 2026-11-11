@@ -146,10 +146,13 @@ IP preparation intentionally retains two files. `prepare_ip.sh` is the outer
 orchestrator for repository Vivado IP, generated GeneralBus/GeneralBD
 checkpoints, and an external DDR checkpoint. The child
 `export_vivado_ip.tcl` must run inside Vivado because it uses project, IP, BD,
-and checkpoint commands. Owned GBus RTL lives in `uvhs/common` and is added to
-the UVHS file list only when `DIFFTEST_HOSTIF=GBUS`. AXIS and AXI-Lite clock
-crossing use `uvhs_async_fifo`, a Gray-pointer dual-clock FIFO that uvsyn infers
-as block RAM. The UVHS frontend cannot instantiate Xilinx XPM.
+and checkpoint commands. It also receives the CPU name, because one GBus
+checkpoint is CPU-specific: the 64- to 256-bit AXI converter exists only when
+the CPU port is narrower than the DDR port, which is NutShell. Owned GBus RTL
+lives in `uvhs/common` and is added to the UVHS file list only when
+`DIFFTEST_HOSTIF=GBUS`. AXIS and AXI-Lite clock crossing use `uvhs_async_fifo`,
+a Gray-pointer dual-clock FIFO that uvsyn infers as block RAM. The UVHS
+frontend cannot instantiate Xilinx XPM.
 
 `uvhs_backend` follows the vendor implementation sequence: clock inference and
 transformation, remap, partition, localization, system routing, FPGA PnR,
@@ -504,11 +507,12 @@ before the UVHS timing worker reads it.
 | `common/` | Owned GBus RTL: Gray-pointer async FIFO, AXI-to-AXIS, C2H SRAM FIFO, host/CPU AXIS CDC, AXI-Lite CDC, and GeneralBD bridge. |
 | `../tools/rtl_filelist_lib.sh` | Nested file-list parsing and path resolution. |
 | `../src/tcl/common/{blk_mem_gen_0,AXI_bridge,data_bridge,xdma_ep}.tcl` | Shared Vivado IP/BD generators used by UVHS IP export and Vivado project creation. `data_bridge` is exported for both host modes; only `xdma_ep` is XDMA-specific. |
+| `ip/gbus/{gbus_clk_wiz,gbus_ddr_dwc}.tcl` | GBus-only Vivado IP generators, kept here because nothing outside the UVHS flow runs them. The clock wizard is on every GBus build; the 64- to 256-bit AXI converter is exported only for NutShell, the one CPU that needs it. |
 | `compilation/flow_common.tcl` | Shared UVHS path, environment, and source helpers. |
 | `compilation/frontend_run.tcl` | RTL/IP import, elaboration, and uvsyn frontend. |
 | `compilation/backend_run.tcl` | Fill-rate setup, partition, routing, PnR, and database commit. |
 | `compilation/assemble.tcl` | Assembles the FPGA set from the vendor board description. |
-| `compilation/partition.tcl` | Places memory/configuration on B0/F0 and the core/DiffTest/XDMA path on B0/F2. |
+| `compilation/partition.tcl` | Places memory/configuration on B0/F0 and the core/DiffTest host path on B0/F2. The host path is XDMA or GBus; every other position is identical. |
 | `compilation/assign_pin.tcl` | Physical UART daughter-card, clock, PCIe, JTAG, SD, and control pins. |
 | `compilation/timing.tcl` | External clock and asynchronous-group constraints. |
 | `compilation/vivado_pre_opt.tcl` | XDMA refclock and CDC constraints. |

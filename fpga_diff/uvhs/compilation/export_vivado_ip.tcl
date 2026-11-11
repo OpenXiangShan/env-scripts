@@ -8,11 +8,12 @@ set force 0
 set jobs 8
 set core_dir ""
 set hostif "XDMA"
+set cpu ""
 
 proc print_help {} {
     puts "Usage:"
     puts "  vivado -mode batch -source uvhs/compilation/export_vivado_ip.tcl -tclargs \\"
-    puts "    --origin_dir <fpga_diff> --out_dir <uvhs_work_dir> \[--core_dir <dir>\] \[--hostif XDMA|GBUS\] \[--force\] \[--jobs N\]"
+    puts "    --origin_dir <fpga_diff> --out_dir <uvhs_work_dir> \[--core_dir <dir>\] \[--hostif XDMA|GBUS\] \[--cpu <name>\] \[--force\] \[--jobs N\]"
     exit 0
 }
 
@@ -23,6 +24,7 @@ for {set i 0} {$i < $::argc} {incr i} {
         "--out_dir"        { incr i; set out_dir [lindex $::argv $i] }
         "--core_dir"       { incr i; set core_dir [lindex $::argv $i] }
         "--hostif"         { incr i; set hostif [string toupper [lindex $::argv $i]] }
+        "--cpu"            { incr i; set cpu [string tolower [lindex $::argv $i]] }
         "--force"          { set force 1 }
         "--jobs"           { incr i; set jobs [lindex $::argv $i] }
         "--help"           { print_help }
@@ -42,6 +44,9 @@ if {$core_dir ne ""} {
     set core_dir [file normalize $core_dir]
 }
 set tcl_dir [file join $origin_dir src tcl common]
+# GBus IP belongs to the UVHS flow, so its generators live under uvhs/ rather
+# than in the shared generator directory.  The rest of the tree never runs them.
+set gbus_tcl_dir [file join $origin_dir uvhs ip gbus]
 set export_project_dir [file join $out_dir vivado_ip_export]
 set export_project [file join $export_project_dir vivado_ip_export.xpr]
 
@@ -366,14 +371,22 @@ if {$hostif eq "XDMA"} {
     lappend exports [list bd xdma_ep [file join $tcl_dir xdma_ep.tcl] \
         [file join $out_dir rtl device pcie xdma_ep.dcp]]
 } else {
-    # NutShell drives the 256-bit DDR IP through a 64-bit port; the width
-    # conversion is the vendor AXI Data Width Converter checkpoint.
-    lappend exports [list xci gbus_ddr_dwc \
-        [file join $tcl_dir gbus_ddr_dwc.tcl] \
-        [file join $out_dir rtl soc gbus_ddr_dwc.dcp]]
+    # The clock wizard is on every GBus build: it is the host fabric clock and
+    # the backend puts an explicit create_clock on its output.
     lappend exports [list xci gbus_clk_wiz \
-        [file join $tcl_dir gbus_clk_wiz.tcl] \
+        [file join $gbus_tcl_dir gbus_clk_wiz.tcl] \
         [file join $out_dir rtl soc gbus_clk_wiz.dcp]]
+    # NutShell reaches the 256-bit DDR IP through a 64-bit CPU port, so only it
+    # instantiates the vendor AXI Data Width Converter (see the CPU_NUTSHELL
+    # branch in uvhs/common/uvhs_gbus_ddr_path.svh).  A 256-bit CPU port, as on
+    # XiangShan, connects directly and this checkpoint would be dead weight.
+    if {$cpu eq "nutshell"} {
+        lappend exports [list xci gbus_ddr_dwc \
+            [file join $gbus_tcl_dir gbus_ddr_dwc.tcl] \
+            [file join $out_dir rtl soc gbus_ddr_dwc.dcp]]
+    } else {
+        puts "INFO: skip gbus_ddr_dwc export; CPU '$cpu' drives a 256-bit DDR port directly"
+    }
     puts "INFO: skip xdma_ep export for DiffTest host interface $hostif"
 }
 
