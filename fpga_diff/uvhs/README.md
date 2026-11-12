@@ -25,27 +25,55 @@ Host selection is not CPU-specific: the shared core instantiates either the
 XDMA endpoint or, for GBus, `uvhs/common/uvhs_gbus_host_wrapper.sv` as
 `core_def/U_GBUS_HOST`, and the only compile-time switch is
 `` `DIFFTEST_HOST_GBUS `` / `` `elsif DIFFTEST_HOST_XDMA ``. The GBus wrapper
-holds the C2H staging FIFO, the GeneralBD configuration bridge, both protected
-GBus endpoints, the AXI3-to-AXIS H2C converter, and the H2C AXIS CDC, so
+holds the GBD1 C2H DMA engine and read aperture, the guarded H2C / DDR path,
+the GeneralBD configuration bridge and both protected GBus endpoints, so
 `core_def` keeps one DiffTest host instance for every CPU family and the
 generated `SimTop` RTL stays unchanged. The UVHS scripts name the wrapper
 hierarchy in their clock, payload, and partition paths.
 
-GBS1 is a register-drained SRAM window. Backpressure reaches the DiffTest
-sender and pauses the CPU while the host transport clock continues to run.
-The matching fpga-host selects the same GBS1 register-window protocol.
+GBD1 is the C2H transport: the DiffTest stream is appended frame by frame to a
+786432-byte (1024-frame) ring, and the host reads a whole batch of frames with
+one DMA call over the AXI aperture and releases it with a single CONSUME write.
+Only CONSUME moves the read pointer, so the producer never overwrites unread
+data and a slow DMA call costs throughput but never correctness. The ring is
+declared `ram_style = "ultra"`, so the 768 KiB stage costs no block RAM on the
+FPGA that also carries the CPU's L3: 24 URAM288 hold the whole ring, which is
+what leaves the B0/F2 block RAM budget to the cache and the host bridges.
+
+Ring depth is the CPU-stall budget, not a bandwidth target: backpressure reaches
+the DiffTest sender as soon as the ring is full, so the ring is sized to absorb
+host jitter instead of being trimmed to the average rate. The host drains at
+half-ring occupancy, which leaves the other half as headroom while the batch is
+in flight, and reads status, frame count and both ring pointers from one
+contiguous snapshot (`0x1248..0x1254`) so a batch costs three runtime round
+trips instead of five. The matching fpga-host uses the same GBD1 protocol.
 
 GeneralBD local offsets are below; the host adds its config base (`0x1000`).
 
-| Local offset | GBS1 register |
+| Local offset | GBD1 register |
 | --- | --- |
-| `0x1200` | present[31], frame error[30], draining[29], staged words[16:8], filling[7], FIFO data[6] |
-| `0x1204` | control: FILL=1, DRAIN=2 |
-| `0x1208` | ID `0x47425331` |
-| `0x2000..0x23fc` | SRAM data window |
+| `0x1200` | status: present[31], frame error[30], protocol error[29], capturing[7], data[6], available[5], active[4] |
+| `0x1204` | control: ENABLE=1, ACK=2 (release one frame), clear error=4, DISABLE=8 |
+| `0x1208` | ID `0x47424431` |
+| `0x120c` | frames captured since stream reset |
+| `0x1210` | read aperture base (`0x0ff40000`) |
+| `0x1214` | ring size (786432 bytes, 1024 frames) |
+| `0x1218..0x1220` | AXI read evidence: AR address, attributes, count |
+| `0x1224..0x1228` | control evidence: write count, last control value |
+| `0x122c..0x1234` | first rejected control: data, state+valid, ordinal |
+| `0x1238` | feature: present[0], streaming[2] |
+| `0x123c` | complete frames available to the host; write CONSUME frame count |
+| `0x1240` | read pointer (byte offset into the ring) |
+| `0x1244` | write pointer (byte offset into the ring) |
+| `0x1248..0x1254` | contiguous snapshot: status, available frames, read pointer, write pointer |
+| `0x2000..0x22fc` | config mirror of the oldest unread frame |
 
-AXIS TLAST validates each 768-byte DiffTest range. The host dispatches complete
-96-byte records and preserves any partial record across SRAM windows.
+The mirror covers the first 768 bytes of the oldest unread frame, which is
+what the host compares against its first DMA batch.
+
+Each AXIS TLAST validates a 768-byte DiffTest range; a malformed frame is
+dropped and raises the sticky frame error bit instead of being published. The
+host compares its first batch against the config mirror before consuming.
 
 ## RTL Input
 
@@ -66,14 +94,13 @@ wrappers in `<work>/rtl/filelist.f`, which the UVHS frontend reads directly.
 
 ## GBus host paths
 
-The GBus C2H path uses the on-chip SRAM register window identified as GBS1.
-GBus H2C converts GeneralBus AXI3 writes into the existing DifftestMemCtrl
-AXI-stream engine; `H2CAXIs2Mem` ignores AXI addresses and writes physical DRAM from
-`0x80000000` using `HOST_IO_H2C_SIZE_MB`. The AXIS payload crosses from the
-free-running host clock to the gated CPU clock in `U_GBUS_H2C_CDC`. DiffTest
-C2H crosses the other way inside `U_GBUS_C2H_FIFO`. No DDR C2H ring,
-GBus-specific physical-DDR path, or 256-to-64 AXI converter is part of this
-flow. Host DMA offsets stay relative to the GeneralBus start address
+The GBus C2H path drains the GBD1 streaming frame FIFO through the AXI read
+aperture: the RTL appends complete 768-byte DiffTest frames to a ring, and the
+host copies a whole batch per DMA read and releases it with one CONSUME write.
+The legacy register-window and frozen-bank protocols are no longer supported.
+GBus H2C goes through the guarded GeneralBus AXI3 write path into the physical
+DDR master (ring reads are routed to GBD1 and rejected by the write guard).
+Host DMA offsets stay relative to the GeneralBus start address
 (`GBUS_DDR_BASE=0`).
 
 ## Build
@@ -119,10 +146,13 @@ IP preparation intentionally retains two files. `prepare_ip.sh` is the outer
 orchestrator for repository Vivado IP, generated GeneralBus/GeneralBD
 checkpoints, and an external DDR checkpoint. The child
 `export_vivado_ip.tcl` must run inside Vivado because it uses project, IP, BD,
-and checkpoint commands. Owned GBus RTL lives in `uvhs/common` and is added to
-the UVHS file list only when `DIFFTEST_HOSTIF=GBUS`. AXIS and AXI-Lite clock
-crossing use `uvhs_async_fifo`, a Gray-pointer dual-clock FIFO that uvsyn infers
-as block RAM. The UVHS frontend cannot instantiate Xilinx XPM.
+and checkpoint commands. It also receives the CPU name, because one GBus
+checkpoint is CPU-specific: the 64- to 256-bit AXI converter exists only when
+the CPU port is narrower than the DDR port, which is NutShell. Owned GBus RTL
+lives in `uvhs/common` and is added to the UVHS file list only when
+`DIFFTEST_HOSTIF=GBUS`. AXIS and AXI-Lite clock crossing use `uvhs_async_fifo`,
+a Gray-pointer dual-clock FIFO that uvsyn infers as block RAM. The UVHS
+frontend cannot instantiate Xilinx XPM.
 
 `uvhs_backend` follows the vendor implementation sequence: clock inference and
 transformation, remap, partition, localization, system routing, FPGA PnR,
@@ -144,12 +174,15 @@ while its runtime session is active.
 The default topology keeps the XiangShan CHI/CMN memory path, configuration
 bridge, runtime flash interface, syscfg, and boot ROM with user DDR on B0/F0.
 The physical UV_FMCH_FLASH USB-UART remains on B0/F1, while the core, DiffTest
-endpoint, and XDMA host path stay on B0/F2. The timer source/sink CDC boundary
-also stays with the CPU-side path, while the 65-bit `syscnt` time bus and the
-DiffTest clock-enable signal use explicit direct F2-to-F0 routes. This avoids
-per-bit TDM skew on the time value. The remaining logic is partitioned
-automatically. XiangShan uses these path constraints together with high
-partition effort and the `uv_placer_balance_slrs` PnR strategy.
+endpoint, and the selected host path stay on B0/F2. GBus replaces `xdma_ep_i`
+in that group instead of moving any CPU or memory cell, so `DIFFTEST_HOSTIF`
+chooses the host cells and leaves every other partition position unchanged.
+The timer source/sink CDC boundary also stays with the CPU-side path, while
+the 65-bit `syscnt` time bus and the DiffTest clock-enable signal use explicit
+direct F2-to-F0 routes. This avoids per-bit TDM skew on the time value. The
+remaining logic is partitioned automatically. XiangShan uses these path
+constraints together with high partition effort and the
+`uv_placer_balance_slrs` PnR strategy.
 
 UVHS drives the AXI UART16550 from `clk6_p` at a fixed 50 MHz. The CPU/SoC
 `clk5_p` frequency comes from the system sign-off result committed in the
@@ -434,6 +467,25 @@ for UHD. The DUT DDR controller is constrained to B0/F0, which owns the separate
 daughter card and B0/F2 for CPU/XDMA. This avoids sharing an UHD card with the
 DUT DDR controller.
 
+GBus builds are the exception. They give the F2 DDR card to the user DDR
+instead of UHD and build without a probe group, because the GBus host drives
+the CPU's own DRAM bus and that bus must not cross FPGAs: with the DDR on
+another FPGA it passes through the F2-F0 TDM link, and the single crossing
+capped the NutShell `GBUS_HOST_CLK` at 14.7 MHz. Co-locating DDR, CPU and GBus
+fabric on B0/F2 realises the full 100 MHz host clock and keeps the TDM link out
+of the DiffTest path. XiangShan shows the same effect from the other side: with
+the DDR left on B0/F0, UVHS relaxed every clock touching the crossing (CPU
+40 -> 125.7 ns, UART 20 -> 63.7 ns), which pushed the DDR controller's clk_wiz
+MMCM out of range and failed PnR with PDRC-179.
+
+Three consequences follow. `uvhs.mk` defaults `UVHS_PROBE_TCL` to empty for
+every `DIFFTEST_HOSTIF=GBUS` build, so the UHD wrapper never claims FMC3; pass
+it explicitly to trade the DDR back for UHD capture. `partition.tcl` puts the
+whole design, XiangShan's memory path included, on B0/F2 and leaves B0/F0
+empty. And the vendor DDR pblock overlaps the system-bus Aurora pblock on
+B0/F2, so `prepare_ip.sh` appends `ddr_pblock_carve.tcl` to the DDR prePlace
+script to keep the two exclusive regions apart.
+
 ## Compatibility Boundary
 
 The retained compatibility code is limited to observed tool behavior:
@@ -462,11 +514,12 @@ before the UVHS timing worker reads it.
 | `common/` | Owned GBus RTL: Gray-pointer async FIFO, AXI-to-AXIS, C2H SRAM FIFO, host/CPU AXIS CDC, AXI-Lite CDC, and GeneralBD bridge. |
 | `../tools/rtl_filelist_lib.sh` | Nested file-list parsing and path resolution. |
 | `../src/tcl/common/{blk_mem_gen_0,AXI_bridge,data_bridge,xdma_ep}.tcl` | Shared Vivado IP/BD generators used by UVHS IP export and Vivado project creation. `data_bridge` is exported for both host modes; only `xdma_ep` is XDMA-specific. |
+| `ip/gbus/{gbus_clk_wiz,gbus_ddr_dwc}.tcl` | GBus-only Vivado IP generators, kept here because nothing outside the UVHS flow runs them. The clock wizard is on every GBus build; the 64- to 256-bit AXI converter is exported only for NutShell, the one CPU that needs it. |
 | `compilation/flow_common.tcl` | Shared UVHS path, environment, and source helpers. |
 | `compilation/frontend_run.tcl` | RTL/IP import, elaboration, and uvsyn frontend. |
 | `compilation/backend_run.tcl` | Fill-rate setup, partition, routing, PnR, and database commit. |
 | `compilation/assemble.tcl` | Assembles the FPGA set from the vendor board description. |
-| `compilation/partition.tcl` | Places memory/configuration on B0/F0 and the core/DiffTest/XDMA path on B0/F2. |
+| `compilation/partition.tcl` | Places memory/configuration on B0/F0 and the core/DiffTest host path on B0/F2. The host path is XDMA or GBus; every other position is identical. |
 | `compilation/assign_pin.tcl` | Physical UART daughter-card, clock, PCIe, JTAG, SD, and control pins. |
 | `compilation/timing.tcl` | External clock and asynchronous-group constraints. |
 | `compilation/vivado_pre_opt.tcl` | XDMA refclock and CDC constraints. |

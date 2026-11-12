@@ -50,13 +50,20 @@ if {[string toupper [uvhs::env_or_default DIFFTEST_HOSTIF XDMA]] eq "XDMA"} {
     create_clock -name XDMA_AXI_ACLK -period $xdma_axi_clock_period \
         $xdma_axi_clock_pin
 } else {
-    # GBus has no XDMA user-clock output.  The fpga-host/GBus protocol and
-    # both protected GBus IPs are driven by the explicit UVHS host clock
-    # UART_CLK_IN (clk6_p/dev_clk_i), not the gated CPU clock and not a clock
-    # inferred from the compatibility shell.
-    # Do not create a second primary clock on a black-box input: doing so makes
-    # the same host net appear as two unrelated clocks and lets infer_clock
-    # rediscover the old pseudo-XDMA clock.
+    # GBus has no XDMA user-clock output, so the host interface runs on a
+    # dedicated Clock Wizard output rather than on the UART clock or the CPU
+    # clock.  The wizard is a blackbox checkpoint, so its clk_out1 pin is a
+    # clock root that has to be constrained explicitly; UVHS cannot derive the
+    # 50->100 MHz ratio through the blackbox.
+    set gbus_clk_out [get_pins -quiet core_def/u_gbus_clk_wiz/clk_out1]
+    if {[llength $gbus_clk_out] != 1} {
+        error "required GBus clock wizard output not found: $gbus_clk_out"
+    }
+    create_clock -name GBUS_HOST_CLK -period 10.0 $gbus_clk_out
+    puts "INFO: GBus host clock GBUS_HOST_CLK 100 MHz from u_gbus_clk_wiz/clk_out1"
+
+    # Confirm the whole GBus fabric really landed on that clock, so a future
+    # re-parenting of the wizard output cannot silently move it elsewhere.
     set gbus_host_clock_pins [get_pins -quiet {
         core_def/U_GBUS_HOST/U_GBUS_GENERALBD/i_clk
         core_def/U_GBUS_HOST/U_GBUS_GENERAL_BUS/dut_axi_aclk
@@ -64,11 +71,7 @@ if {[string toupper [uvhs::env_or_default DIFFTEST_HOSTIF XDMA]] eq "XDMA"} {
     if {[llength $gbus_host_clock_pins] != 2} {
         error "required GBus host clock pins not found: $gbus_host_clock_pins"
     }
-    set gbus_host_clock [get_clocks -quiet UART_CLK_IN]
-    if {[llength $gbus_host_clock] != 1} {
-        error "required host clock UART_CLK_IN not found for GBus: $gbus_host_clock"
-    }
-    puts "INFO: GBus host clock pins use explicit UART_CLK_IN (clk6_p/dev_clk_i): $gbus_host_clock_pins"
+    puts "INFO: GBus host clock pins: $gbus_host_clock_pins"
 
 }
 

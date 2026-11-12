@@ -4,10 +4,39 @@ UVHS_RUNTIME_DIR := $(UVHS_ROOT_DIR)/uvhs/runtime
 
 UVHS_TEMPLATE_DIR ?=
 UVHS_UVW_AXI4_TO_DDR4_SRC ?=
+# The GBus host interface uses only the GBD1 streaming C2H path; the legacy
+# register-window and frozen-bank transports are no longer built.
+#
+# The remote functional-DDR link defaults to off: it exists to carry the DDR
+# master to another FPGA, but fpga-host drives port-0 DMA on the same FPGA as
+# the config window (GBUS_FPGA == GBUS_DMA_FPGA), so the link is unused in the
+# supported topology while its 320-bit TDM packet assembly is the worst setup
+# path in the GBus clock domain.  Enable it explicitly for a multi-FPGA DDR
+# topology.
+UVHS_FUNCTIONAL_DDR_REMOTE_LINK ?= 0
+ifneq ($(filter $(UVHS_FUNCTIONAL_DDR_REMOTE_LINK),0 1),$(UVHS_FUNCTIONAL_DDR_REMOTE_LINK))
+$(error UVHS_FUNCTIONAL_DDR_REMOTE_LINK must be 0 or 1)
+endif
+ifeq ($(UVHS_FUNCTIONAL_DDR_REMOTE_LINK),1)
+ifneq ($(DIFFTEST_HOSTIF),GBUS)
+$(error UVHS_FUNCTIONAL_DDR_REMOTE_LINK=1 requires DIFFTEST_HOSTIF=GBUS)
+endif
+endif
 # KMH is the XiangShan target; keep the larger CPU profile enabled by default.
+#
+# Every GBus topology places the user DDR in b0.F2_FMC3, the daughter-card slot
+# UVHS reserves for UHD waveform capture, because the GBus host drives the CPU's
+# own DDR bus and a cross-FPGA memory path is what caps the host clock.  Binding
+# a probe_net/trigger_net group makes the backend instantiate uvw_uhd_top there
+# and reject the user DDR, so those builds default to no probe group.  Set
+# UVHS_PROBE_TCL explicitly to trade the DDR back for UHD capture.
+ifeq ($(DIFFTEST_HOSTIF),GBUS)
+UVHS_PROBE_TCL ?=
+else
 UVHS_PROBE_TCL ?= $(if $(filter kmh xiangshan,$(CPU)),$(UVHS_COMPILATION_DIR)/probe_kmh.tcl,$(UVHS_COMPILATION_DIR)/probe_ila.tcl)
+endif
 UVHS_PROBE_PATH := $(if $(strip $(UVHS_PROBE_TCL)),$(abspath $(UVHS_PROBE_TCL)),)
-UVHS_DDR_AXI_WIDTH := $(if $(filter nutshell,$(CPU)),64,256)
+UVHS_DDR_AXI_WIDTH := $(if $(filter GBUS,$(DIFFTEST_HOSTIF)),256,$(if $(filter nutshell,$(CPU)),64,256))
 UVHS_WORK_DIR := $(ENV_SCRIPTS_HOME)/$(PRJ_NAME)
 UVHS_FILELIST := $(UVHS_WORK_DIR)/rtl/filelist.f
 
@@ -55,7 +84,9 @@ UVHS_FLOW_ENV = \
 	XDMA_LINK_WIDTH="$(XDMA_LINK_WIDTH)" \
 	DIFFTEST_HOSTIF="$(DIFFTEST_HOSTIF)" \
 	DIFFTEST_HOST_DEFINE="$(DIFFTEST_HOST_DEFINE)" \
+	UVHS_FUNCTIONAL_DDR_REMOTE_LINK="$(UVHS_FUNCTIONAL_DDR_REMOTE_LINK)" \
 	UVHS_KEEP_FPGAS="$(UVHS_KEEP_FPGAS)" \
+	UVHS_CPU="$(CPU)" \
 	UVHS_LUT_FILL_RATE="$(UVHS_LUT_FILL_RATE)" \
 	UVHS_LUT6_FILL_RATE="$(UVHS_LUT6_FILL_RATE)"
 
@@ -114,9 +145,11 @@ uvhs_prepare: uvhs_preflight
 	$(UVHS_FLOW_ENV) bash "$(UVHS_COMPILATION_DIR)/prepare_ip.sh" \
 		"$(UVHS_ROOT_DIR)" "$(UVHS_WORK_DIR)" "$(CORE_DIR)" \
 		"$(UVHS_EXPORT_IP_JOBS)" "$(UVHS_EXPORT_IP_FORCE)" \
-		"$(UVHS_UVW_AXI4_TO_DDR4_SRC)" "$(UVHS_DDR_AXI_WIDTH)"
+		"$(UVHS_UVW_AXI4_TO_DDR4_SRC)" "$(UVHS_DDR_AXI_WIDTH)" "$(CPU)"
 
 uvhs_project: uvhs_prepare
+	DIFFTEST_HOSTIF="$(DIFFTEST_HOSTIF)" DIFFTEST_HOST_DEFINE="$(DIFFTEST_HOST_DEFINE)" \
+	UVHS_FUNCTIONAL_DDR_REMOTE_LINK="$(UVHS_FUNCTIONAL_DDR_REMOTE_LINK)" \
 	bash "$(UVHS_ROOT_DIR)/tools/update_core_flist.sh" uvhs \
 		"$(CORE_DIR)" "$(UVHS_WORK_DIR)" "$(CPU)" "$(UVHS_FILELIST)" \
 		-- $(RTL_INCLUDE)

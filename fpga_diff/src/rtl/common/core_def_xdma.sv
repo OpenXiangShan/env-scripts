@@ -1002,8 +1002,13 @@ wire [3:0]  uvhs_flash_axi_awqos;
 wire        uvhs_flash_axi_awvalid;
 wire        uvhs_flash_axi_awready;
 wire [7:0]  uvhs_flash_axi_wid;
+`ifdef DIFFTEST_HOST_GBUS
+wire [255:0] uvhs_flash_axi_wdata;
+wire [31:0]  uvhs_flash_axi_wstrb;
+`else
 wire [63:0] uvhs_flash_axi_wdata;
 wire [7:0]  uvhs_flash_axi_wstrb;
+`endif
 wire        uvhs_flash_axi_wlast;
 wire        uvhs_flash_axi_wvalid;
 wire        uvhs_flash_axi_wready;
@@ -1023,7 +1028,11 @@ wire [3:0]  uvhs_flash_axi_arqos;
 wire        uvhs_flash_axi_arvalid;
 wire        uvhs_flash_axi_arready;
 wire [7:0]  uvhs_flash_axi_rid;
+`ifdef DIFFTEST_HOST_GBUS
+wire [255:0] uvhs_flash_axi_rdata;
+`else
 wire [63:0] uvhs_flash_axi_rdata;
+`endif
 wire [1:0]  uvhs_flash_axi_rresp;
 wire        uvhs_flash_axi_rlast;
 wire        uvhs_flash_axi_rvalid;
@@ -1255,18 +1264,66 @@ wire [0:0]    br2cfg_wvalid;
 
   wire difftest_pcie_clock;
 `ifdef DIFFTEST_HOST_GBUS
-  // GBus has no XDMA user-clock output.  The DiffTest host-side protocol and
-  // the UVHS GeneralBD/GENERALBUS endpoints are synchronous to the always-on
-  // GBus host/user interface clock: use the real always-running UVHS host
-  // clock (dev_clk_i/clk6_p), not the gated CPU clock or infer_clock output.
-  wire gbus_host_clk = dev_clk_i;
+  // GBus host/user interface clock.
+  //
+  // This domain carries the whole GBus fabric (GeneralBD, generalBus, the
+  // GBD1 C2H engine and the guarded H2C/DDR path) plus the SimTop DiffTest
+  // stream, so it must be free-running: the C2H path has to keep draining
+  // finite TLAST frames after the CPU stops.
+  //
+  // It must not be dev_clk_i.  dev_clk_i is the UART/peripheral clock and also
+  // feeds xilnx_crg; putting the GBus fabric on it left the UART clock tree
+  // with almost no setup margin and made host throughput a function of the
+  // UART divider.  Sharing sys_clk_i with the CPU is equally wrong: the
+  // generalBus read data path then becomes the CPU clock's critical path.
+  //
+  // Use a separate Clock Wizard instance instead.  The wizard is imported as a
+  // blackbox checkpoint (see uvhs/compilation/prepare_ip.sh), which lets the
+  // backend put an explicit create_clock on clk_out1.  A bare MMCME4_ADV
+  // primitive cannot be used: UVHS does not resolve the MMCM feedback divider
+  // and infers every MMCM output as divide-by-1 (TCK-121).
+  //
+  // 50 MHz in (clk6_p, the always-on board clock), 100 MHz out.
+  wire gbus_host_clk;
+
+  gbus_clk_wiz u_gbus_clk_wiz (
+      .clk_in1  (dev_clk_i),
+      .resetn   (rstn_sw4),
+      .clk_out1 (gbus_host_clk),
+      .locked   ()
+  );
+
   assign difftest_pcie_clock = gbus_host_clk;
 `endif
   assign sys_rstn_io = sys_rstn & ~io_host_reset;
   assign cpu_rstn_io = cpu_rstn & ~io_host_reset;
+`ifdef DIFFTEST_HOST_GBUS
+`ifdef CPU_NUTSHELL
+  wire uvhs_memory_cpu_mode;
+  uvhs_difftest_memory_control U_GBUS_MEMORY_CONTROL (
+      .clk(sys_clk_i), .rstn(rstn_sw4 & sys_rstn),
+      .awaddr(difftest_cfg_axilite_awaddr),
+      .awvalid(difftest_cfg_axilite_awvalid), .awready(difftest_cfg_axilite_awready),
+      .wdata(difftest_cfg_axilite_wdata), .wstrb(difftest_cfg_axilite_wstrb),
+      .wvalid(difftest_cfg_axilite_wvalid), .wready(difftest_cfg_axilite_wready),
+      .cpu_mode(uvhs_memory_cpu_mode)
+  );
+`endif
+`endif
+`ifdef DIFFTEST_HOST_GBUS
+`ifdef CPU_NUTSHELL
+  // The exported memory bus multiplexes reference-clock init and CPU traffic,
+  // so the CPU clock stays gated while the host owns the DDR.
+  wire difftest_host_ddr_hold = ~uvhs_memory_cpu_mode;
+`else
+  wire difftest_host_ddr_hold = 1'b0;
+`endif
+`else
+  wire difftest_host_ddr_hold = 1'b0;
+`endif
   assign difftest_clock_gate_enable =
       difftest_clock_enable || ~io_host_diff_enable ||
-      ~sys_rstn_io || ~cpu_rstn_io;
+      ~sys_rstn_io || ~cpu_rstn_io || difftest_host_ddr_hold;
 
   RST_SYNC #(
       .SYNC_STAGES(3),
@@ -1305,8 +1362,8 @@ wire [0:0]    br2cfg_wvalid;
   end
 
 `ifdef DIFFTEST_HOST_GBUS
-  // GBus C2H has a real CPU-to-host async FIFO.  Do not combinationally AND
-  // the host-clock stream enable onto the CPU-clock AXIS handshake.
+  // SimTop already emits this stream on difftest_pcie_clock. The bank must
+  // also drain finite TLAST frames after the CPU stops.
   assign difftest_to_host_axis_tready = difftest_to_host_axis_tready_io;
   assign difftest_to_host_axis_tvalid_io = difftest_to_host_axis_tvalid;
 `else
@@ -1315,6 +1372,7 @@ wire [0:0]    br2cfg_wvalid;
 `endif
 
 `ifdef DIFFTEST_HOST_GBUS
+  `include "uvhs_gbus_ddr_wires.svh"
   // Optional GBus host interface.  The GBus protocol implementation lives in
   // uvhs/common/uvhs_gbus_host_wrapper.sv and is instantiated here so the
   // shared core keeps one DiffTest host instance for every CPU family.  XDMA
@@ -1324,8 +1382,6 @@ wire [0:0]    br2cfg_wvalid;
       .sys_rstn                         (sys_rstn),
       .gbus_host_clk                    (gbus_host_clk),
       .rstn_sw4                         (rstn_sw4),
-      .inter_soc_clk                    (inter_soc_clk),
-      .inter_soc_sync_rstn              (inter_soc_sync_rstn),
       .cpu_rstn_pcie                    (cpu_rstn_pcie),
       .difftest_stream_enable_pcie      (difftest_stream_enable_pcie),
       .difftest_to_host_axis_tvalid_io  (difftest_to_host_axis_tvalid_io),
@@ -1354,7 +1410,46 @@ wire [0:0]    br2cfg_wvalid;
       .difftest_cfg_axilite_rdata       (difftest_cfg_axilite_rdata),
       .difftest_cfg_axilite_rresp       (difftest_cfg_axilite_rresp),
       .difftest_cfg_axilite_rvalid      (difftest_cfg_axilite_rvalid),
-      .difftest_cfg_axilite_rready      (difftest_cfg_axilite_rready)
+      .difftest_cfg_axilite_rready      (difftest_cfg_axilite_rready),
+      .ddr_awid                         (gbus_ddr_awid),
+      .ddr_awaddr                       (gbus_ddr_awaddr),
+      .ddr_awlen                        (gbus_ddr_awlen),
+      .ddr_awsize                       (gbus_ddr_awsize),
+      .ddr_awburst                      (gbus_ddr_awburst),
+      .ddr_awlock                       (gbus_ddr_awlock),
+      .ddr_awcache                      (gbus_ddr_awcache),
+      .ddr_awprot                       (gbus_ddr_awprot),
+      .ddr_awqos                        (gbus_ddr_awqos),
+      .ddr_awregion                     (gbus_ddr_awregion),
+      .ddr_awvalid                      (gbus_ddr_awvalid),
+      .ddr_awready                      (gbus_ddr_awready),
+      .ddr_wdata                        (gbus_ddr_wdata),
+      .ddr_wstrb                        (gbus_ddr_wstrb),
+      .ddr_wlast                        (gbus_ddr_wlast),
+      .ddr_wvalid                       (gbus_ddr_wvalid),
+      .ddr_wready                       (gbus_ddr_wready),
+      .ddr_bid                          (gbus_ddr_bid),
+      .ddr_bresp                        (gbus_ddr_bresp),
+      .ddr_bvalid                       (gbus_ddr_bvalid),
+      .ddr_bready                       (gbus_ddr_bready),
+      .ddr_arid                         (gbus_ddr_arid),
+      .ddr_araddr                       (gbus_ddr_araddr),
+      .ddr_arlen                        (gbus_ddr_arlen),
+      .ddr_arsize                       (gbus_ddr_arsize),
+      .ddr_arburst                      (gbus_ddr_arburst),
+      .ddr_arlock                       (gbus_ddr_arlock),
+      .ddr_arcache                      (gbus_ddr_arcache),
+      .ddr_arprot                       (gbus_ddr_arprot),
+      .ddr_arqos                        (gbus_ddr_arqos),
+      .ddr_arregion                     (gbus_ddr_arregion),
+      .ddr_arvalid                      (gbus_ddr_arvalid),
+      .ddr_arready                      (gbus_ddr_arready),
+      .ddr_rid                          (gbus_ddr_rid),
+      .ddr_rdata                        (gbus_ddr_rdata),
+      .ddr_rresp                        (gbus_ddr_rresp),
+      .ddr_rlast                        (gbus_ddr_rlast),
+      .ddr_rvalid                       (gbus_ddr_rvalid),
+      .ddr_rready                       (gbus_ddr_rready)
   );
 
 `else
@@ -1490,6 +1585,9 @@ mode_ctrl U_MODE_CTRL(
 );
 
 `ifdef UVHS
+`ifdef DIFFTEST_HOST_GBUS
+  `include "uvhs_gbus_ddr_path.svh"
+`else
 // The vendor DDR IP uses 34-bit addresses and 14-bit IDs. Keep those narrow
 // adaptations local while preserving the common fpga_diff AXI interface.
 wire [33:0] uvhs_ddr_awaddr;
@@ -1572,6 +1670,7 @@ uvw_axi4_to_ddr4 U_UVHS_UVW_AXI4_TO_DDR4 (
     .DDR4_DIMM_DQS_N           (),
     .DDR4_DIMM_DQS_P           ()
 );
+`endif
 `else
 jtag_ddr_subsys_wrapper U_JTAG_DDR_SUBSYS(
     .DDR4_act_n             (DDR_ACT_N),

@@ -112,9 +112,14 @@ if {[info exists ::env(DIFFTEST_HOSTIF)] && $::env(DIFFTEST_HOSTIF) ne ""} {
 }
 
 set fpga_diff_async_groups [list]
-set fpga_diff_async_clock_names {TMCLK ddr_ref_clk CPU_CLK_IN jtag_vclk pcie_ep_refclk}
+set fpga_diff_async_clock_names {TMCLK ddr_ref_clk CPU_CLK_IN jtag_vclk}
 if {[string toupper $fpga_diff_hostif] eq "GBUS"} {
     lappend fpga_diff_async_clock_names UART_CLK_IN
+    # Independent root from the Clock Wizard blackbox; the UART clock only
+    # reaches it through the blackbox, so declare them asynchronous.
+    lappend fpga_diff_async_clock_names GBUS_HOST_CLK
+} else {
+    lappend fpga_diff_async_clock_names pcie_ep_refclk
 }
 foreach fpga_diff_clock $fpga_diff_async_clock_names {
     lappend fpga_diff_async_groups -group \

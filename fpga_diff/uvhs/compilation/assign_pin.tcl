@@ -1,8 +1,8 @@
 ################################################################################
 # Pin assignment for fpga_diff on the U2.2 VU19P platform.
 #
-# CPU, PCIe, and low-speed debug I/O use b0.f2. UART0 uses the USB-UART on the
-# flash daughter card at b0.F1_FMC0. The user-DDR controller uses b0.f0.
+# CPU, PCIe, low-speed debug I/O and the user-DDR controller use b0.f2. UART0
+# uses the USB-UART on the flash daughter card at b0.F1_FMC0.
 ################################################################################
 
 proc pin_name {top port} {
@@ -13,6 +13,7 @@ proc pin_name {top port} {
 }
 
 set top [uvhs::env_or_default UVHS_ASSIGN_PIN_TOP fpga_top_debug]
+set hostif [string toupper [uvhs::env_or_default DIFFTEST_HOSTIF XDMA]]
 set xdma_link_width [string toupper [string trim [uvhs::env_or_default XDMA_LINK_WIDTH X4]]]
 if {$xdma_link_width ni {X4 X8}} {
     error "XDMA_LINK_WIDTH must be one of X4/X8, got '$xdma_link_width'"
@@ -36,8 +37,19 @@ proc apc16_pin {port slot} {
 # rstn_sw* are exported as UVHS global resets and must not also be assign_pin'd.
 apc16_pin led0 3
 apc16_pin led2 4
-# led3 is driven by the user-DDR calibration status on F0.
-assign_pin -port [pin_name $top led3] -connector b0.F0_FMC1 -index 311
+# led3 reports the DDR controller's ready status, so it has to sit on the FPGA
+# that owns the DDR.  Every non-GBUS topology keeps the DDR on b0.f0; GBUS
+# co-locates it with the CPU on b0.f2, and only then does led3 move.
+set uvhs_ddr_on_f2 0
+if {$hostif eq "GBUS"} {
+    set uvhs_ddr_on_f2 1
+}
+if {$uvhs_ddr_on_f2} {
+    apc16_pin led3 5
+} else {
+    assign_pin -port [pin_name $top led3] -connector b0.F0_FMC1 -index 311
+}
+unset -nocomplain uvhs_ddr_on_f2
 
 # UV_FMCH_FLASH drives USB_UART_RX at FMC[270] and receives USB_UART_TX at
 # FMC[311], so the FPGA RX/TX directions map to 270/311 respectively.
@@ -74,9 +86,9 @@ assign_pin -port [pin_name $top clk8_n] -fpga b0.f2 -pin F36
 assign_pin -port [pin_name $top clk5_p] -fpga b0.f2 -pin AW17
 assign_pin -port [pin_name $top clk5_n] -fpga b0.f2 -pin AY17
 
-# The physical XDMA PCIe ports are declared for every DiffTest build, so their
-# pins are assigned in both host modes.  Only the endpoint instantiation is
-# host-mode dependent: GBus leaves these ports unused.
+# The physical XDMA PCIe ports exist only in the XDMA host mode; GBus
+# synthesis removes them, so their pins are assigned for XDMA only.
+if {$hostif eq "XDMA"} {
 assign_pin -port [pin_name $top pcie_ep_lnk_up] -connector b0.F2_APC16 -index 58
 
 # XDMA endpoint signals. X4 uses the HGC7 lane group from the Hejian official
@@ -97,6 +109,9 @@ for {set i 0} {$i < $xdma_lane_count} {incr i} {
     assign_pin -port [pin_name $top [format {pci_ep_rxn[%d]} $i]] -connector [lindex $xdma_rx_connectors $i] -index [lindex $xdma_rxn_indices $i]
     assign_pin -port [pin_name $top [format {pci_ep_txp[%d]} $i]] -connector [lindex $xdma_tx_connectors $i] -index [lindex $xdma_txp_indices $i]
     assign_pin -port [pin_name $top [format {pci_ep_txn[%d]} $i]] -connector [lindex $xdma_tx_connectors $i] -index [lindex $xdma_txn_indices $i]
+}
+} else {
+puts "INFO: skip physical XDMA PCIe pin assignments for GBus"
 }
 
 # The vendor DDR DCP declares its PDDR4DME binding through UV_HW_IP metadata.

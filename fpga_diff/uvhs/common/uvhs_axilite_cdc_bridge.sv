@@ -56,6 +56,30 @@ module uvhs_axilite_cdc_bridge #(
     localparam integer READ_REQ_WIDTH = ADDR_WIDTH + 3;
     localparam integer READ_RESP_WIDTH = DATA_WIDTH + 2;
 
+    wire link_resetn = s_resetn & m_resetn;
+    (* ASYNC_REG = "TRUE", SHREG_EXTRACT = "NO" *) reg [2:0] s_reset_sync;
+    (* ASYNC_REG = "TRUE", SHREG_EXTRACT = "NO" *) reg [2:0] m_fifo_reset_sync;
+    (* ASYNC_REG = "TRUE", SHREG_EXTRACT = "NO" *) reg [2:0] m_reset_sync;
+    always @(posedge s_clk or negedge link_resetn) begin
+      if (!link_resetn) s_reset_sync <= 3'b0;
+      else s_reset_sync <= {s_reset_sync[1:0], 1'b1};
+    end
+    always @(posedge m_clk or negedge link_resetn) begin
+      if (!link_resetn) m_fifo_reset_sync <= 3'b0;
+      else m_fifo_reset_sync <= {m_fifo_reset_sync[1:0], 1'b1};
+    end
+    always @(posedge m_clk or negedge m_resetn) begin
+      if (!m_resetn) m_reset_sync <= 3'b0;
+      else m_reset_sync <= {m_reset_sync[1:0], 1'b1};
+    end
+    wire s_cdc_resetn = s_reset_sync[2];
+    wire m_fifo_resetn = m_fifo_reset_sync[2];
+    wire m_domain_resetn = m_reset_sync[2];
+
+    // A source reset cannot reset the BAR: finish already-loaded requests,
+    // including half-accepted AW/W, and discard their old responses.
+    reg m_write_cancel, m_read_cancel;
+
     wire s_write_req_ready;
     wire s_read_req_ready;
     wire m_write_resp_ready;
@@ -66,8 +90,11 @@ module uvhs_axilite_cdc_bridge #(
     wire m_read_req_valid;
     wire [1:0] s_bresp_fifo;
     wire [READ_RESP_WIDTH-1:0] s_read_resp;
+    wire s_bvalid_fifo, s_rvalid_fifo;
     assign s_bresp = s_bresp_fifo;
     assign {s_rdata, s_rresp} = s_read_resp;
+    assign s_bvalid = s_cdc_resetn && s_bvalid_fifo;
+    assign s_rvalid = s_cdc_resetn && s_rvalid_fifo;
 
     reg [ADDR_WIDTH-1:0] s_awaddr_q;
     reg [2:0]            s_awprot_q;
@@ -78,19 +105,19 @@ module uvhs_axilite_cdc_bridge #(
     reg                  s_write_busy;
     reg                  s_read_busy;
 
-    wire s_write_req_valid = s_aw_hold && s_w_hold;
+    wire s_write_req_valid = s_cdc_resetn && s_aw_hold && s_w_hold;
     wire [WRITE_REQ_WIDTH-1:0] s_write_req = {
         s_awaddr_q, s_awprot_q, s_wdata_q, s_wstrb_q
     };
     wire s_write_push = s_write_req_valid && s_write_req_ready;
     wire s_read_push = s_arvalid && s_arready;
 
-    assign s_awready = s_resetn && !s_write_busy && !s_aw_hold;
-    assign s_wready  = s_resetn && !s_write_busy && !s_w_hold;
-    assign s_arready = s_resetn && !s_read_busy && s_read_req_ready;
+    assign s_awready = s_cdc_resetn && !s_write_busy && !s_aw_hold;
+    assign s_wready  = s_cdc_resetn && !s_write_busy && !s_w_hold;
+    assign s_arready = s_cdc_resetn && !s_read_busy && s_read_req_ready;
 
-    always @(posedge s_clk or negedge s_resetn) begin
-      if (!s_resetn) begin
+    always @(posedge s_clk or negedge s_cdc_resetn) begin
+      if (!s_cdc_resetn) begin
         s_awaddr_q <= {ADDR_WIDTH{1'b0}};
         s_awprot_q <= 3'b0;
         s_aw_hold <= 1'b0;
@@ -137,28 +164,42 @@ module uvhs_axilite_cdc_bridge #(
     reg [ADDR_WIDTH-1:0] m_araddr_q;
     reg [2:0]            m_arprot_q;
 
-    wire m_write_idle = !m_write_busy;
-    wire m_read_idle = !m_read_busy;
+    wire m_write_idle = m_fifo_resetn && m_domain_resetn && !m_write_busy;
+    wire m_read_idle = m_fifo_resetn && m_domain_resetn && !m_read_busy;
     wire m_write_pop = m_write_req_valid && m_write_idle;
     wire m_read_pop = m_read_req_valid && m_read_idle;
     wire m_write_issued = m_write_busy && !m_awvalid_q && !m_wvalid_q;
-    wire m_write_resp_push = m_write_issued && m_bvalid && m_write_resp_ready;
-    wire m_read_resp_push = m_wait_r && m_rvalid && m_read_resp_ready;
+    wire m_write_resp_done = m_bvalid && m_bready;
+    wire m_read_resp_done = m_rvalid && m_rready;
+    wire m_write_resp_push = m_write_resp_done && !m_write_cancel && m_fifo_resetn;
+    wire m_read_resp_push = m_read_resp_done && !m_read_cancel && m_fifo_resetn;
 
     assign m_awaddr = m_awaddr_q;
     assign m_awprot = m_awprot_q;
-    assign m_awvalid = m_awvalid_q;
+    assign m_awvalid = m_domain_resetn && m_awvalid_q;
     assign m_wdata = m_wdata_q;
     assign m_wstrb = m_wstrb_q;
-    assign m_wvalid = m_wvalid_q;
-    assign m_bready = m_write_issued && m_write_resp_ready;
+    assign m_wvalid = m_domain_resetn && m_wvalid_q;
+    assign m_bready = m_domain_resetn && m_write_issued &&
+                      (m_write_cancel || (m_fifo_resetn && m_write_resp_ready));
     assign m_araddr = m_araddr_q;
     assign m_arprot = m_arprot_q;
-    assign m_arvalid = m_arvalid_q;
-    assign m_rready = m_wait_r && m_read_resp_ready;
+    assign m_arvalid = m_domain_resetn && m_arvalid_q;
+    assign m_rready = m_domain_resetn && m_wait_r &&
+                      (m_read_cancel || (m_fifo_resetn && m_read_resp_ready));
 
-    always @(posedge m_clk or negedge m_resetn) begin
-      if (!m_resetn) begin
+    always @(posedge m_clk or negedge m_fifo_resetn) begin
+      if (!m_fifo_resetn) begin
+        m_write_cancel <= 1'b1;
+        m_read_cancel <= 1'b1;
+      end else begin
+        if (m_write_pop) m_write_cancel <= 1'b0;
+        if (m_read_pop) m_read_cancel <= 1'b0;
+      end
+    end
+
+    always @(posedge m_clk or negedge m_domain_resetn) begin
+      if (!m_domain_resetn) begin
         m_write_busy <= 1'b0;
         m_awvalid_q <= 1'b0;
         m_wvalid_q <= 1'b0;
@@ -182,7 +223,7 @@ module uvhs_axilite_cdc_bridge #(
             m_awvalid_q <= 1'b0;
           if (m_wvalid_q && m_wready)
             m_wvalid_q <= 1'b0;
-          if (m_write_resp_push)
+          if (m_write_resp_done)
             m_write_busy <= 1'b0;
         end
 
@@ -195,7 +236,7 @@ module uvhs_axilite_cdc_bridge #(
             m_arvalid_q <= 1'b0;
             m_wait_r <= 1'b1;
           end
-          if (m_read_resp_push) begin
+          if (m_read_resp_done) begin
             m_wait_r <= 1'b0;
             m_read_busy <= 1'b0;
           end
@@ -204,35 +245,35 @@ module uvhs_axilite_cdc_bridge #(
     end
 
     uvhs_async_fifo #(.WIDTH(WRITE_REQ_WIDTH), .ADDR_WIDTH(2)) u_write_req (
-        .s_clk(s_clk), .s_rstn(s_resetn),
+        .s_clk(s_clk), .s_rstn(s_cdc_resetn),
         .s_data(s_write_req), .s_valid(s_write_req_valid),
         .s_ready(s_write_req_ready), .s_has_data(),
-        .m_clk(m_clk), .m_rstn(m_resetn),
+        .m_clk(m_clk), .m_rstn(m_fifo_resetn),
         .m_data(m_write_req), .m_valid(m_write_req_valid),
         .m_ready(m_write_idle), .m_has_data()
     );
     uvhs_async_fifo #(.WIDTH(2), .ADDR_WIDTH(2)) u_write_resp (
-        .s_clk(m_clk), .s_rstn(m_resetn),
+        .s_clk(m_clk), .s_rstn(m_fifo_resetn),
         .s_data(m_bresp), .s_valid(m_write_resp_push),
         .s_ready(m_write_resp_ready), .s_has_data(),
-        .m_clk(s_clk), .m_rstn(s_resetn),
-        .m_data(s_bresp_fifo), .m_valid(s_bvalid),
-        .m_ready(s_bready), .m_has_data()
+        .m_clk(s_clk), .m_rstn(s_cdc_resetn),
+        .m_data(s_bresp_fifo), .m_valid(s_bvalid_fifo),
+        .m_ready(s_bready && s_cdc_resetn), .m_has_data()
     );
     uvhs_async_fifo #(.WIDTH(READ_REQ_WIDTH), .ADDR_WIDTH(2)) u_read_req (
-        .s_clk(s_clk), .s_rstn(s_resetn),
+        .s_clk(s_clk), .s_rstn(s_cdc_resetn),
         .s_data({s_araddr, s_arprot}), .s_valid(s_read_push),
         .s_ready(s_read_req_ready), .s_has_data(),
-        .m_clk(m_clk), .m_rstn(m_resetn),
+        .m_clk(m_clk), .m_rstn(m_fifo_resetn),
         .m_data(m_read_req), .m_valid(m_read_req_valid),
         .m_ready(m_read_idle), .m_has_data()
     );
     uvhs_async_fifo #(.WIDTH(READ_RESP_WIDTH), .ADDR_WIDTH(2)) u_read_resp (
-        .s_clk(m_clk), .s_rstn(m_resetn),
+        .s_clk(m_clk), .s_rstn(m_fifo_resetn),
         .s_data({m_rdata, m_rresp}), .s_valid(m_read_resp_push),
         .s_ready(m_read_resp_ready), .s_has_data(),
-        .m_clk(s_clk), .m_rstn(s_resetn),
-        .m_data(s_read_resp), .m_valid(s_rvalid),
-        .m_ready(s_rready), .m_has_data()
+        .m_clk(s_clk), .m_rstn(s_cdc_resetn),
+        .m_data(s_read_resp), .m_valid(s_rvalid_fifo),
+        .m_ready(s_rready && s_cdc_resetn), .m_has_data()
     );
 endmodule
