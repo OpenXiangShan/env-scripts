@@ -24,12 +24,13 @@ endif
 endif
 # KMH is the XiangShan target; keep the larger CPU profile enabled by default.
 #
-# The NutShell GBus topology places the user DDR in b0.F2_FMC3, the daughter-card
-# slot UVHS reserves for UHD waveform capture.  Binding a probe_net/trigger_net
-# group makes the backend instantiate uvw_uhd_top there and reject the user DDR,
-# so that build defaults to no probe group.  Set UVHS_PROBE_TCL explicitly to
-# trade the DDR back for UHD capture.
-ifeq ($(CPU)-$(DIFFTEST_HOSTIF),nutshell-GBUS)
+# Every GBus topology places the user DDR in b0.F2_FMC3, the daughter-card slot
+# UVHS reserves for UHD waveform capture, because the GBus host drives the CPU's
+# own DDR bus and a cross-FPGA memory path is what caps the host clock.  Binding
+# a probe_net/trigger_net group makes the backend instantiate uvw_uhd_top there
+# and reject the user DDR, so those builds default to no probe group.  Set
+# UVHS_PROBE_TCL explicitly to trade the DDR back for UHD capture.
+ifeq ($(DIFFTEST_HOSTIF),GBUS)
 UVHS_PROBE_TCL ?=
 else
 UVHS_PROBE_TCL ?= $(if $(filter kmh xiangshan,$(CPU)),$(UVHS_COMPILATION_DIR)/probe_kmh.tcl,$(UVHS_COMPILATION_DIR)/probe_ila.tcl)
