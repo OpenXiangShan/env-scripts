@@ -1,4 +1,28 @@
 wire uvhs_ddr_transport_clk = gbus_host_clk;
+// Where the DDR bridge clock comes from depends on which FPGA holds the DDR.
+//
+// NutShell keeps the DDR controller beside the CPU on b0.f2 (partition.tcl sets
+// uvhs_ddr_on_f2), so the arbiter and the bridge share an FPGA and the merged
+// AXI stays in gbus_host_clk end to end.  Do not re-time it there: ref_clk_i on
+// that FPGA is the NutShell CPU clock, and running the DDR port at ~25 MHz
+// instead of 100 MHz would throttle every CPU DDR access.
+//
+// XiangShan under the mainline partition puts the arbiter and GBus host on
+// b0.f2 but the DDR controller on b0.f0 (connector b0.F0_FMC0).  gbus_host_clk
+// is generated inside U_GBUS_HOST on b0.f2, so driving the F0 bridge straight
+// from it made UVHS carry the whole 100 MHz domain across the inter-FPGA link,
+// where it closed at only ~16 MHz and stalled every DDR access.  Cross into the
+// F0 part through a dual-clock FIFO instead and run the bridge on the F0-local
+// CPU clock, the same arrangement the mainline XDMA DDR path uses.
+`ifdef CPU_NUTSHELL
+wire uvhs_ddr_bridge_clk = uvhs_ddr_transport_clk;
+`else
+`ifdef UVHS_FUNCTIONAL_DDR_REMOTE_LINK
+wire uvhs_ddr_bridge_clk = uvhs_ddr_transport_clk;
+`else
+wire uvhs_ddr_bridge_clk = ref_clk_i;
+`endif
+`endif
 wire uvhs_ddr_user_clk, uvhs_ddr_user_rst;
 wire [79:0] uvhs_func_ddr_req_data, uvhs_func_ddr_rsp_data;
 wire uvhs_func_ddr_req_valid, uvhs_func_ddr_req_ready, uvhs_func_ddr_rsp_valid, uvhs_func_ddr_rsp_ready;
@@ -204,6 +228,9 @@ uvhs_axi_remote_sink #(
     .m_axi_rready(uvhs_ddr_rready)
 );
 `else
+`ifdef CPU_NUTSHELL
+// NutShell holds the DDR beside the CPU on b0.f2; there is no chip boundary in
+// this path, so keep the original single-clock connection.
 assign uvhs_ddr_awid = gbus_merged_awid;
 assign uvhs_ddr_awaddr = gbus_merged_awaddr;
 assign uvhs_ddr_awlen = gbus_merged_awlen;
@@ -243,9 +270,60 @@ assign gbus_merged_rresp = uvhs_ddr_rresp;
 assign gbus_merged_rlast = uvhs_ddr_rlast;
 assign gbus_merged_rvalid = uvhs_ddr_rvalid;
 assign uvhs_ddr_rready = gbus_merged_rready;
+`else
+// XiangShan mainline partition: GBus arbiter -> DDR bridge is the F2/F0 chip
+// boundary.  Keep the merged AXI in gbus_host_clk at the arbiter, then re-time
+// it to the F0-local bridge clock here rather than handing UVHS a single-cycle
+// crossing that it can only satisfy by relaxing gbus_host_clk to ~16 MHz.
+uvhs_axi_async_bridge #(.ADDR_WIDTH(34), .ID_WIDTH(14), .DATA_WIDTH(256))
+U_GBUS_DDR_XPART_CDC (
+    .s_clk(uvhs_ddr_transport_clk), .s_rstn(rstn_sw4),
+    .s_awid(gbus_merged_awid), .s_awaddr(gbus_merged_awaddr),
+    .s_awlen(gbus_merged_awlen), .s_awsize(gbus_merged_awsize),
+    .s_awburst(gbus_merged_awburst), .s_awlock(gbus_merged_awlock),
+    .s_awcache(gbus_merged_awcache), .s_awprot(gbus_merged_awprot),
+    .s_awqos(gbus_merged_awqos), .s_awregion(gbus_merged_awregion),
+    .s_awvalid(gbus_merged_awvalid), .s_awready(gbus_merged_awready),
+    .s_wdata(gbus_merged_wdata), .s_wstrb(gbus_merged_wstrb),
+    .s_wlast(gbus_merged_wlast), .s_wvalid(gbus_merged_wvalid),
+    .s_wready(gbus_merged_wready), .s_bid(gbus_merged_bid),
+    .s_bresp(gbus_merged_bresp), .s_bvalid(gbus_merged_bvalid),
+    .s_bready(gbus_merged_bready),
+    .s_arid(gbus_merged_arid), .s_araddr(gbus_merged_araddr),
+    .s_arlen(gbus_merged_arlen), .s_arsize(gbus_merged_arsize),
+    .s_arburst(gbus_merged_arburst), .s_arlock(gbus_merged_arlock),
+    .s_arcache(gbus_merged_arcache), .s_arprot(gbus_merged_arprot),
+    .s_arqos(gbus_merged_arqos), .s_arregion(gbus_merged_arregion),
+    .s_arvalid(gbus_merged_arvalid), .s_arready(gbus_merged_arready),
+    .s_rid(gbus_merged_rid), .s_rdata(gbus_merged_rdata),
+    .s_rresp(gbus_merged_rresp), .s_rlast(gbus_merged_rlast),
+    .s_rvalid(gbus_merged_rvalid), .s_rready(gbus_merged_rready),
+    .m_clk(uvhs_ddr_bridge_clk), .m_rstn(rstn_sw4),
+    .m_awid(uvhs_ddr_awid), .m_awaddr(uvhs_ddr_awaddr),
+    .m_awlen(uvhs_ddr_awlen), .m_awsize(uvhs_ddr_awsize),
+    .m_awburst(uvhs_ddr_awburst), .m_awlock(uvhs_ddr_awlock),
+    .m_awcache(uvhs_ddr_awcache), .m_awprot(uvhs_ddr_awprot),
+    .m_awqos(uvhs_ddr_awqos), .m_awregion(uvhs_ddr_awregion),
+    .m_awvalid(uvhs_ddr_awvalid), .m_awready(uvhs_ddr_awready),
+    .m_wdata(uvhs_ddr_wdata), .m_wstrb(uvhs_ddr_wstrb),
+    .m_wlast(uvhs_ddr_wlast), .m_wvalid(uvhs_ddr_wvalid),
+    .m_wready(uvhs_ddr_wready), .m_bid(uvhs_ddr_bid),
+    .m_bresp(uvhs_ddr_bresp), .m_bvalid(uvhs_ddr_bvalid),
+    .m_bready(uvhs_ddr_bready),
+    .m_arid(uvhs_ddr_arid), .m_araddr(uvhs_ddr_araddr),
+    .m_arlen(uvhs_ddr_arlen), .m_arsize(uvhs_ddr_arsize),
+    .m_arburst(uvhs_ddr_arburst), .m_arlock(uvhs_ddr_arlock),
+    .m_arcache(uvhs_ddr_arcache), .m_arprot(uvhs_ddr_arprot),
+    .m_arqos(uvhs_ddr_arqos), .m_arregion(uvhs_ddr_arregion),
+    .m_arvalid(uvhs_ddr_arvalid), .m_arready(uvhs_ddr_arready),
+    .m_rid(uvhs_ddr_rid), .m_rdata(uvhs_ddr_rdata),
+    .m_rresp(uvhs_ddr_rresp), .m_rlast(uvhs_ddr_rlast),
+    .m_rvalid(uvhs_ddr_rvalid), .m_rready(uvhs_ddr_rready)
+);
+`endif
 `endif
 uvw_axi4_to_ddr4 U_UVHS_UVW_AXI4_TO_DDR4 (
-    .ddr4ip_dut_axi_aclk     (uvhs_ddr_transport_clk),
+    .ddr4ip_dut_axi_aclk     (uvhs_ddr_bridge_clk),
     .ddr4ip_dut_axi_aresetn  (rstn_sw4),
     .ddr4ip_dut_axi_awaddr   (uvhs_ddr_awaddr),
     .ddr4ip_dut_axi_awburst  (uvhs_ddr_awburst),

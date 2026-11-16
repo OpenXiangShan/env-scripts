@@ -115,6 +115,14 @@ if {$uvhs_hostif eq "XDMA"} {
         core_def/U_GBUS_HOST/U_GBUS_WRITE_GUARD \
         core_def/U_GBUS_CPU_DDR_CDC \
         core_def/U_GBUS_DDR_ARBITER}
+    # The cross-partition re-timing bridge only exists for the mainline split,
+    # where the GBus host sits on b0.f2 and the DDR controller on b0.f0.
+    # NutShell keeps both on b0.f2, so uvhs_gbus_ddr_path.svh leaves the merged
+    # AXI single-clock and no such cell is elaborated.  Naming a cell that is
+    # absent would trip the "missing required NutShell GBus F2 cell" check below.
+    if {[llength [get_cells -quiet {core_def/U_CPU_TOP/u_SimTop}]] == 0} {
+        lappend uvhs_gbus_host_path_names core_def/U_GBUS_DDR_XPART_CDC
+    }
     if {$uvhs_functional_ddr_remote_link eq "1"} {
         lappend uvhs_gbus_host_path_names core_def/u_uvhs_gbus_func_ddr_remote_source
         set uvhs_remote_sink_cells [get_cells -quiet {core_def/u_uvhs_gbus_func_ddr_remote_sink}]
