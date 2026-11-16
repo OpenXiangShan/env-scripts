@@ -1283,11 +1283,26 @@ wire [0:0]    br2cfg_wvalid;
   // primitive cannot be used: UVHS does not resolve the MMCM feedback divider
   // and infers every MMCM output as divide-by-1 (TCK-121).
   //
-  // 50 MHz in (clk6_p, the always-on board clock), 100 MHz out.
+  // Reference clock and divider come from the CPU's board layout:
+  //
+  // XiangShan drives the PLL from 80 MHz clk7_p (ddr_clk_p), the same reference
+  // the mainline XDMA DDR path uses.  It carries no DUT timing paths, so UVHS
+  // never relaxes its period.  clk6_p was the original reference, but a reset
+  // crossing between FPGAs makes UVHS relax clk6_p's signoff period, and the
+  // bitstream MMCM check then recomputes this VCO from the relaxed value and
+  // rejects the bitstream.
+  //
+  // NutShell keeps 50 MHz clk6_p (dev_clk_i) and its matching IP configuration,
+  // because its DDR sits beside the CPU on b0.f2 and never needs clk7_p; adding
+  // a dependency on the DDR reference there would be a needless change.
   wire gbus_host_clk;
 
   gbus_clk_wiz u_gbus_clk_wiz (
+`ifdef CPU_NUTSHELL
       .clk_in1  (dev_clk_i),
+`else
+      .clk_in1  (ddr_clk_p),
+`endif
       .resetn   (rstn_sw4),
       .clk_out1 (gbus_host_clk),
       .locked   ()

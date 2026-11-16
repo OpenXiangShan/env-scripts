@@ -372,7 +372,14 @@ if {$hostif eq "XDMA"} {
         [file join $out_dir rtl device pcie xdma_ep.dcp]]
 } else {
     # The clock wizard is on every GBus build: it is the host fabric clock and
-    # the backend puts an explicit create_clock on its output.
+    # the backend puts an explicit create_clock on its output.  Its PLL reference
+    # differs per CPU (see the instantiation in core_def_xdma.sv): XiangShan
+    # references 80 MHz clk7_p, NutShell its original 50 MHz clk6_p.
+    if {$cpu eq "nutshell"} {
+        set gbus_clk_wiz_in_freq 50.000
+    } else {
+        set gbus_clk_wiz_in_freq 80.000
+    }
     lappend exports [list xci gbus_clk_wiz \
         [file join $gbus_tcl_dir gbus_clk_wiz.tcl] \
         [file join $out_dir rtl soc gbus_clk_wiz.dcp]]
