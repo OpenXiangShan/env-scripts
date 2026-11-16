@@ -1327,8 +1327,16 @@ wire [0:0]    br2cfg_wvalid;
 `endif
 `ifdef DIFFTEST_HOST_GBUS
 `ifdef CPU_NUTSHELL
-  // The exported memory bus multiplexes reference-clock init and CPU traffic,
-  // so the CPU clock stays gated while the host owns the DDR.
+  // Only a partitioned design needs this keep-alive. NutShell exports a single
+  // memory port, clocked by inter_soc_clk, that carries random init, H2C load
+  // and CPU traffic alike, while the host side of the init and H2C engines
+  // enters on difftest_pcie_clock. So while the host owns the DDR its writes
+  // still have to drain through that port and across U_GBUS_CPU_DDR_CDC, and
+  // gating inter_soc_clk here would leave the host waiting for the init/H2C
+  // done bit forever. Keeping it alive costs nothing: DifftestMemCtrl deselects
+  // the CPU port for as long as init or H2C owns the memory, so the core cannot
+  // retire anything during that window. A single-clock build has no crossing
+  // like this and needs no hold.
   wire difftest_host_ddr_hold = ~uvhs_memory_cpu_mode;
 `else
   wire difftest_host_ddr_hold = 1'b0;
