@@ -175,7 +175,20 @@ wire   dbg_clk_buf;
 
 `ifdef UVHS
 assign tmclk_buf = clk8_p;
+`ifdef DIFFTEST_HOST_GBUS
+// clk6_p is both the GBus host PLL reference and the UART clock that
+// CFG_AXI_bridge_i consumes on the DDR/config FPGA.  Routing the pin straight
+// to those loads leaves UVHS with an unbuffered board-clock port: it pins the
+// replicated copy to the clock-hub pad without the differential partner, which
+// fails the bitstream IO-standard check.  Buffer it like the non-UVHS branch
+// does so the clock reaches every FPGA through a real DXCC/BUFG cone.
+BUFG bufg_cqetmclk_gbus (
+    .I              (clk6_p),
+    .O              (cqetmclk_buf)
+);
+`else
 assign cqetmclk_buf = clk6_p;
+`endif
 assign dbg_clk_buf = clk5_p;
 `else
 wire   tmclk;
