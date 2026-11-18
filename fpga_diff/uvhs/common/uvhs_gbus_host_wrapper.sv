@@ -57,7 +57,21 @@ module uvhs_gbus_host_wrapper (
     input  wire [1:0]  difftest_cfg_axilite_rresp,
     input  wire        difftest_cfg_axilite_rvalid,
     output wire        difftest_cfg_axilite_rready
-    // Physical DDR master used by the guarded H2C path and non-bank reads.
+    // Physical DDR master.  It is a second master into guest memory, not a
+    // copy of the CPU's DDR port, and it exists because the host has bulk DDR
+    // work that the DiffTest record stream cannot carry: H2C writes the
+    // workload image into DDR and reads it back to verify it.
+    //
+    // The C2H DiffTest stream does not use it.  Ring reads are routed to the
+    // local FIFO aperture by uvhs_gbus_axi_read_router, which sends only the
+    // addresses outside that aperture here.
+    //
+    // The port reaches the wrapper boundary because it cannot terminate inside
+    // it: uvhs_gbus_ddr_path.svh arbitrates this master against the CPU's own
+    // port, and only the top level sees both.  Hosts that load the workload
+    // another way -- make write_ddr writes DDR through the vendor instance, not
+    // through design AXI -- could drop the whole H2C path, and with it this
+    // port and the arbiter's s1.
     ,output wire [13:0] ddr_awid, ddr_arid
     ,output wire [33:0] ddr_awaddr, ddr_araddr
     ,output wire [7:0] ddr_awlen, ddr_arlen

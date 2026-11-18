@@ -1434,6 +1434,8 @@ wire [0:0]    br2cfg_wvalid;
       .difftest_cfg_axilite_rresp       (difftest_cfg_axilite_rresp),
       .difftest_cfg_axilite_rvalid      (difftest_cfg_axilite_rvalid),
       .difftest_cfg_axilite_rready      (difftest_cfg_axilite_rready),
+      // The host's own DDR master (H2C workload load and readback); the C2H
+      // ring does not use it.  It joins the CPU's port in U_GBUS_DDR_ARBITER.
       .ddr_awid                         (gbus_ddr_awid),
       .ddr_awaddr                       (gbus_ddr_awaddr),
       .ddr_awlen                        (gbus_ddr_awlen),
