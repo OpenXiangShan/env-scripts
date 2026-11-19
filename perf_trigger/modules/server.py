@@ -18,6 +18,7 @@ with GET_FREE_CORE_SCRIPT_PATH.open("r", encoding="utf-8") as f:
 
 MIN_ALLOC_CORES = 8
 LOG_TRUNCATE_LIMIT = 2048
+SSH_STOP_TIMEOUT = 5
 
 # SSH stdin is a lifetime pipe. On EOF the worker stops only its own process
 # group, even if the launcher did not get a chance to run its cleanup.
@@ -34,11 +35,10 @@ with subprocess.Popen(
     while emu.poll() is None:
         if not select.select([0], [], [], 1)[0]:
             continue
-        if emu.poll() is None:
-            try:
-                os.killpg(emu.pid, signal.SIGTERM)
-            except ProcessLookupError:
-                pass
+        try:
+            os.killpg(emu.pid, signal.SIGTERM)
+        except ProcessLookupError:
+            pass
         break
 status = emu.returncode
 sys.exit(status if status >= 0 else 128 - status)
@@ -440,12 +440,25 @@ class Server:
             free_cores.mem_node,
         )
 
-    def stop(self):
-        for task in self.pending_task:
-            if task.proc.stdin is not None:
-                task.proc.stdin.close()
+    @staticmethod
+    def stop_all(servers: list["Server"]) -> None:
+        processes = []
+        for server in servers:
+            for task in server.pending_task:
+                proc = task.proc
+                if proc.stdin is not None:
+                    proc.stdin.close()
+                processes.append(proc)
+            server.pending_task = []
 
-        self.pending_task = []
+        # Drain the old SSH writers before the launcher releases the result lock.
+        deadline = time.monotonic() + SSH_STOP_TIMEOUT
+        for proc in processes:
+            try:
+                proc.wait(timeout=max(0, deadline - time.monotonic()))
+            except subprocess.TimeoutExpired:
+                proc.kill()
+                proc.wait()
 
     def initialize_open(self, source_path: Path, target_path: Path):
         """Open servers does not share the same nfs with node, rsync emu to server target_path"""
