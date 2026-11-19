@@ -19,6 +19,31 @@ with GET_FREE_CORE_SCRIPT_PATH.open("r", encoding="utf-8") as f:
 MIN_ALLOC_CORES = 8
 LOG_TRUNCATE_LIMIT = 2048
 
+# SSH stdin is a lifetime pipe. On EOF the worker stops only its own process
+# group, even if the launcher did not get a chance to run its cleanup.
+SSH_EMU_GUARD = """\
+import os
+import select
+import signal
+import subprocess
+import sys
+
+with subprocess.Popen(
+    sys.argv[1:], stdin=subprocess.DEVNULL, start_new_session=True
+) as emu:
+    while emu.poll() is None:
+        if not select.select([0], [], [], 1)[0]:
+            continue
+        if emu.poll() is None:
+            try:
+                os.killpg(emu.pid, signal.SIGTERM)
+            except ProcessLookupError:
+                pass
+        break
+status = emu.returncode
+sys.exit(status if status >= 0 else 128 - status)
+"""
+
 
 class Server:
     def __init__(
@@ -223,6 +248,9 @@ class Server:
                 still_pending.append(task)
                 continue
 
+            if task.proc.stdin is not None:
+                task.proc.stdin.close()
+
             # process finished, check result and call .wait() to cleanup
             if result != 0:
                 stdout = self.__read_output(
@@ -279,11 +307,19 @@ class Server:
         stderr: int | IO[Any] = subprocess.PIPE,
         block: bool = True,
         check: bool = False,
+        *,
+        stop_on_disconnect: bool = False,
     ):
+        guard_options = []
+        remote_cmd = cmd
+        if stop_on_disconnect:
+            guard_options = ["-T", "-o", "StdinNull=no"]
+            remote_cmd = ["python3", "-c", shlex.quote(SSH_EMU_GUARD), *cmd]
         p = subprocess.Popen(
             [
                 "ssh",
                 self.hostname,
+                *guard_options,
                 "-o",
                 "BatchMode=yes",
                 "-o",
@@ -295,7 +331,8 @@ class Server:
                 "-o",
                 "ServerAliveCountMax=576",  # 2 days
             ]
-            + cmd,
+            + remote_cmd,
+            stdin=subprocess.PIPE if stop_on_disconnect else None,
             stdout=stdout,
             stderr=stderr,
         )
@@ -381,6 +418,7 @@ class Server:
                 stdout=fout,
                 stderr=ferr,
                 block=False,
+                stop_on_disconnect=True,
             )
         self.pending_task.append(
             PendingTask(
@@ -404,18 +442,8 @@ class Server:
 
     def stop(self):
         for task in self.pending_task:
-            task.proc.terminate()
-
-        if self.pending_task:
-            # send kill signal to all remaining emu processes
-            p = self.run(
-                ["pkill", "-e", "-f", shlex.quote(str(self.emu_path))], check=False
-            )
-
-            if p.stdout is not None:
-                logging.info(
-                    "Sent pkill to %s:\n%s", self.hostname, p.stdout.read().decode()
-                )
+            if task.proc.stdin is not None:
+                task.proc.stdin.close()
 
         self.pending_task = []
 
