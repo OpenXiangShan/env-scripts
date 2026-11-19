@@ -4,6 +4,7 @@ from pathlib import Path
 import random
 import re
 import shlex
+import signal
 import subprocess
 import time
 from typing import IO, Any
@@ -28,6 +29,7 @@ import select
 import signal
 import subprocess
 import sys
+import time
 
 with subprocess.Popen(
     sys.argv[1:], stdin=subprocess.DEVNULL, start_new_session=True
@@ -37,6 +39,9 @@ with subprocess.Popen(
             continue
         try:
             os.killpg(emu.pid, signal.SIGTERM)
+            # Keep the leader unreaped so the process group ID cannot be reused.
+            time.sleep(1)
+            os.killpg(emu.pid, signal.SIGKILL)
         except ProcessLookupError:
             pass
         break
@@ -413,24 +418,38 @@ class Server:
             if emu_config.dry_run:
                 cmd_str = " ".join(run_cmd)
                 self.tracker.info("[DRYRUN] CMD: %s", cmd_str)
-            p = self.run(
-                run_cmd,
-                stdout=fout,
-                stderr=ferr,
-                block=False,
-                stop_on_disconnect=True,
-            )
-        self.pending_task.append(
-            PendingTask(
-                proc=p,
-                name=str(gcpt),
-                free=free_cores,
-                command=tuple(run_cmd),
-                stdout_path=gcpt.stdout_path,
-                stderr_path=gcpt.stderr_path,
-                gcpt=gcpt,
-            )
-        )
+
+            # The cancellation handler must see every SSH writer we start.
+            interrupted = False
+
+            def defer_sigint(_signum, _frame):
+                nonlocal interrupted
+                interrupted = True
+
+            previous_handler = signal.signal(signal.SIGINT, defer_sigint)
+            try:
+                p = self.run(
+                    run_cmd,
+                    stdout=fout,
+                    stderr=ferr,
+                    block=False,
+                    stop_on_disconnect=True,
+                )
+                self.pending_task.append(
+                    PendingTask(
+                        proc=p,
+                        name=str(gcpt),
+                        free=free_cores,
+                        command=tuple(run_cmd),
+                        stdout_path=gcpt.stdout_path,
+                        stderr_path=gcpt.stderr_path,
+                        gcpt=gcpt,
+                    )
+                )
+            finally:
+                signal.signal(signal.SIGINT, previous_handler)
+                if interrupted:
+                    signal.raise_signal(signal.SIGINT)
         self.tracker.info("Started %s on %s", gcpt, self.hostname)
         self.tracker.debug(
             "Assigned cores %d-%d (total %d) on mem node %d",
