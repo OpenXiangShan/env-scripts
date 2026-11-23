@@ -211,8 +211,12 @@ if gzip -t "$ddr_stub" 2>/dev/null; then
   mv -f "$ddr_stub.decompressed" "$ddr_stub"
 fi
 last_bit=$((ddr_width - 1))
-grep -Eq "input[[:space:]]+\[$last_bit:0\][[:space:]]*ddr4ip_dut_axi_wdata" "$ddr_stub"
-grep -Eq "output[[:space:]]+\[$last_bit:0\][[:space:]]*ddr4ip_dut_axi_rdata" "$ddr_stub"
+require_stub_port "$ddr_stub" \
+  "input[[:space:]]+\[$last_bit:0\][[:space:]]*ddr4ip_dut_axi_wdata" \
+  "DDR AXI write data width; expected $ddr_width bits"
+require_stub_port "$ddr_stub" \
+  "output[[:space:]]+\[$last_bit:0\][[:space:]]*ddr4ip_dut_axi_rdata" \
+  "DDR AXI read data width; expected $ddr_width bits"
 echo "INFO: verified UVHS DDR DCP AXI data width: $ddr_width"
 python3 "$script_dir/verify_ddr_ip.py" "$ddr_ecc" "$ddr_stub" \
   "$work_dir/rtl/soc/uvw_axi4_to_ddr4.dcp"

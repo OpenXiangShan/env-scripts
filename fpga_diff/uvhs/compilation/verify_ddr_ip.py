@@ -12,11 +12,12 @@ def ecc_mode(stub):
 
 
 def ports(stub):
+    declarations = re.sub(r"/\*.*?\*/", " ", stub, flags=re.DOTALL)
     return {
         name: (direction, re.sub(r"\s+", "", width or ""))
         for direction, width, name in re.findall(
             r"^\s*(input|output|inout)\s*(\[[^\]]+\])?\s*(\w+)\s*;",
-            stub,
+            declarations,
             re.MULTILINE,
         )
     }
