@@ -100,7 +100,7 @@ the runtime database.
    instead generates the 256-bit GeneralBus and GeneralBD checkpoints from the
    local UVHS installation, while XDMA keeps the existing 64-bit GeneralBus used
    by the UVHS flash path.
-3. Imports the selected DDR DCP and checks its AXI width and ECC mode.
+3. Imports the selected DDR DCP and validates its AXI width.
 4. Builds the complete RTL file list and checks the expected top module.
 
 `uvhs_frontend` then:
@@ -166,19 +166,6 @@ the derived TMCLK value before treating Linux timestamps as wall-clock time.
 The DDR reference `clk7_p` and the DDR IP user clock are not runtime PLL
 outputs and remain fixed by the selected DDR DCP.
 
-### DDR ECC
-
-UVHS XiangShan XDMA DiffTest builds (`CPU=kmh` or `CPU=xiangshan`) default to
-`DDR_ECC=1`. Other UVHS configurations default to `0`. Set `DDR_ECC=0` and
-select a non-ECC package to build the legacy mode.
-
-Point `UVHS_UVW_AXI4_TO_DDR4_SRC` at a matching vendor-generated DDR package
-containing the DCP, its packaged UVHS Stub, and the board placement constraints.
-Generate both the MIG and wrapper with `DDR_ECC_EN=1` for ECC. The package must
-bring the extra DQ/DQS lanes from the board's ECC DIMM through to the MIG. Keep
-the vendor-protected registration block when packaging a regenerated Stub.
-The build checks the Stub and checkpoint before starting UVHS synthesis.
-
 ## Runtime
 
 ```sh
@@ -229,20 +216,13 @@ installed XDMA udev rule avoids a separate `sudo chmod`.
 word width and calls `writemem -rtl`. It leaves the CPU halted until
 `uvhs_reset_cpu` is issued.
 
-An ECC runtime database keeps the CPU in reset after download and rejects
-`uvhs_write_ddr`. Use the XDMA H2C-enabled `fpga-host` with `--random-mem`
-and `--ram-size` covering the full configured memory. After AXI initialization
-and H2C loading both complete, issue `uvhs_reset_cpu` to start the workload.
-Use a fresh build suffix when changing ECC modes to keep the bitstreams and
-runtime database paired.
-The ECC mode travels with the staged `hw.dat` runtime database.
-
 `uvhs_write_flash` locates the compiled generalBus endpoint with
 `query -ipinfo -tclobj`, then writes through its 64-bit AXI port and the
 existing 32-bit AXI flash bridge. The generalBus view starts at offset zero;
 the CPU and normal JTAG address map are unchanged. A complete readback match
 is required before the command succeeds. The command holds the CPU while the
-boot image changes and releases it after the verified write in non-ECC mode.
+boot image changes and releases it after the verified write; callers do not
+need a separate `uvhs_halt_soc` command.
 
 The runtime implementation has two control layers:
 

@@ -66,11 +66,6 @@ proc uvhs_release_soc_after_download {} {
         reset -name $reset_name -value 1
     }
     after 1000
-    if {$::uvhs_ddr_ecc eq "1"} {
-        puts "INFO: CPU held in reset for DDR ECC initialization via AXI"
-        query -reset
-        return
-    }
     reset -name rstn_sw5 -value 1
     after 1000
     query -reset
@@ -586,9 +581,6 @@ proc uvhs_execute_command {args} {
         }
         write_ddr {
             if {[llength $args] != 4} { error "write_ddr expects 3 arguments" }
-            if {$::uvhs_ddr_ecc eq "1"} {
-                error "DDR ECC requires AXI initialization and H2C loading"
-            }
             uvhs_hold_cpu_for_memory
             uvhs_write_ddr_pairs {*}[lrange $args 1 3]
         }
@@ -596,9 +588,7 @@ proc uvhs_execute_command {args} {
             if {[llength $args] != 4} { error "write_flash expects 3 arguments" }
             uvhs_hold_cpu_for_memory
             uvhs_write_flash_gbus {*}[lrange $args 1 3]
-            if {$::uvhs_ddr_ecc eq "0"} {
-                uvhs_release_cpu_after_memory
-            }
+            uvhs_release_cpu_after_memory
         }
         ila_arm {
             if {[llength $args] != 4} { error "ila_arm expects 3 arguments" }
@@ -679,16 +669,6 @@ proc uvhs_serve_runtime_commands {} {
     uvhs_clear_runtime_ready
 }
 
-proc uvhs_runtime_ddr_ecc {db_path} {
-    set mode_file [file join $db_path ddr_ecc]
-    if {![file exists $mode_file]} { return 0 }
-    set mode [string trim [uvhs_read_binary $mode_file]]
-    if {$mode ni {0 1}} {
-        error "Invalid DDR ECC mode in $mode_file"
-    }
-    return $mode
-}
-
 proc uvhs_initialize_runtime {} {
     query -user
     query -fpgas -all
@@ -699,7 +679,6 @@ proc uvhs_initialize_runtime {} {
     } else {
         set db_path [file normalize [file join [pwd] .. hw.dat]]
     }
-    set ::uvhs_ddr_ecc [uvhs_runtime_ddr_ecc $db_path]
     puts "INFO: loading runtime database $db_path"
     load_db -db $db_path
 

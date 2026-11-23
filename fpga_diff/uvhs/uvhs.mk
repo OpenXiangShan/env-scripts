@@ -4,8 +4,7 @@ UVHS_RUNTIME_DIR := $(UVHS_ROOT_DIR)/uvhs/runtime
 
 UVHS_TEMPLATE_DIR ?=
 UVHS_UVW_AXI4_TO_DDR4_SRC ?=
-# The ECC DDR package was qualified with the XiangShan XDMA DiffTest flow.
-DDR_ECC ?= $(if $(and $(filter kmh xiangshan,$(CPU)),$(filter XDMA,$(DIFFTEST_HOSTIF)),$(filter-out 1,$(NO_DIFF))),1,0)
+DDR_ECC ?= 1
 # KMH is the XiangShan target; keep the larger CPU profile enabled by default.
 UVHS_PROBE_TCL ?= $(if $(filter kmh xiangshan,$(CPU)),$(UVHS_COMPILATION_DIR)/probe_kmh.tcl,$(UVHS_COMPILATION_DIR)/probe_ila.tcl)
 UVHS_PROBE_PATH := $(if $(strip $(UVHS_PROBE_TCL)),$(abspath $(UVHS_PROBE_TCL)),)
@@ -75,7 +74,6 @@ uvhs_preflight: check_project_name
 			[[ -n "$${!variable:-}" ]] || { echo "ERROR: $$variable is not set" >&2; exit 1; }; \
 		done; \
 		[[ -n "$(CPU)" ]] || { echo "ERROR: CPU is not set" >&2; exit 1; }; \
-		case "$(DDR_ECC)" in 0|1) ;; *) echo "ERROR: DDR_ECC must be 0 or 1" >&2; exit 1 ;; esac; \
 		for command in bash python3 gzip ldconfig; do \
 			command -v "$$command" >/dev/null || { echo "ERROR: command not found: $$command" >&2; exit 1; }; \
 		done; \
@@ -104,7 +102,6 @@ uvhs_preflight: check_project_name
 
 uvhs_prepare: uvhs_preflight
 	test -n "$(UVHS_WORK_DIR)"
-	rm -f "$(UVHS_WORK_DIR)/.ddr_ecc"
 	rm -rf "$(UVHS_WORK_DIR)/script"
 	mkdir -p "$(UVHS_WORK_DIR)"
 	mkdir -p "$(UVHS_COMPAT_BIN)"
@@ -130,8 +127,7 @@ uvhs_frontend: uvhs_project
 		$(UVHS_FLOW_ENV) \
 		bash "$$UV_ROOT/bin/uv_shell" -bypass_vivado_version_check \
 		-s "$(UVHS_COMPILATION_DIR)/frontend_run.tcl" |& tee frontend_run.log; \
-		grep -Fxq UVHS_FRONTEND_SUCCESS frontend_run.log; \
-		echo "$(DDR_ECC)" > .ddr_ecc'
+		grep -Fxq UVHS_FRONTEND_SUCCESS frontend_run.log'
 
 # Keep frontend and backend serialized even when the caller enables parallel make.
 uvhs: uvhs_frontend
@@ -141,12 +137,10 @@ uvhs_bitstream: uvhs
 
 uvhs_backend:
 	bash -c 'set -euo pipefail; cd "$(UVHS_WORK_DIR)"; \
-		test -f .ddr_ecc || { echo "ERROR: run uvhs_frontend before uvhs_backend" >&2; exit 1; }; \
 		$(UVHS_FLOW_ENV) \
 		bash "$$UV_ROOT/bin/uv_shell" -bypass_vivado_version_check \
 		-s "$(UVHS_COMPILATION_DIR)/backend_run.tcl" |& tee backend_run.log; \
-		grep -Fxq UVHS_BACKEND_SUCCESS backend_run.log; \
-		cp .ddr_ecc hw.dat/ddr_ecc'
+		grep -Fxq UVHS_BACKEND_SUCCESS backend_run.log'
 
 # The process that downloads the database must retain its runtime ownership.
 uvhs_write_bitstream:

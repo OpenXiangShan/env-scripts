@@ -15,7 +15,11 @@ jobs=$4
 force=$5
 ddr_source=$6
 ddr_width=$7
-export DDR_ECC=$8
+ddr_ecc=$8
+case "$ddr_ecc" in
+  0|1) ;;
+  *) echo "ERROR: DDR_ECC must be 0 or 1" >&2; exit 64 ;;
+esac
 script_dir=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)
 
 require_file() {
@@ -156,6 +160,28 @@ PY
   echo "INFO: prepared UVHS GeneralBD DCP from vendor IP"
 }
 
+# Export the Vivado IP owned by this repository.
+vivado=$UV_XILINX_VIVADO/bin/vivado
+vivado_args=(
+  --origin_dir "$origin_dir" --out_dir "$work_dir"
+  --core_dir "$core_dir" --jobs "$jobs"
+  --hostif "${DIFFTEST_HOSTIF:-XDMA}"
+)
+[[ $force != 1 ]] || vivado_args+=(--force)
+export VIVADO_HOME=$UV_XILINX_VIVADO XILINX_VIVADO=$UV_XILINX_VIVADO
+"$vivado" -mode batch -source "$script_dir/export_vivado_ip.tcl" \
+  -tclargs "${vivado_args[@]}"
+
+hostif=${DIFFTEST_HOSTIF:-XDMA}
+if [[ $hostif == GBUS ]]; then
+  generate_generalbus 256
+  prepare_generalbd
+else
+  # XDMA still needs the 64-bit vendor generalBus used by the existing UVHS
+  # flash/runtime path. Generate it locally instead of checking in a DCP.
+  generate_generalbus 64
+fi
+
 # Import the externally generated DDR DCP using its canonical work-tree names.
 [[ $ddr_width == 64 || $ddr_width == 256 ]] || {
   echo "ERROR: unsupported UVHS DDR AXI width: $ddr_width" >&2
@@ -188,26 +214,5 @@ last_bit=$((ddr_width - 1))
 grep -Eq "input[[:space:]]+\[$last_bit:0\][[:space:]]*ddr4ip_dut_axi_wdata" "$ddr_stub"
 grep -Eq "output[[:space:]]+\[$last_bit:0\][[:space:]]*ddr4ip_dut_axi_rdata" "$ddr_stub"
 echo "INFO: verified UVHS DDR DCP AXI data width: $ddr_width"
-python3 "$script_dir/verify_ddr_ip.py" "$DDR_ECC" "$ddr_stub" \
+python3 "$script_dir/verify_ddr_ip.py" "$ddr_ecc" "$ddr_stub" \
   "$work_dir/rtl/soc/uvw_axi4_to_ddr4.dcp"
-
-# Export the Vivado IP owned by this repository.
-vivado=$UV_XILINX_VIVADO/bin/vivado
-vivado_args=(
-  --origin_dir "$origin_dir" --out_dir "$work_dir"
-  --core_dir "$core_dir" --jobs "$jobs"
-  --hostif "${DIFFTEST_HOSTIF:-XDMA}"
-)
-[[ $force != 1 ]] || vivado_args+=(--force)
-export VIVADO_HOME=$UV_XILINX_VIVADO XILINX_VIVADO=$UV_XILINX_VIVADO
-"$vivado" -mode batch -source "$script_dir/export_vivado_ip.tcl" \
-  -tclargs "${vivado_args[@]}"
-
-hostif=${DIFFTEST_HOSTIF:-XDMA}
-if [[ $hostif == GBUS ]]; then
-  generate_generalbus 256
-  prepare_generalbd
-else
-  # The XDMA flash/runtime path uses the vendor 64-bit generalBus.
-  generate_generalbus 64
-fi
