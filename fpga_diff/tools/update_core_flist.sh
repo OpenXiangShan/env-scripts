@@ -91,15 +91,6 @@ generate_uvhs_filelist() {
 
   {
     printf '+define+SYNTHESIS\n+define+XIANGSHAN_FPGA\n+define+UVHS\n'
-    local ddr_stub="$work_dir/rtl/soc/uvw_axi4_to_ddr4_Stub.v"
-    if [[ -f $ddr_stub ]]; then
-      if grep -Eq '^[[:space:]]*input[[:space:]]+ddr_obs_resetn[[:space:]]*;' "$ddr_stub"; then
-        printf '+define+UVHS_DDR_OBSERVER_RESET\n'
-      fi
-      if grep -Eq '^[[:space:]]*input[[:space:]]+ddr_ecc_resetn[[:space:]]*;' "$ddr_stub"; then
-        printf '+define+UVHS_DDR_ECC_OBSERVER_RESET\n'
-      fi
-    fi
     host_define=${DIFFTEST_HOST_DEFINE:-}
     if [[ -z $host_define ]]; then
       if [[ $hostif == GBUS ]]; then

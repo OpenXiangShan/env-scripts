@@ -179,11 +179,6 @@ bring the extra DQ/DQS lanes from the board's ECC DIMM through to the MIG. Keep
 the vendor-protected registration block when packaging a regenerated Stub.
 The build checks the Stub and checkpoint before starting UVHS synthesis.
 
-For an instrumented package, use `UVHS_PROBE_TCL` to select the matching probe
-script. In ECC mode the backend assigns any generated DDR probe group back
-to the FPGA hosting the DDR connector (B0/F0). Board-specific Vivado placement
-constraints can be supplied with `UVHS_PRE_PLACE_TCL=/path/to/pre_place.tcl`.
-
 ## Runtime
 
 ```sh
@@ -240,8 +235,7 @@ and `--ram-size` covering the full configured memory. After AXI initialization
 and H2C loading both complete, issue `uvhs_reset_cpu` to start the workload.
 Use a fresh build suffix when changing ECC modes to keep the bitstreams and
 runtime database paired.
-Copy the entire staged runtime directory, including the hidden `.ddr_ecc`
-file. The runtime checks it against the mode stored in `hw.dat` before download.
+The ECC mode travels with the staged `hw.dat` runtime database.
 
 `uvhs_write_flash` locates the compiled generalBus endpoint with
 `query -ipinfo -tclobj`, then writes through its 64-bit AXI port and the

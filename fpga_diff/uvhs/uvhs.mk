@@ -6,8 +6,6 @@ UVHS_TEMPLATE_DIR ?=
 UVHS_UVW_AXI4_TO_DDR4_SRC ?=
 # The ECC DDR package was qualified with the XiangShan XDMA DiffTest flow.
 DDR_ECC ?= $(if $(and $(filter kmh xiangshan,$(CPU)),$(filter XDMA,$(DIFFTEST_HOSTIF)),$(filter-out 1,$(NO_DIFF))),1,0)
-UVHS_PRE_PLACE_TCL ?=
-UVHS_PRE_PLACE_PATH := $(if $(strip $(UVHS_PRE_PLACE_TCL)),$(abspath $(UVHS_PRE_PLACE_TCL)),)
 # KMH is the XiangShan target; keep the larger CPU profile enabled by default.
 UVHS_PROBE_TCL ?= $(if $(filter kmh xiangshan,$(CPU)),$(UVHS_COMPILATION_DIR)/probe_kmh.tcl,$(UVHS_COMPILATION_DIR)/probe_ila.tcl)
 UVHS_PROBE_PATH := $(if $(strip $(UVHS_PROBE_TCL)),$(abspath $(UVHS_PROBE_TCL)),)
@@ -56,7 +54,6 @@ UVHS_FLOW_ENV = \
 	$(UVHS_TOOL_ENV) \
 	UVHS_FLOW=1 \
 	UVHS_PROBE_TCL="$(UVHS_PROBE_PATH)" \
-	UVHS_PRE_PLACE_TCL="$(UVHS_PRE_PLACE_PATH)" \
 	XDMA_LINK_WIDTH="$(XDMA_LINK_WIDTH)" \
 	DIFFTEST_HOSTIF="$(DIFFTEST_HOSTIF)" \
 	DIFFTEST_HOST_DEFINE="$(DIFFTEST_HOST_DEFINE)" \
@@ -79,9 +76,6 @@ uvhs_preflight: check_project_name
 		done; \
 		[[ -n "$(CPU)" ]] || { echo "ERROR: CPU is not set" >&2; exit 1; }; \
 		case "$(DDR_ECC)" in 0|1) ;; *) echo "ERROR: DDR_ECC must be 0 or 1" >&2; exit 1 ;; esac; \
-		if [[ -n "$(UVHS_PRE_PLACE_PATH)" && ! -f "$(UVHS_PRE_PLACE_PATH)" ]]; then \
-			echo "ERROR: UVHS pre-place script not found: $(UVHS_PRE_PLACE_PATH)" >&2; exit 1; \
-		fi; \
 		for command in bash python3 gzip ldconfig; do \
 			command -v "$$command" >/dev/null || { echo "ERROR: command not found: $$command" >&2; exit 1; }; \
 		done; \
@@ -203,10 +197,6 @@ uvhs_stage_bitstream:
 		echo "ERROR: please set a safe FPGA_BIT_ARTIFACT_DIR=..." >&2; exit 2; \
 	}
 	@test -d "$(UVHS_RUNTIME_DB)"
-	@if test -e "$(UVHS_WORK_DIR)/.ddr_ecc" && \
-		! cmp -s "$(UVHS_WORK_DIR)/.ddr_ecc" "$(UVHS_RUNTIME_DB)/ddr_ecc"; then \
-		echo "ERROR: UVHS runtime database is missing the compiled DDR ECC mode or has a different mode" >&2; exit 1; \
-	fi
 	@mkdir -p "$(FPGA_BIT_ARTIFACT_DIR)/runtime"
 	@test ! -e "$(FPGA_BIT_ARTIFACT_DIR)/runtime/$(PRJ_NAME)" || { \
 		echo "ERROR: runtime artifact already exists; clean the bit archive first" >&2; exit 2; \
@@ -214,9 +204,6 @@ uvhs_stage_bitstream:
 	@mkdir -p "$(FPGA_BIT_ARTIFACT_DIR)/runtime/$(PRJ_NAME)"
 	@cp -a --reflink=auto "$(UVHS_RUNTIME_DB)" \
 		"$(FPGA_BIT_ARTIFACT_DIR)/runtime/$(PRJ_NAME)/"
-	@if test -f "$(UVHS_RUNTIME_DB)/ddr_ecc"; then \
-		cp "$(UVHS_RUNTIME_DB)/ddr_ecc" "$(FPGA_BIT_ARTIFACT_DIR)/runtime/$(PRJ_NAME)/.ddr_ecc"; \
-	fi
 	@echo "FPGA_RUNTIME_ARTIFACT=$(FPGA_BIT_ARTIFACT_DIR)/runtime/$(PRJ_NAME)"
 	@echo "FPGA_RUNTIME_DEST=env-scripts/fpga_diff/$(PRJ_NAME)"
 
