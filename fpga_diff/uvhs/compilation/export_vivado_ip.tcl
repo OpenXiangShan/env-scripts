@@ -48,6 +48,11 @@ set export_project [file join $export_project_dir vivado_ip_export.xpr]
 set ::vivado_version [version -short]
 set ::core_dir $core_dir
 
+if {[info exists ::env(DDR_ECC)] && $::env(DDR_ECC) eq "1"} {
+    source [file join [file dirname [info script]] verify_ddr_lanes.tcl]
+    uvhs_verify_ddr_lanes [file join $out_dir rtl soc uvw_axi4_to_ddr4.dcp]
+}
+
 if {$force && [file exists $export_project_dir]} {
     file delete -force $export_project_dir
 }

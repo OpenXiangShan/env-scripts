@@ -189,8 +189,23 @@ check_design
 report_resource -depth 4
 report_system_resource
 list_partition_constraints -all
+set ddr_probe_group ""
+if {[file isfile .ddr_ecc]} {
+    set mode_file [open .ddr_ecc r]
+    set ddr_ecc [string trim [read $mode_file]]
+    close $mode_file
+    if {$ddr_ecc eq "1"} {
+        partition_design -skip_commit -tdc -tdss true \
+            -bs_max_blk_ratio 0.96 -bs_min_blk_ratio 0.005 -effort high
+        uvhs::source_required place_ddr_probe_group.tcl
+    }
+}
 partition_design -tdc -tdss true \
     -bs_max_blk_ratio 0.96 -bs_min_blk_ratio 0.005 -effort high
+if {$ddr_probe_group ne "" &&
+    [llength [get_cells -quiet b0/f0/part_0/core_def/U_UVHS_UVW_AXI4_TO_DDR4]] != 1} {
+    error "UVHS DDR probe group escaped b0.f0 after partitioning: $ddr_probe_group"
+}
 report_resource -depth 4
 
 instrument_design
@@ -213,6 +228,13 @@ set_option compile.strategyNum 1
 set_option compile.strategy0 uv_placer_balance_slrs
 set_option compile.stage.preOpt \
     [uvhs::path vivado_pre_opt.tcl]
+set pre_place [uvhs::env_or_default UVHS_PRE_PLACE_TCL ""]
+if {$pre_place ne ""} {
+    if {![file isfile $pre_place]} {
+        error "UVHS pre-place script not found: $pre_place"
+    }
+    set_option compile.stage.prePlace $pre_place
+}
 
 compile_fpga -parallel_option fpga -genScriptOnly -explore
 set shell_helper [uvhs::path shell_compat.sh]
