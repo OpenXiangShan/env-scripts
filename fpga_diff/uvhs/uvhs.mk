@@ -110,6 +110,7 @@ uvhs_preflight: check_project_name
 
 uvhs_prepare: uvhs_preflight
 	test -n "$(UVHS_WORK_DIR)"
+	rm -f "$(UVHS_WORK_DIR)/.ddr_ecc"
 	rm -rf "$(UVHS_WORK_DIR)/script"
 	mkdir -p "$(UVHS_WORK_DIR)"
 	mkdir -p "$(UVHS_COMPAT_BIN)"
@@ -146,11 +147,12 @@ uvhs_bitstream: uvhs
 
 uvhs_backend:
 	bash -c 'set -euo pipefail; cd "$(UVHS_WORK_DIR)"; \
+		test -f .ddr_ecc || { echo "ERROR: run uvhs_frontend before uvhs_backend" >&2; exit 1; }; \
 		$(UVHS_FLOW_ENV) \
 		bash "$$UV_ROOT/bin/uv_shell" -bypass_vivado_version_check \
 		-s "$(UVHS_COMPILATION_DIR)/backend_run.tcl" |& tee backend_run.log; \
 		grep -Fxq UVHS_BACKEND_SUCCESS backend_run.log; \
-		if [[ -f .ddr_ecc ]]; then cp .ddr_ecc hw.dat/ddr_ecc; fi'
+		cp .ddr_ecc hw.dat/ddr_ecc'
 
 # The process that downloads the database must retain its runtime ownership.
 uvhs_write_bitstream:

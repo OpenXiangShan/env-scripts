@@ -1509,6 +1509,12 @@ assign cpu2ddr_s2m_rid = {4'b0, uvhs_ddr_rid};
 assign init_calib_complete = rstn_sw4 & ~uvhs_ddr_user_rst;
 
 uvw_axi4_to_ddr4 U_UVHS_UVW_AXI4_TO_DDR4 (
+`ifdef UVHS_DDR_OBSERVER_RESET
+    .ddr_obs_resetn           (cpu_rstn_io),
+`endif
+`ifdef UVHS_DDR_ECC_OBSERVER_RESET
+    .ddr_ecc_resetn           (rstn_sw4),
+`endif
     .ddr4ip_dut_axi_aclk       (ref_clk_i),
     .ddr4ip_dut_axi_aresetn    (rstn_sw4),
     .ddr4ip_dut_axi_awaddr     (uvhs_ddr_awaddr),

@@ -194,6 +194,9 @@ if {[file isfile .ddr_ecc]} {
     set mode_file [open .ddr_ecc r]
     set ddr_ecc [string trim [read $mode_file]]
     close $mode_file
+    if {$ddr_ecc ni {0 1}} {
+        error "Invalid DDR ECC mode in .ddr_ecc"
+    }
     if {$ddr_ecc eq "1"} {
         partition_design -skip_commit -tdc -tdss true \
             -bs_max_blk_ratio 0.96 -bs_min_blk_ratio 0.005 -effort high
