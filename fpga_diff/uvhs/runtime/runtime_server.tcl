@@ -679,6 +679,22 @@ proc uvhs_serve_runtime_commands {} {
     uvhs_clear_runtime_ready
 }
 
+proc uvhs_runtime_ddr_ecc {db_path} {
+    set compiled_file [file join $db_path .. .ddr_ecc]
+    set mode_file [file join $db_path ddr_ecc]
+    if {[file exists $compiled_file] &&
+        (![file isfile $mode_file] ||
+        [uvhs_read_binary $compiled_file] ne [uvhs_read_binary $mode_file])} {
+        error "UVHS runtime database is missing the compiled DDR ECC mode or has a different mode: $db_path"
+    }
+    if {![file exists $mode_file]} { return 0 }
+    set mode [string trim [uvhs_read_binary $mode_file]]
+    if {$mode ni {0 1}} {
+        error "Invalid DDR ECC mode in $mode_file"
+    }
+    return $mode
+}
+
 proc uvhs_initialize_runtime {} {
     query -user
     query -fpgas -all
@@ -689,14 +705,7 @@ proc uvhs_initialize_runtime {} {
     } else {
         set db_path [file normalize [file join [pwd] .. hw.dat]]
     }
-    set ::uvhs_ddr_ecc 0
-    set ecc_mode_file [file join $db_path ddr_ecc]
-    if {[file isfile $ecc_mode_file]} {
-        set ::uvhs_ddr_ecc [string trim [uvhs_read_binary $ecc_mode_file]]
-        if {$::uvhs_ddr_ecc ni {0 1}} {
-            error "Invalid DDR ECC mode in $ecc_mode_file"
-        }
-    }
+    set ::uvhs_ddr_ecc [uvhs_runtime_ddr_ecc $db_path]
     puts "INFO: loading runtime database $db_path"
     load_db -db $db_path
 

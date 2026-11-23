@@ -174,7 +174,7 @@ for rel in "${ddr_files[@]}"; do
   done
   [[ -n $source_file ]] || source_file=$(find "$ddr_source" -type f -name "$base" -size +0c -print -quit)
   case "$rel" in
-    rtl/soc/*) require_file "$source_file" ;;
+    rtl/soc/*) require_file "${source_file:-$ddr_source/$rel}" ;;
   esac
   [[ -z $source_file ]] || { mkdir -p "$(dirname "$destination")"; cp -f "$source_file" "$destination"; }
 done

@@ -240,6 +240,8 @@ and `--ram-size` covering the full configured memory. After AXI initialization
 and H2C loading both complete, issue `uvhs_reset_cpu` to start the workload.
 Use a fresh build suffix when changing ECC modes to keep the bitstreams and
 runtime database paired.
+Copy the entire staged runtime directory, including the hidden `.ddr_ecc`
+file. The runtime checks it against the mode stored in `hw.dat` before download.
 
 `uvhs_write_flash` locates the compiled generalBus endpoint with
 `query -ipinfo -tclobj`, then writes through its 64-bit AXI port and the

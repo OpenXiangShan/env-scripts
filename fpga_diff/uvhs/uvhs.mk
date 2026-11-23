@@ -203,6 +203,10 @@ uvhs_stage_bitstream:
 		echo "ERROR: please set a safe FPGA_BIT_ARTIFACT_DIR=..." >&2; exit 2; \
 	}
 	@test -d "$(UVHS_RUNTIME_DB)"
+	@if test -e "$(UVHS_WORK_DIR)/.ddr_ecc" && \
+		! cmp -s "$(UVHS_WORK_DIR)/.ddr_ecc" "$(UVHS_RUNTIME_DB)/ddr_ecc"; then \
+		echo "ERROR: UVHS runtime database is missing the compiled DDR ECC mode or has a different mode" >&2; exit 1; \
+	fi
 	@mkdir -p "$(FPGA_BIT_ARTIFACT_DIR)/runtime"
 	@test ! -e "$(FPGA_BIT_ARTIFACT_DIR)/runtime/$(PRJ_NAME)" || { \
 		echo "ERROR: runtime artifact already exists; clean the bit archive first" >&2; exit 2; \
@@ -210,6 +214,9 @@ uvhs_stage_bitstream:
 	@mkdir -p "$(FPGA_BIT_ARTIFACT_DIR)/runtime/$(PRJ_NAME)"
 	@cp -a --reflink=auto "$(UVHS_RUNTIME_DB)" \
 		"$(FPGA_BIT_ARTIFACT_DIR)/runtime/$(PRJ_NAME)/"
+	@if test -f "$(UVHS_RUNTIME_DB)/ddr_ecc"; then \
+		cp "$(UVHS_RUNTIME_DB)/ddr_ecc" "$(FPGA_BIT_ARTIFACT_DIR)/runtime/$(PRJ_NAME)/.ddr_ecc"; \
+	fi
 	@echo "FPGA_RUNTIME_ARTIFACT=$(FPGA_BIT_ARTIFACT_DIR)/runtime/$(PRJ_NAME)"
 	@echo "FPGA_RUNTIME_DEST=env-scripts/fpga_diff/$(PRJ_NAME)"
 

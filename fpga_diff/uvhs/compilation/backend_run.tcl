@@ -205,9 +205,8 @@ if {[file isfile .ddr_ecc]} {
 }
 partition_design -tdc -tdss true \
     -bs_max_blk_ratio 0.96 -bs_min_blk_ratio 0.005 -effort high
-if {$ddr_probe_group ne "" &&
-    [llength [get_cells -quiet b0/f0/part_0/core_def/U_UVHS_UVW_AXI4_TO_DDR4]] != 1} {
-    error "UVHS DDR probe group escaped b0.f0 after partitioning: $ddr_probe_group"
+if {$ddr_probe_group ne ""} {
+    uvhs::verify_ddr_probe_group $ddr_probe_group
 }
 report_resource -depth 4
 
