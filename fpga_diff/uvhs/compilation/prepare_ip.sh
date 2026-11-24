@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-[[ $# == 7 ]] || {
-  echo "Usage: $0 ORIGIN_DIR WORK_DIR CORE_DIR JOBS FORCE DDR_SOURCE DDR_WIDTH" >&2
+[[ $# == 8 ]] || {
+  echo "Usage: $0 ORIGIN_DIR WORK_DIR CORE_DIR JOBS FORCE DDR_SOURCE DDR_WIDTH DDR_ECC" >&2
   exit 64
 }
 : "${UV_ROOT:?UV_ROOT is not set}"
@@ -15,6 +15,11 @@ jobs=$4
 force=$5
 ddr_source=$6
 ddr_width=$7
+ddr_ecc=$8
+case "$ddr_ecc" in
+  0|1) ;;
+  *) echo "ERROR: DDR_ECC must be 0 or 1" >&2; exit 64 ;;
+esac
 script_dir=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)
 
 require_file() {
@@ -194,6 +199,9 @@ for rel in "${ddr_files[@]}"; do
     [[ ! -f $candidate ]] || { source_file=$candidate; break; }
   done
   [[ -n $source_file ]] || source_file=$(find "$ddr_source" -type f -name "$base" -size +0c -print -quit)
+  case "$rel" in
+    rtl/soc/*) require_file "${source_file:-$ddr_source/$rel}" ;;
+  esac
   [[ -z $source_file ]] || { mkdir -p "$(dirname "$destination")"; cp -f "$source_file" "$destination"; }
 done
 for rel in "${ddr_files[@]:0:3}"; do require_file "$work_dir/$rel"; done
@@ -203,6 +211,12 @@ if gzip -t "$ddr_stub" 2>/dev/null; then
   mv -f "$ddr_stub.decompressed" "$ddr_stub"
 fi
 last_bit=$((ddr_width - 1))
-grep -Eq "input[[:space:]]+\[$last_bit:0\][[:space:]]*ddr4ip_dut_axi_wdata" "$ddr_stub"
-grep -Eq "output[[:space:]]+\[$last_bit:0\][[:space:]]*ddr4ip_dut_axi_rdata" "$ddr_stub"
+require_stub_port "$ddr_stub" \
+  "input[[:space:]]+\[$last_bit:0\][[:space:]]*ddr4ip_dut_axi_wdata" \
+  "DDR AXI write data width; expected $ddr_width bits"
+require_stub_port "$ddr_stub" \
+  "output[[:space:]]+\[$last_bit:0\][[:space:]]*ddr4ip_dut_axi_rdata" \
+  "DDR AXI read data width; expected $ddr_width bits"
 echo "INFO: verified UVHS DDR DCP AXI data width: $ddr_width"
+python3 "$script_dir/verify_ddr_ip.py" "$ddr_ecc" "$ddr_stub" \
+  "$work_dir/rtl/soc/uvw_axi4_to_ddr4.dcp"

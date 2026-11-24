@@ -4,6 +4,7 @@ UVHS_RUNTIME_DIR := $(UVHS_ROOT_DIR)/uvhs/runtime
 
 UVHS_TEMPLATE_DIR ?=
 UVHS_UVW_AXI4_TO_DDR4_SRC ?=
+DDR_ECC ?= 1
 # KMH is the XiangShan target; keep the larger CPU profile enabled by default.
 UVHS_PROBE_TCL ?= $(if $(filter kmh xiangshan,$(CPU)),$(UVHS_COMPILATION_DIR)/probe_kmh.tcl,$(UVHS_COMPILATION_DIR)/probe_ila.tcl)
 UVHS_PROBE_PATH := $(if $(strip $(UVHS_PROBE_TCL)),$(abspath $(UVHS_PROBE_TCL)),)
@@ -114,7 +115,7 @@ uvhs_prepare: uvhs_preflight
 	$(UVHS_FLOW_ENV) bash "$(UVHS_COMPILATION_DIR)/prepare_ip.sh" \
 		"$(UVHS_ROOT_DIR)" "$(UVHS_WORK_DIR)" "$(CORE_DIR)" \
 		"$(UVHS_EXPORT_IP_JOBS)" "$(UVHS_EXPORT_IP_FORCE)" \
-		"$(UVHS_UVW_AXI4_TO_DDR4_SRC)" "$(UVHS_DDR_AXI_WIDTH)"
+		"$(UVHS_UVW_AXI4_TO_DDR4_SRC)" "$(UVHS_DDR_AXI_WIDTH)" "$(DDR_ECC)"
 
 uvhs_project: uvhs_prepare
 	bash "$(UVHS_ROOT_DIR)/tools/update_core_flist.sh" uvhs \
