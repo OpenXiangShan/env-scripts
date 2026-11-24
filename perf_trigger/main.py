@@ -419,8 +419,7 @@ class XiangShan:
 
     def __stop(self):
         logging.info("Stopping all servers...")
-        for server in self.servers:
-            server.stop()
+        Server.stop_all(self.servers)
 
     def run(
         self,

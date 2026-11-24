@@ -4,6 +4,7 @@ from pathlib import Path
 import random
 import re
 import shlex
+import signal
 import subprocess
 import time
 from typing import IO, Any
@@ -18,6 +19,35 @@ with GET_FREE_CORE_SCRIPT_PATH.open("r", encoding="utf-8") as f:
 
 MIN_ALLOC_CORES = 8
 LOG_TRUNCATE_LIMIT = 2048
+SSH_STOP_TIMEOUT = 5
+
+# SSH stdin is a lifetime pipe. On EOF the worker stops only its own process
+# group, even if the launcher did not get a chance to run its cleanup.
+SSH_EMU_GUARD = """\
+import os
+import select
+import signal
+import subprocess
+import sys
+import time
+
+with subprocess.Popen(
+    sys.argv[1:], stdin=subprocess.DEVNULL, start_new_session=True
+) as emu:
+    while emu.poll() is None:
+        if not select.select([0], [], [], 1)[0]:
+            continue
+        try:
+            os.killpg(emu.pid, signal.SIGTERM)
+            # Keep the leader unreaped so the process group ID cannot be reused.
+            time.sleep(1)
+            os.killpg(emu.pid, signal.SIGKILL)
+        except ProcessLookupError:
+            pass
+        break
+status = emu.returncode
+sys.exit(status if status >= 0 else 128 - status)
+"""
 
 
 class Server:
@@ -223,6 +253,9 @@ class Server:
                 still_pending.append(task)
                 continue
 
+            if task.proc.stdin is not None:
+                task.proc.stdin.close()
+
             # process finished, check result and call .wait() to cleanup
             if result != 0:
                 stdout = self.__read_output(
@@ -279,11 +312,19 @@ class Server:
         stderr: int | IO[Any] = subprocess.PIPE,
         block: bool = True,
         check: bool = False,
+        *,
+        stop_on_disconnect: bool = False,
     ):
+        guard_options = []
+        remote_cmd = cmd
+        if stop_on_disconnect:
+            guard_options = ["-T", "-o", "StdinNull=no"]
+            remote_cmd = ["python3", "-c", shlex.quote(SSH_EMU_GUARD), *cmd]
         p = subprocess.Popen(
             [
                 "ssh",
                 self.hostname,
+                *guard_options,
                 "-o",
                 "BatchMode=yes",
                 "-o",
@@ -295,7 +336,8 @@ class Server:
                 "-o",
                 "ServerAliveCountMax=576",  # 2 days
             ]
-            + cmd,
+            + remote_cmd,
+            stdin=subprocess.PIPE if stop_on_disconnect else None,
             stdout=stdout,
             stderr=stderr,
         )
@@ -376,23 +418,38 @@ class Server:
             if emu_config.dry_run:
                 cmd_str = " ".join(run_cmd)
                 self.tracker.info("[DRYRUN] CMD: %s", cmd_str)
-            p = self.run(
-                run_cmd,
-                stdout=fout,
-                stderr=ferr,
-                block=False,
-            )
-        self.pending_task.append(
-            PendingTask(
-                proc=p,
-                name=str(gcpt),
-                free=free_cores,
-                command=tuple(run_cmd),
-                stdout_path=gcpt.stdout_path,
-                stderr_path=gcpt.stderr_path,
-                gcpt=gcpt,
-            )
-        )
+
+            # The cancellation handler must see every SSH writer we start.
+            interrupted = False
+
+            def defer_sigint(_signum, _frame):
+                nonlocal interrupted
+                interrupted = True
+
+            previous_handler = signal.signal(signal.SIGINT, defer_sigint)
+            try:
+                p = self.run(
+                    run_cmd,
+                    stdout=fout,
+                    stderr=ferr,
+                    block=False,
+                    stop_on_disconnect=True,
+                )
+                self.pending_task.append(
+                    PendingTask(
+                        proc=p,
+                        name=str(gcpt),
+                        free=free_cores,
+                        command=tuple(run_cmd),
+                        stdout_path=gcpt.stdout_path,
+                        stderr_path=gcpt.stderr_path,
+                        gcpt=gcpt,
+                    )
+                )
+            finally:
+                signal.signal(signal.SIGINT, previous_handler)
+                if interrupted:
+                    signal.raise_signal(signal.SIGINT)
         self.tracker.info("Started %s on %s", gcpt, self.hostname)
         self.tracker.debug(
             "Assigned cores %d-%d (total %d) on mem node %d",
@@ -402,22 +459,25 @@ class Server:
             free_cores.mem_node,
         )
 
-    def stop(self):
-        for task in self.pending_task:
-            task.proc.terminate()
+    @staticmethod
+    def stop_all(servers: list["Server"]) -> None:
+        processes = []
+        for server in servers:
+            for task in server.pending_task:
+                proc = task.proc
+                if proc.stdin is not None:
+                    proc.stdin.close()
+                processes.append(proc)
+            server.pending_task = []
 
-        if self.pending_task:
-            # send kill signal to all remaining emu processes
-            p = self.run(
-                ["pkill", "-e", "-f", shlex.quote(str(self.emu_path))], check=False
-            )
-
-            if p.stdout is not None:
-                logging.info(
-                    "Sent pkill to %s:\n%s", self.hostname, p.stdout.read().decode()
-                )
-
-        self.pending_task = []
+        # Drain the old SSH writers before the launcher releases the result lock.
+        deadline = time.monotonic() + SSH_STOP_TIMEOUT
+        for proc in processes:
+            try:
+                proc.wait(timeout=max(0, deadline - time.monotonic()))
+            except subprocess.TimeoutExpired:
+                proc.kill()
+                proc.wait()
 
     def initialize_open(self, source_path: Path, target_path: Path):
         """Open servers does not share the same nfs with node, rsync emu to server target_path"""
