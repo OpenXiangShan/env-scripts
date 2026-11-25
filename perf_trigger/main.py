@@ -13,7 +13,7 @@ import time
 
 from modules.gcpt import GCPT
 from modules.lock import Heartbeat, FakeLock
-from modules.server import Server
+from modules.server import Server, get_cluster_from_hostname
 from modules.spec import Spec, get_benchmarks, get_int_benchmarks, get_fp_benchmarks
 from modules.types import EmuConfig, FreeCoreInfo
 from modules.tracker import Tracker
@@ -60,11 +60,33 @@ SERVER_POOL = [
     "open26",
     "open27",
 ]
+CONTROLLER_CLUSTER = get_cluster_from_hostname(os.uname().nodename)
+KNOWN_CONTROLLER_CLUSTER = ["node", "open"]
 
 HEARTBEAT_INTERVAL = 60
 PROFILE_DIR = Path(__file__).parent / "profile" / "data"
 
 RETRY_LIMIT = 3
+
+HOME = {
+    "node": "/nfs/home/cirunner",
+    "open": "/nfs/home/ci-runner",
+}
+
+
+def path_to(cluster: str, path: Path) -> Path:
+    """Convert a path to the corresponding path on a different cluster."""
+    src_home = HOME.get(CONTROLLER_CLUSTER, "")
+    dst_home = HOME.get(cluster, "")
+    path_str = str(path)
+    if (
+        src_home
+        and dst_home
+        and (path_str.startswith(f"{src_home}/") or path_str == src_home)
+    ):
+        return Path(str(path).replace(src_home, dst_home, 1))
+
+    return path
 
 
 class XiangShan:
@@ -217,32 +239,44 @@ class XiangShan:
             for hostname in server_pool
         ]
 
-        open_server = [s for s in self.servers if s.hostname.startswith("open")]
-        if open_server and self.mode == XiangShan.Mode.WORKLOAD_LIST:
-            logging.warning(
-                "Workload-list images are used as-is on remote hosts; "
-                "open servers do not share node NFS. Ensure every listed path "
-                "is visible on the selected servers."
+        target_clusters = {
+            cluster: [s for s in self.servers if s.cluster == cluster]
+            for cluster in set(s.cluster for s in self.servers)
+            if cluster != CONTROLLER_CLUSTER
+        }
+
+        if target_clusters:
+            logging.info(
+                "Using servers on another cluster, initializing binaries and libs..."
             )
-        if open_server:
-            logging.info("Using open servers, initializing binaries and libs...")
-            target_result_path = Path(
-                str(self.result_path).replace(
-                    "/nfs/home/cirunner", "/nfs/home/ci-runner"
+
+            if self.mode == XiangShan.Mode.WORKLOAD_LIST:
+                logging.warning(
+                    "Workload-list images are used as-is on remote hosts; "
+                    "different clusters (open and node) do not share node NFS. "
+                    "Ensure every listed path is visible on the selected servers."
                 )
-            )
-            target_emu_path = target_result_path / emu_path.name
-            target_nemu_so_path = None
 
-            open_server[0].initialize_open(emu_path, target_emu_path)
+            for target_cluster, target_servers in target_clusters.items():
+                if target_cluster not in KNOWN_CONTROLLER_CLUSTER:
+                    logging.warning(
+                        "Using servers on unknown cluster %s, initialization may not work as expected",
+                        target_cluster,
+                    )
 
-            if nemu_so_path is not None:
-                target_nemu_so_path = target_result_path / nemu_so_path.name
-                open_server[0].initialize_open(nemu_so_path, target_nemu_so_path)
+                target_result_path = path_to(target_cluster, self.result_path)
+                target_emu_path = target_result_path / emu_path.name
+                target_nemu_so_path = None
 
-            for server in open_server:
-                server.emu_path = target_emu_path
-                server.nemu_so_path = target_nemu_so_path
+                target_servers[0].initialize(emu_path, target_emu_path)
+
+                if nemu_so_path is not None:
+                    target_nemu_so_path = target_result_path / nemu_so_path.name
+                    target_servers[0].initialize(nemu_so_path, target_nemu_so_path)
+
+                for server in target_servers:
+                    server.emu_path = target_emu_path
+                    server.nemu_so_path = target_nemu_so_path
 
     def __init_tracker(self):
         self.tracker = Tracker(
@@ -825,6 +859,12 @@ def main():
             handler.setLevel(args.log_level.upper())
         if isinstance(handler, logging.FileHandler):
             handler.setLevel(logging.DEBUG)
+
+    if CONTROLLER_CLUSTER not in KNOWN_CONTROLLER_CLUSTER:
+        logging.warning(
+            "Running on unknown cluster %s, server initialization may not work as expected",
+            CONTROLLER_CLUSTER,
+        )
 
     if log_path is None:
         logging.warning(
