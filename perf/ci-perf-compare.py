@@ -24,6 +24,7 @@ for test in new_list:
   new_test = log_new_path + "/" + test
   old_test = log_old_path + "/" + test
 
-  cmd = f"python3 perf.py \'{old_test}\' \'{new_test}\' -o \'{output_path+test_name}.csv\'"
+  # Use sys.executable to ensure the same Python interpreter (venv) is used
+  cmd = f"{sys.executable} perf.py \'{old_test}\' \'{new_test}\' -o \'{output_path+test_name}.csv\'"
   #print(cmd)
   os.system(cmd)
