@@ -20,6 +20,11 @@ MIN_ALLOC_CORES = 8
 LOG_TRUNCATE_LIMIT = 2048
 
 
+def get_cluster_from_hostname(hostname: str) -> str:
+    """Extract the cluster name from the hostname."""
+    return hostname[:4]
+
+
 class Server:
     def __init__(
         self,
@@ -36,6 +41,7 @@ class Server:
             free=False, mem_node=0, start=0, end=0, total=0
         )
         self.tracker = tracker
+        self.cluster = get_cluster_from_hostname(hostname)
 
     def __str__(self) -> str:
         return self.hostname
@@ -338,7 +344,7 @@ class Server:
                     else []
                 )
                 + [
-                    str(self.emu_path),
+                    shlex.quote(str(self.emu_path)),
                     "-W",
                     str(emu_config.warmup) if not emu_config.dry_run else "1000",
                     "-I",
@@ -349,7 +355,7 @@ class Server:
                     str(random.randint(0, 9999)),
                 ]
                 + (
-                    ["--diff", str(self.nemu_so_path)]
+                    ["--diff", shlex.quote(str(self.nemu_so_path))]
                     if self.nemu_so_path
                     else ["--no-diff"]
                 )
@@ -419,10 +425,8 @@ class Server:
 
         self.pending_task = []
 
-    def initialize_open(self, source_path: Path, target_path: Path):
-        """Open servers does not share the same nfs with node, rsync emu to server target_path"""
-        assert self.hostname.startswith("open")
-
+    def initialize(self, source_path: Path, target_path: Path):
+        """Initialize the server on a different cluster by copying the source_path to target_path on the server."""
         source_path = source_path.resolve()
 
         # Skip if already exists
@@ -520,7 +524,8 @@ class Server:
             check=True,
         )
         logging.info(
-            "Copied %s to open server (%s) successfully.",
+            "Copied %s to %s:%s successfully.",
             source_path.name,
+            self.hostname,
             target_path,
         )
